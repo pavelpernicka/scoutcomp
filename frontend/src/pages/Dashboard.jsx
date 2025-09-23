@@ -72,7 +72,7 @@ export default function Dashboard() {
     staleTime: 60_000,
   });
 
-  const handleShowDetails = (userId, userName) => {
+  const handleShowDetails = (userId) => {
     setSelectedUserId(userId);
     setShowDetailsModal(true);
   };
@@ -245,7 +245,7 @@ export default function Dashboard() {
 
                 {/* Activity feed */}
                 <div className="activity-feed" style={{ maxHeight: '300px', overflowY: 'auto' }}>
-                  {teamActivity.activities.slice(0, 8).map((activity, index) => (
+                  {teamActivity.activities.slice(0, 8).map((activity) => (
                     <div key={activity.id} className={`p-3 border-bottom ${activity.is_current_user ? 'bg-primary bg-opacity-10' : ''}`}>
                       <div className="d-flex align-items-start gap-2">
                         <div className="flex-shrink-0">

@@ -133,7 +133,7 @@ export default function LeaderboardPage() {
   };
 
   // Handlers for team breakdown modal
-  const handleShowTeamBreakdown = (teamId, teamName) => {
+  const handleShowTeamBreakdown = (teamId) => {
     setSelectedTeamId(teamId);
     setShowTeamBreakdownModal(true);
   };
@@ -156,7 +156,7 @@ export default function LeaderboardPage() {
 
   const renderEntryList = (entries, maxScore, getSubtitle, isUserList = false, isTeamList = false) => (
     <div className="d-flex flex-column gap-3">
-      {entries.map((entry, index) => {
+      {entries.map((entry) => {
         const percentage = Math.max(0, Math.min(100, (entry.score / maxScore) * 100));
         const subtitle = getSubtitle ? getSubtitle(entry) : null;
 
