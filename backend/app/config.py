@@ -55,6 +55,9 @@ class Settings(BaseModel):
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.yaml"
+# Fallback for Docker environment where config.yaml should be in /app
+if not CONFIG_PATH.exists():
+    CONFIG_PATH = Path("/app/config.yaml")
 
 
 def _read_config_file() -> dict:
@@ -71,6 +74,7 @@ def get_settings() -> Settings:
     database_cfg = raw_cfg.get("database", {})
     mail_cfg = raw_cfg.get("mail", {})
 
+
     secret_key = os.getenv("SCOUTCOMP_SECRET_KEY", app_cfg.get("secret_key", "change-me"))
     database_url = os.getenv("SCOUTCOMP_DB_URL", database_cfg.get("url", "sqlite:///./database.db"))
     developer_mode_env = os.getenv("SCOUTCOMP_DEVELOPER_MODE")
@@ -81,10 +85,15 @@ def get_settings() -> Settings:
         **app_cfg,
         "secret_key": secret_key,
     }
+
+    if not database_cfg.get("engine"):
+        database_cfg["engine"] = "sqlite"
+
     database_cfg = {
         **database_cfg,
         "url": database_url,
     }
+
 
     return Settings(
         app=AppSettings(**app_cfg),
