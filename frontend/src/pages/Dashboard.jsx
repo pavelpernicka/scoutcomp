@@ -218,11 +218,13 @@ export default function Dashboard() {
           </div>
           <div className="card-body p-0 d-flex flex-column justify-content-between">
             {teamActivity.activities.length === 0 ? (
+            <div class="flex-grow-1 d-flex align-items-center justify-content-center p-4">
               <div className="text-center py-4 text-muted">
-                <div className="mb-2">🚀</div>
-                <div>{t("dashboard.makeMagic", "Time to make some magic happen!")}</div>
-                <small>{t("dashboard.completeTasksToSee", "Complete tasks to see your team's amazing progress here")}</small>
+                <div className="display-4 mb-3">🚀</div>
+                <h5 class="text-muted">{t("dashboard.makeMagic", "Time to make some magic happen!")}</h5>
+                <p class="small text-muted mb-0">{t("dashboard.completeTasksToSee", "Complete tasks to see your team's amazing progress here")}</p>
               </div>
+            </div>
             ) : (
               <>
                 {/* Week stats banner */}
@@ -376,7 +378,7 @@ export default function Dashboard() {
               </div>
             ) : completions.length === 0 ? (
               <div className="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-center py-4">
-                <div className="display-4 mb-3">🎪</div>
+                <div className="display-4 mb-3">⭐</div>
                 <h5 className="text-muted">{t("dashboard.readyToShine", "Ready to shine?")}</h5>
                 <p className="small text-muted mb-0">{t("dashboard.startCompleting", "Start completing tasks to see your amazing progress!")}</p>
               </div>

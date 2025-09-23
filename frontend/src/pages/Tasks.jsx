@@ -377,9 +377,8 @@ export default function TasksPage() {
 
                 {/* Progress Stats */}
                 <div className="bg-gradient rounded-3 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                  <h5 className="mb-3 d-flex align-items-center">
-                    <span className="me-2">📊</span>
-                    {t("tasks.questProgress", "Your Quest Progress")}
+                  <h5 className="mb-3 d-flex align-items-center text-black">
+                    {t("tasks.questStatus", "Your Quest Status")}
                   </h5>
                   <div className="text-white opacity-90">
                     {renderProgress(selectedTask)}
