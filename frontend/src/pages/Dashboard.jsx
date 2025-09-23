@@ -218,11 +218,11 @@ export default function Dashboard() {
           </div>
           <div className="card-body p-0 d-flex flex-column justify-content-between">
             {teamActivity.activities.length === 0 ? (
-            <div class="flex-grow-1 d-flex align-items-center justify-content-center p-4">
+            <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4">
               <div className="text-center py-4 text-muted">
                 <div className="display-4 mb-3">🚀</div>
-                <h5 class="text-muted">{t("dashboard.makeMagic", "Time to make some magic happen!")}</h5>
-                <p class="small text-muted mb-0">{t("dashboard.completeTasksToSee", "Complete tasks to see your team's amazing progress here")}</p>
+                <h5 className="text-muted">{t("dashboard.makeMagic", "Time to make some magic happen!")}</h5>
+                <p className="small text-muted mb-0">{t("dashboard.completeTasksToSee", "Complete tasks to see your team's amazing progress here")}</p>
               </div>
             </div>
             ) : (
