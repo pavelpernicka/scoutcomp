@@ -182,7 +182,7 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
     assert summary["icon"] == icon_updated
 
     # Leaderboard per category (members)
-    leaderboard = client.get(f"/leaderboard/stats/{category_id}").json()
+    leaderboard = client.get(f"/leaderboard/stats/{category_id}", headers=_auth_headers(token)).json()
     assert len(leaderboard) == 2
     # member_one score: points 10*1 + completions task_completions (1)*2 = 12
     # member_two score: points 5*1 + completions (3)*2 = 11
@@ -195,6 +195,7 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
     team_leaderboard = client.get(
         f"/leaderboard/stats/{category_id}",
         params={"scope": "teams"},
+        headers=_auth_headers(token),
     ).json()
     assert len(team_leaderboard) == 1
     assert team_leaderboard[0]["member_count"] == 2
@@ -208,7 +209,7 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
     assert delete_response.status_code == 204
 
     # After deletion leaderboard should return 404
-    not_found = client.get(f"/leaderboard/stats/{category_id}")
+    not_found = client.get(f"/leaderboard/stats/{category_id}", headers=_auth_headers(token))
     assert not_found.status_code == 404
 
 

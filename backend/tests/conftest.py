@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -11,32 +12,33 @@ from app.migrations import run_migrations
 from app.dependencies import get_db
 from app.main import app
 
-TEST_DB_PATH = Path("test.db")
-TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
-
-if TEST_DB_PATH.exists():
-    TEST_DB_PATH.unlink()
-
-test_engine = create_engine(
-    TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    future=True,
-)
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine, future=True)
-
-
 @pytest.fixture(scope="function")
 def db_session():
-    Base.metadata.create_all(bind=test_engine)
-    run_migrations(test_engine)
-    session = TestingSessionLocal()
+    # Create a temporary database for each test
+    db_fd, db_path = tempfile.mkstemp(suffix='.db')
+    os.close(db_fd)  # Close the file descriptor, we just need the path
+
+    test_database_url = f"sqlite:///{db_path}"
+    test_engine = create_engine(
+        test_database_url,
+        connect_args={"check_same_thread": False},
+        future=True,
+    )
+    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine, future=True)
+
     try:
-        yield session
+        Base.metadata.create_all(bind=test_engine)
+        run_migrations(test_engine)
+        session = TestingSessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
     finally:
-        session.close()
-        Base.metadata.drop_all(bind=test_engine)
-        if TEST_DB_PATH.exists():
-            TEST_DB_PATH.unlink()
+        # Clean up the test database
+        test_engine.dispose()
+        if os.path.exists(db_path):
+            os.unlink(db_path)
 
 
 @pytest.fixture(scope="function")
