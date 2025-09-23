@@ -84,6 +84,7 @@ export function AuthProvider({ children }) {
     clearAuthTokens();
     setProfile(null);
     setIsLoaded(true);
+    window.location.reload();
   };
 
   const register = async (payload) => {
