@@ -1,0 +1,23 @@
+app:
+  secret_key: "super-secret"
+  default_language: "cs"
+  supported_languages: ["cs", "en"]
+  token:
+    access_expire_minutes: 30
+    refresh_expire_minutes: 10080
+  features:
+    require_email_verification: false
+    allow_self_registration: true
+  developer_mode: true
+
+database:
+  engine: "sqlite"
+  url: "sqlite:///./database.db"
+
+  # sample config for PostgreSQL:
+  # engine: "postgresql"
+  # url: "postgresql://scout:scout123@db:5432/competition"
+
+  # sample config for MySQL:
+  # engine: "mysql"
+  # url: "mysql+pymysql://scout:scout123@db:3306/competition"
