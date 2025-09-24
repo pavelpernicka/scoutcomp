@@ -2,53 +2,6 @@
 
 A modern FastAPI + React web application for running scout competitions. Features include a progress dashboard, seasonal task completion, visual leaderboards, and comprehensive admin management tools.
 
-## Prerequisites
-- Python 3.11+
-- Node.js 20+
-- DB: SQLite (bundled) or PostgreSQL/MariaDB if configured
-
-## Quick Start for development
-
-1. **Backend Setup:**
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload --port 8001
-   ```
-
-2. **Frontend Setup:**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-
-3. **Access the Application:**
-   - Frontend: `http://localhost:5173`
-   - API Documentation (Swagger UI): `http://localhost:8001/docs` or `http://localhost:5173/api/docs`
-   - Alternative API Docs (ReDoc): `http://localhost:8001/redoc` or `http://localhost:5173/api/redoc`
-
-The frontend automatically proxies API requests to `/api` endpoints.
-
-## Configuration
-
-Core options live in `config.yaml` and can be overridden with environment variables:
-
-- `SCOUTCOMP_SECRET_KEY` — JWT signing key (required for production)
-- `SCOUTCOMP_DB_URL` — SQLAlchemy connection URL (defaults to local SQLite)
-- `app.default_language` / `app.supported_languages` — localization defaults
-- `app.features.allow_self_registration` — enable member sign-up via join code
-- `app.developer_mode` or `SCOUTCOMP_DEVELOPER_MODE` — allow bootstrap of admin users when developing or on first run
-
-### Runtime Configuration
-
-Administrators can configure the following settings on Global settings page:
-
-- **Application Name** — Customize the app title -- rebranding
-- **Leaderboard Default View** — Choose wheather to display total or average points of group at leaderboard
-
 ## Features
 
 ### User Management
@@ -86,6 +39,53 @@ Key admin features:
 - **Real-time Updates:** Instant feedback system for user interactions
 - **Role-based Access:** Admin, group admin, and member permission levels
 
+## Prerequisites
+- Python 3.11+
+- Node.js 20+
+- DB: SQLite (bundled) or PostgreSQL/MariaDB if configured
+
+## Quick Start for development
+
+1. **Backend Setup:**
+   ```bash
+   cd backend
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   uvicorn app.main:app --reload --port 8001
+   ```
+
+2. **Frontend Setup:**
+   ```bash
+   cd frontend
+   npm install
+   npm run dev
+   ```
+
+3. **Access the Application:**
+   - Frontend: `http://localhost:5173`
+   - API Documentation (Swagger UI): `http://localhost:8001/docs` or `http://localhost:5173/api/docs`
+   - Alternative API Docs (ReDoc): `http://localhost:8001/redoc` or `http://localhost:5173/api/redoc`
+
+The frontend automatically proxies API requests to `/api` endpoints.
+
+## Configuration
+
+Core options live in `config.yaml` and can be overridden with environment variables:
+
+- global `SCOUTCOMP_SECRET_KEY` — JWT signing key (required for production)
+- global `SCOUTCOMP_DB_URL` — SQLAlchemy connection URL (defaults to local SQLite)
+- `app.default_language` / `app.supported_languages` — localization defaults
+- `app.features.allow_self_registration` — enable member sign-up via join code
+- `app.developer_mode` or `SCOUTCOMP_DEVELOPER_MODE` — allow bootstrap of admin users when developing or on first run
+
+### Runtime Configuration
+
+Administrators can configure the following settings on Global settings page:
+
+- **Application Name** — Customize the app title -- rebranding
+- **Leaderboard Default View** — Choose wheather to display total or average points of group at leaderboard
+
 ## Development & Testing
 
 ### Testing
@@ -109,8 +109,8 @@ When making schema changes:
 
 ## Deployment
 
-### Docker Compose
-The included `docker-compose.yml` runs both services together:
+### Non-production use
+The included `docker-compose.yml` runs both services together, just launch:
 
 ```bash
 # First time setup
@@ -121,16 +121,46 @@ docker-compose up
 ```
 
 ### Production Deployment
-In environment file:
-- Set `SCOUTCOMP_SECRET_KEY` to a secure random value
-- Configure `SCOUTCOMP_DB_URL` for production database
-
-In `config.yaml`:
-- Disable `developer_mode` in production
-
-Example `.env` file:
+- Create `.env` file in projects top-level directory:
 ```bash
 SCOUTCOMP_SECRET_KEY=aaabbbccc
 SCOUTCOMP_DB_URL="sqlite:///./data/database.db"
 SCOUTCOMP_DEVELOPER_MODE=false
+SCOUTCOMP_BACKEND_PORT=8001
+SCOUTCOMP_FRONTEND_PORT=3200
 ```
+- Generate value of `SCOUTCOMP_SECRET_KEY` using f.e. `openssl rand -hex 32`
+- Test current setup using `docker compose -f docker-compose.prod.yml up -d --build`
+- If it gives errors about ports in use, change them in environment
+- If it works, you can set-up autostart by changing `restart` to `allways` in `docker-compose.prod.yml` or f.e. using systemd service
+- Set up reverse proxy using nginx:
+  - Create config /etc/nginx/sites-available/scoutcomp:
+  ```bash
+  server {
+    server_name some.address.tld;
+
+    # Frontend
+    location / {
+      proxy_pass http://127.0.0.1:3200;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Backend
+    location /api/ {
+      proxy_pass http://127.0.0.1:8001/;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 80;
+  }
+
+  ```
+  - Activate this config: `ln -s /etc/nginx/sites-available/scoutcomp /etc/nginx/sites-enabled/`
+  - Reload nginx: `systemctl reload nginx`
+  

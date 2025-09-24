@@ -6,7 +6,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - "127.0.0.1:8001:8000"
+      - "127.0.0.1:${SCOUTCOMP_BACKEND_PORT}:8000"
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -21,7 +21,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.prod
     ports:
-      - "127.0.0.1:3200:80"
+      - "127.0.0.1:${SCOUTCOMP_FRONTEND_PORT_PORT}:80"
     depends_on:
       - backend
     restart: unless-stopped
