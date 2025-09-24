@@ -120,8 +120,17 @@ docker-compose up --build
 docker-compose up
 ```
 
-### Production Considerations
+### Production Deployment
+In environment file:
 - Set `SCOUTCOMP_SECRET_KEY` to a secure random value
 - Configure `SCOUTCOMP_DB_URL` for production database
+
+In `config.yaml`:
 - Disable `developer_mode` in production
 
+Example `.env` file:
+```bash
+SCOUTCOMP_SECRET_KEY=aaabbbccc
+SCOUTCOMP_DB_URL="sqlite:///./data/database.db"
+SCOUTCOMP_DEVELOPER_MODE=false
+```

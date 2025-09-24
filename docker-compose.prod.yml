@@ -1,0 +1,27 @@
+version: '3.3'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    environment:
+      - SCOUTCOMP_SECRET_KEY=${SCOUTCOMP_SECRET_KEY}
+      - SCOUTCOMP_DB_URL=${SCOUTCOMP_DB_URL}
+      - SCOUTCOMP_DEVELOPER_MODE=false
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    ports:
+      - "127.0.0.1:3200:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
