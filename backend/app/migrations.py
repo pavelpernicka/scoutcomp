@@ -258,6 +258,16 @@ def _add_first_login_at_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE users ADD COLUMN first_login_at TIMESTAMP"))
 
 
+def _add_real_name_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "real_name" in columns:
+        logger.debug("Column 'real_name' already present on users table")
+        return
+    logger.info("Adding 'real_name' column to users table")
+    conn.execute(text("ALTER TABLE users ADD COLUMN real_name VARCHAR(150) NOT NULL DEFAULT ''"))
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -308,6 +318,11 @@ MIGRATIONS: List[Migration] = [
         "20251005_add_first_login_at",
         _add_first_login_at_column,
         "Add first_login_at column to users table for password change tracking",
+    ),
+    Migration(
+        "20251005_add_real_name",
+        _add_real_name_column,
+        "Add real_name column to users table",
     ),
 ]
 

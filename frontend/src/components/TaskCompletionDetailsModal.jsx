@@ -116,6 +116,7 @@ TaskCompletionDetailsModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   userTaskDetails: PropTypes.shape({
     username: PropTypes.string,
+    real_name: PropTypes.string,
     task_completions: PropTypes.arrayOf(
       PropTypes.shape({
         task_id: PropTypes.number,

@@ -48,7 +48,7 @@ const generateUsername = (realName) => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // Remove accents
     .replace(/([^\w]+|\s+)/g, '_')   // Replace space and other characters by hyphen
-    .replace(/\-\-+/g, '_')          // Replaces multiple hyphens by one hyphen
+    .replace(/--+/g, '_')            // Replaces multiple hyphens by one hyphen
     .replace(/(^-+|-+$)/g, '')       // Remove extra hyphens from beginning or end
     .substring(0, 50); // Limit length
 };
@@ -1682,7 +1682,7 @@ export default function AdminUsers() {
                         </tr>
                       </thead>
                       <tbody>
-                        {bulkRegistrationResults.created_users.map((user, index) => (
+                        {bulkRegistrationResults.created_users.map((user) => (
                           <tr key={user.id}>
                             <td className="fw-semibold">{user.real_name}</td>
                             <td className="font-monospace">{user.username}</td>
