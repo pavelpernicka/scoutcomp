@@ -205,6 +205,7 @@ class TaskPublic(TaskBase):
     created_at: datetime
     updated_at: datetime
     progress: Optional["TaskProgress"] = None
+    variants: List["TaskVariantPublic"] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -216,10 +217,12 @@ class CompletionSubmission(BaseModel):
 
 class CompletionCreate(CompletionSubmission):
     task_id: int
+    variant_id: Optional[int] = None
 
 
 class CompletionAdminCreate(CompletionSubmission):
     task_id: int
+    variant_id: Optional[int] = None
     status: Optional[CompletionStatus] = CompletionStatus.APPROVED
     admin_note: Optional[str] = Field(default=None, max_length=500)
 
@@ -250,6 +253,7 @@ class CompletionPublic(BaseModel):
     id: int
     task_id: int
     member_id: int
+    variant_id: Optional[int] = None
     status: CompletionStatus
     submitted_at: datetime
     reviewed_at: Optional[datetime]
@@ -260,6 +264,7 @@ class CompletionPublic(BaseModel):
     count: int
     task: Optional[TaskPublic] = None
     member: Optional[MemberInfo] = None
+    variant: Optional["TaskVariantPublic"] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -277,6 +282,33 @@ class TaskProgress(BaseModel):
     period_start: Optional[datetime]
     period_end: Optional[datetime]
     lifetime: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TaskVariantBase(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    description: Optional[str] = None
+    points: float = Field(gt=0)
+    position: int = Field(ge=0, default=0)
+
+
+class TaskVariantCreate(TaskVariantBase):
+    pass
+
+
+class TaskVariantUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    points: Optional[float] = Field(default=None, gt=0)
+    position: Optional[int] = Field(default=None, ge=0)
+
+
+class TaskVariantPublic(TaskVariantBase):
+    id: int
+    task_id: int
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

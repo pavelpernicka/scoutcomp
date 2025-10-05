@@ -85,6 +85,8 @@ export default function AdminTasks() {
   const [createForm, setCreateForm] = useState(emptyTaskForm);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editForm, setEditForm] = useState(emptyTaskForm);
+  const [variantManagementTaskId, setVariantManagementTaskId] = useState(null);
+  const [variantForm, setVariantForm] = useState({ name: "", description: "", points: "", position: "" });
 
   const handleOpenEditModal = (task) => {
     setEditingTaskId(task.id);
@@ -94,6 +96,33 @@ export default function AdminTasks() {
   const handleCloseEditModal = () => {
     setEditingTaskId(null);
     setEditForm(emptyTaskForm);
+  };
+
+  const handleOpenVariantModal = (task) => {
+    setVariantManagementTaskId(task.id);
+  };
+
+  const handleCloseVariantModal = () => {
+    setVariantManagementTaskId(null);
+    setVariantForm({ name: "", description: "", points: "", position: "" });
+  };
+
+  const handleCreateVariant = (e) => {
+    e.preventDefault();
+    if (!variantManagementTaskId) return;
+    const payload = {
+      name: variantForm.name,
+      description: variantForm.description || null,
+      points: parseFloat(variantForm.points),
+      position: variantForm.position ? parseInt(variantForm.position) : undefined,
+    };
+    createVariantMutation.mutate({ taskId: variantManagementTaskId, payload });
+  };
+
+  const handleDeleteVariant = (variantId) => {
+    if (!variantManagementTaskId) return;
+    if (!window.confirm('Are you sure you want to delete this variant?')) return;
+    deleteVariantMutation.mutate({ taskId: variantManagementTaskId, variantId });
   };
 
   const { data: tasks = [], isLoading, isError, error } = useQuery({
@@ -151,6 +180,22 @@ export default function AdminTasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
       handleCloseEditModal();
+    },
+  });
+
+  const createVariantMutation = useMutation({
+    mutationFn: async ({ taskId, payload }) => api.post(`/tasks/${taskId}/variants`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
+      setVariantForm({ name: "", description: "", points: "", position: "" });
+    },
+  });
+
+
+  const deleteVariantMutation = useMutation({
+    mutationFn: async ({ taskId, variantId }) => api.delete(`/tasks/${taskId}/variants/${variantId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
     },
   });
 
@@ -365,6 +410,7 @@ export default function AdminTasks() {
                     <thead>
                       <tr>
                         <th>Name</th>
+                        <th>Points/Variants</th>
                         <th>Period limit</th>
                         <th>Status</th>
                         <th>Team</th>
@@ -375,14 +421,27 @@ export default function AdminTasks() {
                       {sortedTasks.map((task) => (
                         <tr key={task.id}>
                           <td>
-                          <div className="fw-semibold">{task.name}</div>
-                          <div className="text-muted small">{task.points_per_completion} pts</div>
-                          {task.description && (
-                            <div
-                              className="text-muted small"
-                              dangerouslySetInnerHTML={renderMarkdown(task.description)}
-                            />
-                          )}
+                            <div className="fw-semibold">{task.name}</div>
+                            {task.description && (
+                              <div
+                                className="text-muted small"
+                                dangerouslySetInnerHTML={renderMarkdown(task.description)}
+                              />
+                            )}
+                          </td>
+                          <td>
+                            {task.variants && task.variants.length > 0 ? (
+                              <div>
+                                <div className="fw-semibold small text-primary">
+                                  {task.variants.length} variant{task.variants.length > 1 ? 's' : ''}
+                                </div>
+                                <div className="small text-muted">
+                                  {Math.min(...task.variants.map(v => v.points))}-{Math.max(...task.variants.map(v => v.points))} pts
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-muted small">{task.points_per_completion} pts</div>
+                            )}
                           </td>
                           <td>
                             {task.max_per_period
@@ -407,6 +466,13 @@ export default function AdminTasks() {
                                 onClick={() => handleOpenEditModal(task)}
                               >
                                 Edit
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline-info btn-sm"
+                                onClick={() => handleOpenVariantModal(task)}
+                              >
+                                Variants ({task.variants?.length || 0})
                               </button>
                               {task.is_archived ? (
                                 <button
@@ -638,6 +704,166 @@ export default function AdminTasks() {
                     </div>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show"></div>
+        </>
+      )}
+
+      {/* Variant Management Modal */}
+      {variantManagementTaskId && (
+        <>
+          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+            <div className="modal-dialog modal-lg" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    Manage Variants - {tasks.find(t => t.id === variantManagementTaskId)?.name}
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={handleCloseVariantModal}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  {/* Create New Variant Form */}
+                  <div className="card mb-4">
+                    <div className="card-header">Add New Variant</div>
+                    <div className="card-body">
+                      <form onSubmit={handleCreateVariant} className="row g-3">
+                        <div className="col-md-6">
+                          <label className="form-label">Variant Name</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            value={variantForm.name}
+                            onChange={(e) => setVariantForm(prev => ({ ...prev, name: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label">Points</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            className="form-control"
+                            value={variantForm.points}
+                            onChange={(e) => setVariantForm(prev => ({ ...prev, points: e.target.value }))}
+                            required
+                          />
+                        </div>
+                        <div className="col-md-3">
+                          <label className="form-label">Position (optional)</label>
+                          <input
+                            type="number"
+                            className="form-control"
+                            value={variantForm.position}
+                            onChange={(e) => setVariantForm(prev => ({ ...prev, position: e.target.value }))}
+                          />
+                        </div>
+                        <div className="col-12">
+                          <label className="form-label">Description (optional)</label>
+                          <textarea
+                            className="form-control"
+                            rows={3}
+                            value={variantForm.description}
+                            onChange={(e) => setVariantForm(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Supports Markdown"
+                          />
+                        </div>
+                        <div className="col-12">
+                          <button
+                            type="submit"
+                            className="btn btn-primary"
+                            disabled={createVariantMutation.isLoading}
+                          >
+                            Add Variant
+                          </button>
+                          {createVariantMutation.isError && (
+                            <div className="text-danger mt-2 small">
+                              {createVariantMutation.error?.response?.data?.detail || "Failed to create variant"}
+                            </div>
+                          )}
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+
+                  {/* Existing Variants List */}
+                  <div className="card">
+                    <div className="card-header">Existing Variants</div>
+                    <div className="card-body">
+                      {(() => {
+                        const currentTask = tasks.find(t => t.id === variantManagementTaskId);
+                        const variants = currentTask?.variants || [];
+
+                        if (variants.length === 0) {
+                          return <p className="text-muted">No variants created yet.</p>;
+                        }
+
+                        return (
+                          <div className="table-responsive">
+                            <table className="table table-sm">
+                              <thead>
+                                <tr>
+                                  <th>Position</th>
+                                  <th>Name</th>
+                                  <th>Points</th>
+                                  <th>Description</th>
+                                  <th>Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {variants
+                                  .sort((a, b) => a.position - b.position)
+                                  .map((variant) => (
+                                    <tr key={variant.id}>
+                                      <td>{variant.position}</td>
+                                      <td className="fw-medium">{variant.name}</td>
+                                      <td>{variant.points}</td>
+                                      <td className="text-muted small">
+                                        {variant.description ? (
+                                          <div
+                                            dangerouslySetInnerHTML={{
+                                              __html: DOMPurify.sanitize(marked.parse(variant.description))
+                                            }}
+                                          />
+                                        ) : (
+                                          <em>No description</em>
+                                        )}
+                                      </td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="btn btn-outline-danger btn-sm"
+                                          onClick={() => handleDeleteVariant(variant.id)}
+                                          disabled={deleteVariantMutation.isLoading}
+                                        >
+                                          Delete
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))
+                                }
+                              </tbody>
+                            </table>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleCloseVariantModal}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

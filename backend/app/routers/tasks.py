@@ -12,6 +12,7 @@ from ..models import (
     RoleEnum,
     Task,
     TaskPeriodUnit,
+    TaskVariant,
     Team,
     User,
 )
@@ -22,6 +23,9 @@ from ..schemas import (
     TaskProgress,
     TaskPublic,
     TaskUpdate,
+    TaskVariantCreate,
+    TaskVariantPublic,
+    TaskVariantUpdate,
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -172,7 +176,7 @@ def list_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> List[Task]:
-    query = db.query(Task)
+    query = db.query(Task).options(joinedload(Task.variants))
     if status:
         query = _apply_status_filter(query, status)
     if not include_archived:
@@ -222,7 +226,7 @@ def get_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> Task:
-    task = db.get(Task, task_id)
+    task = db.query(Task).options(joinedload(Task.variants)).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     _assert_task_access(task, current_user)
@@ -278,6 +282,7 @@ def submit_completion(
     payload: CompletionSubmission,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
+    variant_id: Optional[int] = Query(default=None, description="Optional task variant ID")
 ) -> Completion:
     task = db.get(Task, task_id)
     if not task:
@@ -292,12 +297,29 @@ def submit_completion(
 
     status_target = CompletionStatus.PENDING if task.requires_approval else CompletionStatus.APPROVED
     now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Handle variant selection
+    variant = None
+    if variant_id:
+        variant = db.query(TaskVariant).filter(
+            TaskVariant.id == variant_id,
+            TaskVariant.task_id == task_id
+        ).first()
+        if not variant:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Task variant not found"
+            )
+
+    # Calculate points based on variant or task default
+    points_per_completion = variant.points if variant else task.points_per_completion
+
     completion = Completion(
         task_id=task.id,
         member_id=current_user.id,
+        variant_id=variant_id,
         status=status_target,
         member_note=payload.member_note,
-        points_awarded=(task.points_per_completion * count)
+        points_awarded=(points_per_completion * count)
         if status_target == CompletionStatus.APPROVED
         else 0,
         count=count,
@@ -359,3 +381,159 @@ def list_task_submissions(
     if current_user.role != RoleEnum.ADMIN:
         query = query.filter(Completion.member_id == current_user.id)
     return query.order_by(Completion.submitted_at.desc()).all()
+
+
+# Task Variant Management Endpoints
+
+@router.post("/{task_id}/variants", response_model=TaskVariantPublic, status_code=status.HTTP_201_CREATED)
+def create_task_variant(
+    task_id: int,
+    payload: TaskVariantCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> TaskVariant:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    # Check if variant name is unique for this task
+    existing = db.query(TaskVariant).filter(
+        TaskVariant.task_id == task_id,
+        TaskVariant.name == payload.name
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Variant with this name already exists for this task"
+        )
+
+    # Check if position is unique for this task
+    if payload.position:
+        existing_pos = db.query(TaskVariant).filter(
+            TaskVariant.task_id == task_id,
+            TaskVariant.position == payload.position
+        ).first()
+        if existing_pos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Variant with this position already exists for this task"
+            )
+
+    # Auto-assign position if not provided
+    if not payload.position:
+        max_pos = db.query(func.max(TaskVariant.position)).filter(
+            TaskVariant.task_id == task_id
+        ).scalar() or 0
+        payload.position = max_pos + 1
+
+    variant = TaskVariant(
+        task_id=task_id,
+        name=payload.name,
+        description=payload.description,
+        points=payload.points,
+        position=payload.position,
+    )
+    db.add(variant)
+    db.commit()
+    db.refresh(variant)
+    return variant
+
+
+@router.get("/{task_id}/variants", response_model=List[TaskVariantPublic])
+def list_task_variants(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> List[TaskVariant]:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    _assert_task_access(task, current_user)
+
+    return db.query(TaskVariant).filter(TaskVariant.task_id == task_id).order_by(TaskVariant.position).all()
+
+
+@router.patch("/{task_id}/variants/{variant_id}", response_model=TaskVariantPublic)
+def update_task_variant(
+    task_id: int,
+    variant_id: int,
+    payload: TaskVariantUpdate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> TaskVariant:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    variant = db.query(TaskVariant).filter(
+        TaskVariant.id == variant_id,
+        TaskVariant.task_id == task_id
+    ).first()
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+    # Check for unique constraints if fields are being changed
+    if payload.name and payload.name != variant.name:
+        existing = db.query(TaskVariant).filter(
+            TaskVariant.task_id == task_id,
+            TaskVariant.name == payload.name,
+            TaskVariant.id != variant_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Variant with this name already exists for this task"
+            )
+
+    if payload.position is not None and payload.position != variant.position:
+        existing_pos = db.query(TaskVariant).filter(
+            TaskVariant.task_id == task_id,
+            TaskVariant.position == payload.position,
+            TaskVariant.id != variant_id
+        ).first()
+        if existing_pos:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Variant with this position already exists for this task"
+            )
+
+    # Update fields
+    if payload.name is not None:
+        variant.name = payload.name
+    if payload.description is not None:
+        variant.description = payload.description
+    if payload.points is not None:
+        variant.points = payload.points
+    if payload.position is not None:
+        variant.position = payload.position
+
+    db.commit()
+    db.refresh(variant)
+    return variant
+
+
+@router.delete("/{task_id}/variants/{variant_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task_variant(
+    task_id: int,
+    variant_id: int,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> None:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+
+    variant = db.query(TaskVariant).filter(
+        TaskVariant.id == variant_id,
+        TaskVariant.task_id == task_id
+    ).first()
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+    # Set variant_id to NULL for any completions referencing this variant
+    db.query(Completion).filter(Completion.variant_id == variant_id).update(
+        {"variant_id": None}
+    )
+
+    db.delete(variant)
+    db.commit()

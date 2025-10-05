@@ -13,6 +13,7 @@ from ..models import (
     StatCategoryComponent,
     StatMetricEnum,
     Task,
+    TaskVariant,
     Team,
     User,
 )
@@ -102,47 +103,68 @@ def get_user_task_completions(
     # This makes the leaderboard feature more open and social
     pass
 
-    # Get task completion counts grouped by task
-    task_completions = (
-        db.query(
-            Completion.task_id,
-            func.count(Completion.id).label("completion_count"),
-            func.sum(Completion.points_awarded).label("total_points"),
+    # Get all individual completions with variant information
+    individual_completions = (
+        db.query(Completion)
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.variant)
         )
-        .join(Task, Task.id == Completion.task_id)
         .filter(
             Completion.member_id == user_id,
             Completion.status == CompletionStatus.APPROVED
         )
-        .group_by(Completion.task_id)
         .all()
     )
 
-    # Get task names
-    task_ids = [tc.task_id for tc in task_completions]
-    if not task_ids:
+    if not individual_completions:
         return {"user_id": user_id, "username": user.username, "real_name": user.real_name, "task_completions": []}
 
-    tasks = (
-        db.query(Task.id, Task.name)
-        .filter(Task.id.in_(task_ids))
-        .all()
-    )
-    task_names = {task.id: task.name for task in tasks}
+    # Group by task and organize variant information
+    task_completions_map = {}
+    for completion in individual_completions:
+        task_id = completion.task_id
+
+        if task_id not in task_completions_map:
+            task_completions_map[task_id] = {
+                "task_id": task_id,
+                "task_name": completion.task.name if completion.task else f"Task #{task_id}",
+                "completion_count": 0,
+                "total_points": 0.0,
+                "variants": {}
+            }
+
+        task_data = task_completions_map[task_id]
+        task_data["completion_count"] += completion.count
+        task_data["total_points"] += completion.points_awarded
+
+        # Track variant information
+        if completion.variant:
+            variant_key = completion.variant_id
+            if variant_key not in task_data["variants"]:
+                task_data["variants"][variant_key] = {
+                    "variant_id": completion.variant.id,
+                    "variant_name": completion.variant.name,
+                    "variant_points": completion.variant.points,
+                    "completion_count": 0,
+                    "total_points": 0.0
+                }
+
+            variant_data = task_data["variants"][variant_key]
+            variant_data["completion_count"] += completion.count
+            variant_data["total_points"] += completion.points_awarded
+
+    # Convert variants dict to list and finalize structure
+    task_completions_list = []
+    for task_data in task_completions_map.values():
+        task_data["variants"] = list(task_data["variants"].values())
+        task_completions_list.append(task_data)
 
     result = {
         "user_id": user_id,
         "username": user.username,
         "real_name": user.real_name,
-        "task_completions": [
-            {
-                "task_id": tc.task_id,
-                "task_name": task_names.get(tc.task_id, f"Task #{tc.task_id}"),
-                "completion_count": tc.completion_count,
-                "total_points": float(tc.total_points or 0)
-            }
-            for tc in task_completions
-        ]
+        "task_completions": task_completions_list
     }
 
     return result

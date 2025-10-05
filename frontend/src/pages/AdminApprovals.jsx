@@ -171,7 +171,7 @@ export default function AdminApprovals() {
               <DecoratedCard
                 key={item.id}
                 title={item.task?.name || `Task #${item.task_id}`}
-                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count", "Count")}: ${item.count} • ${new Date(item.submitted_at).toLocaleString()}`}
+                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count", "Count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${new Date(item.submitted_at).toLocaleString()}`}
                 icon="📝"
                 headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                 shadow={true}
@@ -180,6 +180,22 @@ export default function AdminApprovals() {
               >
                   <div className="row">
                     <div className="col-md-8">
+                      {/* Variant Information */}
+                      {item.variant && (
+                        <div className="mb-3">
+                          <p className="text-muted mb-2">Selected Variant:</p>
+                          <div className="bg-info bg-opacity-10 p-3 rounded border border-info border-opacity-25">
+                            <div className="d-flex align-items-center justify-content-between">
+                              <div>
+                                <strong className="text-info">{item.variant.name}</strong>
+                                <div className="small text-muted">{item.variant.description || 'No description'}</div>
+                              </div>
+                              <span className="badge bg-info">{item.variant.points} pts</span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       <p className="text-muted mb-2">{t("approvals.memberNote", "Member's Note:")}</p>
                       <div className="bg-light p-3 rounded border">
                         {item.member_note || <em className="text-muted">{t("approvals.noNote", "No note provided")}</em>}

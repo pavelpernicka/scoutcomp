@@ -226,6 +226,50 @@ def _fix_empty_real_names(conn: Connection) -> None:
         text("UPDATE users SET real_name = username WHERE real_name = '' OR real_name IS NULL")
     )
     logger.info(f"Updated {result.rowcount} users with empty real_name")
+
+
+def _create_task_variants_table(conn: Connection) -> None:
+    """Create task_variants table for task variant support."""
+    inspector = inspect(conn)
+    if "task_variants" in inspector.get_table_names():
+        logger.debug("Table 'task_variants' already exists")
+        return
+
+    logger.info("Creating 'task_variants' table")
+    conn.execute(
+        text(
+            """
+            CREATE TABLE task_variants (
+                id INTEGER PRIMARY KEY,
+                task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                name VARCHAR(100) NOT NULL,
+                description TEXT,
+                points REAL NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(task_id, name),
+                UNIQUE(task_id, position)
+            )
+            """
+        )
+    )
+
+
+def _add_variant_id_to_completions(conn: Connection) -> None:
+    """Add variant_id column to completions table."""
+    inspector = inspect(conn)
+    if "completions" not in inspector.get_table_names():
+        logger.debug("Table 'completions' missing; variant_id column addition skipped")
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("completions")}
+    if "variant_id" in columns:
+        logger.debug("Column 'variant_id' already present on completions table")
+        return
+
+    logger.info("Adding 'variant_id' column to completions table")
+    conn.execute(text("ALTER TABLE completions ADD COLUMN variant_id INTEGER REFERENCES task_variants(id) ON DELETE SET NULL"))
     columns = inspector.get_columns("stat_categories")
     icon_column = next((column for column in columns if column["name"] == "icon"), None)
     if not icon_column:
@@ -347,6 +391,16 @@ MIGRATIONS: List[Migration] = [
         "20251005_fix_empty_real_names",
         _fix_empty_real_names,
         "Fix users with empty real_name fields",
+    ),
+    Migration(
+        "20251005_create_task_variants",
+        _create_task_variants_table,
+        "Create task_variants table for task variant support",
+    ),
+    Migration(
+        "20251005_add_variant_id_completions",
+        _add_variant_id_to_completions,
+        "Add variant_id column to completions table",
     ),
 ]
 

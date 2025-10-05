@@ -89,11 +89,13 @@ export default function TasksPage() {
   });
 
   const submissionMutation = useMutation({
-    mutationFn: async ({ taskId, count, note }) =>
-      api.post(`/tasks/${taskId}/submissions`, {
+    mutationFn: async ({ taskId, count, note, variantId }) => {
+      const url = `/tasks/${taskId}/submissions${variantId ? `?variant_id=${variantId}` : ''}`;
+      return api.post(url, {
         count,
         member_note: note || undefined,
-      }),
+      });
+    },
     onSuccess: (_, variables) => {
       setFeedback({ type: "success", message: t("tasks.submitSuccess") });
       setCooldowns((prev) => ({
@@ -141,6 +143,16 @@ export default function TasksPage() {
     return [...tasks].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
   }, [tasks]);
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
+  const [selectedVariant, setSelectedVariant] = useState(null);
+
+  // Reset selected variant when task changes
+  useEffect(() => {
+    if (selectedTask && selectedTask.variants?.length > 0) {
+      setSelectedVariant(selectedTask.variants[0]);
+    } else {
+      setSelectedVariant(null);
+    }
+  }, [selectedTask]);
   useEffect(() => {
     setExpandedDescriptions((prev) => {
       const next = { ...prev };
@@ -188,6 +200,7 @@ export default function TasksPage() {
       taskId: selectedTask.id,
       count: submissionCount,
       note: submissionNote,
+      variantId: selectedVariant?.id,
     });
   };
 
@@ -404,30 +417,83 @@ export default function TasksPage() {
           <i className="fas fa-star text-warning"></i>
         </div>
 
-        {/* Quest Description */}
-        <div className="bg-light rounded-3 p-4 mb-4 border border-info border-opacity-25">
-          <h5 className="text-primary mb-3 d-flex align-items-center">
-            <span className="me-2">📋</span>
-            {t("tasks.questDescription", "Quest Description")}
-          </h5>
-          <div
-            className="text-dark"
-            dangerouslySetInnerHTML={renderMarkdown(
-              selectedTask.description || t("tasks.noDescription", "No description")
+        {/* Task Variants or Description */}
+        {selectedTask.variants && selectedTask.variants.length > 0 ? (
+          <div className="mb-4">
+            {/* Common Task Description */}
+            {selectedTask.description && (
+              <div className="bg-light rounded-3 p-4 mb-3 border border-info border-opacity-25">
+                <h5 className="text-primary mb-3 d-flex align-items-center">
+                  <span className="me-2">📋</span>
+                  {t("tasks.questDescription", "Quest Description")}
+                </h5>
+                <div
+                  className="text-dark"
+                  dangerouslySetInnerHTML={renderMarkdown(selectedTask.description)}
+                  style={{ lineHeight: '1.6' }}
+                />
+              </div>
             )}
-            style={{ lineHeight: '1.6' }}
-          />
-        </div>
 
-        {/* Progress Stats */}
-        <div className="bg-gradient rounded-3 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-          <h5 className="mb-3 d-flex align-items-center text-black">
-            {t("tasks.questStatus", "Your Quest Status")}
-          </h5>
-          <div className="text-white opacity-90">
-            {renderProgress(selectedTask)}
+            {/* Variant Tabs */}
+            <div className="nav nav-tabs border-0 mb-0" role="tablist" style={{ borderBottom: '2px solid #e9ecef' }}>
+              {selectedTask.variants.map((variant) => (
+                <button
+                  key={variant.id}
+                  className={`nav-link px-4 py-3 fw-medium border-0 position-relative ${
+                    selectedVariant?.id === variant.id
+                      ? 'active text-primary'
+                      : 'text-muted hover-bg-light'
+                  }`}
+                  style={{
+                    backgroundColor: selectedVariant?.id === variant.id ? '#f8f9fa' : 'transparent',
+                    borderBottom: selectedVariant?.id === variant.id ? '3px solid #0d6efd' : '3px solid transparent',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => setSelectedVariant(variant)}
+                  role="tab"
+                >
+                  <div className="d-flex align-items-center">
+                    <span className="me-2 fw-bold">{variant.name}</span>
+                    <span className="badge bg-primary bg-opacity-90 px-2 py-1">
+                      💰 {variant.points} {t("tasks.pts", "pts")}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Variant Content */}
+            <div className="tab-content bg-light border-0 rounded-bottom-3 p-4">
+              {selectedVariant && (
+                <div className="tab-pane fade show active">
+                  <div
+                    className="text-dark"
+                    dangerouslySetInnerHTML={renderMarkdown(
+                      selectedVariant.description || t("tasks.noVariantDescription", "No additional description for this variant")
+                    )}
+                    style={{ lineHeight: '1.6' }}
+                  />
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          // Show task description when no variants
+          <div className="bg-light rounded-3 p-4 mb-4 border border-info border-opacity-25">
+            <h5 className="text-primary mb-3 d-flex align-items-center">
+              <span className="me-2">📋</span>
+              {t("tasks.questDescription", "Quest Description")}
+            </h5>
+            <div
+              className="text-dark"
+              dangerouslySetInnerHTML={renderMarkdown(
+                selectedTask.description || t("tasks.noDescription", "No description")
+              )}
+              style={{ lineHeight: '1.6' }}
+            />
+          </div>
+        )}
 
         {/* Submission Form */}
         <div className="bg-success bg-opacity-10 rounded-3 p-4 mb-4 border border-success border-opacity-25">
@@ -558,7 +624,14 @@ export default function TasksPage() {
                       <h5 className="card-title fw-bold text-dark mb-2">{task.name}</h5>
                       <div className="d-flex flex-wrap gap-2 mb-3">
                         <span className="badge bg-primary bg-opacity-90 px-3 py-2">
-                          💰 {task.points_per_completion} {t("tasks.pts", "pts")}
+                          💰 {task.variants && task.variants.length > 0
+                            ? (() => {
+                                const minPoints = Math.min(...task.variants.map(v => v.points));
+                                const maxPoints = Math.max(...task.variants.map(v => v.points));
+                                return minPoints === maxPoints ? `${minPoints}` : `${minPoints}-${maxPoints}`;
+                              })()
+                            : task.points_per_completion
+                          } {t("tasks.pts", "pts")}
                         </span>
                         {task.requires_approval && (
                           <span className="badge bg-warning text-dark px-3 py-2">

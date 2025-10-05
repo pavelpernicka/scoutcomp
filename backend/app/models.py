@@ -152,6 +152,27 @@ class Task(Base):
 
     team = relationship("Team", back_populates="tasks")
     completions = relationship("Completion", back_populates="task")
+    variants = relationship("TaskVariant", back_populates="task", order_by="TaskVariant.position")
+
+
+class TaskVariant(Base):
+    __tablename__ = "task_variants"
+    __table_args__ = (
+        UniqueConstraint("task_id", "name", name="uq_task_variant_name"),
+        UniqueConstraint("task_id", "position", name="uq_task_variant_position"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    points = Column(Float, nullable=False)
+    position = Column(Integer, default=0, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    task = relationship("Task", back_populates="variants")
+    completions = relationship("Completion", back_populates="variant")
 
 
 class Completion(Base):
@@ -160,6 +181,7 @@ class Completion(Base):
     id = Column(Integer, primary_key=True, index=True)
     member_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    variant_id = Column(Integer, ForeignKey("task_variants.id", ondelete="SET NULL"), nullable=True)
     status = Column(SAEnum(CompletionStatus), default=CompletionStatus.PENDING, nullable=False)
     submitted_at = Column(DateTime, default=func.now(), nullable=False)
     reviewed_at = Column(DateTime, nullable=True)
@@ -172,6 +194,7 @@ class Completion(Base):
     member = relationship("User", back_populates="completions", foreign_keys=[member_id])
     reviewer = relationship("User", back_populates="admin_reviews", foreign_keys=[reviewer_id])
     task = relationship("Task", back_populates="completions")
+    variant = relationship("TaskVariant", back_populates="completions")
 
 
 class RefreshToken(Base):

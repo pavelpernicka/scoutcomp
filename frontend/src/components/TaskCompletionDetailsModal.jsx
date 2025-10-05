@@ -50,6 +50,10 @@ const TaskCompletionDetailsModal = ({
                               <i className="fas fa-tasks me-2 text-primary"></i>
                               {t("leaderboard.taskColumn", "Task")}
                             </th>
+                            <th className="text-center border-0">
+                              <i className="fas fa-layer-group me-2 text-secondary"></i>
+                              Variants
+                            </th>
                             <th className="text-end border-0">
                               <i className="fas fa-chart-bar me-2 text-info"></i>
                               {t("leaderboard.completionsColumn", "Completions")}
@@ -66,6 +70,27 @@ const TaskCompletionDetailsModal = ({
                             .map((task) => (
                             <tr key={task.task_id}>
                               <td>{task.task_name}</td>
+                              <td className="text-center">
+                                {task.variants && task.variants.length > 0 ? (
+                                  <div className="d-flex flex-wrap gap-1 justify-content-center">
+                                    {task.variants
+                                      .sort((a, b) => b.completion_count - a.completion_count)
+                                      .map((variant) => (
+                                        <span
+                                          key={variant.variant_id}
+                                          className="badge bg-secondary bg-opacity-75 text-dark small"
+                                          title={`${variant.variant_name}: ${variant.completion_count}x completed, ${variant.total_points.toFixed(1)} pts`}
+                                        >
+                                          {variant.variant_name} ({variant.completion_count}×)
+                                        </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted small">
+                                    <i className="fas fa-minus"></i>
+                                  </span>
+                                )}
+                              </td>
                               <td className="text-end">{task.completion_count}</td>
                               <td className="text-end fw-bold">{task.total_points.toFixed(2)}</td>
                             </tr>
@@ -74,6 +99,9 @@ const TaskCompletionDetailsModal = ({
                         <tfoot className="table-light">
                           <tr>
                             <th>Total</th>
+                            <th className="text-center">
+                              <span className="text-muted small">—</span>
+                            </th>
                             <th className="text-end">
                               {userTaskDetails.task_completions.reduce((sum, t) => sum + t.completion_count, 0)}
                             </th>
