@@ -491,7 +491,7 @@ export default function LeaderboardPage() {
         onClose={handleCloseTeamBreakdownModal}
         title={t("leaderboard.teamMembers", "Team Members")}
         subtitle={teamBoard.find(t => t.entity_id === selectedTeamId)?.name}
-        icon={<i className="fas fa-users fs-3 text-info"></i>}
+        icon={<i className="fas fa-users fs-3"></i>}
         size="lg"
         headerGradient="linear-gradient(135deg, #fd7e14 0%, #f093fb 100%)"
         footer={

@@ -107,7 +107,7 @@ export default function Dashboard() {
             <div className="row align-items-center">
               <div className="col-md-8">
                 <div className="d-flex align-items-center mb-2">
-                  <span className="fs-1 me-3">🎯</span>
+                  <span className="fs-1 me-3">👋</span>
                   <div>
                     <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.real_name || profile?.user?.username })}</h3>
                     {profile?.user?.team_name && (
@@ -439,7 +439,7 @@ export default function Dashboard() {
                 </div>
                 {completions.length > 5 && (
                   <div className="p-3 text-center">
-                    <small className="text-muted">{t("dashboard.moreInHistory", "And {{count}} more in your history! 📚", { count: completions.length - 5 })}</small>
+                    <small className="text-muted">{t("dashboard.moreInHistory", "And {{count}} more in your history!", { count: completions.length - 5 })}</small>
                   </div>
 
                 )}
@@ -463,7 +463,7 @@ export default function Dashboard() {
                 <table className="table table-hover mb-0">
                   <thead className="bg-light">
                     <tr>
-                      <th className="py-3">{t("dashboard.rank", "Rank")}</th>
+                      <th className="py-3 text-center">{t("dashboard.rank", "Rank")}</th>
                       <th className="py-3">{t("dashboard.champion", "Name")}</th>
                       <th className="py-3 text-end">{t("dashboard.victories", "Completions")}</th>
                       <th className="py-3 text-end">{t("dashboard.glory", "Points")}</th>
@@ -477,7 +477,7 @@ export default function Dashboard() {
                             {member.rank === 1 && <i className="fas fa-trophy fs-4 text-warning"></i>}
                             {member.rank === 2 && <i className="fas fa-medal fs-4 text-secondary"></i>}
                             {member.rank === 3 && <i className="fas fa-medal fs-4" style={{color: '#cd7f32'}}></i>}
-                            {member.rank > 3 && <span className="text-muted">#{member.rank}</span>}
+                            {member.rank > 3 && <span className="font-weight-bold">#{member.rank}</span>}
                           </div>
                         </td>
                         <td className="py-3">

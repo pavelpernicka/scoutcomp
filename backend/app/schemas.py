@@ -178,6 +178,7 @@ class TaskBase(BaseModel):
     period_unit: Optional[TaskPeriodUnit] = None
     period_count: Optional[int] = Field(default=None, ge=1)
     requires_approval: bool = False
+    hot_deal: bool = False
     team_id: Optional[int] = None
 
 
@@ -196,6 +197,7 @@ class TaskUpdate(BaseModel):
     period_count: Optional[int] = Field(default=None, ge=1)
     requires_approval: Optional[bool] = None
     is_archived: Optional[bool] = None
+    hot_deal: Optional[bool] = None
     team_id: Optional[int] = None
 
 

@@ -20,6 +20,7 @@ const emptyTaskForm = {
   description: "",
   points_per_completion: "",
   requires_approval: false,
+  hot_deal: false,
   max_per_period: "",
   period_unit: "day",
   period_count: "",
@@ -33,6 +34,7 @@ const mapTaskToForm = (task) => ({
   description: task.description || "",
   points_per_completion: String(task.points_per_completion || ""),
   requires_approval: Boolean(task.requires_approval),
+  hot_deal: Boolean(task.hot_deal),
   max_per_period: task.max_per_period ? String(task.max_per_period) : "",
   period_unit: task.period_unit || "day",
   period_count: task.period_count ? String(task.period_count) : "",
@@ -47,6 +49,7 @@ const buildPayload = (form) => {
     description: form.description || null,
     points_per_completion: parseFloat(form.points_per_completion),
     requires_approval: form.requires_approval,
+    hot_deal: form.hot_deal,
     team_id: form.team_id ? Number(form.team_id) : null,
   };
 
@@ -294,7 +297,7 @@ export default function AdminTasks() {
                   </select>
                 </div>
                 <div className="col-12 col-md-6 d-flex align-items-center">
-                  <div className="form-check">
+                  <div className="form-check mb-2">
                     <input
                       className="form-check-input"
                       type="checkbox"
@@ -309,6 +312,23 @@ export default function AdminTasks() {
                     />
                     <label className="form-check-label" htmlFor="createRequiresApproval">
                       Requires approval
+                    </label>
+                  </div>
+                  <div className="form-check">
+                    <input
+                      className="form-check-input"
+                      type="checkbox"
+                      id="createHotDeal"
+                      checked={createForm.hot_deal}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          hot_deal: event.target.checked,
+                        }))
+                      }
+                    />
+                    <label className="form-check-label" htmlFor="createHotDeal">
+                      🔥 Hot Deal
                     </label>
                   </div>
                 </div>
@@ -585,7 +605,7 @@ export default function AdminTasks() {
                         </select>
                       </div>
                       <div className="col-12 col-md-6 d-flex align-items-center">
-                        <div className="form-check">
+                        <div className="form-check mb-2">
                           <input
                             className="form-check-input"
                             type="checkbox"
@@ -600,6 +620,23 @@ export default function AdminTasks() {
                           />
                           <label className="form-check-label" htmlFor="editRequiresApproval">
                             Requires approval
+                          </label>
+                        </div>
+                        <div className="form-check">
+                          <input
+                            className="form-check-input"
+                            type="checkbox"
+                            id="editHotDeal"
+                            checked={editForm.hot_deal}
+                            onChange={(event) =>
+                              setEditForm((prev) => ({
+                                ...prev,
+                                hot_deal: event.target.checked,
+                              }))
+                            }
+                          />
+                          <label className="form-check-label" htmlFor="editHotDeal">
+                            🔥 Hot Deal
                           </label>
                         </div>
                       </div>

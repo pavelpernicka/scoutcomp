@@ -436,11 +436,11 @@ export default function TasksPage() {
             )}
 
             {/* Variant Tabs */}
-            <div className="nav nav-tabs border-0 mb-0" role="tablist" style={{ borderBottom: '2px solid #e9ecef' }}>
+            <div className="nav nav-tabs mb-0" role="tablist" style={{ borderBottom: '2px solid #e9ecef' }}>
               {selectedTask.variants.map((variant) => (
                 <button
                   key={variant.id}
-                  className={`nav-link px-4 py-3 fw-medium border-0 position-relative ${
+                  className={`nav-link px-4 py-3 fw-medium position-relative ${
                     selectedVariant?.id === variant.id
                       ? 'active text-primary'
                       : 'text-muted hover-bg-light'
@@ -464,7 +464,7 @@ export default function TasksPage() {
             </div>
 
             {/* Variant Content */}
-            <div className="tab-content bg-light border-0 rounded-bottom-3 p-4">
+            <div className="tab-content bg-light border border-info rounded-bottom-3 p-4">
               {selectedVariant && (
                 <div className="tab-pane fade show active">
                   <div
@@ -504,7 +504,6 @@ export default function TasksPage() {
 
           <div className="mb-3">
             <label className="form-label fw-medium text-dark d-flex align-items-center">
-              <span className="me-2">🏆</span>
               {t("tasks.countLabel", "How many completions?")}
             </label>
             <input
@@ -522,7 +521,6 @@ export default function TasksPage() {
               </small>
             ) : (
               <small className="text-success d-flex align-items-center mt-2">
-                <span className="me-1">🚀</span>
                 {t("tasks.noLimit", "No limit in this period")}
               </small>
             )}
@@ -530,7 +528,6 @@ export default function TasksPage() {
 
           <div className="mb-3">
             <label className="form-label fw-medium text-dark d-flex align-items-center">
-              <span className="me-2">💬</span>
               {t("tasks.noteLabel", "Note")}
             </label>
             <textarea
@@ -547,7 +544,6 @@ export default function TasksPage() {
         {/* Status Messages */}
         {isLimitReached && (
           <div className="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-            <span className="me-2 fs-4">🏁</span>
             <div>
               <strong>{t("tasks.questComplete", "Quest Complete!")}</strong>
               <div className="small opacity-75">{t("tasks.limitReached", "You have reached the limit for this period.")}</div>
@@ -596,13 +592,22 @@ export default function TasksPage() {
 
           return (
             <div key={task.id} className="col-12 col-md-6 col-xl-4">
-              <div className="card h-100 shadow-sm border position-relative" style={{
+              <div className={`card h-100 shadow-sm position-relative ${task.hot_deal ? 'bg-warning bg-opacity-25' : 'border'}`} style={{
                 transform: 'translateY(0)',
                 transition: 'all 0.3s ease',
-                backgroundColor: '#ffffff',
-                borderColor: isLimitReached ? '#e9ecef' : isCooldownActive ? '#b3d7ff' : '#28a745',
-                borderWidth: '2px'
+                backgroundColor: task.hot_deal ? '#fff3cd' : '#ffffff',
+                borderColor: task.hot_deal ? '#dc3545' : (isLimitReached ? '#e9ecef' : isCooldownActive ? '#b3d7ff' : '#28a745'),
+                borderWidth: task.hot_deal ? '4px' : '2px'
               }}>
+                {/* Hot Deal indicator */}
+                {task.hot_deal && (
+                  <div className="position-absolute" style={{ top: '-35px', left: '-20px', zIndex: 10 }}>
+                    <span style={{ fontSize: '3rem', filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.3))' }}>
+                      🔥
+                    </span>
+                  </div>
+                )}
+
                 {/* Status indicator - only show for cooldown or ready */}
                 <div className="position-absolute top-0 end-0 m-3">
                   {isCooldownActive ? (

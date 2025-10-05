@@ -147,6 +147,7 @@ class Task(Base):
     period_count = Column(Integer, nullable=True)
     requires_approval = Column(Boolean, default=False, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
+    hot_deal = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 

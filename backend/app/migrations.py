@@ -331,6 +331,22 @@ def _add_real_name_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE users ADD COLUMN real_name VARCHAR(150) NOT NULL DEFAULT ''"))
 
 
+def _add_hot_deal_column(conn: Connection) -> None:
+    """Add hot_deal column to tasks table."""
+    inspector = inspect(conn)
+    if "tasks" not in inspector.get_table_names():
+        logger.debug("Table 'tasks' missing; hot_deal column addition skipped")
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("tasks")}
+    if "hot_deal" in columns:
+        logger.debug("Column 'hot_deal' already present on tasks table")
+        return
+
+    logger.info("Adding 'hot_deal' column to tasks table")
+    conn.execute(text("ALTER TABLE tasks ADD COLUMN hot_deal BOOLEAN NOT NULL DEFAULT FALSE"))
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -401,6 +417,11 @@ MIGRATIONS: List[Migration] = [
         "20251005_add_variant_id_completions",
         _add_variant_id_to_completions,
         "Add variant_id column to completions table",
+    ),
+    Migration(
+        "20251005_add_hot_deal_to_tasks",
+        _add_hot_deal_column,
+        "Add hot_deal column to tasks table",
     ),
 ]
 
