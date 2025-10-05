@@ -280,7 +280,7 @@ useEffect(() => {
                         <div className="col-12">
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
-                              <span className="me-2">⚠️</span>
+                              <i className="fas fa-exclamation-triangle text-warning me-2"></i>
                               {loginError}
                             </div>
                           </div>
@@ -409,7 +409,7 @@ useEffect(() => {
                         <div className="col-12">
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
-                              <span className="me-2">⚠️</span>
+                              <i className="fas fa-exclamation-triangle text-warning me-2"></i>
                               {extractErrorMessage(memberRegistration.error, t("register.error", "Registration failed"))}
                             </div>
                           </div>
@@ -453,7 +453,7 @@ useEffect(() => {
                       <div className="col-12">
                         <div className="alert alert-info border-0 shadow-sm">
                           <div className="d-flex align-items-center">
-                            <span className="me-2">ℹ️</span>
+                            <i className="fas fa-info-circle text-info me-2"></i>
                             {t("register.adminHint", "Create the first administrator account for this system")}
                           </div>
                         </div>
@@ -513,7 +513,7 @@ useEffect(() => {
                         <div className="col-12">
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
-                              <span className="me-2">⚠️</span>
+                              <i className="fas fa-exclamation-triangle text-warning me-2"></i>
                               {extractErrorMessage(adminRegistration.error, t("register.error", "Registration failed"))}
                             </div>
                           </div>

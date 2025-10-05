@@ -5,6 +5,12 @@ import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
 import { useConfig } from "../providers/ConfigProvider";
+import TaskCompletionDetailsModal from "../components/TaskCompletionDetailsModal";
+import HeroHeader from "../components/HeroHeader";
+import LoadingSpinner from "../components/LoadingSpinner";
+import Button from "../components/Button";
+import Modal from "../components/Modal";
+import DecoratedCard from "../components/DecoratedCard";
 
 const formatScore = (score) => Number.parseFloat(score ?? 0).toFixed(2);
 
@@ -162,7 +168,7 @@ export default function LeaderboardPage() {
 
         // Determine rank styling and colors
         const isTopThree = entry.rank <= 3;
-        const rankIcon = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : '🏅';
+        const rankIcon = entry.rank === 1 ? <i className="fas fa-trophy text-warning"></i> : entry.rank === 2 ? <i className="fas fa-medal text-secondary"></i> : entry.rank === 3 ? <i className="fas fa-medal" style={{color: '#cd7f32'}}></i> : <i className="fas fa-award text-success"></i>;
         const progressColor = entry.rank === 1 ? '#ffd700' : entry.rank === 2 ? '#c0c0c0' : entry.rank === 3 ? '#cd7f32' : '#28a745';
 
         return (
@@ -173,25 +179,25 @@ export default function LeaderboardPage() {
                 <div>
                   <div className="fw-bold">
                     {isUserList ? (
-                      <button
-                        type="button"
-                        className="btn btn-link p-0 fw-bold text-start text-decoration-none"
+                      <Button
+                        variant="link"
+                        className="p-0 fw-bold text-start text-decoration-none"
                         onClick={() => handleShowUserDetails(entry.entity_id)}
                         title={t("leaderboard.clickForDetails", "Click to see task breakdown")}
                         style={{ color: isTopThree ? '#6f42c1' : '#0d6efd' }}
                       >
                         {entry.name}
-                      </button>
+                      </Button>
                     ) : isTeamList ? (
-                      <button
-                        type="button"
-                        className="btn btn-link p-0 fw-bold text-start text-decoration-none"
+                      <Button
+                        variant="link"
+                        className="p-0 fw-bold text-start text-decoration-none"
                         onClick={() => handleShowTeamBreakdown(entry.entity_id, entry.name)}
                         title={t("leaderboard.clickForTeamDetails", "Click to see team members")}
                         style={{ color: isTopThree ? '#6f42c1' : '#0d6efd' }}
                       >
                         {entry.name}
-                      </button>
+                      </Button>
                     ) : (
                       <span style={{ color: isTopThree ? '#6f42c1' : '#495057' }}>{entry.name}</span>
                     )}
@@ -242,61 +248,48 @@ export default function LeaderboardPage() {
     const iconPreview = renderStatIcon(category.icon, 64);
 
     return (
-      <div className="card shadow-lg border-0 h-100" style={{ borderTop: '4px solid #6f42c1' }}>
-        <div className="card-header bg-light border-0">
-          <div className="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-            <div className="d-flex align-items-center gap-3">
-              <div className="d-flex align-items-center justify-content-center">
-                {iconPreview || <span style={{ fontSize: '4rem' }}>📊</span>}
-              </div>
-              <div className="flex-grow-1">
-                <h6 className="mb-0 fw-bold text-primary">{category.name}</h6>
-                {category.description && (
-                  <small className="text-muted">{category.description}</small>
-                )}
-              </div>
-            </div>
-            {categoryBoard.length > 5 && (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm px-3 py-2"
-                onClick={() =>
-                  openBoardModal({
-                    title: category.name,
-                    description: category.description,
-                    icon: category.icon,
-                    data: categoryBoard,
-                    maxScore,
-                    getSubtitle: null,
-                    isUserList: true,
-                  })
-                }
-              >
-                <span className="me-1">📈</span>
-                {t("leaderboard.showAll", "Show all")}
-              </button>
-            )}
+      <DecoratedCard
+        title={category.name}
+        subtitle={category.description}
+        icon={iconPreview || "📊"}
+        headerGradient="linear-gradient(135deg, #6f42c1 0%, #764ba2 100%)"
+        shadow={true}
+        className="h-100"
+        rightContent={categoryBoard.length > 5 && (
+          <Button
+            variant="primary"
+            size="sm"
+            className="px-3 py-2"
+            onClick={() =>
+              openBoardModal({
+                title: category.name,
+                description: category.description,
+                icon: category.icon,
+                data: categoryBoard,
+                maxScore,
+                getSubtitle: null,
+                isUserList: true,
+              })
+            }
+            icon="fas fa-eye"
+            iconPosition="left"
+          >
+            {t("leaderboard.showAll", "Show all")}
+          </Button>
+        )}
+      >
+        {isLoading ? (
+          <LoadingSpinner size="sm" color="primary" text={t("tasks.loading", "Loading…")} />
+        ) : topEntries.length === 0 ? (
+          <div className="text-center py-4">
+            <div className="display-4 mb-2">📊</div>
+            <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
+            <small className="text-muted">{t("leaderboard.beTheFirst", "Be the first to earn points here!")}</small>
           </div>
-        </div>
-        <div className="card-body p-4">
-          {isLoading ? (
-            <div className="text-center text-muted py-3">
-              <div className="spinner-border spinner-border-sm text-primary" role="status">
-                <span className="visually-hidden">{t("tasks.loading", "Loading…")}</span>
-              </div>
-              <div className="mt-2">{t("tasks.loading", "Loading…")}</div>
-            </div>
-          ) : topEntries.length === 0 ? (
-            <div className="text-center py-4">
-              <div className="display-4 mb-2">📊</div>
-              <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
-              <small className="text-muted">{t("leaderboard.beTheFirst", "Be the first to earn points here!")}</small>
-            </div>
-          ) : (
-            renderEntryList(topEntries, maxScore, null, true)
-          )}
-        </div>
-      </div>
+        ) : (
+          renderEntryList(topEntries, maxScore, null, true)
+        )}
+      </DecoratedCard>
     );
   }
 
@@ -323,156 +316,121 @@ export default function LeaderboardPage() {
 
   return (
     <>
-      {/* Enthusiastic Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center mb-2">
-                    <span className="fs-1 me-3">🏆</span>
-                    <div>
-                      <h1 className="mb-1">{t("leaderboard.heroTitle", "Hall of Champions!")}</h1>
-                      <p className="mb-0 opacity-90 fs-5">
-                        {t("leaderboard.heroSubtitle", "Celebrating our amazing quest heroes and their incredible achievements!")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="position-absolute top-0 end-0 opacity-10" style={{ fontSize: '8rem', lineHeight: 1, marginTop: '-2rem', marginRight: '-2rem' }}>
-                🎖️
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HeroHeader
+        title={t("leaderboard.heroTitle", "Hall of Champions!")}
+        subtitle={t("leaderboard.heroSubtitle", "Celebrating our amazing quest heroes and their incredible achievements!")}
+        icon="🏆"
+        gradient="linear-gradient(350deg, #f093fb 0%, #f5576c 100%)"
+      />
 
       <div className="row g-4">
         {/* Members Leaderboard */}
         <div className="col-12 col-xl-6">
-          <div className="card shadow-lg border-0 h-100" style={{ borderTop: '4px solid #28a745' }}>
-            <div className="card-header bg-light border-0">
-              <div className="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fs-4">🥇</span>
-                  <div>
-                    <h5 className="mb-0 fw-bold text-success">{t("leaderboard.members")}</h5>
-                    <small className="text-muted">{t("leaderboard.topPerformers", "Top Performers")}</small>
-                  </div>
-                  <span className="badge bg-success text-white px-3 py-2">{memberBoard.length}</span>
-                </div>
-                {memberBoard.length > 5 && (
-                  <button
-                    type="button"
-                    className="btn btn-success btn-sm px-3 py-2"
-                    onClick={() =>
-                      openBoardModal({
-                        title: t("leaderboard.members"),
-                        description: t(
-                          "leaderboard.membersDescription",
-                          "Total approved points per member"
-                        ),
-                        data: memberBoard,
-                        maxScore: memberMax,
-                        getSubtitle: null,
-                        isUserList: true,
-                      })
-                    }
-                  >
-                    <span className="me-1">📊</span>
-                    {t("leaderboard.showAll", "Show all")}
-                  </button>
-                )}
+          <DecoratedCard
+            title={t("leaderboard.members")}
+            subtitle={t("leaderboard.topPerformers", "Top Performers")}
+            icon="🏆"
+            headerGradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
+            shadow={true}
+            className="h-100"
+            rightBadge={memberBoard.length}
+            rightContent={memberBoard.length > 5 && (
+              <Button
+                variant="success"
+                size="sm"
+                className="px-3 py-2 ms-2"
+                onClick={() =>
+                  openBoardModal({
+                    title: t("leaderboard.members"),
+                    description: t(
+                      "leaderboard.membersDescription",
+                      "Total approved points per member"
+                    ),
+                    data: memberBoard,
+                    maxScore: memberMax,
+                    getSubtitle: null,
+                    isUserList: true,
+                  })
+                }
+                icon="fas fa-eye"
+                iconPosition="left"
+              >
+                {t("leaderboard.showAll", "Show all")}
+              </Button>
+            )}
+          >
+            {membersLoading ? (
+              <LoadingSpinner size="sm" color="success" text={t("tasks.loading", "Loading…")} />
+            ) : topMembers.length === 0 ? (
+              <div className="text-center py-4">
+                <div className="display-3 mb-3"><i className="fas fa-trophy text-warning"></i></div>
+                <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet", "No champions yet!")}</h6>
+                <small className="text-muted">{t("leaderboard.startQuesting", "Complete tasks to appear on the leaderboard")}</small>
               </div>
-            </div>
-            <div className="card-body p-4">
-              {membersLoading ? (
-                <div className="text-center text-muted py-3">
-                  <div className="spinner-border spinner-border-sm text-success" role="status">
-                    <span className="visually-hidden">{t("tasks.loading", "Loading…")}</span>
-                  </div>
-                  <div className="mt-2">{t("tasks.loading", "Loading…")}</div>
-                </div>
-              ) : topMembers.length === 0 ? (
-                <div className="text-center py-4">
-                  <div className="display-3 mb-3">🥇</div>
-                  <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet", "No champions yet!")}</h6>
-                  <small className="text-muted">{t("leaderboard.startQuesting", "Complete tasks to appear on the leaderboard")}</small>
-                </div>
-              ) : (
-                renderEntryList(topMembers, memberMax, null, true)
-              )}
-            </div>
-          </div>
+            ) : (
+              renderEntryList(topMembers, memberMax, null, true)
+            )}
+          </DecoratedCard>
         </div>
 
         {/* Teams Leaderboard */}
         <div className="col-12 col-xl-6">
-          <div className="card shadow-lg border-0 h-100" style={{ borderTop: '4px solid #fd7e14' }}>
-            <div className="card-header bg-light border-0">
-              <div className="d-flex justify-content-between align-items-center gap-2 flex-wrap">
-                <div className="d-flex align-items-center gap-2">
-                  <span className="fs-4">🏅</span>
-                  <div>
-                    <h5 className="mb-0 fw-bold text-warning">{t("leaderboard.teams")}</h5>
-                    <small className="text-muted">{t("leaderboard.teamRankings", "Team Rankings")}</small>
-                  </div>
-                  <span className="badge text-white px-3 py-2" style={{ backgroundColor: '#fd7e14' }}>{teamBoard.length}</span>
-                </div>
-                <div className="btn-group btn-group-sm" role="group" aria-label="Team leaderboard mode">
-                  <button
-                    type="button"
-                    className={`btn ${teamMode === "total" ? "btn-warning" : "btn-outline-warning"}`}
-                    onClick={() => setTeamMode("total")}
-                  >
-                    <span className="me-1">📈</span>
-                    {t("leaderboard.totalBtn", "Total")}
-                  </button>
-                  <button
-                    type="button"
-                    className={`btn ${teamMode === "average" ? "btn-warning" : "btn-outline-warning"}`}
-                    onClick={() => setTeamMode("average")}
-                  >
-                    <span className="me-1">⚖️</span>
-                    {t("leaderboard.averageBtn", "Average")}
-                  </button>
-                </div>
+          <DecoratedCard
+            title={t("leaderboard.teams", "Teams")}
+            subtitle={t("leaderboard.teamRankings", "Team Rankings")}
+            icon="🏅"
+            headerGradient="linear-gradient(45deg, rgb(233, 30, 99), rgb(255, 127, 39))"
+            shadow={true}
+            className="h-100"
+            rightBadge={teamBoard.length}
+            rightContent={
+              <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label="Team leaderboard mode">
+                <Button
+                  variant={teamMode === "total" ? "warning" : ""}
+                  size="sm"
+                  onClick={() => setTeamMode("total")}
+                  icon="fas fa-calculator"
+                  iconPosition="left"
+                >
+                  {t("leaderboard.totalBtn", "Total")}
+                </Button>
+                <Button
+                  variant={teamMode === "average" ? "warning" : ""}
+                  size="sm"
+                  onClick={() => setTeamMode("average")}
+                  icon="fas fa-chart-bar"
+                  iconPosition="left"
+                >
+                  {t("leaderboard.averageBtn", "Average")}
+                </Button>
               </div>
-            </div>
-            <div className="card-body p-4">
-              {teamsLoading ? (
-                <div className="text-center text-muted py-3">
-                  <div className="spinner-border spinner-border-sm" style={{ color: '#fd7e14' }} role="status">
-                    <span className="visually-hidden">{t("tasks.loading", "Loading…")}</span>
-                  </div>
-                  <div className="mt-2">{t("tasks.loading", "Loading…")}</div>
-                </div>
-              ) : teamBoard.length === 0 ? (
-                <div className="text-center py-4">
-                  <div className="display-3 mb-3">🏅</div>
-                  <h6 className="text-muted mb-1">{t("leaderboard.noTeamsYet", "No team rankings yet!")}</h6>
-                  <small className="text-muted">{t("leaderboard.teamsWillAppear", "Team standings will appear as members complete tasks")}</small>
-                </div>
-              ) : (
-                renderEntryList(teamBoard, teamMax, (entry) => {
-                  const totalPoints = entry.total_points ?? entry.score;
-                  const memberCount = entry.member_count ?? 0;
-                  return teamMode === "average"
-                    ? t("leaderboard.averageLine", {
-                        defaultValue: "Total {{total}} • Members {{count}}",
-                        total: formatScore(totalPoints),
-                        count: memberCount,
-                      })
-                    : t("leaderboard.membersLine", {
-                        defaultValue: "Members {{count}}",
-                        count: memberCount,
-                      });
-                }, false, true)
-              )}
-            </div>
-          </div>
+            }
+          >
+            {teamsLoading ? (
+              <LoadingSpinner size="sm" color="warning" text={t("tasks.loading", "Loading…")} />
+            ) : teamBoard.length === 0 ? (
+              <div className="text-center py-4">
+                <div className="display-3 mb-3">🏅</div>
+                <h6 className="text-muted mb-1">{t("leaderboard.noTeamsYet", "No team rankings yet!")}</h6>
+                <small className="text-muted">{t("leaderboard.teamsWillAppear", "Team standings will appear as members complete tasks")}</small>
+              </div>
+            ) : (
+              renderEntryList(teamBoard, teamMax, (entry) => {
+                const totalPoints = entry.total_points ?? entry.score;
+                const memberCount = entry.member_count ?? 0;
+                return teamMode === "average"
+                  ? t("leaderboard.averageLine", {
+                      defaultValue: "Total {{total}} • Members {{count}}",
+                      total: formatScore(totalPoints),
+                      count: memberCount,
+                    })
+                  : t("leaderboard.membersLine", {
+                      defaultValue: "Members {{count}}",
+                      count: memberCount,
+                    });
+              }, false, true)
+            )}
+          </DecoratedCard>
         </div>
 
         {/* Loading state for stats */}
@@ -519,257 +477,122 @@ export default function LeaderboardPage() {
       </div>
 
       {/* User Task Details Modal */}
-      {showUserDetailsModal && (
-        <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
-            <div className="modal-dialog modal-lg" role="document">
-              <div className="modal-content border-0 shadow-lg">
-                <div className="modal-header text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="fs-3">📊</span>
-                    <div>
-                      <h5 className="modal-title mb-0">{t("leaderboard.taskDetails", "Task Completion Details")}</h5>
-                      <small className="opacity-90">{userTaskDetails?.username}</small>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    aria-label="Close"
-                    onClick={handleCloseUserDetailsModal}
-                  ></button>
-                </div>
-                <div className="modal-body p-4">
-                  {userDetailsLoading ? (
-                    <div className="text-center py-4">
-                      <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {userTaskDetails?.task_completions?.length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-hover border rounded">
-                            <thead className="table-light">
-                              <tr>
-                                <th className="border-0">
-                                  <span className="me-2">🎯</span>
-                                  {t("leaderboard.taskColumn", "Task")}
-                                </th>
-                                <th className="text-end border-0">
-                                  <span className="me-2">📊</span>
-                                  {t("leaderboard.completionsColumn", "Completions")}
-                                </th>
-                                <th className="text-end border-0">
-                                  <span className="me-2">🏆</span>
-                                  {t("leaderboard.pointsColumn", "Points")}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {userTaskDetails.task_completions
-                                .sort((a, b) => b.total_points - a.total_points)
-                                .map((task) => (
-                                <tr key={task.task_id}>
-                                  <td>{task.task_name}</td>
-                                  <td className="text-end">{task.completion_count}</td>
-                                  <td className="text-end fw-bold">{task.total_points.toFixed(2)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="table-light">
-                              <tr>
-                                <th>Total</th>
-                                <th className="text-end">
-                                  {userTaskDetails.task_completions.reduce((sum, t) => sum + t.completion_count, 0)}
-                                </th>
-                                <th className="text-end">
-                                  {userTaskDetails.task_completions.reduce((sum, t) => sum + t.total_points, 0).toFixed(2)}
-                                </th>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-muted text-center py-4">No completed tasks found.</p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleCloseUserDetailsModal}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show"></div>
-        </>
-      )}
+      <TaskCompletionDetailsModal
+        isVisible={showUserDetailsModal}
+        onClose={handleCloseUserDetailsModal}
+        userTaskDetails={userTaskDetails}
+        isLoading={userDetailsLoading}
+        title={t("leaderboard.taskDetails", "Task Completion Details")}
+      />
 
       {/* Team Members Breakdown Modal */}
-      {showTeamBreakdownModal && (
-        <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
-            <div className="modal-dialog modal-lg" role="document">
-              <div className="modal-content border-0 shadow-lg">
-                <div className="modal-header text-white" style={{ background: 'linear-gradient(135deg, #fd7e14 0%, #f093fb 100%)' }}>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className="fs-3">👥</span>
-                    <div>
-                      <h5 className="modal-title mb-0">{t("leaderboard.teamMembers", "Team Members")}</h5>
-                      <small className="opacity-90">{teamBoard.find(t => t.entity_id === selectedTeamId)?.name}</small>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-close btn-close-white"
-                    aria-label="Close"
-                    onClick={handleCloseTeamBreakdownModal}
-                  ></button>
-                </div>
-                <div className="modal-body p-4">
-                  {teamMembersLoading ? (
-                    <div className="text-center py-4">
-                      <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {teamMembersData.length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-hover border rounded">
-                            <thead className="table-light">
-                              <tr>
-                                <th className="border-0">
-                                  <span className="me-2">🏅</span>
-                                  {t("leaderboard.rankColumn", "Rank")}
-                                </th>
-                                <th className="border-0">
-                                  <span className="me-2">👤</span>
-                                  {t("leaderboard.memberColumn", "Member")}
-                                </th>
-                                <th className="text-end border-0">
-                                  <span className="me-2">📊</span>
-                                  {t("leaderboard.completionsColumn", "Completions")}
-                                </th>
-                                <th className="text-end border-0">
-                                  <span className="me-2">💰</span>
-                                  {t("leaderboard.totalPointsColumn", "Total Points")}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {teamMembersData.map((member) => (
-                                <tr key={member.entity_id}>
-                                  <td>
-                                    <span className={`badge ${member.rank === 1 ? "bg-warning text-dark" : member.rank === 2 ? "bg-secondary" : member.rank === 3 ? "bg-dark" : "bg-light text-dark"}`}>
-                                      #{member.rank}
-                                    </span>
-                                  </td>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="btn btn-link p-0 text-start"
-                                      onClick={() => {
-                                        handleCloseTeamBreakdownModal();
-                                        handleShowUserDetails(member.entity_id);
-                                      }}
-                                      title="Click to see task breakdown"
-                                    >
-                                      {member.name}
-                                    </button>
-                                  </td>
-                                  <td className="text-end">{member.member_count || 0}</td>
-                                  <td className="text-end fw-bold">{member.score.toFixed(2)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-muted text-center py-4">No members found in this team.</p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleCloseTeamBreakdownModal}
-                  >
-                    Close
-                  </button>
-                </div>
+      <Modal
+        isVisible={showTeamBreakdownModal}
+        onClose={handleCloseTeamBreakdownModal}
+        title={t("leaderboard.teamMembers", "Team Members")}
+        subtitle={teamBoard.find(t => t.entity_id === selectedTeamId)?.name}
+        icon={<i className="fas fa-users fs-3 text-info"></i>}
+        size="lg"
+        headerGradient="linear-gradient(135deg, #fd7e14 0%, #f093fb 100%)"
+        footer={
+          <Button
+            variant="secondary"
+            onClick={handleCloseTeamBreakdownModal}
+          >
+            Close
+          </Button>
+        }
+      >
+        {teamMembersLoading ? (
+          <LoadingSpinner text="Loading..." />
+        ) : (
+          <>
+            {teamMembersData.length > 0 ? (
+              <div className="table-responsive">
+                <table className="table table-hover border rounded">
+                  <thead className="table-light">
+                    <tr>
+                      <th className="border-0">
+                        <span className="me-2">🏅</span>
+                        {t("leaderboard.rankColumn", "Rank")}
+                      </th>
+                      <th className="border-0">
+                        <i className="fas fa-user me-2 text-secondary"></i>
+                        {t("leaderboard.memberColumn", "Member")}
+                      </th>
+                      <th className="text-end border-0">
+                        <span className="me-2">📊</span>
+                        {t("leaderboard.completionsColumn", "Completions")}
+                      </th>
+                      <th className="text-end border-0">
+                        <span className="me-2">💰</span>
+                        {t("leaderboard.totalPointsColumn", "Total Points")}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {teamMembersData.map((member) => (
+                      <tr key={member.entity_id}>
+                        <td>
+                          <span className={`badge ${member.rank === 1 ? "bg-warning text-dark" : member.rank === 2 ? "bg-secondary" : member.rank === 3 ? "bg-dark" : "bg-light text-dark"}`}>
+                            #{member.rank}
+                          </span>
+                        </td>
+                        <td>
+                          <Button
+                            variant="link"
+                            className="p-0 text-start"
+                            onClick={() => {
+                              handleCloseTeamBreakdownModal();
+                              handleShowUserDetails(member.entity_id);
+                            }}
+                            title="Click to see task breakdown"
+                          >
+                            {member.name}
+                          </Button>
+                        </td>
+                        <td className="text-end">{member.member_count || 0}</td>
+                        <td className="text-end fw-bold">{member.score.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show"></div>
-        </>
-      )}
+            ) : (
+              <p className="text-muted text-center py-4">No members found in this team.</p>
+            )}
+          </>
+        )}
+      </Modal>
 
       {/* Expanded Board Modal */}
-      {expandedBoard && (
-        <>
-          <div
-            className="modal fade show"
-            style={{ display: "block" }}
-            role="dialog"
-            tabIndex="-1"
-            onClick={closeBoardModal}
-          >
-            <div
-              className="modal-dialog modal-lg"
-              role="document"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title d-flex align-items-center gap-2">
-                    {expandedBoardIcon ? (
-                      <span className="d-inline-flex align-items-center justify-content-center me-1">
-                        {expandedBoardIcon}
-                      </span>
-                    ) : null}
-                    <span>{expandedBoard.title}</span>
-                  </h5>
-                  <button type="button" className="btn-close" aria-label="Close" onClick={closeBoardModal}></button>
-                </div>
-                <div className="modal-body">
-                  {expandedBoard.description ? (
-                    <p className="text-muted small">{expandedBoard.description}</p>
-                  ) : null}
-                  {expandedBoard.data.length === 0 ? (
-                    <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
-                  ) : (
-                    renderEntryList(
-                      expandedBoard.data,
-                      expandedBoard.maxScore,
-                      expandedBoard.getSubtitle,
-                      expandedBoard.isUserList || false,
-                      expandedBoard.isTeamList || false
-                    )
-                  )}
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={closeBoardModal}>
-                    {t("common.close", "Close")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show"></div>
-        </>
-      )}
+      <Modal
+        isVisible={Boolean(expandedBoard)}
+        onClose={closeBoardModal}
+        title={expandedBoard?.title}
+        icon={expandedBoardIcon}
+        size="lg"
+        footer={
+          <Button variant="secondary" onClick={closeBoardModal}>
+            {t("common.close", "Close")}
+          </Button>
+        }
+      >
+        {expandedBoard?.description ? (
+          <p className="text-muted small">{expandedBoard.description}</p>
+        ) : null}
+        {expandedBoard?.data.length === 0 ? (
+          <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
+        ) : (
+          renderEntryList(
+            expandedBoard?.data || [],
+            expandedBoard?.maxScore || 1,
+            expandedBoard?.getSubtitle,
+            expandedBoard?.isUserList || false,
+            expandedBoard?.isTeamList || false
+          )
+        )}
+      </Modal>
     </>
   );
 }

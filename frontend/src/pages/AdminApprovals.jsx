@@ -4,6 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import HeroHeader from "../components/HeroHeader";
+import Alert from "../components/Alert";
+import Button from "../components/Button";
+import LoadingSpinner from "../components/LoadingSpinner";
+import DecoratedCard from "../components/DecoratedCard";
+import Textarea from "../components/Textarea";
 
 const extractErrorMessage = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -91,145 +97,109 @@ export default function AdminApprovals() {
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">{t("approvals.loading", "Loading...")}</span>
-        </div>
+        <LoadingSpinner text={t("approvals.loading", "Loading...")} />
       </div>
     );
   }
 
   return (
     <>
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' }}>
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center mb-2">
-                    <div>
-                      <h1 className="mb-1">{t("approvals.title", "Task Approvals")}</h1>
-                      <p className="mb-0 opacity-90 fs-5">
-                        {t("approvals.subtitle", "Review and approve member task completions")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4 text-end">
-                  <div className="badge bg-light text-success px-3 py-2 fs-4">
-                    {pending.length} {t("approvals.pending", "pending")}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <HeroHeader
+        title={t("approvals.title", "Task Approvals")}
+        subtitle={t("approvals.subtitle", "Review and approve member task completions")}
+        icon="🔍"
+        gradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
+      >
+        <div className="badge bg-light text-success px-3 py-2 fs-4">
+          {pending.length} {t("approvals.pending", "pending")}
         </div>
-      </div>
+      </HeroHeader>
 
       {/* Information Panel */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="alert alert-info shadow-sm border-0">
-            <h6 className="alert-heading mb-3">{t("approvals.infoTitle", "What users see:")}</h6>
-            <div className="row g-3">
-              <div className="col-md-4">
-                <div className="d-flex align-items-start">
-                  <div className="badge bg-warning text-dark me-2 mt-1">&nbsp;</div>
-                  <div>
-                    <strong>{t("approvals.pendingStatus", "Pending Review")}</strong>
-                    <div className="text-muted small">{t("approvals.pendingDescription", "Task appears as 'Awaiting approval' in user's dashboard")}</div>
-                  </div>
-                </div>
+      <Alert type="info" className="shadow-sm border-0 mb-4" icon={<></>}>
+        <h6 className="alert-heading mb-3">{t("approvals.infoTitle", "What users see:")}</h6>
+        <div className="row g-3">
+          <div className="col-md-4">
+            <div className="d-flex align-items-start">
+              <div className="badge bg-warning text-dark me-2 mt-1">&nbsp;</div>
+              <div>
+                <strong>{t("approvals.pendingStatus", "Pending Review")}</strong>
+                <div className="text-muted small">{t("approvals.pendingDescription", "Task appears as 'Awaiting approval' in user's dashboard")}</div>
               </div>
-              <div className="col-md-4">
-                <div className="d-flex align-items-start">
-                  <div className="badge bg-success me-2 mt-1">&nbsp;</div>
-                  <div>
-                    <strong>{t("approvals.approvedStatus", "Approved")}</strong>
-                    <div className="text-muted small">{t("approvals.approvedDescription", "Points added to score, task marked as completed")}</div>
-                  </div>
-                </div>
+            </div>
+          </div>
+          <div className="col-md-4">
+            <div className="d-flex align-items-start">
+              <div className="badge bg-success me-2 mt-1">&nbsp;</div>
+              <div>
+                <strong>{t("approvals.approvedStatus", "Approved")}</strong>
+                <div className="text-muted small">{t("approvals.approvedDescription", "Points added to score, task marked as completed")}</div>
               </div>
-              <div className="col-md-4">
-                <div className="d-flex align-items-start">
-                  <div className="badge bg-danger me-2 mt-1">&nbsp;</div>
-                  <div>
-                    <strong>{t("approvals.rejectedStatus", "Rejected")}</strong>
-                    <div className="text-muted small">{t("approvals.rejectedDescription", "User sees feedback and can resubmit")}</div>
-                  </div>
-                </div>
+            </div>
+          </div>
+          <div className="col-md-4">
+            <div className="d-flex align-items-start">
+              <div className="badge bg-danger me-2 mt-1">&nbsp;</div>
+              <div>
+                <strong>{t("approvals.rejectedStatus", "Rejected")}</strong>
+                <div className="text-muted small">{t("approvals.rejectedDescription", "User sees feedback and can resubmit")}</div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </Alert>
 
       {/* Feedback */}
       {feedback && (
-        <div className="row mb-4">
-          <div className="col-12">
-            <div className={`alert alert-${feedback.type} shadow-sm border-0`} role="alert">
-              <div className="d-flex align-items-center">
-                {feedback.message}
-              </div>
-            </div>
-          </div>
-        </div>
+        <Alert type={feedback.type} className="shadow-sm border-0 mb-4" icon={<></>}>
+          {feedback.message}
+        </Alert>
       )}
 
       {/* Approvals List */}
       {!pending.length ? (
-        <div className="row">
-          <div className="col-12">
-            <div className="card shadow-lg border-0 p-3">
-              <div className="card-body text-center py-5">
-                <div className="display-1 text-muted mb-3">✅</div>
-                <h4 className="text-muted mb-2">{t("approvals.empty", "All caught up!")}</h4>
-                <p className="text-muted">{t("approvals.emptyDescription", "No task completions are waiting for review right now.")}</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        <DecoratedCard
+          title={t("approvals.empty", "All caught up!")}
+          subtitle={t("approvals.emptyDescription", "No task completions are waiting for review right now.")}
+          icon={<i className="fas fa-check-circle text-success"></i>}
+          shadow={true}
+          bodyClassName="text-center py-5"
+        />
       ) : (
-        <div className="row g-4">
+        <div className="d-flex flex-column gap-4">
           {pending.map((item) => (
-            <div key={item.id} className="col-12">
-              <div className="card shadow-lg border-0 p-3">
-                <div className="card-header bg-light border-0">
-                  <div className="row align-items-center">
-                    <div className="col-md-8">
-                      <h5 className="mb-1 fw-bold text-primary">{item.task?.name || `Task #${item.task_id}`}</h5>
-                      <div className="d-flex align-items-center gap-3 text-muted">
-                        <span>
-                          <strong>{item.member?.username || `User #${item.member_id}`}</strong>
-                          {item.member?.team_name && ` • ${item.member.team_name}`}
-                        </span>
-                        <span>•</span>
-                        <span>{t("approvals.count", "Count")}: {item.count}</span>
-                        <span>•</span>
-                        <span>{new Date(item.submitted_at).toLocaleString()}</span>
-                      </div>
-                    </div>
-                    <div className="col-md-4 text-md-end">
-                      <span className="badge bg-warning text-dark px-3 py-2">
-                        {t("approvals.awaitingReview", "Awaiting Review")}
-                      </span>
-                    </div>
+              <DecoratedCard
+                key={item.id}
+                title={item.task?.name || `Task #${item.task_id}`}
+                subtitle={
+                  <div className="d-flex align-items-center gap-3">
+                    <span>
+                      <strong>{item.member?.username || `User #${item.member_id}`}</strong>
+                      {item.member?.team_name && ` • ${item.member.team_name}`}
+                    </span>
+                    <span>•</span>
+                    <span>{t("approvals.count", "Count")}: {item.count}</span>
+                    <span>•</span>
+                    <span>{new Date(item.submitted_at).toLocaleString()}</span>
                   </div>
-                </div>
-                <div className="card-body">
+                }
+                icon="📝"
+                headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                shadow={true}
+                className="m-2"
+                rightBadge={t("approvals.awaitingReview", "Awaiting Review")}
+              >
                   <div className="row">
                     <div className="col-md-8">
                       <p className="text-muted mb-2">{t("approvals.memberNote", "Member's Note:")}</p>
-                      <div className="bg-light p-3 rounded">
+                      <div className="bg-light p-3 rounded border">
                         {item.member_note || <em className="text-muted">{t("approvals.noNote", "No note provided")}</em>}
                       </div>
                     </div>
                     <div className="col-md-4">
                       <p className="text-muted mb-2">{t("approvals.adminFeedback", "Admin Feedback:")}</p>
-                      <textarea
-                        className="form-control mb-3"
+                      <Textarea
+                        className="mb-3"
                         rows={3}
                         placeholder={t("approvals.feedbackPlaceholder", "Optional feedback (required for rejection)")}
                         value={reasonMap[item.id] || ""}
@@ -238,28 +208,28 @@ export default function AdminApprovals() {
                         }
                       />
                       <div className="d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button
-                          type="button"
-                          className="btn btn-success px-4"
+                        <Button
+                          variant="success"
+                          className="px-4"
                           disabled={reviewMutation.isLoading}
+                          loading={reviewMutation.isLoading}
                           onClick={() => handleReview(item, "approved")}
                         >
                           {reviewMutation.isLoading ? t("approvals.processing", "Processing...") : t("approvals.approve", "Approve")}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-danger px-4"
+                        </Button>
+                        <Button
+                          variant="danger"
+                          className="px-4"
                           disabled={reviewMutation.isLoading}
+                          loading={reviewMutation.isLoading}
                           onClick={() => handleReview(item, "rejected")}
                         >
                           {reviewMutation.isLoading ? t("approvals.processing", "Processing...") : t("approvals.reject", "Reject")}
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
+              </DecoratedCard>
           ))}
         </div>
       )}

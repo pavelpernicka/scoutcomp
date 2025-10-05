@@ -31,7 +31,7 @@ export default function Footer() {
                 className="link-primary"
                 style={{ fontSize: 'inherit' }}
               >
-                Made with ❤️ by Hruška
+                Made with <i className="fas fa-heart text-danger"></i> by Hruška
               </a>
             </small>
           </div>

@@ -55,36 +55,36 @@ export default function Layout({ children }) {
 
           {/* Mobile menu toggle */}
           <button
-            className="navbar-toggler border-0"
+            className="navbar-toggler border-0 text-white"
             type="button"
             onClick={() => setShowMobileMenu(!showMobileMenu)}
             aria-controls="primaryNav"
             aria-expanded={showMobileMenu}
             aria-label="Toggle navigation"
           >
-            <span className="navbar-toggler-icon text-white"></span>
+            <i className="fas fa-bars fs-4"></i>
           </button>
 
           <div className={`collapse navbar-collapse ${showMobileMenu ? 'show' : ''}`} id="primaryNav">
             {isAuthenticated && (
-              <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+              <ul className="navbar-nav me-auto mb-2 mb-lg-0 flex-column flex-lg-row">
                 <li className="nav-item">
-                  <NavLink to="/" end className={navLinkClass} style={{ color: 'white' }} onClick={() => setShowMobileMenu(false)}>
+                  <NavLink to="/" end className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
                     {t("navigation.dashboard", "Dashboard")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
-                  <NavLink to="/tasks" className={navLinkClass} style={{ color: 'white' }} onClick={() => setShowMobileMenu(false)}>
+                  <NavLink to="/tasks" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
                     {t("navigation.tasks", "Tasks")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
-                  <NavLink to="/leaderboard" className={navLinkClass} style={{ color: 'white' }} onClick={() => setShowMobileMenu(false)}>
+                  <NavLink to="/leaderboard" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
                     {t("navigation.leaderboard", "Leaderboard")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
-                  <NavLink to="/rules" className={navLinkClass} style={{ color: 'white' }} onClick={() => setShowMobileMenu(false)}>
+                  <NavLink to="/rules" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
                     {t("navigation.rules", "Rules")}
                   </NavLink>
                 </li>
@@ -93,13 +93,13 @@ export default function Layout({ children }) {
                 {hasAdminAccess && (
                   <li className="nav-item dropdown" ref={adminDropdownRef}>
                     <button
-                      className="nav-link dropdown-toggle btn btn-link text-white border-0 p-2"
+                      className="nav-link dropdown-toggle btn btn-link text-white border-0 p-2 d-flex align-items-center justify-content-between w-100"
                       type="button"
                       onClick={() => setShowAdminDropdown(!showAdminDropdown)}
                     >
-                      {t("navigation.admin", "Administration")}
+                      <span>{t("navigation.admin", "Administration")}</span>
                     </button>
-                    <ul className={`dropdown-menu shadow-lg border-0 ${showAdminDropdown ? 'show' : ''}`}>
+                    <ul className={`dropdown-menu shadow-lg border-0 w-100 ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                       {canReviewCompletions && (
                         <li>
                           <NavLink to="/admin/approvals" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
@@ -155,21 +155,21 @@ export default function Layout({ children }) {
             )}
 
             {/* Right side navigation */}
-            <div className="d-flex align-items-center gap-3">
-              <LanguageSwitcher />
+            <div className={`d-flex align-items-center gap-2 ${showMobileMenu ? 'flex-column w-100 mt-3' : 'flex-wrap'}`}>
+              <LanguageSwitcher isMobile={showMobileMenu} />
 
               {isAuthenticated ? (
-                <div className="dropdown" ref={userDropdownRef}>
+                <div className={`dropdown ${showMobileMenu ? 'w-100' : ''}`} ref={userDropdownRef}>
                   <button
-                    className="btn btn-outline-light d-flex align-items-center px-3 py-2"
+                    className={`btn btn-outline-light d-flex align-items-center px-3 py-2 ${showMobileMenu ? 'w-100 justify-content-between' : ''}`}
                     type="button"
                     onClick={() => setShowUserDropdown(!showUserDropdown)}
                     style={{ borderRadius: '20px' }}
                   >
                     <span className="fw-bold">{profile?.user?.username}</span>
-                    <span className="ms-2">▼</span>
+                    <i className="fas fa-chevron-down ms-2"></i>
                   </button>
-                  <ul className={`dropdown-menu dropdown-menu-end shadow-lg border-0 mt-2 ${showUserDropdown ? 'show' : ''}`}>
+                  <ul className={`dropdown-menu dropdown-menu-end ${showMobileMenu ? 'w-100' : ''} shadow-lg border-0 mt-2 ${showUserDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                     <li className="dropdown-header d-flex align-items-center">
                       <div>
                         <div className="fw-bold">{profile?.user?.username}</div>
@@ -193,7 +193,7 @@ export default function Layout({ children }) {
                   </ul>
                 </div>
               ) : (
-                <NavLink to="/login" className="btn btn-outline-light" onClick={() => setShowMobileMenu(false)}>
+                <NavLink to="/login" className={`btn btn-outline-light ${showMobileMenu ? 'w-100' : ''}`} onClick={() => setShowMobileMenu(false)}>
                   {t("navigation.login", "Login")}
                 </NavLink>
               )}

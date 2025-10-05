@@ -4,6 +4,11 @@ import { useState } from "react";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import TaskCompletionDetailsModal from "../components/TaskCompletionDetailsModal";
+import HeroHeader from "../components/HeroHeader";
+import LoadingSpinner from "../components/LoadingSpinner";
+import Card from "../components/Card";
+import DecoratedCard from "../components/DecoratedCard";
 
 const formatDate = (value) => new Date(value).toLocaleString();
 
@@ -83,7 +88,11 @@ export default function Dashboard() {
   };
 
   if (isLoading) {
-    return <div className="text-center py-5">{t("tasks.loading", "Loading…")}</div>;
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
+        <LoadingSpinner text={t("tasks.loading", "Loading…")} />
+      </div>
+    );
   }
 
   const totalPoints = profile?.scoreboard?.total_points ?? 0;
@@ -94,23 +103,21 @@ export default function Dashboard() {
     <div className="row g-4">
       {/* Welcome box */}
       <div className="col-12">
-        <div className="card shadow-lg border-0" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <Card className="shadow-lg border-0" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
           <div className="card-body text-white p-4">
             <div className="row align-items-center">
               <div className="col-md-8">
                 <div className="d-flex align-items-center mb-2">
-                  <span className="fs-2 me-2">🎯</span>
+                  <span className="fs-1 me-3">🎯</span>
                   <div>
-                    <h3 className="mb-1 fw-bold text-white">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.username })}</h3>
+                    <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.username })}</h3>
                     {profile?.user?.team_name && (
                       <p className="mb-0 opacity-90">
-                        <span className="me-2">🏆</span>
                         {t("dashboard.teamPride", "Proudly representing {{teamName}}", { teamName: profile.user.team_name })}
                       </p>
                     )}
                     {!profile?.user?.team_name && profile?.user?.team_id === null && (
                       <p className="mb-0 opacity-90">
-                        <span className="me-2">🚀</span>
                         {t("dashboard.welcomeNoGroup", "You are not in any group yet, it you think you should be, contact admin")}
                       </p>
                     )}
@@ -143,7 +150,7 @@ export default function Dashboard() {
               </div>
               {/* Future: badge */}
               <div className="col-md-4 text-end d-none">
-                <div className="display-1" style={{ fontSize: '4rem' }}>🌟</div>
+                <div className="display-1" style={{ fontSize: '4rem' }}><i className="fas fa-star text-warning"></i></div>
                 {totalPoints > 0 && (
                   <div className="mt-2">
                     <span className="badge bg-warning text-dark px-3 py-2 fs-6">
@@ -155,68 +162,63 @@ export default function Dashboard() {
               {/* End of badge */}
             </div>
           </div>
-        </div>
+        </Card>
       </div>
 
       {dashboardMessages.length > 0 && (
         <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-header text-white position-relative" style={{ background: 'linear-gradient(135deg, #4834d4 0%, #686de0 100%)' }}>
-              <div className="d-flex align-items-center gap-3">
-                <span className="fs-2">📢</span>
-                <div>
-                  <h4 className="mb-1">{t("dashboard.announcements", "Important Announcements")}</h4>
-                  <p className="mb-0 opacity-90">{t("dashboard.stayInformed", "Stay informed about what's happening!")}</p>
-                </div>
-              </div>
-            </div>
-            <div className="card-body p-0">
-              <div className="d-flex flex-column">
+          <DecoratedCard
+            title={t("dashboard.announcements", "Important Announcements")}
+            subtitle={t("dashboard.stayInformed", "Stay informed about what's happening!")}
+            icon={<span className="flip_vert fs-2">📢</span>}
+            headerGradient="linear-gradient(135deg, #4834d4 0%, #686de0 100%)"
+            shadow={true}
+            border={false}
+            bodyClassName="p-0"
+          >
+            <div className="d-flex flex-column">
                 {dashboardMessages.map((message, index) => (
                   <div key={message.id} className={`p-4 ${index !== dashboardMessages.length - 1 ? 'border-bottom' : ''} position-relative overflow-hidden`} style={{ background: index % 2 === 0 ? '#f8f9fa' : 'white' }}>
                     <div className="position-absolute start-0 top-0 bottom-0 bg-primary" style={{ width: '4px' }}></div>
                     <div className="d-flex justify-content-between align-items-start mb-3">
                       <div className="d-flex align-items-center gap-2">
-                        <span className="badge bg-primary px-3 py-2">
-                          {message.team_name || t("dashboard.allTeams", "All Teams")}
-                        </span>
-                        <h5 className="mb-0 text-dark">{message.title || t("dashboard.infoTitle", "Information")}</h5>
+                        <h5 className="mb-0 text-dark display-6">{message.title || t("dashboard.infoTitle", "Information")}</h5>
                       </div>
                       <div className="text-end">
                         <small className="text-muted d-flex align-items-center gap-1">
-                          <span>🕐</span>
+                          <i className="fas fa-clock text-muted"></i>
                           {formatDate(message.created_at)}
                         </small>
                       </div>
                     </div>
-                    <div className="ms-2">
-                      <p className="mb-0 text-dark" style={{ lineHeight: '1.6' }}>{message.body}</p>
+                    <div className="AnnText">
+                      <p className="mb-2 text-dark lead" style={{ lineHeight: '1.6' }}>{message.body}</p>
+                      <span className="badge bg-primary px-2 py-2">
+                        {message.team_name || t("dashboard.allTeams", "All Teams")}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="card-footer bg-light text-center py-3">
-              <small className="text-muted">
-                ✨ {t("dashboard.totalAnnouncements", "{{count}} announcement(s)", { count: dashboardMessages.length })}
-              </small>
-            </div>
-          </div>
+          </DecoratedCard>
         </div>
       )}
 
       <div className="col-12 col-xl-4">
-        <div className="card shadow-sm h-100" style={{ minHeight: '500px' }}>
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <div className="d-flex align-items-center gap-2">
-              <span>🔥 {t("dashboard.teamActivity", "Team Activity")}</span>
-              {teamActivity.stats.team_name && (
-                <span className="badge bg-success">{teamActivity.stats.team_name}</span>
-              )}
-            </div>
-            <span className="small text-muted">{t("dashboard.lastDays", "Last 7 days")}</span>
-          </div>
-          <div className="card-body p-0 d-flex flex-column justify-content-between">
+        <DecoratedCard
+          title={t("dashboard.teamActivity", "Team Activity")}
+          icon={<i className="fas fa-chart-line text-white"></i>}
+          headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
+          rightContent={
+            teamActivity.stats.team_name && (
+              <span className="badge bg-white text-dark">{teamActivity.stats.team_name}</span>
+            )
+          }
+          shadow={true}
+          className="h-100"
+          style={{ minHeight: '500px' }}
+          bodyClassName="p-0 d-flex flex-column justify-content-between"
+        >
             {teamActivity.activities.length === 0 ? (
             <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4">
               <div className="text-center py-4 text-muted">
@@ -226,7 +228,7 @@ export default function Dashboard() {
               </div>
             </div>
             ) : (
-              <>
+              <div className="d-block">
                 {/* Week stats banner */}
                 <div className="bg-light p-3 border-bottom">
                   <div className="row text-center g-0">
@@ -246,10 +248,10 @@ export default function Dashboard() {
                 </div>
 
                 {/* Activity feed */}
-                <div className="activity-feed" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <div className="d-block activity-feed" style={{ maxHeight: '380px', overflowY: 'auto' }}>
                   {teamActivity.activities.slice(0, 8).map((activity) => (
                     <div key={activity.id} className={`p-3 border-bottom ${activity.is_current_user ? 'bg-primary bg-opacity-10' : ''}`}>
-                      <div className="d-flex align-items-start gap-2">
+                      <div className="d-block align-items-start gap-2">
                         <div className="flex-shrink-0">
                           {activity.is_current_user ? (
                             <span className="badge bg-primary rounded-pill">You</span>
@@ -269,7 +271,7 @@ export default function Dashboard() {
                                   <span><strong>{activity.member_name}</strong> {t("dashboard.completed", "completed")}</span>
                                 )} <span className="text-dark">{activity.task_name}</span>
                                 {activity.count > 1 && (
-                                  <span className="badge bg-info ms-2">{activity.count}x</span>
+                                  <span className="badge bg-done ms-2">{activity.count}x</span>
                                 )}
                               </div>
                               <div className="small text-muted">
@@ -291,29 +293,34 @@ export default function Dashboard() {
                     <small className="text-muted">{t("dashboard.moreAchievements", "And {{count}} more amazing achievements! 🎉", { count: teamActivity.activities.length - 8 })}</small>
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
-        </div>
+        </DecoratedCard>
       </div>
 
       <div className="col-12 col-xl-4">
-        <div className="card shadow-sm h-100" style={{ minHeight: '500px' }}>
-          <div className="card-header">{t("dashboard.notifications", "Messages")}</div>
-          <div className="card-body d-flex flex-column p-0 justify-content-between">
+        <DecoratedCard
+          title={t("dashboard.notifications", "Messages")}
+          icon={<i className="fas fa-envelope text-white"></i>}
+          headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
+          shadow={true}
+          className="h-100"
+          style={{ minHeight: '500px' }}
+          bodyClassName="d-flex flex-column p-0 justify-content-between"
+        >
             {notifications.length === 0 ? (
               <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4">
                 <div className="text-center">
-                  <div className="display-4 mb-3">📬</div>
+                  <div className="display-4 mb-3"><i className="fas fa-inbox text-muted"></i></div>
                   <h5 className="text-muted">{t("dashboard.noMessagesYet", "No messages yet")}</h5>
                   <p className="small text-muted mb-0">{t("dashboard.messagesWillAppear", "Important messages will appear here when available")}</p>
                 </div>
               </div>
             ) : (
-              <>
+              <div className="d-block">
                 <div className="p-3 bg-light border-bottom">
                   <div className="d-flex align-items-center justify-content-between">
-                    <span className="fw-medium text-dark">💬 {t("dashboard.recentMessages", "Recent Messages")}</span>
+                    <span className="fw-medium text-dark">{t("dashboard.recentMessages", "Recent Messages")}</span>
                     <span className="badge bg-primary">{notifications.length}</span>
                   </div>
                 </div>
@@ -326,7 +333,7 @@ export default function Dashboard() {
                             <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', fontSize: '14px', color: 'white' }}>
                               {notification.sender_username ?
                                 notification.sender_username.charAt(0).toUpperCase() :
-                                '⚙️'
+                                <i className="fas fa-cog text-secondary"></i>
                               }
                             </div>
                             <div>
@@ -351,25 +358,26 @@ export default function Dashboard() {
                 {notifications.length > 10 && (
                    <div className="p-3 text-center">
                     <small className="text-muted">
-                      📨 {t("dashboard.scrollForMore", "Scroll up to see all {{count}} messages", { count: notifications.length })}
+                      <i className="fas fa-envelope me-2 text-primary"></i>{t("dashboard.scrollForMore", "Scroll up to see all {{count}} messages", { count: notifications.length })}
                     </small>
                   </div>
                 )}
-              </>
+              </div>
             )}
-          </div>
-        </div>
+        </DecoratedCard>
       </div>
 
       <div className="col-12 col-xl-4">
-        <div className="card shadow-sm h-100" style={{ minHeight: '500px' }}>
-          <div className="card-header bg-gradient text-white" style={{ background: 'linear-gradient(45deg, #ff6b6b, #feca57)' }}>
-            <div className="d-flex align-items-center text-black gap-2">
-              <span>⚡</span>
-              <span>{t("dashboard.yourJourney", "How is it going")}</span>
-            </div>
-          </div>
-          <div className="p-0 card-body d-flex flex-column">
+        <DecoratedCard
+          title={t("dashboard.yourJourney", "How is it going")}
+          icon={<i className="fas fa-bolt text-white"></i>}
+          headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
+          headerClassName="text-black"
+          shadow={true}
+          className="h-100"
+          style={{ minHeight: '500px' }}
+          bodyClassName="p-0 d-flex flex-column"
+        >
             {isLoadingCompletions ? (
               <div className="text-center py-4">
                 <div className="spinner-border text-primary" role="status">
@@ -378,15 +386,15 @@ export default function Dashboard() {
               </div>
             ) : completions.length === 0 ? (
               <div className="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-center py-4">
-                <div className="display-4 mb-3">⭐</div>
+                <div className="display-4 mb-3"><i className="fas fa-star text-warning"></i></div>
                 <h5 className="text-muted">{t("dashboard.readyToShine", "Ready to shine?")}</h5>
                 <p className="small text-muted mb-0">{t("dashboard.startCompleting", "Start completing tasks to see your amazing progress!")}</p>
               </div>
             ) : (
               <div className="d-flex flex-column gap-3 flex-grow-1 justify-content-between">
-              <div className="p-3 activity-feed" style={{ maxHeight: '390px', overflowY: 'auto' }}>
+              <div className="p-3 activity-feed" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                 {completions.slice(0, 5).map((entry) => (
-                  <div key={entry.id} className={`p-3 rounded border-start border-4 ${
+                  <div key={entry.id} className={`p-3 mb-1 rounded border-start border-4 ${
                     entry.status === 'approved' ? 'border-success bg-success bg-opacity-10' :
                     entry.status === 'pending' ? 'border-warning bg-warning bg-opacity-10' :
                     'border-danger bg-danger bg-opacity-10'
@@ -396,26 +404,26 @@ export default function Dashboard() {
                         <div className="fw-medium mb-1 d-flex align-items-center justify-content-between">
                           <div className="d-flex align-items-center">
                             <span className="me-2">
-                              {entry.status === 'approved' ? '✅' : entry.status === 'pending' ? '⏳' : '❌'}
+                              {entry.status === 'approved' ? <i className="fas fa-check-circle text-success"></i> : entry.status === 'pending' ? <i className="fas fa-hourglass-half text-warning"></i> : <i className="fas fa-times-circle text-danger"></i>}
                             </span>
                             <span>{entry.task?.name || entry.task_id}</span>
                           </div>
-                          <span className="badge bg-info">{entry.count}x</span>
+                          <span className="badge bg-done">{entry.count}x</span>
                         </div>
                         <div className="small mb-1">
                           {entry.status === "pending" && (
                             <span className="text-warning fw-medium">
-                              {t("dashboard.awaitingApproval", "⏰ Awaiting approval")}
+                              {t("dashboard.awaitingApproval", "Awaiting approval")}
                             </span>
                           )}
                           {entry.status === "approved" && (
                             <span className="text-success fw-medium">
-                              🎉 {t("dashboard.amazing", "Amazing! +{{points}} points", { points: entry.points_awarded })}
+                              {t("dashboard.amazing", "Amazing! +{{points}} points", { points: entry.points_awarded })}
                             </span>
                           )}
                           {entry.status === "rejected" && (
                             <div className="text-danger">
-                              <div className="fw-medium">❌ {t("dashboard.rejected", "Rejected")}</div>
+                              <div className="fw-medium">{t("dashboard.rejected", "Rejected")}</div>
                               {entry.admin_note && (
                                 <div className="small mt-1 text-muted">
                                   {t("dashboard.reason", "Reason")}: {entry.admin_note}
@@ -434,34 +442,24 @@ export default function Dashboard() {
                   <div className="p-3 text-center">
                     <small className="text-muted">{t("dashboard.moreInHistory", "And {{count}} more in your history! 📚", { count: completions.length - 5 })}</small>
                   </div>
-                  
+
                 )}
               </div>
             )}
-          </div>
-        </div>
+        </DecoratedCard>
       </div>
 
       {profile?.user?.team_id && teamMembers.length > 0 && (
         <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-header text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="d-flex justify-content-between align-items-center position-relative">
-                <div className="d-flex align-items-center gap-3">
-                  <span className="fs-2">🏆</span>
-                  <div>
-                    <h4 className="mb-1">{t("dashboard.teamChampions", "Team Champions")}</h4>
-                    <p className="mb-0 opacity-90">{profile.user.team_name}</p>
-                  </div>
-                </div>
-                <div className="text-end">
-                  <span className="badge bg-white text-dark px-3 py-2 fs-6">
-                    {teamMembers.length} {t("dashboard.heroes", "Heroes")}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="card-body p-0">
+          <DecoratedCard
+            title={t("dashboard.teamChampions", "Team Champions")}
+            subtitle={profile.user.team_name}
+            icon="🏆"
+            rightBadge={`${teamMembers.length} ${t("dashboard.heroes", "Heroes")}`}
+            shadow={true}
+            border={false}
+            bodyClassName="p-0"
+          >
               <div className="table-responsive">
                 <table className="table table-hover mb-0">
                   <thead className="bg-light">
@@ -476,18 +474,11 @@ export default function Dashboard() {
                     {teamMembers.map((member) => (
                       <tr key={member.entity_id} className={`${member.entity_id === profile.user.id ? "table-primary" : ""} ${member.rank <= 3 ? "fw-bold" : ""}`}>
                         <td className="py-3">
-                          <div className="d-flex align-items-center gap-2">
-                            {member.rank === 1 && <span className="fs-4">🥇</span>}
-                            {member.rank === 2 && <span className="fs-4">🥈</span>}
-                            {member.rank === 3 && <span className="fs-4">🥉</span>}
-                            <span className={`badge ${
-                              member.rank === 1 ? "bg-warning text-dark" :
-                              member.rank === 2 ? "bg-secondary" :
-                              member.rank === 3 ? "bg-dark" :
-                              "bg-light text-dark"
-                            } px-3 py-2`}>
-                              #{member.rank}
-                            </span>
+                          <div className="d-flex align-items-center justify-content-center">
+                            {member.rank === 1 && <i className="fas fa-trophy fs-4 text-warning"></i>}
+                            {member.rank === 2 && <i className="fas fa-medal fs-4 text-secondary"></i>}
+                            {member.rank === 3 && <i className="fas fa-medal fs-4" style={{color: '#cd7f32'}}></i>}
+                            {member.rank > 3 && <span className="text-muted">#{member.rank}</span>}
                           </div>
                         </td>
                         <td className="py-3">
@@ -502,7 +493,7 @@ export default function Dashboard() {
                             </button>
                             {member.entity_id === profile.user.id && (
                               <span className="badge bg-primary rounded-pill px-2 py-1">
-                                {t("dashboard.you", "You")} 🌟
+                                {t("dashboard.you", "You")} <i className="fas fa-star text-warning"></i>
                               </span>
                             )}
                           </div>
@@ -514,7 +505,7 @@ export default function Dashboard() {
                             onClick={() => handleShowDetails(member.entity_id, member.name)}
                             title={t("dashboard.viewTasks", "View completed tasks")}
                           >
-                            {member.member_count || 0} 🎯
+                            {member.member_count || 0} <i className="fas fa-tasks ms-1"></i>
                           </button>
                         </td>
                         <td className="py-3 text-end">
@@ -533,92 +524,18 @@ export default function Dashboard() {
                   {t("dashboard.keepPushing", "Keep pushing forward, team! Every task completed makes us stronger!")} 💪
                 </small>
               </div>
-            </div>
-          </div>
+          </DecoratedCard>
         </div>
       )}
 
       {/* Task Details Modal */}
-      {showDetailsModal && (
-        <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
-            <div className="modal-dialog modal-lg" role="document">
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">
-                    Task Completion Details - {userTaskDetails?.username}
-                  </h5>
-                  <button
-                    type="button"
-                    className="btn-close"
-                    aria-label="Close"
-                    onClick={handleCloseModal}
-                  ></button>
-                </div>
-                <div className="modal-body">
-                  {isLoadingDetails ? (
-                    <div className="text-center py-4">
-                      <div className="spinner-border" role="status">
-                        <span className="visually-hidden">Loading...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      {userTaskDetails?.task_completions?.length > 0 ? (
-                        <div className="table-responsive">
-                          <table className="table table-striped">
-                            <thead>
-                              <tr>
-                                <th>Task</th>
-                                <th className="text-end">Completions</th>
-                                <th className="text-end">Points</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {userTaskDetails.task_completions
-                                .sort((a, b) => b.total_points - a.total_points)
-                                .map((task) => (
-                                <tr key={task.task_id}>
-                                  <td>{task.task_name}</td>
-                                  <td className="text-end">{task.completion_count}</td>
-                                  <td className="text-end fw-bold">{task.total_points.toFixed(2)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot className="table-light">
-                              <tr>
-                                <th>Total</th>
-                                <th className="text-end">
-                                  {userTaskDetails.task_completions.reduce((sum, t) => sum + t.completion_count, 0)}
-                                </th>
-                                <th className="text-end">
-                                  {userTaskDetails.task_completions.reduce((sum, t) => sum + t.total_points, 0).toFixed(2)}
-                                </th>
-                              </tr>
-                            </tfoot>
-                          </table>
-                        </div>
-                      ) : (
-                        <p className="text-muted text-center py-4">No completed tasks found.</p>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={handleCloseModal}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show"></div>
-        </>
-      )}
+      <TaskCompletionDetailsModal
+        isVisible={showDetailsModal}
+        onClose={handleCloseModal}
+        userTaskDetails={userTaskDetails}
+        isLoading={isLoadingDetails}
+        title={t("dashboard.taskDetails", "Task Completion Details")}
+      />
     </div>
   );
 }

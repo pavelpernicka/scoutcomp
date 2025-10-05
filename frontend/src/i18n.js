@@ -1,5 +1,6 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import LanguageDetector from "i18next-browser-languagedetector";
 
 const resources = {
   cs: {
@@ -31,10 +32,10 @@ const resources = {
         yourJourney: "Jak se ti daří",
         readyToShine: "Připraven/a zazářit?",
         startCompleting: "Začni plnit úkoly a uvidíš svůj úžasný pokrok!",
-        awaitingApproval: "⏰ Čeká na schválení",
+        awaitingApproval: "Čeká na schválení",
         amazing: "Úžasné! +{{points}} bodů",
         tryAgain: "Nevzdávej to, zkus to znovu!",
-        moreInHistory: "A {{count}} dalších ve tvé historii! 📚",
+        moreInHistory: "A {{count}} dalších ve tvé historii!",
         teamChampions: "Družinkoví šampióni",
         heroes: "Statečných",
         rank: "Pořadí",
@@ -312,14 +313,14 @@ const resources = {
         activeHeroes: "Active heroes!",
         youCompleted: "You completed",
         completed: "completed",
-        moreAchievements: "And {{count}} more amazing achievements! 🎉",
+        moreAchievements: "And {{count}} more amazing achievements!",
         yourJourney: "How is it going",
         readyToShine: "Ready to shine?",
         startCompleting: "Start completing tasks to see your amazing progress!",
-        awaitingApproval: "⏰ Awaiting approval",
+        awaitingApproval: "Awaiting approval",
         amazing: "Amazing! +{{points}} points",
         tryAgain: "Don't give up, try again!",
-        moreInHistory: "And {{count}} more in your history! 📚",
+        moreInHistory: "And {{count}} more in your history!",
         teamChampions: "Team Champions",
         heroes: "Heroes",
         rank: "Rank",
@@ -518,14 +519,19 @@ const resources = {
   },
 };
 
-const userLanguage = window.navigator?.language?.split("-")[0] || "cs";
-
-i18n.use(initReactI18next).init({
-  resources,
-  lng: userLanguage,
-  fallbackLng: "cs",
-  supportedLngs: ["cs", "en"],
-  interpolation: { escapeValue: false },
-});
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources,
+    fallbackLng: "cs",
+    supportedLngs: ["cs", "en"],
+    interpolation: { escapeValue: false },
+    detection: {
+      order: ['localStorage', 'navigator', 'htmlTag'],
+      lookupLocalStorage: 'i18nextLng',
+      caches: ['localStorage'],
+    },
+  });
 
 export default i18n;

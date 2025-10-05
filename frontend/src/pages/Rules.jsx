@@ -6,6 +6,12 @@ import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import HeroHeader from "../components/HeroHeader";
+import Button from "../components/Button";
+import Alert from "../components/Alert";
+import LoadingSpinner from "../components/LoadingSpinner";
+import DecoratedCard from "../components/DecoratedCard";
+import Textarea from "../components/Textarea";
 
 marked.setOptions({ breaks: true });
 
@@ -85,101 +91,82 @@ export default function RulesPage() {
   };
 
   if (isLoading || !page) {
-    return <div className="text-center text-muted py-5">{t("rules.loading", "Loading rules…")}</div>;
+    return <LoadingSpinner className="py-5" text={t("rules.loading", "Loading rules…")} centered />;
   }
 
   return (
     <>
-      {/* Enthusiastic Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center mb-2">
-                    <span className="fs-1 me-3">📋</span>
-                    <div>
-                      <h1 className="mb-1">{t("rules.title", "Quest Guidelines & Rules")}</h1>
-                      <p className="mb-0 opacity-90 fs-5">
-                        {t("rules.subtitle", "Your essential guide to fair play and adventure!")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4 text-end">
-                  <div className="display-2">⚖️</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HeroHeader
+        title={t("rules.title", "Quest Guidelines & Rules")}
+        subtitle={t("rules.subtitle", "Your essential guide to fair play and adventure!")}
+        icon="📋"
+      >
+      </HeroHeader>
 
       <div className="px-0">
         {feedback && (
-          <div className={`alert alert-${feedback.type} shadow-sm border-0`} role="alert">
-            <div className="d-flex align-items-center">
-              <span className="me-2">
-                {feedback.type === 'success' ? '✅' : feedback.type === 'danger' ? '⚠️' : 'ℹ️'}
-              </span>
-              {feedback.message}
-            </div>
-          </div>
+          <Alert type={feedback.type} className="shadow-sm border-0 mb-4">
+            {feedback.message}
+          </Alert>
         )}
 
-        <div className="card shadow-lg border-0">
-          <div className="card-header bg-light d-flex justify-content-between align-items-center border-0" style={{ borderRadius: '0.5rem 0.5rem 0 0' }}>
-            <div className="d-flex align-items-center">
-              <span className="me-2">📜</span>
-              <strong>{t("rules.officialRules", "Official Rules")}</strong>
-            </div>
-            {isAdmin && (
-              <div className="d-flex align-items-center gap-2">
-                {isEditing && hasChanges && (
-                  <span className="badge text-dark px-3 py-2 d-flex align-items-center" style={{ backgroundColor: '#ffc107' }}>
-                    <span className="me-1">⚠️</span>
-                    {t("rules.unsavedChanges", "Unsaved changes")}
-                  </span>
-                )}
-                {isEditing ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary btn-sm px-3"
-                      onClick={handleCancel}
-                      disabled={updateMutation.isLoading}
-                    >
-                      <span className="me-1">↩️</span>
-                      {t("common.cancel", "Cancel")}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-success btn-sm px-3"
-                      onClick={handleSave}
-                      disabled={!hasChanges || updateMutation.isLoading}
-                    >
-                      <span className="me-1">💾</span>
-                      {updateMutation.isLoading ? t("rules.saving", "Saving...") : t("rules.save", "Save")}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm px-3"
-                    onClick={() => setIsEditing(true)}
+        <DecoratedCard
+          title={t("rules.officialRules", "Official Rules")}
+          icon="📜"
+          headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+          shadow={true}
+          rightContent={isAdmin && (
+            <div className="d-flex align-items-center gap-2">
+              {isEditing && hasChanges && (
+                <span className="badge text-dark px-3 py-2 d-flex align-items-center" style={{ backgroundColor: '#ffc107' }}>
+                  <i className="fas fa-exclamation-triangle me-1"></i>
+                  {t("rules.unsavedChanges", "Unsaved changes")}
+                </span>
+              )}
+              {isEditing ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="px-3"
+                    onClick={handleCancel}
+                    disabled={updateMutation.isLoading}
+                    icon="fas fa-undo"
+                    iconPosition="left"
                   >
-                    <span className="me-1">✏️</span>
-                    {t("rules.editRules", "Edit Rules")}
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="card-body p-4">
+                    {t("common.cancel", "Cancel")}
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    className="px-3"
+                    onClick={handleSave}
+                    disabled={!hasChanges || updateMutation.isLoading}
+                    loading={updateMutation.isLoading}
+                    icon="fas fa-save"
+                    iconPosition="left"
+                  >
+                    {updateMutation.isLoading ? t("rules.saving", "Saving...") : t("rules.save", "Save")}
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="px-3"
+                  onClick={() => setIsEditing(true)}
+                  icon="fas fa-edit"
+                  iconPosition="left"
+                >
+                  {t("rules.editRules", "Edit Rules")}
+                </Button>
+              )}
+            </div>
+          )}
+        >
             {updatedAtLabel && (
               <div className="bg-light rounded p-2 mb-4 d-flex align-items-center">
-                <span className="me-2">🕒</span>
+                <i className="fas fa-clock text-muted me-2"></i>
                 <small className="text-muted">{t("rules.lastUpdated", "Last updated")} {updatedAtLabel}</small>
               </div>
             )}
@@ -192,21 +179,21 @@ export default function RulesPage() {
                       <span className="me-2">📝</span>
                       {t("rules.markdownContent", "Markdown Content")}
                     </label>
-                    <textarea
-                      className="form-control border-2"
+                    <Textarea
+                      className="border-2"
                       rows={18}
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
                       disabled={updateMutation.isLoading}
                       placeholder={t("rules.markdownPlaceholder", "Enter your rules in Markdown format...")}
                       style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '0.9rem' }}
-                    ></textarea>
+                    />
                   </div>
                 </div>
                 <div className="col-12 col-xl-6">
                   <div className="mb-3">
                     <label className="form-label fw-bold d-flex align-items-center">
-                      <span className="me-2">👁️</span>
+                      <i className="fas fa-eye text-secondary me-2"></i>
                       {t("rules.livePreview", "Live Preview")}
                     </label>
                     <div
@@ -228,8 +215,7 @@ export default function RulesPage() {
                 <p className="text-muted mb-0">{t("rules.comingSoonMessage", "The official quest rules are being prepared and will be available here soon.")}</p>
               </div>
             )}
-          </div>
-        </div>
+        </DecoratedCard>
       </div>
     </>
   );

@@ -6,6 +6,10 @@ import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import HeroHeader from "../components/HeroHeader";
+import Alert from "../components/Alert";
+import Button from "../components/Button";
+import Modal from "../components/Modal";
 
 const COOLDOWN_MS = 5000;
 const MAX_PREVIEW_LENGTH = 220;
@@ -336,209 +340,184 @@ export default function TasksPage() {
     const isCooldownActive = cooldownMs > 0;
     const maxCount = remaining !== null ? Math.max(remaining, 1) : 50;
 
+    const modalFooter = (
+      <div className="bg-light bg-opacity-50 px-4 py-3">
+        <Button
+          variant="outline-secondary"
+          className="px-4 py-2"
+          onClick={() => setSelectedTask(null)}
+          icon="fas fa-undo"
+          iconPosition="left"
+        >
+          {t("common.cancel", "Cancel")}
+        </Button>
+        <Button
+          variant="primary"
+          className="px-4 py-2 fw-bold text-light shadow ms-2"
+          onClick={handleSubmit}
+          loading={submissionMutation.isLoading}
+          disabled={
+            submissionMutation.isLoading ||
+            isLimitReached ||
+            submissionCount < 1 ||
+            (remaining !== null && submissionCount > remaining) ||
+            isCooldownActive
+          }
+          gradient={
+            submissionMutation.isLoading || isLimitReached || isCooldownActive
+              ? undefined
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+          }
+          icon={
+            submissionMutation.isLoading ? "fas fa-hourglass-half"
+            : isLimitReached ? null
+            : isCooldownActive ? "fas fa-clock"
+            : "fas fa-arrow-right-to-bracket"
+          }
+          iconPosition="left"
+        >
+          {isLimitReached && <span className="me-2">🏁</span>}
+          {submissionMutation.isLoading
+            ? t("tasks.sending", "Sending…")
+            : isLimitReached
+              ? t("tasks.questComplete", "Quest Complete!")
+              : isCooldownActive
+                ? t("tasks.cooldownActive", "Taking a breather!")
+                : t("tasks.submit", "Log completion")}
+        </Button>
+      </div>
+    );
+
     return (
-      <>
-        <div className="modal fade show d-block" tabIndex="-1" role="dialog">
-          <div className="modal-dialog modal-lg" role="document">
-            <div className="modal-content border-0 shadow-lg">
-              <div className="modal-header text-white position-relative" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                <div className="d-flex align-items-center">
-                  <span className="fs-2 me-3">🎯</span>
-                  <div>
-                    <h4 className="modal-title mb-1">{selectedTask.name}</h4>
-                    <p className="mb-0 opacity-90">{t("tasks.questDetails", "Quest Details & Submission")}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white"
-                  aria-label="Close"
-                  onClick={() => setSelectedTask(null)}
-                ></button>
-                <div className="position-absolute top-0 end-0 opacity-20" style={{ fontSize: '4rem', lineHeight: 1, marginTop: '-1rem', marginRight: '3rem' }}>
-                  ⭐
-                </div>
-              </div>
-              <div className="modal-body p-4">
-                {/* Quest Description */}
-                <div className="bg-light rounded-3 p-4 mb-4 border border-info border-opacity-25">
-                  <h5 className="text-primary mb-3 d-flex align-items-center">
-                    <span className="me-2">📋</span>
-                    {t("tasks.questDescription", "Quest Description")}
-                  </h5>
-                  <div
-                    className="text-dark"
-                    dangerouslySetInnerHTML={renderMarkdown(
-                      selectedTask.description || t("tasks.noDescription", "No description")
-                    )}
-                    style={{ lineHeight: '1.6' }}
-                  />
-                </div>
+      <Modal
+        isVisible={true}
+        onClose={() => setSelectedTask(null)}
+        title={selectedTask.name}
+        subtitle={t("tasks.questDetails", "Quest Details & Submission")}
+        icon="🎯"
+        size="lg"
+        headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+        footer={modalFooter}
+        className="position-relative"
+      >
+        <div className="position-absolute top-0 end-0 opacity-20" style={{ fontSize: '4rem', lineHeight: 1, marginTop: '-1rem', marginRight: '3rem' }}>
+          <i className="fas fa-star text-warning"></i>
+        </div>
 
-                {/* Progress Stats */}
-                <div className="bg-gradient rounded-3 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-                  <h5 className="mb-3 d-flex align-items-center text-black">
-                    {t("tasks.questStatus", "Your Quest Status")}
-                  </h5>
-                  <div className="text-white opacity-90">
-                    {renderProgress(selectedTask)}
-                  </div>
-                </div>
+        {/* Quest Description */}
+        <div className="bg-light rounded-3 p-4 mb-4 border border-info border-opacity-25">
+          <h5 className="text-primary mb-3 d-flex align-items-center">
+            <span className="me-2">📋</span>
+            {t("tasks.questDescription", "Quest Description")}
+          </h5>
+          <div
+            className="text-dark"
+            dangerouslySetInnerHTML={renderMarkdown(
+              selectedTask.description || t("tasks.noDescription", "No description")
+            )}
+            style={{ lineHeight: '1.6' }}
+          />
+        </div>
 
-                {/* Submission Form */}
-                <div className="bg-success bg-opacity-10 rounded-3 p-4 mb-4 border border-success border-opacity-25">
-                  <h5 className="text-success mb-3 d-flex align-items-center">
-                    <span className="me-2">🎯</span>
-                    {t("tasks.logCompletion", "Log Your Achievement")}
-                  </h5>
-
-                  <div className="mb-3">
-                    <label className="form-label fw-medium text-dark d-flex align-items-center">
-                      <span className="me-2">🏆</span>
-                      {t("tasks.countLabel", "How many completions?")}
-                    </label>
-                    <input
-                      type="number"
-                      className="form-control form-control-lg border-success border-opacity-50"
-                      min={1}
-                      max={maxCount || 50}
-                      value={submissionCount}
-                      onChange={(event) => setSubmissionCount(Number(event.target.value))}
-                      disabled={isLimitReached}
-                    />
-                    {limit !== null ? (
-                      <small className="text-success d-flex align-items-center mt-2">
-                        <span className="me-1">✨</span>
-                        {t("tasks.remainingLabel", { count: remaining })}
-                      </small>
-                    ) : (
-                      <small className="text-success d-flex align-items-center mt-2">
-                        <span className="me-1">🚀</span>
-                        {t("tasks.noLimit", "No limit in this period")}
-                      </small>
-                    )}
-                  </div>
-
-                  <div className="mb-3">
-                    <label className="form-label fw-medium text-dark d-flex align-items-center">
-                      <span className="me-2">💬</span>
-                      {t("tasks.noteLabel", "Note")}
-                    </label>
-                    <textarea
-                      className="form-control border-success border-opacity-50"
-                      rows={3}
-                      value={submissionNote}
-                      onChange={(event) => setSubmissionNote(event.target.value)}
-                      placeholder={t("tasks.notePlaceholder", "Optional note for approver")}
-                      style={{ resize: 'none' }}
-                    ></textarea>
-                  </div>
-                </div>
-
-                {/* Status Messages */}
-                {isLimitReached && (
-                  <div className="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
-                    <span className="me-2 fs-4">🏁</span>
-                    <div>
-                      <strong>{t("tasks.questComplete", "Quest Complete!")}</strong>
-                      <div className="small opacity-75">{t("tasks.limitReached", "You have reached the limit for this period.")}</div>
-                    </div>
-                  </div>
-                )}
-                {isCooldownActive && (
-                  <div className="alert alert-info border-0 shadow-sm d-flex align-items-center" role="alert">
-                    <span className="me-2 fs-4">⏰</span>
-                    <div>
-                      <strong>{t("tasks.cooldownActive", "Taking a breather!")}</strong>
-                      <div className="small opacity-75">{t("tasks.cooldown", "Please wait a moment before logging again.")}</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="modal-footer bg-light bg-opacity-50 px-4 py-3">
-                <button
-                  type="button"
-                  className="btn btn-outline-secondary px-4 py-2"
-                  onClick={() => setSelectedTask(null)}
-                >
-                  <span className="me-2">↩️</span>
-                  {t("common.cancel", "Cancel")}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary px-4 py-2 fw-bold shadow"
-                  onClick={handleSubmit}
-                  disabled={
-                    submissionMutation.isLoading ||
-                    isLimitReached ||
-                    submissionCount < 1 ||
-                    (remaining !== null && submissionCount > remaining) ||
-                    isCooldownActive
-                  }
-                  style={{
-                    background: submissionMutation.isLoading || isLimitReached || isCooldownActive
-                      ? undefined
-                      : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none'
-                  }}
-                >
-                  <span className="me-2">
-                    {submissionMutation.isLoading ? '⏳' : isLimitReached ? '🏁' : isCooldownActive ? '⏰' : '🚀'}
-                  </span>
-                  {submissionMutation.isLoading
-                    ? t("tasks.sending", "Sending…")
-                    : isLimitReached
-                      ? t("tasks.questComplete", "Quest Complete!")
-                      : isCooldownActive
-                        ? t("tasks.cooldownActive", "Taking a breather!")
-                        : t("tasks.submit", "Log completion")}
-                </button>
-              </div>
-            </div>
+        {/* Progress Stats */}
+        <div className="bg-gradient rounded-3 p-4 mb-4 text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+          <h5 className="mb-3 d-flex align-items-center text-black">
+            {t("tasks.questStatus", "Your Quest Status")}
+          </h5>
+          <div className="text-white opacity-90">
+            {renderProgress(selectedTask)}
           </div>
         </div>
-        <div className="modal-backdrop fade show"></div>
-      </>
+
+        {/* Submission Form */}
+        <div className="bg-success bg-opacity-10 rounded-3 p-4 mb-4 border border-success border-opacity-25">
+          <h5 className="text-success mb-3 d-flex align-items-center">
+            <span className="me-2">🎯</span>
+            {t("tasks.logCompletion", "Log Your Achievement")}
+          </h5>
+
+          <div className="mb-3">
+            <label className="form-label fw-medium text-dark d-flex align-items-center">
+              <span className="me-2">🏆</span>
+              {t("tasks.countLabel", "How many completions?")}
+            </label>
+            <input
+              type="number"
+              className="form-control form-control-lg border-success border-opacity-50"
+              min={1}
+              max={maxCount || 50}
+              value={submissionCount}
+              onChange={(event) => setSubmissionCount(Number(event.target.value))}
+              disabled={isLimitReached}
+            />
+            {limit !== null ? (
+              <small className="text-success d-flex align-items-center mt-2">
+                {t("tasks.remainingLabel", { count: remaining })}
+              </small>
+            ) : (
+              <small className="text-success d-flex align-items-center mt-2">
+                <span className="me-1">🚀</span>
+                {t("tasks.noLimit", "No limit in this period")}
+              </small>
+            )}
+          </div>
+
+          <div className="mb-3">
+            <label className="form-label fw-medium text-dark d-flex align-items-center">
+              <span className="me-2">💬</span>
+              {t("tasks.noteLabel", "Note")}
+            </label>
+            <textarea
+              className="form-control border-success border-opacity-50"
+              rows={3}
+              value={submissionNote}
+              onChange={(event) => setSubmissionNote(event.target.value)}
+              placeholder={t("tasks.notePlaceholder", "Optional note for approver")}
+              style={{ resize: 'none' }}
+            ></textarea>
+          </div>
+        </div>
+
+        {/* Status Messages */}
+        {isLimitReached && (
+          <div className="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
+            <span className="me-2 fs-4">🏁</span>
+            <div>
+              <strong>{t("tasks.questComplete", "Quest Complete!")}</strong>
+              <div className="small opacity-75">{t("tasks.limitReached", "You have reached the limit for this period.")}</div>
+            </div>
+          </div>
+        )}
+        {isCooldownActive && (
+          <div className="alert alert-info border-0 shadow-sm d-flex align-items-center" role="alert">
+            <i className="fas fa-clock text-info me-2 fs-4"></i>
+            <div>
+              <strong>{t("tasks.cooldownActive", "Taking a breather!")}</strong>
+              <div className="small opacity-75">{t("tasks.cooldown", "Please wait a moment before logging again.")}</div>
+            </div>
+          </div>
+        )}
+      </Modal>
     );
   };
 
   return (
     <>
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body border text-white position-relative" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center mb-2">
-                    <span className="fs-1 me-3">🚀</span>
-                    <div>
-                      <h1 className="mb-1">{t("tasks.heroTitle", "Your Epic Quest Awaits!")}</h1>
-                      <p className="mb-0 opacity-90 fs-5">
-                        {t("tasks.heroSubtitle", "{{count}} exciting challenge(s) ready to conquer!", { count: tasks.length })}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="col-md-4 text-end">
-                  <div className="display-2">⭐</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HeroHeader
+        title={t("tasks.heroTitle", "Your Epic Quest Awaits!")}
+        subtitle={t("tasks.heroSubtitle", "{{count}} exciting challenge(s) ready to conquer!", { count: tasks.length })}
+        icon="🚀"
+        gradient="linear-gradient(351deg, #f093fb 0%, #f5576c 100%)"
+      />
 
       {feedback && (
-        <div className={`alert alert-${feedback.type} shadow-sm border-0`} role="alert">
-          <div className="d-flex align-items-center">
-            <span className="me-2">
-              {feedback.type === 'success' ? '🎉' : feedback.type === 'danger' ? '⚠️' : 'ℹ️'}
-            </span>
-            {feedback.message}
-          </div>
-        </div>
+        <Alert
+          type={feedback.type}
+          className="shadow-sm border-0 mb-4"
+          icon={feedback.type === 'success' ? '🎉' : undefined}
+        >
+          {feedback.message}
+        </Alert>
       )}
 
       <div className="row g-4">
@@ -562,11 +541,11 @@ export default function TasksPage() {
                 <div className="position-absolute top-0 end-0 m-3">
                   {isCooldownActive ? (
                     <span className="badge text-dark px-3 py-2" style={{ backgroundColor: '#b3d7ff', color: '#0056b3 !important' }}>
-                      ⏰ {cooldownSeconds}s
+                      <i className="fas fa-clock text-info me-1"></i> {cooldownSeconds}s
                     </span>
                   ) : !isLimitReached ? (
                     <span className="badge bg-success text-white px-3 py-2">
-                      ✨ {t("tasks.ready", "Ready!")}
+                      {t("tasks.ready", "Ready!")}
                     </span>
                   ) : null}
                 </div>
@@ -592,7 +571,7 @@ export default function TasksPage() {
                             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                             fontSize: '0.85rem'
                           }}>
-                            <span className="me-1">⭐</span>
+                            <i className="fas fa-star text-warning me-1"></i>
                             {task.progress.lifetime}x {t("tasks.completed", "completed")}
                           </span>
                         )}
@@ -629,7 +608,7 @@ export default function TasksPage() {
                   <div className="bg-light rounded-3 p-3 mb-3 border" style={{ borderColor: '#e9ecef' }}>
                     <h6 className="text-primary mb-2 fw-bold d-flex align-items-center">
                       <span className="me-2">📊</span>
-                      {t("tasks.progressTitle", "Your Progress")}
+                      {t("tasks.questStatus", "Your Quest Status")}
                     </h6>
                     <div className="small">
                       {renderProgress(task)}
@@ -646,22 +625,16 @@ export default function TasksPage() {
                   {task.end_time && (
                     <div className="bg-danger bg-opacity-10 rounded p-2 mb-3">
                       <div className="text-danger small fw-medium d-flex align-items-center">
-                        <span className="me-2">⏰</span>
+                        <i className="fas fa-clock me-2"></i>
                         {t("tasks.ends", "Ends")}: {formatDateTime(task.end_time)}
                       </div>
                     </div>
                   )}
 
                   {/* Action button */}
-                  <button
-                    type="button"
-                    className={`btn mt-auto py-3 fw-bold ${
-                      isLimitReached
-                        ? 'btn-outline-secondary'
-                        : isCooldownActive
-                          ? 'btn-outline-primary'
-                          : 'btn-success'
-                    }`}
+                  <Button
+                    variant={isLimitReached ? 'outline-secondary' : isCooldownActive ? 'outline-primary' : 'success'}
+                    className="mt-auto py-3 fw-bold"
                     onClick={() => handleOpenModal(task)}
                     disabled={isLimitReached || isCooldownActive}
                     style={{
@@ -670,11 +643,11 @@ export default function TasksPage() {
                     }}
                   >
                     {isLimitReached
-                      ? `🏆 ${t("tasks.limitReachedShort", "Limit Reached")}`
+                      ? `${t("tasks.limitReachedShort", "Limit Reached")}`
                       : isCooldownActive
-                      ? `⏳ ${t("tasks.cooldownShort", "Cooldown")} (${cooldownSeconds}s)`
-                      : `🚀 ${t("tasks.startQuest", "Start Quest!")}`}
-                  </button>
+                      ? <><i className="fas fa-hourglass-half text-info me-2"></i>{t("tasks.cooldownShort", "Cooldown")} ({cooldownSeconds}s)</>
+                      : <>🚀 {t("tasks.startQuest", "Start Quest!")}</>}
+                  </Button>
                 </div>
 
               </div>

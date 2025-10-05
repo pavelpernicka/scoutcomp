@@ -4,6 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
 import { useConfig } from "../providers/ConfigProvider";
+import HeroHeader from "../components/HeroHeader";
+import Alert from "../components/Alert";
+import Button from "../components/Button";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 export default function AdminConfig() {
   const { t } = useTranslation();
@@ -77,9 +81,7 @@ export default function AdminConfig() {
   if (configLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
+        <LoadingSpinner text="Loading..." />
       </div>
     );
   }
