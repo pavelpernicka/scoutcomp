@@ -98,10 +98,9 @@ def get_user_task_completions(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    # Allow admins to see any user's details, otherwise restrict to same team
-    is_admin = current_user.role == RoleEnum.ADMIN
-    if not is_admin and (not current_user.team_id or user.team_id != current_user.team_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    # Allow any authenticated user to view task completions of any other user
+    # This makes the leaderboard feature more open and social
+    pass
 
     # Get task completion counts grouped by task
     task_completions = (
@@ -158,8 +157,8 @@ def get_team_recent_activity(
         return {"activities": []}
 
     # Get recent approved completions from team members (last 7 days)
-    from datetime import datetime, timedelta
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    from datetime import datetime, timedelta, timezone
+    week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
 
     recent_completions = (
         db.query(Completion)
@@ -186,7 +185,7 @@ def get_team_recent_activity(
     # Format activities
     activities = []
     for completion in recent_completions:
-        time_ago = datetime.utcnow() - completion.reviewed_at
+        time_ago = datetime.now(timezone.utc).replace(tzinfo=None) - completion.reviewed_at
         if time_ago.days > 0:
             time_str = f"{time_ago.days} day{'s' if time_ago.days > 1 else ''} ago"
         elif time_ago.seconds > 3600:

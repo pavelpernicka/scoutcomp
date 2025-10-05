@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.core.security import get_password_hash
 from app.models import Completion, CompletionStatus, RoleEnum, Task, Team, User
 
@@ -24,6 +26,8 @@ def test_admin_can_create_completion_for_user(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     member = User(
         username="member",
@@ -33,6 +37,8 @@ def test_admin_can_create_completion_for_user(client, db_session):
         preferred_language="cs",
         team=team,
         is_active=True,
+        real_name="Test Member",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     task = Task(
         name="Log fire",
@@ -81,6 +87,8 @@ def test_group_admin_cannot_create_for_foreign_team(client, db_session):
         role=RoleEnum.GROUP_ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Group Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin.managed_teams.append(team_alpha)
     member = User(
@@ -91,6 +99,8 @@ def test_group_admin_cannot_create_for_foreign_team(client, db_session):
         preferred_language="cs",
         team=team_bravo,
         is_active=True,
+        real_name="Test Other Member",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     task = Task(
         name="Task",
@@ -122,6 +132,8 @@ def test_group_admin_can_create_for_managed_team(client, db_session):
         role=RoleEnum.GROUP_ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Group Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin.managed_teams.append(team_alpha)
     member = User(
@@ -132,6 +144,8 @@ def test_group_admin_can_create_for_managed_team(client, db_session):
         preferred_language="cs",
         team=team_alpha,
         is_active=True,
+        real_name="Test Scout",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     task = Task(
         name="Signal fire",

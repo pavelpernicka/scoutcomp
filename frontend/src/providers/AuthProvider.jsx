@@ -8,6 +8,13 @@ import PropTypes from "prop-types";
 
 import api, { TOKEN_STORAGE_KEY, clearAuthTokens, setAuthTokens } from "../services/api";
 
+export class PasswordChangeRequiredError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'PasswordChangeRequiredError';
+  }
+}
+
 const AuthContext = createContext(undefined);
 
 const parseStoredTokens = () => {
@@ -62,6 +69,28 @@ export function AuthProvider({ children }) {
 
   const login = async ({ username, password }) => {
     const { data } = await api.post("/auth/login", { username, password });
+
+    // Check if password change is required
+    if (data.requires_password_change) {
+      throw new PasswordChangeRequiredError(data.message || "Password change required");
+    }
+
+    const nextTokens = {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresIn: data.expires_in,
+    };
+    persistTokens(nextTokens);
+    setAuthTokens(nextTokens);
+    await fetchProfile();
+  };
+
+  const changePassword = async ({ username, oldPassword, newPassword }) => {
+    const { data } = await api.post("/auth/force-change-password", {
+      username,
+      old_password: oldPassword,
+      new_password: newPassword,
+    });
     const nextTokens = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -120,6 +149,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     register,
+    changePassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

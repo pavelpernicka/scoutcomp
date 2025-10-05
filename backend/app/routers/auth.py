@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -9,12 +9,15 @@ from ..core.security import (
     get_password_hash,
     verify_password,
 )
-from ..dependencies import get_db
+from ..dependencies import get_current_active_user, get_db
 from ..models import RefreshToken, RoleEnum, Team, User
 from ..config import settings
 from .config import get_config_bool
 from ..schemas import (
+    ForcePasswordChangeRequest,
     LoginRequest,
+    PasswordChangeRequest,
+    PasswordChangeRequired,
     RegistrationRequest,
     RegistrationSettings,
     RefreshRequest,
@@ -99,18 +102,17 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
     )
 
 
-@router.post("/login", response_model=TokenPair)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
+@router.post("/login")
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User inactive")
 
-    # Track first login for password change prompt
-    if not user.first_login_at:
-        from datetime import datetime
-        user.first_login_at = datetime.utcnow()
+    # Check if password change is required (first_login_at is None)
+    if user.first_login_at is None:
+        return PasswordChangeRequired()
 
     access_token, expires_in = create_access_token(user.id, user.role)
     refresh_token_value, refresh_expires = create_refresh_token()
@@ -133,7 +135,7 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> Ref
         .filter(RefreshToken.token == payload.refresh_token)
         .first()
     )
-    if not token_record or token_record.expires_at < datetime.utcnow():
+    if not token_record or token_record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
     user = token_record.user
@@ -154,3 +156,64 @@ def logout(payload: RefreshRequest, db: Session = Depends(get_db)) -> None:
     if token_record:
         db.delete(token_record)
         db.commit()
+
+
+@router.post("/change-password", response_model=TokenPair)
+def change_password(
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> TokenPair:
+    if not verify_password(payload.old_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid current password")
+
+    current_user.password_hash = get_password_hash(payload.new_password)
+    current_user.first_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    db.add(current_user)
+    db.commit()
+
+    access_token, expires_in = create_access_token(current_user.id, current_user.role)
+    refresh_token_value, refresh_expires = create_refresh_token()
+
+    refresh_token = RefreshToken(user_id=current_user.id, token=refresh_token_value, expires_at=refresh_expires)
+    db.add(refresh_token)
+    db.commit()
+
+    return TokenPair(
+        access_token=access_token,
+        refresh_token=refresh_token_value,
+        expires_in=expires_in,
+    )
+
+
+@router.post("/force-change-password", response_model=TokenPair)
+def force_change_password(payload: ForcePasswordChangeRequest, db: Session = Depends(get_db)) -> TokenPair:
+    user = db.query(User).filter(User.username == payload.username).first()
+    if not user or not verify_password(payload.old_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User inactive")
+
+    if user.first_login_at is not None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Password change not required")
+
+    user.password_hash = get_password_hash(payload.new_password)
+    user.first_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    db.add(user)
+    db.commit()
+
+    access_token, expires_in = create_access_token(user.id, user.role)
+    refresh_token_value, refresh_expires = create_refresh_token()
+
+    refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)
+    db.add(refresh_token)
+    db.commit()
+
+    return TokenPair(
+        access_token=access_token,
+        refresh_token=refresh_token_value,
+        expires_in=expires_in,
+    )

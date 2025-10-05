@@ -1,8 +1,10 @@
 import pytest
+from datetime import datetime, timezone
 
 from app.config import settings
 from app.core.security import get_password_hash
-from app.models import RoleEnum, Team, User
+from app.models import RoleEnum, Team, User, Config
+from app.routers.config import set_config_value
 
 
 @pytest.fixture(autouse=True)
@@ -22,6 +24,8 @@ def test_login_success(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db_session.add(user)
     db_session.commit()
@@ -47,10 +51,14 @@ def test_login_rejects_invalid_credentials(client):
 
 
 def test_member_registration_with_join_code(client, db_session):
-    settings.app.features.allow_self_registration = True
+    # Enable self-registration in database config
+    set_config_value(db_session, "allow_self_registration", "true")
+    db_session.commit()
+
     team = Team(name="Alfa", description="Test", join_code="JOIN1234")
     db_session.add(team)
     db_session.commit()
+    db_session.refresh(team)
 
     response = client.post(
         "/auth/register",
@@ -60,6 +68,7 @@ def test_member_registration_with_join_code(client, db_session):
             "password": "Secret123",
             "join_code": "JOIN1234",
             "preferred_language": "cs",
+            "real_name": "Test Scout",
         },
     )
 
@@ -82,6 +91,7 @@ def test_admin_bootstrap_allowed_in_developer_mode(client, db_session):
             "email": "admin2@example.com",
             "password": "Secret123",
             "role": "admin",
+            "real_name": "Test Admin 2",
         },
     )
 

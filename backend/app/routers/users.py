@@ -286,6 +286,9 @@ def update_user(
         if current_user.role != RoleEnum.ADMIN and current_user.id != user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify password")
         user.password_hash = get_password_hash(payload.password)
+        # If admin is changing someone else's password, require password change on next login
+        if current_user.role == RoleEnum.ADMIN and current_user.id != user.id:
+            user.first_login_at = None
     if payload.preferred_language is not None:
         user.preferred_language = payload.preferred_language
     if payload.team_id is not None:
@@ -348,6 +351,34 @@ def generate_password(length: int = 12) -> str:
     # Shuffle to avoid predictable pattern
     secrets.SystemRandom().shuffle(password)
     return ''.join(password)
+
+
+@router.post("/{user_id}/generate-password")
+def generate_and_set_password(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+) -> dict:
+    """Generate a random password for a user and require them to change it on next login."""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if current_user.id == user_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot generate password for yourself")
+
+    new_password = generate_password()
+    user.password_hash = get_password_hash(new_password)
+    user.first_login_at = None  # Require password change on next login
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "password": new_password,
+        "message": "Password generated. User will be required to change it on next login."
+    }
 
 
 def transliterate_text(text: str) -> str:
@@ -471,8 +502,8 @@ def change_own_password(
 
     # Mark as having completed first login (no longer needs password change)
     if current_user.first_login_at is None:
-        from datetime import datetime
-        current_user.first_login_at = datetime.utcnow()
+        from datetime import datetime, timezone
+        current_user.first_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     db.commit()
     db.refresh(current_user)

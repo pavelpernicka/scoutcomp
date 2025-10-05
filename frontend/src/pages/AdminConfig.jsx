@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import { useConfig } from "../providers/ConfigProvider";
 import LoadingSpinner from "../components/LoadingSpinner";
+import defaultAppIcon from "../assets/default-app-icon.svg";
 
 export default function AdminConfig() {
   const { t } = useTranslation();
@@ -14,9 +15,11 @@ export default function AdminConfig() {
   const [feedback, setFeedback] = useState(null);
   const [formData, setFormData] = useState({
     appName: "",
+    appIcon: "",
     leaderboardDefaultView: "total", // "total" or "average"
     allowSelfRegistration: false,
   });
+  const [iconPreview, setIconPreview] = useState(defaultAppIcon);
 
   useEffect(() => {
     if (!feedback) return;
@@ -38,9 +41,11 @@ export default function AdminConfig() {
     if (config) {
       setFormData({
         appName: config.app_name || "ScoutComp",
+        appIcon: config.app_icon || "",
         leaderboardDefaultView: config.leaderboard_default_view || "total",
         allowSelfRegistration: config.allow_self_registration || false,
       });
+      setIconPreview(config.app_icon || defaultAppIcon);
     }
   }, [config]);
 
@@ -48,6 +53,7 @@ export default function AdminConfig() {
     mutationFn: async (data) => {
       const { data: response } = await api.patch("/admin/config", {
         app_name: data.appName,
+        app_icon: data.appIcon,
         leaderboard_default_view: data.leaderboardDefaultView,
         allow_self_registration: data.allowSelfRegistration,
       });
@@ -71,6 +77,42 @@ export default function AdminConfig() {
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleIconUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.includes('image/')) {
+      setFeedback({ type: "danger", message: "Please select a valid image file." });
+      return;
+    }
+
+    // Validate file size (max 1MB)
+    if (file.size > 1024 * 1024) {
+      setFeedback({ type: "danger", message: "File size must be less than 1MB." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target.result;
+      setFormData(prev => ({
+        ...prev,
+        appIcon: dataUrl,
+      }));
+      setIconPreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const resetIcon = () => {
+    setFormData(prev => ({
+      ...prev,
+      appIcon: "",
+    }));
+    setIconPreview(defaultAppIcon);
   };
 
   const handleSubmit = (e) => {
@@ -148,6 +190,54 @@ export default function AdminConfig() {
                     />
                     <div className="form-text">
                       {t("adminConfig.appNameHelp", "This name will appear in the navigation bar and page titles")}
+                    </div>
+                  </div>
+
+                  {/* App Icon */}
+                  <div className="col-12">
+                    <label className="form-label fw-medium">
+                      {t("adminConfig.appIcon", "Application Icon")}
+                    </label>
+                    <div className="row g-3">
+                      <div className="col-md-8">
+                        <div className="input-group">
+                          <input
+                            type="file"
+                            className="form-control border-primary border-opacity-50"
+                            accept="image/*"
+                            onChange={handleIconUpload}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary"
+                            onClick={resetIcon}
+                            title="Reset to default icon"
+                          >
+                            <i className="fas fa-undo me-1"></i>Reset
+                          </button>
+                        </div>
+                        <div className="form-text">
+                          {t("adminConfig.appIconHelp", "Upload a custom icon for your application. Recommended: SVG, PNG, or JPG (max 1MB, square format recommended)")}
+                        </div>
+                      </div>
+                      <div className="col-md-4">
+                        <div className="text-center">
+                          <div className="border rounded p-3 bg-light d-inline-block">
+                            <img
+                              src={iconPreview}
+                              alt="App Icon Preview"
+                              style={{
+                                width: "64px",
+                                height: "64px",
+                                objectFit: "contain"
+                              }}
+                            />
+                          </div>
+                          <div className="mt-2">
+                            <small className="text-muted">Preview</small>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
 

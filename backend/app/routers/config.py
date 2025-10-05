@@ -11,6 +11,7 @@ admin_router = APIRouter(prefix="/admin/config", tags=["admin", "config"])
 # Default configuration values
 DEFAULT_CONFIG = {
     "app_name": "ScoutComp",
+    "app_icon": "",
     "leaderboard_default_view": "total",
     "allow_self_registration": "false"
 }
@@ -48,6 +49,7 @@ def get_public_config(
     """Get current configuration settings (public endpoint)."""
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
+        app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
@@ -61,6 +63,7 @@ def get_config(
     """Get current configuration settings."""
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
+        app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
@@ -77,6 +80,9 @@ def update_config(
     if payload.app_name is not None:
         set_config_value(db, "app_name", payload.app_name)
 
+    if payload.app_icon is not None:
+        set_config_value(db, "app_icon", payload.app_icon)
+
     if payload.leaderboard_default_view is not None:
         set_config_value(db, "leaderboard_default_view", payload.leaderboard_default_view)
 
@@ -86,6 +92,7 @@ def update_config(
     # Return updated configuration
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
+        app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )

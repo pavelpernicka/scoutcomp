@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Callable, List
 
 from sqlalchemy import inspect, text
@@ -43,7 +43,7 @@ def _migration_applied(conn: Connection, identifier: str) -> bool:
 def _record_migration(conn: Connection, identifier: str) -> None:
     conn.execute(
         text("INSERT INTO schema_migrations (id, applied_at) VALUES (:id, :ts)"),
-        {"id": identifier, "ts": datetime.utcnow()},
+        {"id": identifier, "ts": datetime.now(timezone.utc)},
     )
 
 

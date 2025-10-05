@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.core.security import get_password_hash
 from app.models import RoleEnum, User
 
@@ -23,6 +25,8 @@ def test_member_can_view_rules_page(client, db_session):
         role=RoleEnum.MEMBER,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Member",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db_session.add(member)
     db_session.commit()
@@ -44,6 +48,8 @@ def test_only_admin_can_update_rules_page(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     member = User(
         username="helper",
@@ -52,6 +58,8 @@ def test_only_admin_can_update_rules_page(client, db_session):
         role=RoleEnum.MEMBER,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Helper",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db_session.add_all([admin, member])
     db_session.commit()

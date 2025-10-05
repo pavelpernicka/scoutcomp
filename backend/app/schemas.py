@@ -51,6 +51,22 @@ class RefreshTokenResponse(BaseModel):
     expires_in: int
 
 
+class PasswordChangeRequired(BaseModel):
+    requires_password_change: bool = True
+    message: str = "Password change required"
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str = Field(min_length=8)
+
+
+class ForcePasswordChangeRequest(BaseModel):
+    username: str
+    old_password: str
+    new_password: str = Field(min_length=8)
+
+
 class UserBase(BaseModel):
     username: str
     real_name: str = Field(min_length=1, max_length=150)
@@ -66,7 +82,7 @@ class UserCreate(UserBase):
 
 
 class BulkUserRegistration(BaseModel):
-    names: List[str] = Field(min_items=1, max_items=100)
+    names: List[str] = Field(min_length=1, max_length=100)
     team_id: Optional[int] = None
     role: RoleEnum = RoleEnum.MEMBER
     preferred_language: str = Field(default="cs", max_length=8)
@@ -453,12 +469,14 @@ class PaginatedResponse(BaseModel):
 
 class ConfigUpdate(BaseModel):
     app_name: Optional[str] = None
+    app_icon: Optional[str] = None
     leaderboard_default_view: Optional[str] = Field(default=None, pattern="^(total|average)$")
     allow_self_registration: Optional[bool] = None
 
 
 class ConfigResponse(BaseModel):
     app_name: str
+    app_icon: str
     leaderboard_default_view: str
     allow_self_registration: bool
 

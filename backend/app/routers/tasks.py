@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 def _apply_status_filter(query, status_filter: Optional[str]):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if status_filter == "active":
         query = query.filter(Task.start_time <= now)
         query = query.filter((Task.end_time.is_(None)) | (Task.end_time >= now))
@@ -66,7 +66,7 @@ def _assert_task_access(task: Task, user: User) -> None:
 
 
 def _assert_task_window(task: Task) -> None:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     if task.start_time and task.start_time > now:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Task not yet active")
     if task.end_time and task.end_time < now:
@@ -130,7 +130,7 @@ def _current_window_stats(
 
 
 def _calculate_progress(db: Session, task: Task, member: User) -> TaskProgress:
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     total_all = int(
         db.query(func.coalesce(func.sum(Completion.count), 0))
         .filter(
@@ -201,7 +201,7 @@ def create_task(
     task = Task(
         name=payload.name,
         description=payload.description,
-        start_time=payload.start_time or datetime.utcnow(),
+        start_time=payload.start_time or datetime.now(timezone.utc).replace(tzinfo=None),
         end_time=payload.end_time,
         points_per_completion=payload.points_per_completion,
         max_per_period=payload.max_per_period,
@@ -291,7 +291,7 @@ def submit_completion(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission limit reached")
 
     status_target = CompletionStatus.PENDING if task.requires_approval else CompletionStatus.APPROVED
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     completion = Completion(
         task_id=task.id,
         member_id=current_user.id,

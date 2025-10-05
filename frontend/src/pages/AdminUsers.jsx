@@ -86,6 +86,10 @@ export default function AdminUsers() {
   const [completionDrafts, setCompletionDrafts] = useState({});
   const [completionError, setCompletionError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [editPasswordGenerated, setEditPasswordGenerated] = useState(false);
+  const [createPasswordGenerated, setCreatePasswordGenerated] = useState(false);
   const [completionTaskFilter, setCompletionTaskFilter] = useState("all");
   const [completionFrom, setCompletionFrom] = useState("");
   const [completionTo, setCompletionTo] = useState("");
@@ -173,6 +177,8 @@ export default function AdminUsers() {
     if (!selectedUser) {
       setEditForm(emptyEditForm);
       setCompletionDrafts({});
+      setShowEditPassword(false);
+      setEditPasswordGenerated(false);
       return;
     }
     setEditForm({
@@ -186,6 +192,8 @@ export default function AdminUsers() {
       managedTeamIds: selectedUser.managed_team_ids.map((id) => String(id)),
       password: "",
     });
+    setShowEditPassword(false);
+    setEditPasswordGenerated(false);
   }, [selectedUser]);
 
   const availableTeamsForSelect = useMemo(() => {
@@ -404,6 +412,8 @@ export default function AdminUsers() {
   const openCreateModal = () => {
     createUserMutation.reset();
     setCreateForm(emptyCreateForm);
+    setShowCreatePassword(false);
+    setCreatePasswordGenerated(false);
     setShowCreateModal(true);
   };
 
@@ -411,6 +421,8 @@ export default function AdminUsers() {
     createUserMutation.reset();
     setShowCreateModal(false);
     setCreateForm(emptyCreateForm);
+    setShowCreatePassword(false);
+    setCreatePasswordGenerated(false);
   };
 
   const openCreateCompletionModal = () => {
@@ -470,6 +482,30 @@ export default function AdminUsers() {
       setFeedback({
         type: "danger",
         message: getErrorMessage(error, "Failed to send message."),
+      });
+    },
+  });
+
+  const generatePasswordMutation = useMutation({
+    mutationFn: async (userId) => {
+      const { data } = await api.post(`/users/${userId}/generate-password`);
+      return data;
+    },
+    onSuccess: (data) => {
+      setEditForm((prev) => ({ ...prev, password: data.password }));
+      setShowEditPassword(true);
+      setEditPasswordGenerated(true);
+
+      // Auto-hide password and message after 10 seconds
+      setTimeout(() => {
+        setShowEditPassword(false);
+        setEditPasswordGenerated(false);
+      }, 10000);
+    },
+    onError: (error) => {
+      setFeedback({
+        type: "danger",
+        message: getErrorMessage(error, "Failed to generate password."),
       });
     },
   });
@@ -630,6 +666,33 @@ export default function AdminUsers() {
     };
 
     bulkRegisterMutation.mutate(payload);
+  };
+
+  const handleGeneratePassword = () => {
+    if (!selectedUserId) return;
+    generatePasswordMutation.mutate(selectedUserId);
+  };
+
+  const generateRandomPassword = () => {
+    const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const handleGenerateCreatePassword = () => {
+    const newPassword = generateRandomPassword();
+    setCreateForm((prev) => ({ ...prev, password: newPassword }));
+    setShowCreatePassword(true);
+    setCreatePasswordGenerated(true);
+
+    // Auto-hide password and message after 10 seconds
+    setTimeout(() => {
+      setShowCreatePassword(false);
+      setCreatePasswordGenerated(false);
+    }, 10000);
   };
 
   const handleResetCompletionFilters = () => {
@@ -920,15 +983,46 @@ export default function AdminUsers() {
 
                   <div className="col-12">
                     <label className="form-label">Reset password</label>
-                    <input
-                      className="form-control"
-                      type="password"
-                      value={editForm.password}
-                      placeholder="Leave blank to keep current password"
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, password: event.target.value }))
-                      }
-                    />
+                    <div className="form-text mb-2">
+                      <i className="fas fa-info-circle me-1"></i>
+                      Click Generate to create a secure random password. Generated passwords will be visible for 10 seconds.
+                    </div>
+                    {editPasswordGenerated && (
+                      <div className="alert alert-success py-2 mb-2" role="alert">
+                        <i className="fas fa-check-circle me-1"></i>
+                        Random password generated and revealed. Don&apos;t forget to save changes!
+                      </div>
+                    )}
+                    <div className="input-group">
+                      <input
+                        className="form-control"
+                        type={showEditPassword ? "text" : "password"}
+                        value={editForm.password}
+                        placeholder="Leave blank to keep current password"
+                        onChange={(event) =>
+                          setEditForm((prev) => ({ ...prev, password: event.target.value }))
+                        }
+                      />
+                      {editForm.password && (
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary"
+                          onClick={() => setShowEditPassword(!showEditPassword)}
+                          title={showEditPassword ? "Hide password" : "Show password"}
+                        >
+                          <i className={`fas ${showEditPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={handleGeneratePassword}
+                        disabled={generatePasswordMutation.isLoading}
+                        title="Generate random password"
+                      >
+                        <i className="fas fa-dice me-1"></i>Generate
+                      </button>
+                    </div>
                   </div>
 
                   {updateUserMutation.isError && (
@@ -1248,15 +1342,45 @@ export default function AdminUsers() {
                       </div>
                       <div className="col-12 col-md-6">
                         <label className="form-label">Password</label>
-                        <input
-                          className="form-control"
-                          type="password"
-                          value={createForm.password}
-                          onChange={(event) =>
-                            setCreateForm((prev) => ({ ...prev, password: event.target.value }))
-                          }
-                          required
-                        />
+                        <div className="form-text mb-2">
+                          <i className="fas fa-info-circle me-1"></i>
+                          Generate secure random passwords. Will be visible for 10 seconds.
+                        </div>
+                        {createPasswordGenerated && (
+                          <div className="alert alert-success py-2 mb-2" role="alert">
+                            <i className="fas fa-check-circle me-1"></i>
+                            Random password generated and revealed!
+                          </div>
+                        )}
+                        <div className="input-group">
+                          <input
+                            className="form-control"
+                            type={showCreatePassword ? "text" : "password"}
+                            value={createForm.password}
+                            onChange={(event) =>
+                              setCreateForm((prev) => ({ ...prev, password: event.target.value }))
+                            }
+                            required
+                          />
+                          {createForm.password && (
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary"
+                              onClick={() => setShowCreatePassword(!showCreatePassword)}
+                              title={showCreatePassword ? "Hide password" : "Show password"}
+                            >
+                              <i className={`fas ${showCreatePassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary"
+                            onClick={handleGenerateCreatePassword}
+                            title="Generate random password"
+                          >
+                            <i className="fas fa-dice"></i>
+                          </button>
+                        </div>
                       </div>
                       <div className="col-12 col-md-6">
                         <label className="form-label">Preferred language</label>

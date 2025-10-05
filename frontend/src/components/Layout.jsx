@@ -7,6 +7,7 @@ import { useAuth } from "../providers/AuthProvider";
 import { useConfig } from "../providers/ConfigProvider";
 import LanguageSwitcher from "./LanguageSwitcher";
 import Footer from "./Footer";
+import defaultAppIcon from "../assets/default-app-icon.svg";
 
 const navLinkClass = ({ isActive }) => `nav-link ${isActive ? "active fw-bold" : ""}`;
 
@@ -45,7 +46,12 @@ export default function Layout({ children }) {
         <div className="container-fluid">
           {/* Brand */}
           <Link className="navbar-brand d-flex align-items-center text-white fw-bold fs-3" to="/">
-            <span className="me-2 fs-2">🏕️</span>
+            <img
+              src={config.app_icon || defaultAppIcon}
+              alt="App Icon"
+              className="me-2"
+              style={{ width: "32px", height: "32px", objectFit: "contain" }}
+            />
             {config.app_name}
             {isAdmin && <span className="badge bg-warning text-dark ms-2 px-2 py-1">ADMIN</span>}
             {!isAdmin && isGroupAdmin && (

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Tuple
 import secrets
 
@@ -22,7 +22,7 @@ def get_password_hash(password: str) -> str:
 
 def _create_token(data: Dict[str, Any], expires_delta: timedelta) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(timezone.utc) + expires_delta
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.app.secret_key, algorithm=settings.app.token.algorithm)
     return encoded_jwt
@@ -36,7 +36,7 @@ def create_access_token(user_id: int, role: RoleEnum) -> Tuple[str, int]:
 
 def create_refresh_token() -> Tuple[str, datetime]:
     token = secrets.token_urlsafe(48)
-    expires_at = datetime.utcnow() + timedelta(minutes=settings.app.token.refresh_expire_minutes)
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=settings.app.token.refresh_expire_minutes)
     return token, expires_at
 
 

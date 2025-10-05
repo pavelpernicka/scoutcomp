@@ -3,9 +3,10 @@ import { useTranslation } from "react-i18next";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { useAuth } from "../providers/AuthProvider";
+import { useAuth, PasswordChangeRequiredError } from "../providers/AuthProvider";
 import { useConfig } from "../providers/ConfigProvider";
 import api from "../services/api";
+import defaultAppIcon from "../assets/default-app-icon.svg";
 
 const extractErrorMessage = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -37,12 +38,19 @@ const extractErrorMessage = (error, fallback) => {
 
 export default function LoginPage() {
   const { t } = useTranslation();
-  const { login, register, isAuthenticated, isLoading } = useAuth();
+  const { login, register, changePassword, isAuthenticated, isLoading } = useAuth();
   const { config } = useConfig();
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("login");
   const [loginState, setLoginState] = useState({ username: "", password: "" });
+  const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
+  const [passwordChangeForm, setPasswordChangeForm] = useState({
+    username: "",
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
   const [memberForm, setMemberForm] = useState({
     username: "",
     realName: "",
@@ -118,7 +126,9 @@ useEffect(() => {
   }
 
   const [loginError, setLoginError] = useState(null);
+  const [passwordChangeError, setPasswordChangeError] = useState(null);
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
+  const [isSubmittingPasswordChange, setIsSubmittingPasswordChange] = useState(false);
 
   const handleLoginSubmit = async (event) => {
     event.preventDefault();
@@ -128,9 +138,40 @@ useEffect(() => {
       await login(loginState);
       navigate("/");
     } catch (error) {
-      setLoginError(extractErrorMessage(error, t("login.error")));
+      if (error instanceof PasswordChangeRequiredError) {
+        setPasswordChangeForm(prev => ({
+          ...prev,
+          username: loginState.username,
+          oldPassword: loginState.password,
+        }));
+        setPasswordChangeRequired(true);
+      } else {
+        setLoginError(extractErrorMessage(error, t("login.error")));
+      }
     } finally {
       setIsSubmittingLogin(false);
+    }
+  };
+
+  const handlePasswordChangeSubmit = async (event) => {
+    event.preventDefault();
+    if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
+      setPasswordChangeError("Passwords do not match");
+      return;
+    }
+    setIsSubmittingPasswordChange(true);
+    setPasswordChangeError(null);
+    try {
+      await changePassword({
+        username: passwordChangeForm.username,
+        oldPassword: passwordChangeForm.oldPassword,
+        newPassword: passwordChangeForm.newPassword,
+      });
+      navigate("/");
+    } catch (error) {
+      setPasswordChangeError(extractErrorMessage(error, "Failed to change password"));
+    } finally {
+      setIsSubmittingPasswordChange(false);
     }
   };
 
@@ -223,21 +264,156 @@ useEffect(() => {
           <div className="col-12 col-md-8 col-lg-6 col-xl-5 col-xxl-4">
             {/* Welcome Header */}
             <div className="text-center text-white mb-4">
-              <h1 className="display-5 fw-bold mb-2">🏕️ {config?.app_name || "ScoutComp"}</h1>
+              <div className="d-flex align-items-center justify-content-center mb-3">
+                <img
+                  src={config?.app_icon || defaultAppIcon}
+                  alt="App Icon"
+                  style={{ width: "48px", height: "48px", objectFit: "contain" }}
+                  className="me-3"
+                />
+                <h1 className="display-5 fw-bold mb-0">{config?.app_name || "ScoutComp"}</h1>
+              </div>
               <p className="fs-5 opacity-90">{t("login.welcome", "Welcome to Scout Competition")}</p>
             </div>
 
             <div className="card shadow-lg border-0">
               <div className="card-body p-4">
-              {tabButtons}
+              {passwordChangeRequired ? (
+                <div className="text-center mb-4">
+                  <h4 className="text-primary fw-bold">🔒 Password Change Required</h4>
+                  <p className="text-muted">
+                    Your password needs to be changed before you can continue.
+                  </p>
+                </div>
+              ) : (
+                tabButtons
+              )}
 
               <div className="tab-content">
-                <div
-                  className={`tab-pane fade ${activeTab === "login" ? "show active" : ""}`}
-                  role="tabpanel"
-                  aria-labelledby="tab-login"
-                  id="panel-login"
-                >
+                {passwordChangeRequired ? (
+                  <div className="tab-pane fade show active">
+                    <form className="row g-4" onSubmit={handlePasswordChangeSubmit}>
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">
+                          Username
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control form-control-lg"
+                          value={passwordChangeForm.username}
+                          disabled
+                        />
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">
+                          Current Password
+                        </label>
+                        <input
+                          type="password"
+                          className="form-control form-control-lg"
+                          value={passwordChangeForm.oldPassword}
+                          onChange={(event) =>
+                            setPasswordChangeForm((prev) => ({ ...prev, oldPassword: event.target.value }))
+                          }
+                          disabled={isSubmittingPasswordChange}
+                          required
+                        />
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">
+                          New Password
+                        </label>
+                        <input
+                          type="password"
+                          className="form-control form-control-lg"
+                          placeholder="Enter your new password"
+                          value={passwordChangeForm.newPassword}
+                          onChange={(event) =>
+                            setPasswordChangeForm((prev) => ({ ...prev, newPassword: event.target.value }))
+                          }
+                          disabled={isSubmittingPasswordChange}
+                          required
+                          minLength={8}
+                        />
+                      </div>
+
+                      <div className="col-12">
+                        <label className="form-label fw-semibold">
+                          Confirm New Password
+                        </label>
+                        <input
+                          type="password"
+                          className="form-control form-control-lg"
+                          placeholder="Confirm your new password"
+                          value={passwordChangeForm.confirmPassword}
+                          onChange={(event) =>
+                            setPasswordChangeForm((prev) => ({ ...prev, confirmPassword: event.target.value }))
+                          }
+                          disabled={isSubmittingPasswordChange}
+                          required
+                          minLength={8}
+                        />
+                      </div>
+
+                      {passwordChangeError && (
+                        <div className="col-12">
+                          <div className="alert alert-danger border-0 shadow-sm" role="alert">
+                            <div className="d-flex align-items-center">
+                              <i className="fas fa-exclamation-triangle text-warning me-2"></i>
+                              {passwordChangeError}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="col-12 d-grid">
+                        <button
+                          type="submit"
+                          className="btn btn-primary btn-lg fw-semibold py-3"
+                          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
+                          disabled={isSubmittingPasswordChange}
+                        >
+                          {isSubmittingPasswordChange ? (
+                            <>
+                              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                              Changing Password...
+                            </>
+                          ) : (
+                            "Change Password"
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="col-12 text-center">
+                        <button
+                          type="button"
+                          className="btn btn-link text-muted"
+                          onClick={() => {
+                            setPasswordChangeRequired(false);
+                            setPasswordChangeForm({
+                              username: "",
+                              oldPassword: "",
+                              newPassword: "",
+                              confirmPassword: "",
+                            });
+                            setPasswordChangeError(null);
+                          }}
+                        >
+                          Back to Login
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={`tab-pane fade ${activeTab === "login" ? "show active" : ""}`}
+                      role="tabpanel"
+                      aria-labelledby="tab-login"
+                      id="panel-login"
+                    >
                   {activeTab === "login" && (
                     <form className="row g-4" onSubmit={handleLoginSubmit}>
                       <div className="col-12">
@@ -571,6 +747,8 @@ useEffect(() => {
                     </form>
                   )}
                 </div>
+                    </>
+                  )}
               </div>
             </div>
           </div>

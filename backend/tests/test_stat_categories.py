@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.core.security import get_password_hash
 from app.models import (
     Completion,
@@ -31,6 +33,8 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     member_one = User(
         username="scout1",
@@ -40,6 +44,8 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
         preferred_language="cs",
         team=team,
         is_active=True,
+        real_name="Test Scout One",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     member_two = User(
         username="scout2",
@@ -49,6 +55,8 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
         preferred_language="cs",
         team=team,
         is_active=True,
+        real_name="Test Scout Two",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
     task_points = Task(
@@ -186,9 +194,9 @@ def test_stat_category_crud_and_leaderboard(client, db_session):
     assert len(leaderboard) == 2
     # member_one score: points 10*1 + completions task_completions (1)*2 = 12
     # member_two score: points 5*1 + completions (3)*2 = 11
-    assert leaderboard[0]["name"] == "scout1"
+    assert leaderboard[0]["name"] == "Test Scout One"
     assert leaderboard[0]["score"] == 12
-    assert leaderboard[1]["name"] == "scout2"
+    assert leaderboard[1]["name"] == "Test Scout Two"
     assert leaderboard[1]["score"] == 11
 
     # Leaderboard per category (teams)
@@ -222,6 +230,8 @@ def test_group_admin_cannot_manage_categories(client, db_session):
         role=RoleEnum.GROUP_ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Group Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin.managed_teams.append(team)
     db_session.add_all([team, group_admin])

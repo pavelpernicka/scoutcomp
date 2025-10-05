@@ -4,7 +4,7 @@ from typing import List, Optional
 import os
 
 import yaml
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, ConfigDict
 
 
 class DatabaseSettings(BaseModel):
@@ -50,8 +50,7 @@ class Settings(BaseModel):
     database: DatabaseSettings
     mail: MailSettings = MailSettings()
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.yaml"

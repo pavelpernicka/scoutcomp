@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -86,7 +86,7 @@ def review_completion(
     completion.status = payload.status
     completion.admin_note = payload.admin_note
     completion.reviewer_id = reviewer.id
-    completion.reviewed_at = datetime.utcnow()
+    completion.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
     message = None
     if payload.status == CompletionStatus.APPROVED:
@@ -184,7 +184,7 @@ def create_user_completion(
     if status_value == CompletionStatus.PENDING:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status cannot be pending")
 
-    submitted_at = datetime.utcnow()
+    submitted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     completion = Completion(
         task_id=task.id,
         member_id=member.id,
@@ -263,7 +263,7 @@ def update_user_completion(
     status_changed = False
     if payload.status is not None and completion.status != payload.status:
         completion.status = payload.status
-        completion.reviewed_at = datetime.utcnow()
+        completion.reviewed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         completion.reviewer_id = current_user.id
         status_changed = True
 

@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.core.security import get_password_hash
 from app.models import RoleEnum, Team, User
 
@@ -24,6 +26,8 @@ def test_admin_can_create_global_dashboard_message(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db_session.add(admin)
     db_session.commit()
@@ -55,6 +59,8 @@ def test_group_admin_restricted_to_managed_teams(client, db_session):
         role=RoleEnum.GROUP_ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Group Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin.managed_teams.append(team_alpha)
     db_session.add(group_admin)
@@ -99,6 +105,8 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
         role=RoleEnum.ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Admin",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin = User(
         username="captain",
@@ -107,6 +115,8 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
         role=RoleEnum.GROUP_ADMIN,
         preferred_language="cs",
         is_active=True,
+        real_name="Test Captain",
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     group_admin.managed_teams.append(team_alpha)
     db_session.add_all([admin, group_admin])
