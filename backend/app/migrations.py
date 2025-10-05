@@ -207,6 +207,25 @@ def _widen_stat_category_icon_column(conn: Connection) -> None:
     if "stat_categories" not in inspector.get_table_names():
         logger.debug("Table 'stat_categories' missing; icon column resize skipped")
         return
+
+
+def _fix_empty_real_names(conn: Connection) -> None:
+    """Update users with empty real_name to use username as placeholder."""
+    inspector = inspect(conn)
+    if "users" not in inspector.get_table_names():
+        logger.debug("Table 'users' missing; real_name fix skipped")
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "real_name" not in columns:
+        logger.debug("Column 'real_name' not present; fix skipped")
+        return
+
+    logger.info("Fixing users with empty real_name fields")
+    result = conn.execute(
+        text("UPDATE users SET real_name = username WHERE real_name = '' OR real_name IS NULL")
+    )
+    logger.info(f"Updated {result.rowcount} users with empty real_name")
     columns = inspector.get_columns("stat_categories")
     icon_column = next((column for column in columns if column["name"] == "icon"), None)
     if not icon_column:
@@ -323,6 +342,11 @@ MIGRATIONS: List[Migration] = [
         "20251005_add_real_name",
         _add_real_name_column,
         "Add real_name column to users table",
+    ),
+    Migration(
+        "20251005_fix_empty_real_names",
+        _fix_empty_real_names,
+        "Fix users with empty real_name fields",
     ),
 ]
 
