@@ -17,6 +17,12 @@ from ..schemas import (
     CompletionPublic,
     CompletionReview,
 )
+from ..translation import (
+    get_completion_approval_message,
+    get_completion_rejection_message,
+    get_admin_completion_approval_message,
+    get_admin_completion_rejection_message,
+)
 
 
 def _populate_member_info(completion: Completion) -> Completion:
@@ -38,7 +44,11 @@ def list_pending(
 ) -> List[Completion]:
     query = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.status == CompletionStatus.PENDING)
         .order_by(Completion.submitted_at.asc())
     )
@@ -61,7 +71,11 @@ def review_completion(
 ) -> Completion:
     completion = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.id == completion_id)
         .first()
     )
@@ -90,16 +104,21 @@ def review_completion(
 
     message = None
     if payload.status == CompletionStatus.APPROVED:
-        completion.points_awarded = completion.task.points_per_completion * completion.count
-        message = (
-            f"Your completion of '{completion.task.name}' ({completion.count}x) "
-            f"was approved. +{completion.points_awarded:g} points."
+        # Calculate points based on variant or task default
+        points_per_completion = completion.variant.points if completion.variant else completion.task.points_per_completion
+        completion.points_awarded = points_per_completion * completion.count
+        message = get_completion_approval_message(
+            task_name=completion.task.name,
+            count=completion.count,
+            points=completion.points_awarded,
+            language=completion.member.preferred_language
         )
     else:
         completion.points_awarded = 0
-        reason = payload.admin_note or "No reason provided."
-        message = (
-            f"Your completion of '{completion.task.name}' was rejected. Reason: {reason}"
+        message = get_completion_rejection_message(
+            task_name=completion.task.name,
+            reason=payload.admin_note,
+            language=completion.member.preferred_language
         )
 
     notification = Notification(
@@ -122,7 +141,11 @@ def list_my_completions(
 ) -> List[Completion]:
     completions = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.member_id == current_user.id)
         .order_by(Completion.submitted_at.desc())
         .all()
@@ -147,7 +170,11 @@ def list_user_completions(
 
     completions = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.member_id == user_id)
         .order_by(Completion.submitted_at.desc())
         .all()
@@ -198,15 +225,21 @@ def create_user_completion(
     )
 
     if status_value == CompletionStatus.APPROVED:
+        # For admin-created completions, use task points by default (no variant support in admin creation yet)
         completion.points_awarded = task.points_per_completion * payload.count
-        message = (
-            f"An admin recorded a completion of '{task.name}' ({payload.count}x). "
-            f"+{completion.points_awarded:g} points."
+        message = get_admin_completion_approval_message(
+            task_name=task.name,
+            count=payload.count,
+            points=completion.points_awarded,
+            language=member.preferred_language
         )
     else:
         completion.points_awarded = 0
-        reason = payload.admin_note or "Marked as rejected"
-        message = f"An admin added a completion of '{task.name}' but marked it rejected. Reason: {reason}"
+        message = get_admin_completion_rejection_message(
+            task_name=task.name,
+            reason=payload.admin_note,
+            language=member.preferred_language
+        )
 
     notification = Notification(
         user_id=member.id,
@@ -222,7 +255,11 @@ def create_user_completion(
     # Load the completion with member and team info for response
     completion = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.id == completion.id)
         .first()
     )
@@ -239,7 +276,11 @@ def update_user_completion(
 ) -> Completion:
     completion = (
         db.query(Completion)
-        .options(joinedload(Completion.task), joinedload(Completion.member).joinedload(User.team))
+        .options(
+            joinedload(Completion.task),
+            joinedload(Completion.member).joinedload(User.team),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.id == completion_id, Completion.member_id == user_id)
         .first()
     )
@@ -272,7 +313,9 @@ def update_user_completion(
 
     if payload.count is not None or status_changed:
         if completion.status == CompletionStatus.APPROVED and completion.task:
-            completion.points_awarded = completion.task.points_per_completion * completion.count
+            # Calculate points based on variant or task default
+            points_per_completion = completion.variant.points if completion.variant else completion.task.points_per_completion
+            completion.points_awarded = points_per_completion * completion.count
         else:
             completion.points_awarded = 0
 
@@ -291,7 +334,10 @@ def delete_user_completion(
 ) -> None:
     completion = (
         db.query(Completion)
-        .options(joinedload(Completion.member))
+        .options(
+            joinedload(Completion.member),
+            joinedload(Completion.variant)
+        )
         .filter(Completion.id == completion_id, Completion.member_id == user_id)
         .first()
     )
