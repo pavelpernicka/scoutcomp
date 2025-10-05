@@ -5,7 +5,6 @@ import { useState } from "react";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import TaskCompletionDetailsModal from "../components/TaskCompletionDetailsModal";
-import HeroHeader from "../components/HeroHeader";
 import LoadingSpinner from "../components/LoadingSpinner";
 import Card from "../components/Card";
 import DecoratedCard from "../components/DecoratedCard";

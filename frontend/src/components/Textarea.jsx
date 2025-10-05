@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Textarea = ({
   error,
   className = '',
@@ -17,6 +19,12 @@ const Textarea = ({
       {...props}
     />
   );
+};
+
+Textarea.propTypes = {
+  error: PropTypes.string,
+  className: PropTypes.string,
+  rows: PropTypes.number
 };
 
 export default Textarea;

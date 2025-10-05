@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Input = ({
   type = 'text',
   error,
@@ -41,6 +43,14 @@ const Input = ({
       {...props}
     />
   );
+};
+
+Input.propTypes = {
+  type: PropTypes.string,
+  error: PropTypes.string,
+  icon: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  iconPosition: PropTypes.oneOf(['left', 'right']),
+  className: PropTypes.string
 };
 
 export default Input;

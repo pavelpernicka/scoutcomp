@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Button = ({
   variant = 'primary',
   size,
@@ -57,6 +59,19 @@ const Button = ({
       )}
     </button>
   );
+};
+
+Button.propTypes = {
+  variant: PropTypes.oneOf(['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark', 'outline-primary', 'outline-secondary', 'outline-success', 'outline-danger', 'outline-warning', 'outline-info', 'outline-light', 'outline-dark']),
+  size: PropTypes.oneOf(['sm', 'lg']),
+  icon: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  iconPosition: PropTypes.oneOf(['left', 'right']),
+  loading: PropTypes.bool,
+  disabled: PropTypes.bool,
+  children: PropTypes.node,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  gradient: PropTypes.string
 };
 
 export default Button;

@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Select = ({
   options = [],
   error,
@@ -23,6 +25,18 @@ const Select = ({
       ))}
     </select>
   );
+};
+
+Select.propTypes = {
+  options: PropTypes.arrayOf(
+    PropTypes.oneOfType([
+      PropTypes.string,
+      PropTypes.object
+    ])
+  ),
+  error: PropTypes.string,
+  placeholder: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default Select;

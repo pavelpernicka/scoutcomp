@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Modal = ({
   isVisible,
   onClose,
@@ -53,6 +55,20 @@ const Modal = ({
       <div className="modal-backdrop fade show"></div>
     </>
   );
+};
+
+Modal.propTypes = {
+  isVisible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+  icon: PropTypes.node,
+  children: PropTypes.node,
+  footer: PropTypes.node,
+  size: PropTypes.oneOf(['sm', 'lg', 'xl']),
+  headerStyle: PropTypes.object,
+  headerGradient: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default Modal;

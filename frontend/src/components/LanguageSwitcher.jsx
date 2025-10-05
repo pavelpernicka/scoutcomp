@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useState, useRef, useEffect } from "react";
+import PropTypes from 'prop-types';
 
 export default function LanguageSwitcher({ isMobile = false }) {
   const { i18n } = useTranslation();
@@ -61,3 +62,7 @@ export default function LanguageSwitcher({ isMobile = false }) {
     </div>
   );
 }
+
+LanguageSwitcher.propTypes = {
+  isMobile: PropTypes.bool
+};

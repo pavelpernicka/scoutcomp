@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const DecoratedCard = ({
   // Header content
   title,
@@ -82,6 +84,25 @@ const DecoratedCard = ({
       )}
     </div>
   );
+};
+
+DecoratedCard.propTypes = {
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+  icon: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  headerGradient: PropTypes.string,
+  headerClassName: PropTypes.string,
+  rightContent: PropTypes.node,
+  rightBadge: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.node]),
+  shadow: PropTypes.bool,
+  border: PropTypes.bool,
+  className: PropTypes.string,
+  style: PropTypes.object,
+  children: PropTypes.node,
+  bodyClassName: PropTypes.string,
+  bodyStyle: PropTypes.object,
+  headerOverflow: PropTypes.bool,
+  headerPosition: PropTypes.oneOf(['relative', 'absolute', 'fixed', 'sticky'])
 };
 
 export default DecoratedCard;

@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import PropTypes from 'prop-types';
 
 const TaskCompletionDetailsModal = ({
   isVisible,
@@ -108,6 +109,24 @@ const TaskCompletionDetailsModal = ({
       <div className="modal-backdrop fade show"></div>
     </>
   );
+};
+
+TaskCompletionDetailsModal.propTypes = {
+  isVisible: PropTypes.bool.isRequired,
+  onClose: PropTypes.func.isRequired,
+  userTaskDetails: PropTypes.shape({
+    username: PropTypes.string,
+    task_completions: PropTypes.arrayOf(
+      PropTypes.shape({
+        task_id: PropTypes.number,
+        task_name: PropTypes.string,
+        completion_count: PropTypes.number,
+        total_points: PropTypes.number
+      })
+    )
+  }),
+  isLoading: PropTypes.bool,
+  title: PropTypes.string
 };
 
 export default TaskCompletionDetailsModal;

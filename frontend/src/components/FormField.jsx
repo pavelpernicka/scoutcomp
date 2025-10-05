@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const FormField = ({
   label,
   icon,
@@ -23,6 +25,17 @@ const FormField = ({
       {error && <div className="invalid-feedback d-block">{error}</div>}
     </div>
   );
+};
+
+FormField.propTypes = {
+  label: PropTypes.string,
+  icon: PropTypes.node,
+  error: PropTypes.string,
+  help: PropTypes.string,
+  required: PropTypes.bool,
+  children: PropTypes.node,
+  className: PropTypes.string,
+  labelClassName: PropTypes.string
 };
 
 export default FormField;

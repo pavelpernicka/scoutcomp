@@ -4,9 +4,6 @@ import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
 import { useConfig } from "../providers/ConfigProvider";
-import HeroHeader from "../components/HeroHeader";
-import Alert from "../components/Alert";
-import Button from "../components/Button";
 import LoadingSpinner from "../components/LoadingSpinner";
 
 export default function AdminConfig() {

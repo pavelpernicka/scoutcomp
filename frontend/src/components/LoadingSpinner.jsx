@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const LoadingSpinner = ({
   size = 'normal',
   text = 'Loading...',
@@ -17,6 +19,13 @@ const LoadingSpinner = ({
       )}
     </div>
   );
+};
+
+LoadingSpinner.propTypes = {
+  size: PropTypes.oneOf(['small', 'normal']),
+  text: PropTypes.string,
+  className: PropTypes.string,
+  centered: PropTypes.bool
 };
 
 export default LoadingSpinner;

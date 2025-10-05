@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Card = ({
   title,
   subtitle,
@@ -45,6 +47,21 @@ const Card = ({
       )}
     </div>
   );
+};
+
+Card.propTypes = {
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+  icon: PropTypes.node,
+  children: PropTypes.node,
+  header: PropTypes.node,
+  footer: PropTypes.node,
+  className: PropTypes.string,
+  headerClassName: PropTypes.string,
+  bodyClassName: PropTypes.string,
+  footerClassName: PropTypes.string,
+  shadow: PropTypes.bool,
+  border: PropTypes.bool
 };
 
 export default Card;

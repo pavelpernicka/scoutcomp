@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const Alert = ({
   type = 'info',
   children,
@@ -43,6 +45,14 @@ const Alert = ({
       </div>
     </div>
   );
+};
+
+Alert.propTypes = {
+  type: PropTypes.oneOf(['info', 'success', 'warning', 'danger', 'error']),
+  children: PropTypes.node,
+  onDismiss: PropTypes.func,
+  icon: PropTypes.node,
+  className: PropTypes.string,
 };
 
 export default Alert;

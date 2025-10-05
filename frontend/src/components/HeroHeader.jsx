@@ -1,3 +1,5 @@
+import PropTypes from 'prop-types';
+
 const HeroHeader = ({
   title,
   subtitle,
@@ -31,6 +33,14 @@ const HeroHeader = ({
       </div>
     </div>
   );
+};
+
+HeroHeader.propTypes = {
+  title: PropTypes.string,
+  subtitle: PropTypes.string,
+  icon: PropTypes.node,
+  gradient: PropTypes.string,
+  children: PropTypes.node
 };
 
 export default HeroHeader;
