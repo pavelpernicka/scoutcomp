@@ -1,4 +1,6 @@
 from typing import List, Optional
+import secrets
+import string
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, or_
@@ -13,8 +15,8 @@ from ..dependencies import (
     require_admin_or_group_admin,
 )
 from ..models import Completion, CompletionStatus, RoleEnum, Team, User
-from ..schemas import MeResponse, ScoreSummary, UserCreate, UserPublic, UserUpdate
-from ..core.security import get_password_hash
+from ..schemas import BulkRegistrationResult, BulkUserRegistration, MeResponse, PasswordChangeRequest, ScoreSummary, UserCreate, UserPublic, UserUpdate, UserWithPassword
+from ..core.security import get_password_hash, verify_password
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -23,6 +25,7 @@ def _user_to_public(user: User) -> UserPublic:
     return UserPublic(
         id=user.id,
         username=user.username,
+        real_name=user.real_name,
         email=user.email,
         preferred_language=user.preferred_language,
         role=user.role,
@@ -30,6 +33,7 @@ def _user_to_public(user: User) -> UserPublic:
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at,
+        needs_password_change=user.first_login_at is None,  # First login requires password change
         managed_team_ids=[team.id for team in getattr(user, "managed_teams", [])],
         team_name=user.team.name if hasattr(user, 'team') and user.team else None,
     )
@@ -194,6 +198,7 @@ def create_user(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
     user = User(
         username=payload.username,
+        real_name=payload.real_name,
         email=payload.email,
         password_hash=get_password_hash(payload.password),
         preferred_language=payload.preferred_language,
@@ -269,6 +274,9 @@ def update_user(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change usernames")
         user.username = payload.username
 
+    if payload.real_name is not None:
+        user.real_name = payload.real_name
+
     if payload.email is not None:
         if current_user.role != RoleEnum.ADMIN:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change emails")
@@ -324,6 +332,114 @@ def update_user(
     return user
 
 
+def generate_password(length: int = 12) -> str:
+    """Generate a secure random password."""
+    characters = string.ascii_letters + string.digits
+    # Ensure password has at least one uppercase, one lowercase, and one digit
+    password = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits)
+    ]
+    # Fill the rest with random characters
+    for _ in range(length - 3):
+        password.append(secrets.choice(characters))
+
+    # Shuffle to avoid predictable pattern
+    secrets.SystemRandom().shuffle(password)
+    return ''.join(password)
+
+
+def transliterate_text(text: str) -> str:
+    """Convert accented characters to their ASCII equivalents using unidecode."""
+    from unidecode import unidecode
+    return unidecode(text)
+
+
+@router.post("/bulk-register", response_model=BulkRegistrationResult)
+def bulk_register_users(
+    payload: BulkUserRegistration,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+) -> BulkRegistrationResult:
+    def generate_username(real_name: str) -> str:
+        return (
+            transliterate_text(real_name)
+            .lower()
+            .replace(" ", "_")
+            .replace("-", "_")
+            [:50]
+        )
+
+    created_users = []
+    errors = []
+
+    if payload.team_id is not None:
+        team = db.get(Team, payload.team_id)
+        if not team:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    for name in payload.names:
+        name = name.strip()
+        if not name:
+            errors.append(f"Empty name provided")
+            continue
+
+        username = generate_username(name)
+        if not username:
+            errors.append(f"Could not generate username for '{name}'")
+            continue
+
+        existing_user = db.query(User).filter(User.username == username).first()
+        if existing_user:
+            counter = 1
+            base_username = username
+            while existing_user and counter < 100:
+                username = f"{base_username}_{counter}"
+                existing_user = db.query(User).filter(User.username == username).first()
+                counter += 1
+
+            if existing_user:
+                errors.append(f"Could not generate unique username for '{name}'")
+                continue
+
+        try:
+            # Generate unique password for each user
+            plain_password = generate_password()
+
+            user = User(
+                username=username,
+                real_name=name,
+                email=None,
+                password_hash=get_password_hash(plain_password),
+                preferred_language=payload.preferred_language,
+                team_id=payload.team_id,
+                role=payload.role,
+            )
+            db.add(user)
+            db.flush()
+
+            # Create user with password for response
+            user_public = _user_to_public(user)
+            user_with_password = {**user_public.__dict__, "password": plain_password}
+            created_users.append(UserWithPassword(**user_with_password))
+
+        except IntegrityError:
+            db.rollback()
+            errors.append(f"Failed to create user for '{name}' due to database constraint")
+            continue
+
+    if created_users:
+        db.commit()
+
+    return BulkRegistrationResult(
+        success_count=len(created_users),
+        failed_count=len(errors),
+        created_users=created_users,
+        errors=errors
+    )
+
+
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(
     user_id: int,
@@ -337,3 +453,28 @@ def delete_user(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account")
     db.delete(user)
     db.commit()
+
+
+@router.put("/me/password", response_model=UserPublic)
+def change_own_password(
+    payload: PasswordChangeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> UserPublic:
+    """Change current user's password."""
+    # Verify current password
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+
+    # Update password
+    current_user.password_hash = get_password_hash(payload.new_password)
+
+    # Mark as having completed first login (no longer needs password change)
+    if current_user.first_login_at is None:
+        from datetime import datetime
+        current_user.first_login_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(current_user)
+
+    return _user_to_public(current_user)

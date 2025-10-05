@@ -45,6 +45,7 @@ export default function LoginPage() {
   const [loginState, setLoginState] = useState({ username: "", password: "" });
   const [memberForm, setMemberForm] = useState({
     username: "",
+    realName: "",
     email: "",
     password: "",
     joinCode: "",
@@ -52,6 +53,7 @@ export default function LoginPage() {
   });
   const [adminForm, setAdminForm] = useState({
     username: "",
+    realName: "",
     email: "",
     password: "",
   });
@@ -136,7 +138,8 @@ useEffect(() => {
     mutationFn: async () =>
       register({
         username: memberForm.username,
-        email: memberForm.email,
+        real_name: memberForm.realName,
+        email: memberForm.email || undefined,
         password: memberForm.password,
         join_code: memberForm.joinCode,
         preferred_language: memberForm.preferredLanguage,
@@ -150,7 +153,8 @@ useEffect(() => {
     mutationFn: async () =>
       register({
         username: adminForm.username,
-        email: adminForm.email,
+        real_name: adminForm.realName,
+        email: adminForm.email || undefined,
         password: adminForm.password,
         role: "admin",
       }),
@@ -323,6 +327,21 @@ useEffect(() => {
                       }}
                     >
                       <div className="col-12">
+                        <label className="form-label fw-semibold" htmlFor="member-realName">
+                          {t("register.realName", "Real name")}
+                        </label>
+                        <input
+                          id="member-realName"
+                          className="form-control form-control-lg"
+                          placeholder={t("register.realNamePlaceholder", "Enter your full name")}
+                          value={memberForm.realName}
+                          onChange={(event) =>
+                            setMemberForm((prev) => ({ ...prev, realName: event.target.value }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-username">
                           {t("register.username", "Username")}
                         </label>
@@ -340,18 +359,17 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-email">
-                          {t("register.email", "Email")}
+                          {t("register.email", "Email")} <span className="text-muted">({t("register.optional", "optional")})</span>
                         </label>
                         <input
                           id="member-email"
                           className="form-control form-control-lg"
                           type="email"
-                          placeholder={t("register.emailPlaceholder", "Enter your email address")}
+                          placeholder={t("register.emailPlaceholder", "Enter your email address (optional)")}
                           value={memberForm.email}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, email: event.target.value }))
                           }
-                          required
                         />
                       </div>
 
@@ -460,6 +478,21 @@ useEffect(() => {
                       </div>
 
                       <div className="col-12">
+                        <label className="form-label fw-semibold" htmlFor="admin-realName">
+                          {t("register.realName", "Real name")}
+                        </label>
+                        <input
+                          id="admin-realName"
+                          className="form-control form-control-lg"
+                          placeholder={t("register.realNamePlaceholder", "Enter your full name")}
+                          value={adminForm.realName}
+                          onChange={(event) =>
+                            setAdminForm((prev) => ({ ...prev, realName: event.target.value }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-username">
                           {t("register.username", "Username")}
                         </label>
@@ -477,18 +510,17 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-email">
-                          {t("register.email", "Email")}
+                          {t("register.email", "Email")} <span className="text-muted">({t("register.optional", "optional")})</span>
                         </label>
                         <input
                           id="admin-email"
                           className="form-control form-control-lg"
                           type="email"
-                          placeholder={t("register.emailPlaceholder", "Enter your email address")}
+                          placeholder={t("register.emailPlaceholder", "Enter your email address (optional)")}
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({ ...prev, email: event.target.value }))
                           }
-                          required
                         />
                       </div>
 

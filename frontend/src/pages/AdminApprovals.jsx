@@ -171,18 +171,7 @@ export default function AdminApprovals() {
               <DecoratedCard
                 key={item.id}
                 title={item.task?.name || `Task #${item.task_id}`}
-                subtitle={
-                  <div className="d-flex align-items-center gap-3">
-                    <span>
-                      <strong>{item.member?.username || `User #${item.member_id}`}</strong>
-                      {item.member?.team_name && ` • ${item.member.team_name}`}
-                    </span>
-                    <span>•</span>
-                    <span>{t("approvals.count", "Count")}: {item.count}</span>
-                    <span>•</span>
-                    <span>{new Date(item.submitted_at).toLocaleString()}</span>
-                  </div>
-                }
+                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count", "Count")}: ${item.count} • ${new Date(item.submitted_at).toLocaleString()}`}
                 icon="📝"
                 headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                 shadow={true}

@@ -6,6 +6,7 @@ import api from "../services/api";
 
 const emptyCreateForm = {
   username: "",
+  realName: "",
   email: "",
   password: "",
   preferredLanguage: "cs",
@@ -16,6 +17,7 @@ const emptyCreateForm = {
 
 const emptyEditForm = {
   username: "",
+  realName: "",
   email: "",
   preferredLanguage: "cs",
   teamId: "",
@@ -31,6 +33,24 @@ const emptyCompletionForm = {
   status: "approved",
   memberNote: "",
   adminNote: "",
+};
+
+const emptyBulkRegistrationForm = {
+  names: "",
+  teamId: "",
+  role: "member",
+  preferredLanguage: "cs",
+};
+
+// Helper function to generate username from real name
+const generateUsername = (realName) => {
+  return realName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+    .replace(/([^\w]+|\s+)/g, '_')   // Replace space and other characters by hyphen
+    .replace(/\-\-+/g, '_')          // Replaces multiple hyphens by one hyphen
+    .replace(/(^-+|-+$)/g, '')       // Remove extra hyphens from beginning or end
+    .substring(0, 50); // Limit length
 };
 
 const formatErrorDetail = (detail) => {
@@ -73,6 +93,14 @@ export default function AdminUsers() {
   const [showCreateCompletionModal, setShowCreateCompletionModal] = useState(false);
   const [newCompletionForm, setNewCompletionForm] = useState(emptyCompletionForm);
   const [completionCreateError, setCompletionCreateError] = useState(null);
+  const [showBulkRegistrationModal, setShowBulkRegistrationModal] = useState(false);
+  const [bulkForm, setBulkForm] = useState(emptyBulkRegistrationForm);
+  const [bulkRegistrationError, setBulkRegistrationError] = useState(null);
+  const [previewUsers, setPreviewUsers] = useState([]);
+
+  // Password results modal
+  const [showPasswordResultsModal, setShowPasswordResultsModal] = useState(false);
+  const [bulkRegistrationResults, setBulkRegistrationResults] = useState(null);
 
   useEffect(() => {
     if (!feedback) return;
@@ -81,7 +109,7 @@ export default function AdminUsers() {
   }, [feedback]);
 
   useEffect(() => {
-    const anyModalOpen = showCreateModal || showCreateCompletionModal;
+    const anyModalOpen = showCreateModal || showCreateCompletionModal || showBulkRegistrationModal;
     if (anyModalOpen) {
       document.body.classList.add("modal-open");
     } else {
@@ -90,7 +118,7 @@ export default function AdminUsers() {
     return () => {
       document.body.classList.remove("modal-open");
     };
-  }, [showCreateModal, showCreateCompletionModal]);
+  }, [showCreateModal, showCreateCompletionModal, showBulkRegistrationModal, showPasswordResultsModal]);
 
   const { data: teams = [] } = useQuery({
     queryKey: ["admin", "teams", "for-users"],
@@ -149,7 +177,8 @@ export default function AdminUsers() {
     }
     setEditForm({
       username: selectedUser.username,
-      email: selectedUser.email,
+      realName: selectedUser.real_name || "",
+      email: selectedUser.email || "",
       preferredLanguage: selectedUser.preferred_language,
       teamId: selectedUser.team_id ? String(selectedUser.team_id) : "",
       role: selectedUser.role,
@@ -226,7 +255,8 @@ export default function AdminUsers() {
     mutationFn: async () => {
       const payload = {
         username: createForm.username.trim(),
-        email: createForm.email.trim(),
+        real_name: createForm.realName.trim(),
+        email: createForm.email.trim() || undefined,
         password: createForm.password,
         preferred_language: createForm.preferredLanguage || "cs",
         role: createForm.role,
@@ -342,6 +372,35 @@ export default function AdminUsers() {
     },
   });
 
+  const bulkRegisterMutation = useMutation({
+    mutationFn: async (payload) => {
+      const { data } = await api.post("/users/bulk-register", payload);
+      return data;
+    },
+    onMutate: () => {
+      setBulkRegistrationError(null);
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      setShowBulkRegistrationModal(false);
+      setBulkForm(emptyBulkRegistrationForm);
+      setPreviewUsers([]);
+
+      // Show password results if users were created
+      if (result.created_users && result.created_users.length > 0) {
+        setBulkRegistrationResults(result);
+        setShowPasswordResultsModal(true);
+      }
+      setFeedback({
+        type: "success",
+        message: `Successfully created ${result.success_count} users. ${result.failed_count} failed.`,
+      });
+    },
+    onError: (error) => {
+      setBulkRegistrationError(getErrorMessage(error, "Failed to create users."));
+    },
+  });
+
   const openCreateModal = () => {
     createUserMutation.reset();
     setCreateForm(emptyCreateForm);
@@ -367,6 +426,38 @@ export default function AdminUsers() {
     setShowCreateCompletionModal(false);
     setCompletionCreateError(null);
     setNewCompletionForm(emptyCompletionForm);
+  };
+
+  const openBulkRegistrationModal = () => {
+    setBulkRegistrationError(null);
+    setBulkForm(emptyBulkRegistrationForm);
+    setPreviewUsers([]);
+    setShowBulkRegistrationModal(true);
+  };
+
+  const closeBulkRegistrationModal = () => {
+    setShowBulkRegistrationModal(false);
+    setBulkRegistrationError(null);
+    setBulkForm(emptyBulkRegistrationForm);
+    setPreviewUsers([]);
+  };
+
+  const handleBulkFormChange = (field, value) => {
+    setBulkForm((prev) => ({ ...prev, [field]: value }));
+
+    // Update preview when names or related fields change
+    if (field === 'names') {
+      const names = value.split('\n').filter(name => name.trim());
+      setPreviewUsers(
+        names.map(name => {
+          const trimmed = name.trim();
+          return {
+            realName: trimmed,
+            username: generateUsername(trimmed),
+          };
+        })
+      );
+    }
   };
 
   const sendMessageMutation = useMutation({
@@ -397,8 +488,8 @@ export default function AdminUsers() {
       if (editForm.username.trim() !== selectedUser.username) {
         payload.username = editForm.username.trim();
       }
-      if (editForm.email.trim() !== selectedUser.email) {
-        payload.email = editForm.email.trim();
+      if (editForm.email.trim() !== (selectedUser.email || "")) {
+        payload.email = editForm.email.trim() || undefined;
       }
       if (editForm.role !== selectedUser.role) {
         payload.role = editForm.role;
@@ -406,6 +497,10 @@ export default function AdminUsers() {
       if (editForm.isActive !== selectedUser.is_active) {
         payload.is_active = editForm.isActive;
       }
+    }
+
+    if (editForm.realName.trim() !== (selectedUser.real_name || "")) {
+      payload.real_name = editForm.realName.trim();
     }
 
     if (editForm.preferredLanguage !== selectedUser.preferred_language) {
@@ -515,6 +610,28 @@ export default function AdminUsers() {
     sendMessageMutation.mutate(trimmed);
   };
 
+  const handleBulkRegistration = (event) => {
+    event.preventDefault();
+
+    const names = bulkForm.names.split('\n')
+      .map(name => name.trim())
+      .filter(name => name.length > 0);
+
+    if (names.length === 0) {
+      setBulkRegistrationError("Please enter at least one name.");
+      return;
+    }
+
+    const payload = {
+      names,
+      team_id: bulkForm.teamId ? Number(bulkForm.teamId) : null,
+      role: bulkForm.role,
+      preferred_language: bulkForm.preferredLanguage,
+    };
+
+    bulkRegisterMutation.mutate(payload);
+  };
+
   const handleResetCompletionFilters = () => {
     setCompletionTaskFilter("all");
     setCompletionFrom("");
@@ -602,9 +719,14 @@ export default function AdminUsers() {
             <div className="card-header d-flex justify-content-between align-items-center">
               <span>Users</span>
               {isAdmin && (
-                <button type="button" className="btn btn-primary btn-sm" onClick={openCreateModal}>
-                  Add user
-                </button>
+                <div className="d-flex gap-2">
+                  <button type="button" className="btn btn-outline-primary btn-sm" onClick={openBulkRegistrationModal}>
+                    Bulk register
+                  </button>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={openCreateModal}>
+                    Add user
+                  </button>
+                </div>
               )}
             </div>
             <div className="card-body p-0">
@@ -617,6 +739,7 @@ export default function AdminUsers() {
                   <table className="table table-hover table-sm align-middle mb-0">
                     <thead className="table-light">
                       <tr>
+                        <th>Name</th>
                         <th>Username</th>
                         <th>Email</th>
                         <th>Role</th>
@@ -627,8 +750,9 @@ export default function AdminUsers() {
                     <tbody>
                       {users.map((user) => (
                         <tr key={user.id} className={user.id === selectedUserId ? "table-primary" : ""}>
-                          <td>{user.username}</td>
-                          <td>{user.email}</td>
+                          <td>{user.real_name || user.username}</td>
+                          <td className="font-monospace text-muted">{user.username}</td>
+                          <td>{user.email || "—"}</td>
                           <td className="text-capitalize">{user.role.replace("_", " ")}</td>
                           <td>
                             {user.team_id
@@ -657,9 +781,20 @@ export default function AdminUsers() {
         {selectedUser && (
           <div className="col-12 col-xl-6">
             <div className="card shadow-sm mb-4">
-              <div className="card-header">Edit user – {selectedUser.username}</div>
+              <div className="card-header">Edit user – {selectedUser.real_name || selectedUser.username}</div>
               <div className="card-body">
                 <form className="row g-3" onSubmit={handleEditUser}>
+                  <div className="col-12 col-md-6">
+                    <label className="form-label">Real name</label>
+                    <input
+                      className="form-control"
+                      value={editForm.realName}
+                      onChange={(event) =>
+                        setEditForm((prev) => ({ ...prev, realName: event.target.value }))
+                      }
+                      required
+                    />
+                  </div>
                   {isAdmin && (
                     <>
                       <div className="col-12 col-md-6">
@@ -674,7 +809,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Email</label>
+                        <label className="form-label">Email (optional)</label>
                         <input
                           className="form-control"
                           type="email"
@@ -682,7 +817,6 @@ export default function AdminUsers() {
                           onChange={(event) =>
                             setEditForm((prev) => ({ ...prev, email: event.target.value }))
                           }
-                          required
                         />
                       </div>
                     </>
@@ -1080,6 +1214,17 @@ export default function AdminUsers() {
                   <div className="modal-body">
                     <div className="row g-3">
                       <div className="col-12 col-md-6">
+                        <label className="form-label">Real name</label>
+                        <input
+                          className="form-control"
+                          value={createForm.realName}
+                          onChange={(event) =>
+                            setCreateForm((prev) => ({ ...prev, realName: event.target.value }))
+                          }
+                          required
+                        />
+                      </div>
+                      <div className="col-12 col-md-6">
                         <label className="form-label">Username</label>
                         <input
                           className="form-control"
@@ -1091,7 +1236,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Email</label>
+                        <label className="form-label">Email (optional)</label>
                         <input
                           className="form-control"
                           type="email"
@@ -1099,7 +1244,6 @@ export default function AdminUsers() {
                           onChange={(event) =>
                             setCreateForm((prev) => ({ ...prev, email: event.target.value }))
                           }
-                          required
                         />
                       </div>
                       <div className="col-12 col-md-6">
@@ -1363,6 +1507,250 @@ export default function AdminUsers() {
                     </div>
                   </form>
                 )}
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show"></div>
+        </>
+      )}
+
+      {isAdmin && showBulkRegistrationModal && (
+        <>
+          <div
+            className="modal fade show d-block"
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
+            onClick={closeBulkRegistrationModal}
+          >
+            <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(event) => event.stopPropagation()}>
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">Bulk user registration</h5>
+                  <button type="button" className="btn-close" aria-label="Close" onClick={closeBulkRegistrationModal}></button>
+                </div>
+                <form onSubmit={handleBulkRegistration}>
+                  <div className="modal-body">
+                    {bulkRegistrationError && (
+                      <div className="alert alert-danger" role="alert">
+                        {bulkRegistrationError}
+                      </div>
+                    )}
+                    <div className="row g-3">
+                      <div className="col-12">
+                        <label className="form-label">Names (one per line)</label>
+                        <textarea
+                          className="form-control"
+                          rows={8}
+                          value={bulkForm.names}
+                          onChange={(event) => handleBulkFormChange('names', event.target.value)}
+                          placeholder="Enter real names, one per line&#10;Example:&#10;John Doe&#10;Jane Smith&#10;Michael Johnson"
+                          required
+                        />
+                        <div className="form-text">
+                          Usernames will be automatically generated from these names.
+                        </div>
+                      </div>
+
+                      <div className="col-12 col-md-6">
+                        <label className="form-label">Preferred language</label>
+                        <select
+                          className="form-select"
+                          value={bulkForm.preferredLanguage}
+                          onChange={(event) => handleBulkFormChange('preferredLanguage', event.target.value)}
+                        >
+                          <option value="cs">Čeština</option>
+                          <option value="en">English</option>
+                        </select>
+                      </div>
+
+                      <div className="col-12 col-md-6">
+                        <label className="form-label">Role</label>
+                        <select
+                          className="form-select"
+                          value={bulkForm.role}
+                          onChange={(event) => handleBulkFormChange('role', event.target.value)}
+                        >
+                          <option value="member">Member</option>
+                          <option value="group_admin">Group admin</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+
+                      <div className="col-12 col-md-6">
+                        <label className="form-label">Team</label>
+                        <select
+                          className="form-select"
+                          value={bulkForm.teamId}
+                          onChange={(event) => handleBulkFormChange('teamId', event.target.value)}
+                        >
+                          <option value="">No team</option>
+                          {teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {previewUsers.length > 0 && (
+                        <div className="col-12">
+                          <h6 className="fw-semibold">Username preview ({previewUsers.length} users)</h6>
+                          <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                            <div className="table-responsive">
+                              <table className="table table-sm table-borderless mb-0">
+                                <thead>
+                                  <tr>
+                                    <th>Real name</th>
+                                    <th>Generated username</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {previewUsers.map((user, index) => (
+                                    <tr key={index}>
+                                      <td>{user.realName}</td>
+                                      <td className="font-monospace">{user.username}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button
+                      type="button"
+                      className="btn btn-outline-secondary"
+                      onClick={closeBulkRegistrationModal}
+                      disabled={bulkRegisterMutation.isLoading}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={bulkRegisterMutation.isLoading || previewUsers.length === 0}
+                    >
+                      {bulkRegisterMutation.isLoading ? 'Creating...' : `Create ${previewUsers.length} users`}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show"></div>
+        </>
+      )}
+
+      {/* Password Results Modal */}
+      {showPasswordResultsModal && bulkRegistrationResults && (
+        <>
+          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+            <div className="modal-dialog modal-lg" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">📋 Bulk Registration Complete</h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={() => {
+                      setShowPasswordResultsModal(false);
+                      setBulkRegistrationResults(null);
+                    }}
+                  ></button>
+                </div>
+                <div className="modal-body">
+                  <div className="alert alert-warning d-flex align-items-center mb-4">
+                    <i className="fas fa-exclamation-triangle me-2"></i>
+                    <div>
+                      <strong>Important:</strong> These passwords will only be shown once! Make sure to save them securely.
+                      Users will be prompted to change their password on first login.
+                    </div>
+                  </div>
+
+                  <div className="table-responsive">
+                    <table className="table table-hover border">
+                      <thead className="table-dark">
+                        <tr>
+                          <th>Real Name</th>
+                          <th>Username</th>
+                          <th>Generated Password</th>
+                          <th>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkRegistrationResults.created_users.map((user, index) => (
+                          <tr key={user.id}>
+                            <td className="fw-semibold">{user.real_name}</td>
+                            <td className="font-monospace">{user.username}</td>
+                            <td className="font-monospace">{user.password}</td>
+                            <td>
+                              <button
+                                className="btn btn-sm btn-outline-primary"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${user.username}: ${user.password}`);
+                                  // Could add toast notification here
+                                }}
+                                title="Copy username and password"
+                              >
+                                <i className="fas fa-copy"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {bulkRegistrationResults.failed_count > 0 && (
+                    <div className="mt-3">
+                      <h6 className="text-danger">Failed to create ({bulkRegistrationResults.failed_count}):</h6>
+                      <ul className="text-danger">
+                        {bulkRegistrationResults.errors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    className="btn btn-success me-auto"
+                    onClick={() => {
+                      const csvContent = 'Real Name,Username,Password\n' +
+                        bulkRegistrationResults.created_users.map(user =>
+                          `"${user.real_name}","${user.username}","${user.password}"`
+                        ).join('\n');
+
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                      const link = document.createElement('a');
+                      const url = URL.createObjectURL(blob);
+                      link.setAttribute('href', url);
+                      link.setAttribute('download', `bulk_users_${new Date().toISOString().split('T')[0]}.csv`);
+                      link.style.visibility = 'hidden';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                  >
+                    <i className="fas fa-download me-2"></i>
+                    Download CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowPasswordResultsModal(false);
+                      setBulkRegistrationResults(null);
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

@@ -26,7 +26,8 @@ class RefreshRequest(BaseModel):
 
 class RegistrationRequest(BaseModel):
     username: str
-    email: EmailStr
+    real_name: str = Field(min_length=1, max_length=150)
+    email: Optional[EmailStr] = None
     password: str = Field(min_length=8)
     join_code: Optional[str] = None
     preferred_language: Optional[str] = Field(default=None, max_length=8)
@@ -52,7 +53,8 @@ class RefreshTokenResponse(BaseModel):
 
 class UserBase(BaseModel):
     username: str
-    email: EmailStr
+    real_name: str = Field(min_length=1, max_length=150)
+    email: Optional[EmailStr] = None
     preferred_language: str = Field(default="cs", max_length=8)
 
 
@@ -63,8 +65,16 @@ class UserCreate(UserBase):
     managed_team_ids: Optional[List[int]] = None
 
 
+class BulkUserRegistration(BaseModel):
+    names: List[str] = Field(min_items=1, max_items=100)
+    team_id: Optional[int] = None
+    role: RoleEnum = RoleEnum.MEMBER
+    preferred_language: str = Field(default="cs", max_length=8)
+
+
 class UserUpdate(BaseModel):
     username: Optional[str] = None
+    real_name: Optional[str] = Field(default=None, min_length=1, max_length=150)
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=8)
     preferred_language: Optional[str] = Field(default=None, max_length=8)
@@ -72,6 +82,11 @@ class UserUpdate(BaseModel):
     role: Optional[RoleEnum] = None
     is_active: Optional[bool] = None
     managed_team_ids: Optional[List[int]] = None
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=1)
 
 
 class UserPublic(UserBase):
@@ -82,9 +97,21 @@ class UserPublic(UserBase):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+    needs_password_change: bool = False  # True if this is first login and password should be changed
     managed_team_ids: List[int] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserWithPassword(UserPublic):
+    password: str  # Plain text password - only returned during creation
+
+
+class BulkRegistrationResult(BaseModel):
+    success_count: int
+    failed_count: int
+    created_users: List[UserWithPassword]
+    errors: List[str]
 
 
 class ScoreSummary(BaseModel):
@@ -196,6 +223,7 @@ class CompletionReview(BaseModel):
 class MemberInfo(BaseModel):
     id: int
     username: str
+    real_name: str
     team_id: Optional[int]
     team_name: Optional[str] = None
 
@@ -271,6 +299,7 @@ class NotificationPublic(BaseModel):
     read_at: Optional[datetime]
     sender_id: Optional[int]
     sender_username: Optional[str]
+    sender_real_name: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -425,11 +454,13 @@ class PaginatedResponse(BaseModel):
 class ConfigUpdate(BaseModel):
     app_name: Optional[str] = None
     leaderboard_default_view: Optional[str] = Field(default=None, pattern="^(total|average)$")
+    allow_self_registration: Optional[bool] = None
 
 
 class ConfigResponse(BaseModel):
     app_name: str
     leaderboard_default_view: str
+    allow_self_registration: bool
 
 
 TaskPublic.model_rebuild()

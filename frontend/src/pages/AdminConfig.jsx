@@ -15,6 +15,7 @@ export default function AdminConfig() {
   const [formData, setFormData] = useState({
     appName: "",
     leaderboardDefaultView: "total", // "total" or "average"
+    allowSelfRegistration: false,
   });
 
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function AdminConfig() {
       setFormData({
         appName: config.app_name || "ScoutComp",
         leaderboardDefaultView: config.leaderboard_default_view || "total",
+        allowSelfRegistration: config.allow_self_registration || false,
       });
     }
   }, [config]);
@@ -47,6 +49,7 @@ export default function AdminConfig() {
       const { data: response } = await api.patch("/admin/config", {
         app_name: data.appName,
         leaderboard_default_view: data.leaderboardDefaultView,
+        allow_self_registration: data.allowSelfRegistration,
       });
       return response;
     },
@@ -163,6 +166,28 @@ export default function AdminConfig() {
                     </select>
                     <div className="form-text">
                       {t("adminConfig.leaderboardHelp", "Choose which view users see by default when opening the leaderboard")}
+                    </div>
+                  </div>
+
+                  {/* Allow Self Registration */}
+                  <div className="col-12">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="form-check form-switch">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          id="allowSelfRegistration"
+                          checked={formData.allowSelfRegistration}
+                          onChange={(e) => handleInputChange("allowSelfRegistration", e.target.checked)}
+                        />
+                        <label className="form-check-label fw-medium" htmlFor="allowSelfRegistration">
+                          {t("adminConfig.allowSelfRegistration", "Allow Self Registration with Team Code")}
+                        </label>
+                      </div>
+                    </div>
+                    <div className="form-text mt-2">
+                      {t("adminConfig.selfRegistrationHelp", "When enabled, users can register themselves using a team join code without admin approval")}
                     </div>
                   </div>
                 </div>

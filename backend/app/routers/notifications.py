@@ -36,6 +36,7 @@ def list_notifications(
             read_at=note.read_at,
             sender_id=note.sender_id,
             sender_username=note.sender.username if note.sender else None,
+            sender_real_name=note.sender.real_name if note.sender else None,
         )
         for note in notifications
     ]
@@ -77,4 +78,5 @@ def send_notification_to_user(
         read_at=notification.read_at,
         sender_id=notification.sender_id,
         sender_username=current_user.username,
+        sender_real_name=current_user.real_name,
     )

@@ -8,6 +8,7 @@ from ..dependencies import get_current_active_user, get_db
 from ..models import (
     Completion,
     CompletionStatus,
+    RoleEnum,
     StatCategory,
     StatCategoryComponent,
     StatMetricEnum,
@@ -28,7 +29,7 @@ def member_leaderboard(
     rows = (
         db.query(
             User.id.label("entity_id"),
-            User.username.label("name"),
+            User.real_name.label("name"),
             func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
         )
         .outerjoin(
@@ -61,7 +62,7 @@ def team_member_leaderboard(
     rows = (
         db.query(
             User.id.label("entity_id"),
-            User.username.label("name"),
+            User.real_name.label("name"),
             func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
             func.coalesce(func.count(Completion.id), 0).label("completion_count"),
         )
@@ -97,7 +98,9 @@ def get_user_task_completions(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if not current_user.team_id or user.team_id != current_user.team_id:
+    # Allow admins to see any user's details, otherwise restrict to same team
+    is_admin = current_user.role == RoleEnum.ADMIN
+    if not is_admin and (not current_user.team_id or user.team_id != current_user.team_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     # Get task completion counts grouped by task
@@ -119,7 +122,7 @@ def get_user_task_completions(
     # Get task names
     task_ids = [tc.task_id for tc in task_completions]
     if not task_ids:
-        return {"user_id": user_id, "username": user.username, "task_completions": []}
+        return {"user_id": user_id, "username": user.username, "real_name": user.real_name, "task_completions": []}
 
     tasks = (
         db.query(Task.id, Task.name)
@@ -131,6 +134,7 @@ def get_user_task_completions(
     result = {
         "user_id": user_id,
         "username": user.username,
+        "real_name": user.real_name,
         "task_completions": [
             {
                 "task_id": tc.task_id,
@@ -194,7 +198,7 @@ def get_team_recent_activity(
 
         activities.append({
             "id": completion.id,
-            "member_name": completion.member.username if completion.member else "Unknown",
+            "member_name": completion.member.real_name or completion.member.username if completion.member else "Unknown",
             "task_name": completion.task.name if completion.task else "Unknown Task",
             "points": completion.points_awarded,
             "count": completion.count,
@@ -227,7 +231,7 @@ def get_team_members_leaderboard(
     rows = (
         db.query(
             User.id.label("entity_id"),
-            User.username.label("name"),
+            User.real_name.label("name"),
             func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
             func.coalesce(func.count(Completion.id), 0).label("completion_count"),
         )
@@ -368,7 +372,7 @@ def stats_leaderboard(
         return []
 
     users = (
-        db.query(User.id, User.username, User.team_id)
+        db.query(User.id, User.username, User.real_name, User.team_id)
         .filter(User.id.in_(member_ids))
         .all()
     )
@@ -458,7 +462,7 @@ def stats_leaderboard(
         member_entries.append(
             {
                 "entity_id": member_id,
-                "name": user.username,
+                "name": user.real_name or user.username,
                 "score": float(aggregates["score"]),
                 "total_points": float(aggregates["raw"]),
             }

@@ -11,7 +11,8 @@ admin_router = APIRouter(prefix="/admin/config", tags=["admin", "config"])
 # Default configuration values
 DEFAULT_CONFIG = {
     "app_name": "ScoutComp",
-    "leaderboard_default_view": "total"
+    "leaderboard_default_view": "total",
+    "allow_self_registration": "false"
 }
 
 
@@ -34,6 +35,12 @@ def set_config_value(db: Session, key: str, value: str) -> None:
     db.commit()
 
 
+def get_config_bool(db: Session, key: str) -> bool:
+    """Get a boolean config value from database."""
+    value = get_config_value(db, key)
+    return value.lower() in ("true", "1", "yes", "on")
+
+
 @router.get("/config", response_model=ConfigResponse)
 def get_public_config(
     db: Session = Depends(get_db),
@@ -42,6 +49,7 @@ def get_public_config(
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
 
 
@@ -54,6 +62,7 @@ def get_config(
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
 
 
@@ -71,8 +80,12 @@ def update_config(
     if payload.leaderboard_default_view is not None:
         set_config_value(db, "leaderboard_default_view", payload.leaderboard_default_view)
 
+    if payload.allow_self_registration is not None:
+        set_config_value(db, "allow_self_registration", str(payload.allow_self_registration).lower())
+
     # Return updated configuration
     return ConfigResponse(
         app_name=get_config_value(db, "app_name"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )

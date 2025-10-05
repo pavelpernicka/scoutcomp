@@ -233,7 +233,7 @@ export default function UserSettingsPage() {
           >
               <div className="mb-3">
                 <h6 className="text-muted mb-1">{t("userSettings.currentUsername", "Current Username")}</h6>
-                <p className="mb-0 fw-bold">{profile?.user?.username}</p>
+                <p className="mb-0 fw-bold">{profile?.user?.real_name || profile?.user?.username}</p>
               </div>
               <div className="mb-3">
                 <h6 className="text-muted mb-1">{t("userSettings.role", "Role")}</h6>

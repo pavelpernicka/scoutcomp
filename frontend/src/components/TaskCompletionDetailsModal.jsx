@@ -22,7 +22,7 @@ const TaskCompletionDetailsModal = ({
                 <i className="fas fa-chart-bar fs-3"></i>
                 <div>
                   <h5 className="modal-title mb-0">{title}</h5>
-                  <small className="opacity-90">{userTaskDetails?.username}</small>
+                  <small className="opacity-90">{userTaskDetails?.real_name || userTaskDetails?.username}</small>
                 </div>
               </div>
               <button

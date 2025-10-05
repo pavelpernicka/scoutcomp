@@ -279,7 +279,7 @@ export default function LeaderboardPage() {
         )}
       >
         {isLoading ? (
-          <LoadingSpinner size="sm" color="primary" text={t("tasks.loading", "Loading…")} />
+          <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
         ) : topEntries.length === 0 ? (
           <div className="text-center py-4">
             <div className="display-4 mb-2">📊</div>
@@ -360,7 +360,7 @@ export default function LeaderboardPage() {
             )}
           >
             {membersLoading ? (
-              <LoadingSpinner size="sm" color="success" text={t("tasks.loading", "Loading…")} />
+              <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
             ) : topMembers.length === 0 ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3"><i className="fas fa-trophy text-warning"></i></div>
@@ -386,7 +386,7 @@ export default function LeaderboardPage() {
             rightContent={
               <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label="Team leaderboard mode">
                 <Button
-                  variant={teamMode === "total" ? "warning" : ""}
+                  variant={teamMode === "total" ? "warning" : "secondary"}
                   size="sm"
                   onClick={() => setTeamMode("total")}
                   icon="fas fa-calculator"
@@ -395,7 +395,7 @@ export default function LeaderboardPage() {
                   {t("leaderboard.totalBtn", "Total")}
                 </Button>
                 <Button
-                  variant={teamMode === "average" ? "warning" : ""}
+                  variant={teamMode === "average" ? "warning" : "secondary"}
                   size="sm"
                   onClick={() => setTeamMode("average")}
                   icon="fas fa-chart-bar"
@@ -407,7 +407,7 @@ export default function LeaderboardPage() {
             }
           >
             {teamsLoading ? (
-              <LoadingSpinner size="sm" color="warning" text={t("tasks.loading", "Loading…")} />
+              <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
             ) : teamBoard.length === 0 ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3">🏅</div>

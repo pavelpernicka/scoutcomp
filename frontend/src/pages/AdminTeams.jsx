@@ -192,11 +192,11 @@ export default function AdminTeams() {
       .filter((user) => {
         if (!normalizedSearch) return true;
         return (
-          user.username.toLowerCase().includes(normalizedSearch) ||
+          (user.real_name || user.username).toLowerCase().includes(normalizedSearch) ||
           (user.email && user.email.toLowerCase().includes(normalizedSearch))
         );
       })
-      .sort((a, b) => a.username.localeCompare(b.username));
+      .sort((a, b) => (a.real_name || a.username).localeCompare(b.real_name || b.username));
   }, [activeTeam, isAdmin, managedTeamIds, memberFilter, memberSearch, users]);
 
   const handleDeleteTeam = (team) => {
@@ -416,7 +416,7 @@ export default function AdminTeams() {
               {unassignedUsers.map((user) => (
                 <li key={user.id} className="list-group-item d-flex justify-content-between align-items-center gap-3">
                   <div>
-                    <div className="fw-semibold">{user.username}</div>
+                    <div className="fw-semibold">{user.real_name || user.username}</div>
                     <div className="text-muted small">{user.email}</div>
                   </div>
                   <select
@@ -499,7 +499,7 @@ export default function AdminTeams() {
                       </option>
                       {availableUsersForActiveTeam.map((user) => (
                         <option key={user.id} value={user.id}>
-                          {user.username}
+                          {user.real_name || user.username}
                           {user.team_id
                             ? ` – ${teamNameById[user.team_id] || "Other team"}`
                             : " – No team"}
@@ -542,7 +542,7 @@ export default function AdminTeams() {
                         <tbody>
                           {activeTeamMembersLocal.map((user) => (
                             <tr key={user.id}>
-                              <td>{user.username}</td>
+                              <td>{user.real_name || user.username}</td>
                               <td>{user.email}</td>
                               <td>
                                 {isAdmin ? (

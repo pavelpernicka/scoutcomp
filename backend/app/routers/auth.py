@@ -1,7 +1,6 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ..core.security import (
@@ -13,6 +12,7 @@ from ..core.security import (
 from ..dependencies import get_db
 from ..models import RefreshToken, RoleEnum, Team, User
 from ..config import settings
+from .config import get_config_bool
 from ..schemas import (
     LoginRequest,
     RegistrationRequest,
@@ -32,7 +32,7 @@ def _allow_admin_bootstrap(db: Session) -> bool:
 
 @router.get("/options", response_model=RegistrationSettings)
 def registration_options(db: Session = Depends(get_db)) -> RegistrationSettings:
-    allow_member = settings.app.features.allow_self_registration
+    allow_member = get_config_bool(db, "allow_self_registration")
     allow_admin = _allow_admin_bootstrap(db)
     return RegistrationSettings(
         allow_member_registration=allow_member,
@@ -44,7 +44,7 @@ def registration_options(db: Session = Depends(get_db)) -> RegistrationSettings:
 def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> TokenPair:
     role = payload.role or RoleEnum.MEMBER
     allow_admin = _allow_admin_bootstrap(db)
-    allow_member = settings.app.features.allow_self_registration
+    allow_member = get_config_bool(db, "allow_self_registration")
 
     if role == RoleEnum.ADMIN:
         if not allow_admin:
@@ -61,16 +61,20 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
         team_id = team.id
         role = RoleEnum.MEMBER
 
-    existing_user = (
-        db.query(User)
-        .filter(or_(User.username == payload.username, User.email == payload.email))
-        .first()
-    )
+    # Check for existing username
+    existing_user = db.query(User).filter(User.username == payload.username).first()
     if existing_user:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already exists")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+
+    # Check for existing email if provided
+    if payload.email:
+        existing_email = db.query(User).filter(User.email == payload.email).first()
+        if existing_email:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
     user = User(
         username=payload.username,
+        real_name=payload.real_name,
         email=payload.email,
         password_hash=get_password_hash(payload.password),
         preferred_language=payload.preferred_language or settings.app.default_language,
@@ -97,15 +101,16 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
 
 @router.post("/login", response_model=TokenPair)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
-    user = (
-        db.query(User)
-        .filter(or_(User.username == payload.username, User.email == payload.username))
-        .first()
-    )
+    user = db.query(User).filter(User.username == payload.username).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User inactive")
+
+    # Track first login for password change prompt
+    if not user.first_login_at:
+        from datetime import datetime
+        user.first_login_at = datetime.utcnow()
 
     access_token, expires_in = create_access_token(user.id, user.role)
     refresh_token_value, refresh_expires = create_refresh_token()

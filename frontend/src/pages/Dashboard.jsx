@@ -109,7 +109,7 @@ export default function Dashboard() {
                 <div className="d-flex align-items-center mb-2">
                   <span className="fs-1 me-3">🎯</span>
                   <div>
-                    <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.username })}</h3>
+                    <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.real_name || profile?.user?.username })}</h3>
                     {profile?.user?.team_name && (
                       <p className="mb-0 opacity-90">
                         {t("dashboard.teamPride", "Proudly representing {{teamName}}", { teamName: profile.user.team_name })}
@@ -330,14 +330,14 @@ export default function Dashboard() {
                         <div className="d-flex justify-content-between align-items-start mb-2">
                           <div className="d-flex align-items-center gap-2">
                             <div className="bg-primary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', fontSize: '14px', color: 'white' }}>
-                              {notification.sender_username ?
-                                notification.sender_username.charAt(0).toUpperCase() :
+                              {notification.sender_real_name || notification.sender_username ?
+                                (notification.sender_real_name || notification.sender_username).charAt(0).toUpperCase() :
                                 <i className="fas fa-cog text-secondary"></i>
                               }
                             </div>
                             <div>
                               <span className="fw-semibold text-dark">
-                                {notification.sender_username || t("dashboard.system", "System")}
+                                {notification.sender_real_name || notification.sender_username || t("dashboard.system", "System")}
                               </span>
                               <div className="small text-muted">
                                 {formatDate(notification.created_at)}
