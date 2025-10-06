@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import { formatDateToLocal } from "../utils/dateUtils";
 
 const emptyCreateForm = {
   username: "",
@@ -1220,7 +1221,7 @@ export default function AdminUsers() {
                       <tbody>
                         {filteredCompletions.map((item) => (
                           <tr key={item.id}>
-                            <td>{new Date(item.submitted_at).toLocaleString()}</td>
+                            <td>{formatDateToLocal(item.submitted_at)}</td>
                             <td>{item.task?.name || `Task #${item.task_id}`}</td>
                             <td>
                               <select

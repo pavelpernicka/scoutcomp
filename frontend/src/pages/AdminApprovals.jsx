@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import { formatDateToLocal } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
@@ -171,7 +172,7 @@ export default function AdminApprovals() {
               <DecoratedCard
                 key={item.id}
                 title={item.task?.name || `Task #${item.task_id}`}
-                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${new Date(item.submitted_at).toLocaleString()}`}
+                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${formatDateToLocal(item.submitted_at)}`}
                 icon="📝"
                 headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                 shadow={true}

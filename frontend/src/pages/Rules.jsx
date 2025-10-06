@@ -6,6 +6,7 @@ import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import { formatDateToLocal } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
@@ -75,7 +76,7 @@ export default function RulesPage() {
 
   const updatedAtLabel = useMemo(() => {
     if (!page?.updated_at) return null;
-    return new Date(page.updated_at).toLocaleString();
+    return formatDateToLocal(page.updated_at);
   }, [page?.updated_at]);
 
   const handleSave = () => {

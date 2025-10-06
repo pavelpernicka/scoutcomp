@@ -8,10 +8,11 @@ import TaskCompletionDetailsModal from "../components/TaskCompletionDetailsModal
 import LoadingSpinner from "../components/LoadingSpinner";
 import Card from "../components/Card";
 import DecoratedCard from "../components/DecoratedCard";
+import { formatDateToLocal } from "../utils/dateUtils";
 
 const formatDate = (value, language = 'en') => {
   const locale = language === 'cs' ? 'cs-CZ' : 'en-US';
-  return new Date(value).toLocaleString(locale);
+  return formatDateToLocal(value, locale);
 };
 
 const formatRelativeTime = (value, language = 'en', t) => {

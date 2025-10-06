@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import { convertLocalToUTC, formatDateToLocal, isDateExpired } from "../utils/dateUtils";
 
 const getPeriodUnits = (t) => [
   { value: "hour", label: t("adminTasks.periodUnits.hour") },
@@ -55,10 +56,10 @@ const buildPayload = (form) => {
   };
 
   if (form.start_time) {
-    payload.start_time = new Date(form.start_time).toISOString();
+    payload.start_time = convertLocalToUTC(form.start_time);
   }
   if (form.end_time) {
-    payload.end_time = new Date(form.end_time).toISOString();
+    payload.end_time = convertLocalToUTC(form.end_time);
   }
   if (form.max_per_period) {
     payload.max_per_period = Number(form.max_per_period);
@@ -75,7 +76,7 @@ const buildPayload = (form) => {
 
 const formatStatus = (task, t) => {
   if (task.is_archived) return t("adminTasks.status.archived");
-  if (task.end_time && new Date(task.end_time) < new Date()) return t("adminTasks.status.expired");
+  if (task.end_time && isDateExpired(task.end_time)) return t("adminTasks.status.expired");
   return t("adminTasks.status.active");
 };
 
@@ -92,6 +93,9 @@ export default function AdminTasks() {
   const [editForm, setEditForm] = useState(emptyTaskForm);
   const [variantManagementTaskId, setVariantManagementTaskId] = useState(null);
   const [variantForm, setVariantForm] = useState({ name: "", description: "", points: "", position: "" });
+  const [editVariantModalOpen, setEditVariantModalOpen] = useState(false);
+  const [editingVariant, setEditingVariant] = useState(null);
+  const [editVariantForm, setEditVariantForm] = useState({ name: "", description: "", points: "", position: "" });
 
   const handleOpenEditModal = (task) => {
     setEditingTaskId(task.id);
@@ -110,6 +114,9 @@ export default function AdminTasks() {
   const handleCloseVariantModal = () => {
     setVariantManagementTaskId(null);
     setVariantForm({ name: "", description: "", points: "", position: "" });
+    setEditVariantModalOpen(false);
+    setEditingVariant(null);
+    setEditVariantForm({ name: "", description: "", points: "", position: "" });
   };
 
   const handleCreateVariant = (e) => {
@@ -128,6 +135,35 @@ export default function AdminTasks() {
     if (!variantManagementTaskId) return;
     if (!window.confirm(t('adminTasks.confirmDeleteVariant'))) return;
     deleteVariantMutation.mutate({ taskId: variantManagementTaskId, variantId });
+  };
+
+  const handleOpenEditVariantModal = (variant) => {
+    setEditingVariant(variant);
+    setEditVariantForm({
+      name: variant.name,
+      description: variant.description || "",
+      points: variant.points.toString(),
+      position: variant.position?.toString() || ""
+    });
+    setEditVariantModalOpen(true);
+  };
+
+  const handleCloseEditVariantModal = () => {
+    setEditVariantModalOpen(false);
+    setEditingVariant(null);
+    setEditVariantForm({ name: "", description: "", points: "", position: "" });
+  };
+
+  const handleSaveVariantEdit = (e) => {
+    e.preventDefault();
+    if (!variantManagementTaskId || !editingVariant) return;
+    const payload = {
+      name: editVariantForm.name,
+      description: editVariantForm.description || null,
+      points: parseFloat(editVariantForm.points),
+      position: editVariantForm.position ? parseInt(editVariantForm.position) : undefined,
+    };
+    updateVariantMutation.mutate({ taskId: variantManagementTaskId, variantId: editingVariant.id, payload });
   };
 
   const { data: tasks = [], isLoading, isError, error } = useQuery({
@@ -201,6 +237,14 @@ export default function AdminTasks() {
     mutationFn: async ({ taskId, variantId }) => api.delete(`/tasks/${taskId}/variants/${variantId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
+    },
+  });
+
+  const updateVariantMutation = useMutation({
+    mutationFn: async ({ taskId, variantId, payload }) => api.patch(`/tasks/${taskId}/variants/${variantId}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
+      handleCloseEditVariantModal();
     },
   });
 
@@ -874,14 +918,23 @@ export default function AdminTasks() {
                                         )}
                                       </td>
                                       <td>
-                                        <button
-                                          type="button"
-                                          className="btn btn-outline-danger btn-sm"
-                                          onClick={() => handleDeleteVariant(variant.id)}
-                                          disabled={deleteVariantMutation.isLoading}
-                                        >
-                                          {t('adminTasks.delete')}
-                                        </button>
+                                        <div className="btn-group-sm">
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-primary btn-sm me-1"
+                                            onClick={() => handleOpenEditVariantModal(variant)}
+                                          >
+                                            {t('adminTasks.edit')}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="btn btn-outline-danger btn-sm"
+                                            onClick={() => handleDeleteVariant(variant.id)}
+                                            disabled={deleteVariantMutation.isLoading}
+                                          >
+                                            {t('adminTasks.delete')}
+                                          </button>
+                                        </div>
                                       </td>
                                     </tr>
                                   ))
@@ -895,6 +948,11 @@ export default function AdminTasks() {
                   </div>
                 </div>
                 <div className="modal-footer">
+                  {updateVariantMutation.isError && (
+                    <div className="text-danger me-auto small">
+                      {updateVariantMutation.error?.response?.data?.detail || t('adminTasks.failedToUpdate')}
+                    </div>
+                  )}
                   <button
                     type="button"
                     className="btn btn-secondary"
@@ -903,6 +961,104 @@ export default function AdminTasks() {
                     {t('adminTasks.close')}
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-backdrop fade show"></div>
+        </>
+      )}
+
+      {/* Edit Variant Modal */}
+      {editVariantModalOpen && (
+        <>
+          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+            <div className="modal-dialog" role="document">
+              <div className="modal-content">
+                <div className="modal-header">
+                  <h5 className="modal-title">
+                    {t('adminTasks.edit')} {editingVariant?.name}
+                  </h5>
+                  <button
+                    type="button"
+                    className="btn-close"
+                    onClick={handleCloseEditVariantModal}
+                  />
+                </div>
+                <form onSubmit={handleSaveVariantEdit}>
+                  <div className="modal-body">
+                    <div className="row g-3">
+                      <div className="col-md-8">
+                        <label className="form-label">
+                          {t('adminTasks.variantName')} <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          value={editVariantForm.name}
+                          onChange={(e) => setEditVariantForm(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder={t('adminTasks.variantName')}
+                          required
+                        />
+                      </div>
+                      <div className="col-md-4">
+                        <label className="form-label">
+                          {t('adminTasks.points')} <span className="text-danger">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          step="0.1"
+                          value={editVariantForm.points}
+                          onChange={(e) => setEditVariantForm(prev => ({ ...prev, points: e.target.value }))}
+                          placeholder={t('adminTasks.points')}
+                          required
+                        />
+                      </div>
+                      <div className="col-12">
+                        <label className="form-label">{t('adminTasks.positionOptional')}</label>
+                        <input
+                          type="number"
+                          className="form-control"
+                          value={editVariantForm.position}
+                          onChange={(e) => setEditVariantForm(prev => ({ ...prev, position: e.target.value }))}
+                          placeholder={t('adminTasks.positionOptional')}
+                        />
+                      </div>
+                      <div className="col-12">
+                        <label className="form-label">{t('adminTasks.descriptionOptional')}</label>
+                        <textarea
+                          className="form-control"
+                          rows="4"
+                          value={editVariantForm.description}
+                          onChange={(e) => setEditVariantForm(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder={t('adminTasks.supportsMarkdown')}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    {updateVariantMutation.isError && (
+                      <div className="text-danger me-auto small">
+                        {updateVariantMutation.error?.response?.data?.detail || t('adminTasks.failedToUpdate')}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleCloseEditVariantModal}
+                      disabled={updateVariantMutation.isLoading}
+                    >
+                      {t('adminTasks.cancel')}
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn btn-primary"
+                      disabled={updateVariantMutation.isLoading || !editVariantForm.name || !editVariantForm.points}
+                    >
+                      {updateVariantMutation.isLoading ? t('adminTasks.loading') : t('adminTasks.saveChanges')}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>

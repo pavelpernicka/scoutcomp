@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import { formatDateToLocal } from "../utils/dateUtils";
 
 const initialCreateScope = (isAdmin) => (isAdmin ? "global" : "team");
 
@@ -513,7 +514,7 @@ export default function AdminAnnouncements() {
                           <td>{message.title || <span className="text-muted">—</span>}</td>
                           <td>{message.body}</td>
                           <td>{message.team_name || t('adminAnnouncements.all')}</td>
-                          <td>{new Date(message.created_at).toLocaleString()}</td>
+                          <td>{formatDateToLocal(message.created_at)}</td>
                           <td className="text-end">
                             <div className="btn-group btn-group-sm" role="group">
                               <button
