@@ -13,7 +13,7 @@ describe("App shell", () => {
   it("renders login link when logged out", () => {
     const queryClient = new QueryClient();
 
-    const { getByText } = render(
+    const { getByRole } = render(
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
@@ -27,6 +27,6 @@ describe("App shell", () => {
       </I18nextProvider>
     );
 
-    expect(getByText(/login/i)).toBeInTheDocument();
+    expect(getByRole('link', { name: /log in/i })).toBeInTheDocument();
   });
 });

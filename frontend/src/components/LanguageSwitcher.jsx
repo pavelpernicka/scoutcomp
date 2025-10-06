@@ -45,7 +45,7 @@ export default function LanguageSwitcher({ isMobile = false }) {
       >
         <div className="d-flex align-items-center">
           <span className="me-2">{getLanguageFlag(i18n.language)}</span>
-          <span className="fw-bold">{i18n.language.toUpperCase()}</span>
+          <span className="fw-bold">{i18n.language?.toUpperCase() || 'EN'}</span>
         </div>
         <i className="fas fa-chevron-down ms-2"></i>
       </button>
