@@ -9,3 +9,4 @@ pyyaml
 python-jose[cryptography]
 pytest
 httpx
+unidecode
