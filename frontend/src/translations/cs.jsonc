@@ -9,23 +9,23 @@
     // EN: Rules
     "rules": "Pravidla",
     // EN: Administration
-    "admin": "Administrace",
+    "admin": "Admin",
     // EN: Approvals
-    "approvals": "Schvalování",
+    "approvals": "Schválení",
     // EN: Tasks admin
     "tasksAdmin": "Správa úkolů",
     // EN: Stats admin
-    "stats": "Správa statistik",
+    "stats": "Statistiky",
     // EN: Server settings
     "config": "Nastavení serveru",
     // EN: Manage teams
-    "teams": "Družiny",
+    "teams": "Správa družin",
     // EN: Manage users
     "users": "Správa uživatelů",
     // EN: Announcements
     "announcements": "Ohlášky",
     // EN: User settings
-    "userSettings": "Nastavení účtu",
+    "userSettings": "Uživatelská nastavení",
     // EN: Log out
     "logout": "Odhlásit se",
     // EN: Log in
@@ -33,67 +33,67 @@
   },
   "leaderboard": {
     // EN: Task
-    "taskColumn": "[CS] leaderboard.taskColumn",
+    "taskColumn": "Úkol",
     // EN: Task variant
-    "variantsColumn": "[CS] leaderboard.variantsColumn",
+    "variantsColumn": "Varianta úkolu",
     // EN: Completions
-    "completionsColumn": "[CS] leaderboard.completionsColumn",
+    "completionsColumn": "Splnění",
     // EN: Points
-    "pointsColumn": "[CS] leaderboard.pointsColumn",
+    "pointsColumn": "Body",
     // EN: Total
-    "totalRow": "[CS] leaderboard.totalRow",
+    "totalRow": "Celkem",
     // EN: Click for details
-    "clickForDetails": "[CS] leaderboard.clickForDetails",
+    "clickForDetails": "Klikni pro detaily",
     // EN: Click for details about this team
-    "clickForTeamDetails": "[CS] leaderboard.clickForTeamDetails",
+    "clickForTeamDetails": "Klikni pro detaily o této družině",
     // EN: I am so empty...
-    "empty": "[CS] leaderboard.empty",
+    "empty": "Fňuk, tabulka je smutná...",
     // EN: Make me happy and be the first one to be here
-    "beTheFirst": "[CS] leaderboard.beTheFirst",
+    "beTheFirst": "Udělej jí radost a buď první, koho zobrazí",
     // EN: Competition leaderboard
-    "heroTitle": "[CS] leaderboard.heroTitle",
+    "heroTitle": "Výsledky soutěže",
     // EN: That’s exactly what the numbers say. So? Do you see yourself among the top ranks?
-    "heroSubtitle": "[CS] leaderboard.heroSubtitle",
+    "heroSubtitle": "Přesně tak hovoří čísla. Tak co, vidíš se na předních příčkách?",
     // EN: Members
-    "members": "[CS] leaderboard.members",
+    "members": "Členi",
     // EN: Best total result
-    "topPerformers": "[CS] leaderboard.topPerformers",
+    "topPerformers": "Nejlepší celkový výsledek",
     // EN: There are no champions yet
-    "noChampionsYet": "[CS] leaderboard.noChampionsYet",
+    "noChampionsYet": "Zatím tu nejsou žádní šampioni",
     // EN: Be the first!
-    "startQuesting": "[CS] leaderboard.startQuesting",
+    "startQuesting": "Buď první!",
     // EN: Teams
-    "teams": "[CS] leaderboard.teams",
+    "teams": "Družiny",
     // EN: Team score leaderboard
-    "teamRankings": "[CS] leaderboard.teamRankings",
+    "teamRankings": "Žebříček družin",
     // EN: Total
-    "totalBtn": "[CS] leaderboard.totalBtn",
+    "totalBtn": "Celkem",
     // EN: Average
-    "averageBtn": "[CS] leaderboard.averageBtn",
+    "averageBtn": "Průměr",
     // EN: There are no teams yet
-    "noTeamsYet": "[CS] leaderboard.noTeamsYet",
+    "noTeamsYet": "Zatím tu nejsou žádné družiny",
     // EN: When admin creates them, they will appear
-    "teamsWillAppear": "[CS] leaderboard.teamsWillAppear",
+    "teamsWillAppear": "Jakmile je admin vytvoří, objeví se zde",
     // EN: Special statistics
-    "customStatsHeading": "[CS] leaderboard.customStatsHeading",
+    "customStatsHeading": "Speciální statistiky",
     // EN: Categories defined by a combination of tasks
-    "customStatsSubtitle": "[CS] leaderboard.customStatsSubtitle",
+    "customStatsSubtitle": "Kategorie určené kombinací úkolů",
     // EN: There are no special stats yet
-    "noStats": "[CS] leaderboard.noStats",
+    "noStats": "Zatím nejsou žádné speciální statistiky",
     // EN: Tasks done by member
-    "taskDetails": "[CS] leaderboard.taskDetails",
+    "taskDetails": "Úkoly splněné členem/kou",
     // EN: Team members
-    "teamMembers": "[CS] leaderboard.teamMembers",
+    "teamMembers": "Členi družiny",
     // EN: Rank
-    "rankColumn": "[CS] leaderboard.rankColumn",
+    "rankColumn": "Pořadí",
     // EN: Name
-    "memberColumn": "[CS] leaderboard.memberColumn",
+    "memberColumn": "Jméno",
     // EN: Total points
-    "totalPointsColumn": "[CS] leaderboard.totalPointsColumn",
+    "totalPointsColumn": "Celkový počet bodů",
     // EN: Total: {{total}} • Members: {{count}}
-    "averageLine": "[CS] leaderboard.averageLine", // Variables: total, count
+    "averageLine": "Celkem: {{total}} • Členi: {{count}}", // Variables: total, count
     // EN: Members: {{count}}
-    "membersLine": "[CS] leaderboard.membersLine" // Variables: count
+    "membersLine": "Členi: {{count}}" // Variables: count
   },
   "common": {
     // EN: Close
@@ -102,7 +102,8 @@
     "edit": "Upravit",
     // EN: Delete
     "delete": "Smazat",
-    "reset": "Reset",
+    // EN: Reset
+    "reset": "Resetovat",
     // EN: Saving...
     "saving": "Ukládám...",
     // EN: Save
@@ -114,767 +115,761 @@
     // EN: Show all
     "showAll": "Zobrazit vše",
     // EN: Last updated
-    "lastUpdated": "Poslední úprava"
+    "lastUpdated": "Naposledy aktualizováno"
   },
   "adminAnnouncements": {
     // EN: Announcement successfully published
-    "announcementPublished": "[CS] adminAnnouncements.announcementPublished",
+    "announcementPublished": "Ohláška byla úspěšně zveřejněna",
     // EN: Failed to publish!
-    "failedToPublish": "[CS] adminAnnouncements.failedToPublish",
+    "failedToPublish": "Nepodařilo se zveřejnit!",
     // EN: Announcement updated
-    "announcementUpdated": "[CS] adminAnnouncements.announcementUpdated",
+    "announcementUpdated": "Ohláška byla upravena",
     // EN: Failed to update announcement
-    "failedToUpdate": "[CS] adminAnnouncements.failedToUpdate",
+    "failedToUpdate": "Nepodařilo se upravit ohlášku",
     // EN: Announcement removed
-    "announcementRemoved": "[CS] adminAnnouncements.announcementRemoved",
+    "announcementRemoved": "Ohláška byla odstraněna",
     // EN: Failed to remove announcement
-    "failedToRemove": "[CS] adminAnnouncements.failedToRemove",
+    "failedToRemove": "Nepodařilo se odstranit ohlášku",
     // EN: You have no access to modify this
-    "noAccess": "[CS] adminAnnouncements.noAccess",
+    "noAccess": "Nemáš oprávnění to měnit",
     // EN: Message body is mandatory
-    "messageBodyRequired": "[CS] adminAnnouncements.messageBodyRequired",
+    "messageBodyRequired": "Text zprávy je povinný",
     // EN: Select team
-    "selectTeam": "[CS] adminAnnouncements.selectTeam",
+    "selectTeam": "Vyber družinu",
     // EN: Nothing to update
-    "nothingToUpdate": "[CS] adminAnnouncements.nothingToUpdate",
+    "nothingToUpdate": "Není co aktualizovat",
     // EN: Are you sure to delete this announcement?
-    "confirmDelete": "[CS] adminAnnouncements.confirmDelete",
+    "confirmDelete": "Opravdu chceš smazat tuto ohlášku?",
     // EN: Global
-    "global": "[CS] adminAnnouncements.global",
+    "global": "Globální",
     // EN: Team
-    "team": "[CS] adminAnnouncements.team",
+    "team": "Družina",
     // EN: Create new announcement
-    "createAnnouncement": "[CS] adminAnnouncements.createAnnouncement",
+    "createAnnouncement": "Vytvořit novou ohlášku",
     // EN: Title
-    "title": "[CS] adminAnnouncements.title",
+    "title": "Nadpis",
     // EN: Announcement header (optional)
-    "optionalHeadline": "[CS] adminAnnouncements.optionalHeadline",
+    "optionalHeadline": "Záhlaví ohlášky (nepovinné)",
     // EN: Message
-    "message": "[CS] adminAnnouncements.message",
+    "message": "Zpráva",
     // EN: Who can see it:
-    "audience": "[CS] adminAnnouncements.audience",
+    "audience": "Kdo ji uvidí:",
     // EN: All teams (global)
-    "globalAllTeams": "[CS] adminAnnouncements.globalAllTeams",
+    "globalAllTeams": "Všechny družiny (globální)",
     // EN: Specific teams
-    "specificTeam": "[CS] adminAnnouncements.specificTeam",
+    "specificTeam": "Konkrétní družiny",
     // EN: No available teams
-    "noAvailableTeams": "[CS] adminAnnouncements.noAvailableTeams",
+    "noAvailableTeams": "Žádné dostupné družiny",
     // EN: Assign managed team
-    "assignManagedTeam": "[CS] adminAnnouncements.assignManagedTeam",
+    "assignManagedTeam": "Přiřadit spravovanou družinu",
     // EN: Clear
-    "clear": "[CS] adminAnnouncements.clear",
+    "clear": "Vyčistit",
     // EN: Publish
-    "publish": "[CS] adminAnnouncements.publish",
+    "publish": "Zveřejnit",
     // EN: Edit announcement
-    "editAnnouncement": "[CS] adminAnnouncements.editAnnouncement",
+    "editAnnouncement": "Upravit ohlášku",
     // EN: Cancel
-    "cancel": "[CS] adminAnnouncements.cancel",
+    "cancel": "Zrušit",
     // EN: Save
-    "save": "[CS] adminAnnouncements.save",
+    "save": "Uložit",
     // EN: Existing announcements
-    "announcements": "[CS] adminAnnouncements.announcements",
+    "announcements": "Existující ohlášky",
     // EN: Loading...
-    "loading": "[CS] adminAnnouncements.loading",
+    "loading": "Načítám...",
     // EN: No announcements yet
-    "noAnnouncementsYet": "[CS] adminAnnouncements.noAnnouncementsYet",
+    "noAnnouncementsYet": "Zatím žádné ohlášky",
     // EN: Type
-    "type": "[CS] adminAnnouncements.type",
+    "type": "Typ",
     // EN: Content
-    "body": "[CS] adminAnnouncements.body",
+    "body": "Obsah",
     // EN: Created at
-    "created": "[CS] adminAnnouncements.created",
+    "created": "Vytvořeno",
     // EN: All
-    "all": "[CS] adminAnnouncements.all"
+    "all": "Vše"
   },
   "approvals": {
     // EN: Completion approved!
-    "approvedMessage": "[CS] approvals.approvedMessage",
+    "approvedMessage": "Splnění bylo schváleno!",
     // EN: Completion rejected
-    "rejectedMessage": "[CS] approvals.rejectedMessage",
+    "rejectedMessage": "Splnění bylo zamítnuto",
     // EN: Error occured
-    "error": "[CS] approvals.error",
+    "error": "Došlo k chybě",
     // EN: When rejecting, reason is required
-    "reasonRequired": "[CS] approvals.reasonRequired",
+    "reasonRequired": "Při zamítnutí je potřeba uvést důvod",
     // EN: Loading...
-    "loading": "[CS] approvals.loading",
+    "loading": "Načítám...",
     // EN: Approvals
-    "title": "[CS] approvals.title",
+    "title": "Schválení",
     // EN: Approve or reject members completions
-    "subtitle": "[CS] approvals.subtitle",
+    "subtitle": "Schvaluj nebo zamítej splnění úkolů",
     // EN: Pending
-    "pending": "[CS] approvals.pending",
+    "pending": "Čeká na schválení",
     // EN: Possible states:
-    "infoTitle": "[CS] approvals.infoTitle",
+    "infoTitle": "Možné stavy:",
     // EN: Pending review
-    "pendingStatus": "[CS] approvals.pendingStatus",
+    "pendingStatus": "Čeká na kontrolu",
     // EN: Task appears as 'Awaiting approval' in user's dashboard
-    "pendingDescription": "[CS] approvals.pendingDescription",
+    "pendingDescription": "Úkol se u uživatele zobrazí jako „Čeká na schválení“",
     // EN: Approved
-    "approvedStatus": "[CS] approvals.approvedStatus",
+    "approvedStatus": "Schváleno",
     // EN: Points added to score, task marked as completed
-    "approvedDescription": "[CS] approvals.approvedDescription",
+    "approvedDescription": "Body byly přidány a úkol označen jako splněný",
     // EN: Rejected
-    "rejectedStatus": "[CS] approvals.rejectedStatus",
+    "rejectedStatus": "Zamítnuto",
     // EN: User sees feedback and can resubmit
-    "rejectedDescription": "[CS] approvals.rejectedDescription",
+    "rejectedDescription": "Člen/ka vidí zpětnou vazbu a může to zkusit znovu",
     // EN: Everything is done
-    "empty": "[CS] approvals.empty",
+    "empty": "Všechno je hotovo",
     // EN: There are no pending completions
-    "emptyDescription": "[CS] approvals.emptyDescription",
+    "emptyDescription": "Žádné úkoly nečekají na schválení",
     // EN: Count
-    "count": "[CS] approvals.count",
+    "count": "Počet",
     // EN: Awaiting review
-    "awaitingReview": "[CS] approvals.awaitingReview",
+    "awaitingReview": "Čeká na kontrolu",
     // EN: Member's note
-    "memberNote": "[CS] approvals.memberNote",
+    "memberNote": "Poznámka člena/ky",
     // EN: No note provided
-    "noNote": "[CS] approvals.noNote",
+    "noNote": "Bez poznámky",
     // EN: Admin feedback
-    "adminFeedback": "[CS] approvals.adminFeedback",
+    "adminFeedback": "Zpětná vazba od admina",
     // EN: Optional feedback (required for rejection)
-    "feedbackPlaceholder": "[CS] approvals.feedbackPlaceholder",
+    "feedbackPlaceholder": "Nepovinná zpětná vazba (povinná při zamítnutí)",
     // EN: Processing...
-    "processing": "[CS] approvals.processing",
+    "processing": "Zpracovávám...",
     // EN: Approve
-    "approve": "[CS] approvals.approve",
+    "approve": "Schválit",
     // EN: Reject
-    "reject": "[CS] approvals.reject"
+    "reject": "Zamítnout"
   },
   "adminConfig": {
     // EN: Config update successfull
-    "updateSuccess": "[CS] adminConfig.updateSuccess",
+    "updateSuccess": "Nastavení bylo úspěšně aktualizováno",
     // EN: Config update failed
-    "updateFailed": "[CS] adminConfig.updateFailed",
+    "updateFailed": "Aktualizace nastavení selhala",
     // EN: Server settings
-    "title": "[CS] adminConfig.title",
+    "title": "Nastavení serveru",
     // EN: Global server-side settings
-    "subtitle": "[CS] adminConfig.subtitle",
+    "subtitle": "Globální nastavení aplikace",
     // EN: General settings
-    "generalSettings": "[CS] adminConfig.generalSettings",
+    "generalSettings": "Obecná nastavení",
     // EN: Configure basic application settings
-    "generalDescription": "[CS] adminConfig.generalDescription",
+    "generalDescription": "Uprav základní parametry aplikace",
     // EN: Application name
-    "appName": "[CS] adminConfig.appName",
+    "appName": "Název aplikace",
     // EN: This name will appear in the navigation bar and page titles
-    "appNameHelp": "[CS] adminConfig.appNameHelp",
+    "appNameHelp": "Tento název se zobrazí v horní liště a titulcích stránek",
     // EN: Application icon
-    "appIcon": "[CS] adminConfig.appIcon",
+    "appIcon": "Ikona aplikace",
     // EN: Upload a custom icon for your application. Recommended: SVG, PNG, or JPG (max 1MB, square format recommended)
-    "appIconHelp": "[CS] adminConfig.appIconHelp",
+    "appIconHelp": "Nahraj vlastní ikonu (doporučeno: SVG, PNG nebo JPG, max 1 MB, čtvercový formát)",
     // EN: Preview
-    "iconPreview": "[CS] adminConfig.iconPreview",
+    "iconPreview": "Náhled ikony",
     // EN: Leaderboard default view
-    "leaderboardDefault": "[CS] adminConfig.leaderboardDefault",
+    "leaderboardDefault": "Výchozí zobrazení výsledků",
     // EN: Total points
-    "totalPoints": "[CS] adminConfig.totalPoints",
+    "totalPoints": "Celkové body",
     // EN: Average points
-    "averagePoints": "[CS] adminConfig.averagePoints",
+    "averagePoints": "Průměrné body",
     // EN: Choose which view users see by default when opening the leaderboard
-    "leaderboardHelp": "[CS] adminConfig.leaderboardHelp",
+    "leaderboardHelp": "Vyber, jaké zobrazení se uživatelům otevře jako první",
     // EN: Allow self registration with team code
-    "allowSelfRegistration": "[CS] adminConfig.allowSelfRegistration",
+    "allowSelfRegistration": "Povolit samoregistraci pomocí kódu družiny",
     // EN: When enabled, users can register themselves using a team join code without admin approval
-    "selfRegistrationHelp": "[CS] adminConfig.selfRegistrationHelp",
+    "selfRegistrationHelp": "Pokud je povoleno, mohou se členové sami registrovat pomocí kódu družiny bez schválení admina",
     // EN: Only administrators can modify these settings
-    "adminOnly": "[CS] adminConfig.adminOnly"
+    "adminOnly": "Tato nastavení může měnit pouze admin"
   },
   "adminStats": {
     // EN: Category created
-    "categoryCreated": "[CS] adminStats.categoryCreated",
+    "categoryCreated": "Kategorie byla vytvořena",
     // EN: Failed to create category
-    "failedToCreateCategory": "[CS] adminStats.failedToCreateCategory",
+    "failedToCreateCategory": "Nepodařilo se vytvořit kategorii",
     // EN: Category updated
-    "categoryUpdated": "[CS] adminStats.categoryUpdated",
+    "categoryUpdated": "Kategorie byla aktualizována",
     // EN: Failed to update category
-    "failedToUpdateCategory": "[CS] adminStats.failedToUpdateCategory",
+    "failedToUpdateCategory": "Nepodařilo se aktualizovat kategorii",
     // EN: Category deleted
-    "categoryDeleted": "[CS] adminStats.categoryDeleted",
+    "categoryDeleted": "Kategorie byla smazána",
     // EN: Failed to delete category
-    "failedToDeleteCategory": "[CS] adminStats.failedToDeleteCategory",
+    "failedToDeleteCategory": "Nepodařilo se smazat kategorii",
     // EN: Component added
-    "componentAdded": "[CS] adminStats.componentAdded",
+    "componentAdded": "Komponenta byla přidána",
     // EN: Failed to add component
-    "failedToAddComponent": "[CS] adminStats.failedToAddComponent",
+    "failedToAddComponent": "Nepodařilo se přidat komponentu",
     // EN: Component updated
-    "componentUpdated": "[CS] adminStats.componentUpdated",
+    "componentUpdated": "Komponenta byla aktualizována",
     // EN: Failed to update component
-    "failedToUpdateComponent": "[CS] adminStats.failedToUpdateComponent",
+    "failedToUpdateComponent": "Nepodařilo se aktualizovat komponentu",
     // EN: Component removed
-    "componentRemoved": "[CS] adminStats.componentRemoved",
+    "componentRemoved": "Komponenta byla odstraněna",
     // EN: Failed to remove component
-    "failedToRemoveComponent": "[CS] adminStats.failedToRemoveComponent",
+    "failedToRemoveComponent": "Nepodařilo se odstranit komponentu",
     // EN: Name is required
-    "nameRequired": "[CS] adminStats.nameRequired",
+    "nameRequired": "Je nutné zadat název",
     // EN: Nothing to update
-    "nothingToUpdate": "[CS] adminStats.nothingToUpdate",
+    "nothingToUpdate": "Není co aktualizovat",
     // EN: Select task
-    "selectTask": "[CS] adminStats.selectTask",
+    "selectTask": "Vyber úkol",
     // EN: Weight must be number
-    "weightMustBeNumber": "[CS] adminStats.weightMustBeNumber",
+    "weightMustBeNumber": "Váha musí být číslo",
     // EN: Position must be positive
-    "positionMustBeNonNegative": "[CS] adminStats.positionMustBeNonNegative",
+    "positionMustBeNonNegative": "Pozice musí být nezáporná hodnota",
     // EN: Component not found
-    "componentNotFound": "[CS] adminStats.componentNotFound",
+    "componentNotFound": "Komponenta nenalezena",
     // EN: Really remove this component?
-    "confirmRemoveComponent": "[CS] adminStats.confirmRemoveComponent",
+    "confirmRemoveComponent": "Opravdu odstranit tuto komponentu?",
     // EN: You have no access
-    "noAccess": "[CS] adminStats.noAccess",
+    "noAccess": "Nemáš oprávnění k přístupu",
     // EN: Icon must be image
-    "iconMustBeImage": "[CS] adminStats.iconMustBeImage",
+    "iconMustBeImage": "Ikona musí být obrázek",
     // EN: Failed to read icon
-    "failedToReadIcon": "[CS] adminStats.failedToReadIcon",
+    "failedToReadIcon": "Nepodařilo se načíst ikonu",
     // EN: Create custom category
-    "createCategory": "[CS] adminStats.createCategory",
+    "createCategory": "Vytvořit vlastní kategorii",
     // EN: Name
-    "name": "[CS] adminStats.name",
+    "name": "Název",
     // EN: Description
-    "description": "[CS] adminStats.description",
+    "description": "Popis",
     // EN: Icon
-    "icon": "[CS] adminStats.icon",
+    "icon": "Ikona",
     // EN: Emoji or paste URL
-    "iconPlaceholder": "[CS] adminStats.iconPlaceholder",
+    "iconPlaceholder": "Emoji nebo URL obrázku",
     // EN: Upload file
-    "uploadFile": "[CS] adminStats.uploadFile",
+    "uploadFile": "Nahrát soubor",
     // EN: Clear
-    "clear": "[CS] adminStats.clear",
+    "clear": "Vymazat",
     // EN: Uploaded image
-    "uploadedImage": "[CS] adminStats.uploadedImage",
+    "uploadedImage": "Nahraný obrázek",
     // EN: Text or emoji icon
-    "textOrEmojiIcon": "[CS] adminStats.textOrEmojiIcon",
+    "textOrEmojiIcon": "Textová nebo emoji ikona",
     // EN: PNG, JPG, SVG, GIF or WEBP up to 150 KB. You can also use an emoji.
-    "iconFormats": "[CS] adminStats.iconFormats",
+    "iconFormats": "PNG, JPG, SVG, GIF nebo WEBP do 150 KB. Můžeš použít i emoji.",
     // EN: Categories
-    "categories": "[CS] adminStats.categories",
+    "categories": "Kategorie",
     // EN: Loading...
-    "loading": "[CS] adminStats.loading",
+    "loading": "Načítám...",
     // EN: No categories yet
-    "noCategoriesYet": "[CS] adminStats.noCategoriesYet",
+    "noCategoriesYet": "Zatím nejsou žádné kategorie",
     // EN: Select category to manage
-    "selectCategoryToManage": "[CS] adminStats.selectCategoryToManage",
+    "selectCategoryToManage": "Vyber kategorii pro správu",
     // EN: Category detail
-    "categoryDetail": "[CS] adminStats.categoryDetail",
+    "categoryDetail": "Detail kategorie",
     // EN: Delete
-    "delete": "[CS] adminStats.delete",
+    "delete": "Smazat",
     // EN: Component count
-    "componentCount": "[CS] adminStats.componentCount",
+    "componentCount": "Počet komponent",
     // EN: Make sure to click save to apply changes.
-    "uploadedImageSaveToApply": "[CS] adminStats.uploadedImageSaveToApply",
+    "uploadedImageSaveToApply": "Pro uplatnění změn klikni na Uložit",
     // EN: Leave empty to remove the icon. Changes apply after saving.
-    "leaveEmptyToRemoveIcon": "[CS] adminStats.leaveEmptyToRemoveIcon",
+    "leaveEmptyToRemoveIcon": "Ponech prázdné pro odstranění ikony. Změna se projeví po uložení.",
     // EN: Save changes
-    "saveChanges": "[CS] adminStats.saveChanges",
+    "saveChanges": "Uložit změny",
     // EN: Components
-    "components": "[CS] adminStats.components",
+    "components": "Komponenty",
     // EN: No components yet
-    "noComponentsYet": "[CS] adminStats.noComponentsYet",
+    "noComponentsYet": "Zatím nejsou žádné komponenty",
     // EN: Task
-    "task": "[CS] adminStats.task",
+    "task": "Úkol",
     // EN: Metric
-    "metric": "[CS] adminStats.metric",
+    "metric": "Metrika",
     // EN: Weight
-    "weight": "[CS] adminStats.weight",
+    "weight": "Váha",
     // EN: Position
-    "position": "[CS] adminStats.position",
+    "position": "Pozice",
     // EN: Actions
-    "actions": "[CS] adminStats.actions",
+    "actions": "Akce",
     // EN: Points
-    "points": "[CS] adminStats.points",
+    "points": "Body",
     // EN: Completions
-    "completions": "[CS] adminStats.completions",
+    "completions": "Splnění",
     // EN: Update
-    "update": "[CS] adminStats.update",
+    "update": "Aktualizovat",
     // EN: Add component
-    "addComponent": "[CS] adminStats.addComponent",
+    "addComponent": "Přidat komponentu",
     // EN: Auto
-    "auto": "[CS] adminStats.auto",
+    "auto": "Automaticky",
     // EN: Define heuristics by combining task metrics. Positive weights add points, negative weights subtract. If only one task is used, choose between points or completions via the metric selector.
-    "defineHeuristics": "[CS] adminStats.defineHeuristics",
+    "defineHeuristics": "Definuj vlastní kombinace metrik úkolů. Kladné váhy přidávají body, záporné je odečítají. Pokud použiješ jen jeden úkol, můžeš zvolit metriky podle bodů nebo počtu splnění.",
     // EN: Are you sure to delete category?
-    "confirmDeleteCategory": "[CS] adminStats.confirmDeleteCategory",
+    "confirmDeleteCategory": "Opravdu smazat kategorii?",
     // EN: Icon is too large. Maximum size is {{maxSize}} KB.
-    "iconTooLarge": "[CS] adminStats.iconTooLarge" // Variables: maxSize
+    "iconTooLarge": "Ikona je příliš velká. Maximální velikost je {{maxSize}} KB." // Variables: maxSize
   },
   "adminTasks": {
     "periodUnits": {
       // EN: hour
-      "hour": "[CS] adminTasks.periodUnits.hour",
+      "hour": "hodina",
       // EN: day
-      "day": "[CS] adminTasks.periodUnits.day",
+      "day": "den",
       // EN: week
-      "week": "[CS] adminTasks.periodUnits.week",
+      "week": "týden",
       // EN: month
-      "month": "[CS] adminTasks.periodUnits.month"
+      "month": "měsíc"
     },
     "status": {
       // EN: archived
-      "archived": "[CS] adminTasks.status.archived",
+      "archived": "archivováno",
       // EN: epired
-      "expired": "[CS] adminTasks.status.expired",
+      "expired": "vypršelo",
       // EN: active
-      "active": "[CS] adminTasks.status.active",
+      "active": "aktivní",
       // EN: label
-      "label": "[CS] adminTasks.status.label"
+      "label": "stav"
     },
     // EN: Really delete this variant?
-    "confirmDeleteVariant": "[CS] adminTasks.confirmDeleteVariant",
+    "confirmDeleteVariant": "Opravdu smazat tuto variantu?",
     // EN: Create task
-    "createTask": "[CS] adminTasks.createTask",
+    "createTask": "Vytvořit úkol",
     // EN: Name
-    "name": "[CS] adminTasks.name",
+    "name": "Název",
     // EN: Points per completion
-    "pointsPerCompletion": "[CS] adminTasks.pointsPerCompletion",
+    "pointsPerCompletion": "Body za splnění",
     // EN: Description
-    "description": "[CS] adminTasks.description",
+    "description": "Popis",
     // EN: Supports Markdown
-    "markdownPlaceholder": "[CS] adminTasks.markdownPlaceholder",
+    "markdownPlaceholder": "Podporuje Markdown",
     // EN: Preview
-    "preview": "[CS] adminTasks.preview",
+    "preview": "Náhled",
     // EN: No description yet
-    "noDescriptionYet": "[CS] adminTasks.noDescriptionYet",
+    "noDescriptionYet": "Zatím bez popisu",
     // EN: Team (optional)
-    "teamOptional": "[CS] adminTasks.teamOptional",
+    "teamOptional": "Družina (nepovinné)",
     // EN: All teams
-    "allTeams": "[CS] adminTasks.allTeams",
+    "allTeams": "Všechny družiny",
     // EN: Requires approval
-    "requiresApproval": "[CS] adminTasks.requiresApproval",
+    "requiresApproval": "Vyžaduje schválení",
     // EN: Hot deal
-    "hotDeal": "[CS] adminTasks.hotDeal",
+    "hotDeal": "Speciální úkol",
     // EN: Max per period
-    "maxPerPeriod": "[CS] adminTasks.maxPerPeriod",
+    "maxPerPeriod": "Maximálně za období",
     // EN: Period count
-    "periodCount": "[CS] adminTasks.periodCount",
+    "periodCount": "Počet období",
     // EN: Period unit
-    "periodUnit": "[CS] adminTasks.periodUnit",
+    "periodUnit": "Jednotka období",
     // EN: Start time
-    "startTime": "[CS] adminTasks.startTime",
+    "startTime": "Začátek",
     // EN: End time
-    "endTime": "[CS] adminTasks.endTime",
+    "endTime": "Konec",
     // EN: Failed to create task
-    "failedToCreate": "[CS] adminTasks.failedToCreate",
+    "failedToCreate": "Nepodařilo se vytvořit úkol",
     // EN: Existing tasks
-    "existingTasks": "[CS] adminTasks.existingTasks",
+    "existingTasks": "Existující úkoly",
     // EN: Loading...
-    "loading": "[CS] adminTasks.loading",
+    "loading": "Načítám...",
     // EN: Failed to load tasks
-    "failedToLoad": "[CS] adminTasks.failedToLoad",
+    "failedToLoad": "Nepodařilo se načíst úkoly",
     // EN: Points/Variants
-    "pointsVariants": "[CS] adminTasks.pointsVariants",
+    "pointsVariants": "Body / varianty",
     // EN: Period limit
-    "periodLimit": "[CS] adminTasks.periodLimit",
+    "periodLimit": "Limit období",
     // EN: Team
-    "team": "[CS] adminTasks.team",
+    "team": "Družina",
     // EN: Actions
-    "actions": "[CS] adminTasks.actions",
+    "actions": "Akce",
     // EN: Edit
-    "edit": "[CS] adminTasks.edit",
+    "edit": "Upravit",
     // EN: Unarchive
-    "unarchive": "[CS] adminTasks.unarchive",
+    "unarchive": "Obnovit",
     // EN: Archive
-    "archive": "[CS] adminTasks.archive",
+    "archive": "Archivovat",
     // EN: Failed to update
-    "failedToUpdate": "[CS] adminTasks.failedToUpdate",
+    "failedToUpdate": "Nepodařilo se aktualizovat",
     // EN: Delete task
-    "deleteTask": "[CS] adminTasks.deleteTask",
-    // EN: cancel
-    "cancel": "[CS] adminTasks.cancel",
+    "deleteTask": "Smazat úkol",
+    // EN: Cancel
+    "cancel": "Zrušit",
     // EN: Save changes
-    "saveChanges": "[CS] adminTasks.saveChanges",
+    "saveChanges": "Uložit změny",
     // EN: Add new variant
-    "addNewVariant": "[CS] adminTasks.addNewVariant",
+    "addNewVariant": "Přidat novou variantu",
     // EN: Variant name
-    "variantName": "[CS] adminTasks.variantName",
+    "variantName": "Název varianty",
     // EN: Points
-    "points": "[CS] adminTasks.points",
+    "points": "Body",
     // EN: Position (optional)
-    "positionOptional": "[CS] adminTasks.positionOptional",
+    "positionOptional": "Pozice (nepovinné)",
     // EN: Description (optional)
-    "descriptionOptional": "[CS] adminTasks.descriptionOptional",
+    "descriptionOptional": "Popis (nepovinné)",
     // EN: Supports Markdown
-    "supportsMarkdown": "[CS] adminTasks.supportsMarkdown",
+    "supportsMarkdown": "Podporuje Markdown",
     // EN: Add variant
-    "addVariant": "[CS] adminTasks.addVariant",
+    "addVariant": "Přidat variantu",
     // EN: Failed to create variant
-    "failedToCreateVariant": "[CS] adminTasks.failedToCreateVariant",
+    "failedToCreateVariant": "Nepodařilo se vytvořit variantu",
     // EN: Existing variants
-    "existingVariants": "[CS] adminTasks.existingVariants",
+    "existingVariants": "Existující varianty",
     // EN: There are no variants of this task yet
-    "noVariantsYet": "[CS] adminTasks.noVariantsYet",
+    "noVariantsYet": "Zatím žádné varianty tohoto úkolu",
     // EN: Position
-    "position": "[CS] adminTasks.position",
+    "position": "Pozice",
     // EN: No description
-    "noDescription": "[CS] adminTasks.noDescription",
+    "noDescription": "Bez popisu",
     // EN: Delete
-    "delete": "[CS] adminTasks.delete",
+    "delete": "Smazat",
     // EN: Close
-    "close": "[CS] adminTasks.close",
+    "close": "Zavřít",
     // EN: Are you sure to delete {{taskName}}?
-    "confirmDeleteTask": "[CS] adminTasks.confirmDeleteTask", // Variables: taskName
+    "confirmDeleteTask": "Opravdu smazat úkol {{taskName}}?", // Variables: taskName
     // EN: {{count}} variants
-    "variantCount": "[CS] adminTasks.variantCount", // Variables: count
+    "variantCount": "{{count}} variant", // Variables: count
     // EN: Variants ({{count}})
-    "variants": "[CS] adminTasks.variants", // Variables: count
+    "variants": "Varianty ({{count}})", // Variables: count
     // EN: Edit {{taskName}}
-    "editTask": "[CS] adminTasks.editTask", // Variables: taskName
+    "editTask": "Upravit úkol {{taskName}}", // Variables: taskName
     // EN: Manage variants of {{taskName}}
-    "manageVariants": "[CS] adminTasks.manageVariants" // Variables: taskName
+    "manageVariants": "Spravovat varianty úkolu {{taskName}}" // Variables: taskName
   },
   "tasks": {
     // EN: pts.
-    "pts": "[CS] tasks.pts",
+    "pts": "bodů",
     // EN: Loading...
-    "loading": "[CS] tasks.loading",
+    "loading": "Načítám...",
     // EN: Well done! Your completion was successfully submited.
-    "submitSuccess": "[CS] tasks.submitSuccess",
+    "submitSuccess": "Hotovo! Tvoje splnění bylo odesláno ke schválení.",
     // EN: Oh no... Something went wrong. Try to submit it later.
-    "error": "[CS] tasks.error",
+    "error": "Jejda... Něco se pokazilo. Zkus to později.",
     // EN: soon
-    "resetSoon": "[CS] tasks.resetSoon",
+    "resetSoon": "brzy se obnoví",
     // EN: No description given
-    "noDescription": "[CS] tasks.noDescription",
+    "noDescription": "Bez popisu",
     // EN: There are no tasks yet
-    "noTasksYet": "[CS] tasks.noTasksYet",
+    "noTasksYet": "Zatím tu nejsou žádné úkoly",
     // EN: Maybe the competition did not started yet?
-    "noTasksMessage": "[CS] tasks.noTasksMessage",
+    "noTasksMessage": "Možná soutěž ještě nezačala?",
     // EN: No limit
-    "noLimitShort": "[CS] tasks.noLimitShort",
+    "noLimitShort": "Bez limitu",
     // EN: Limit resets
-    "resetsIn": "[CS] tasks.resetsIn",
+    "resetsIn": "Limit se obnoví za",
     // EN: Current period
-    "periodRange": "[CS] tasks.periodRange",
+    "periodRange": "Aktuální období",
     // EN: Sending...
-    "sending": "[CS] tasks.sending",
+    "sending": "Odesílám...",
     // EN: Already completed
-    "questComplete": "[CS] tasks.questComplete",
+    "questComplete": "Splněno",
     // EN: Wait
-    "cooldownActive": "[CS] tasks.cooldownActive",
+    "cooldownActive": "Počkej chvíli",
     // EN: Submit task
-    "submit": "[CS] tasks.submit",
+    "submit": "Odeslat úkol",
     // EN: Task details
-    "questDetails": "[CS] tasks.questDetails",
+    "questDetails": "Detaily úkolu",
     // EN: Task description
-    "questDescription": "[CS] tasks.questDescription",
+    "questDescription": "Popis úkolu",
     // EN: No description for this variant
-    "noVariantDescription": "[CS] tasks.noVariantDescription",
+    "noVariantDescription": "Tato varianta nemá popis",
     // EN: Log your completion
-    "logCompletion": "[CS] tasks.logCompletion",
+    "logCompletion": "Zapsat splnění",
     // EN: Number of completions
-    "countLabel": "[CS] tasks.countLabel",
-    // EN: no limit
-    "noLimit": "[CS] tasks.noLimit",
+    "countLabel": "Počet splnění",
+    // EN: No limit
+    "noLimit": "Bez omezení",
     // EN: Note for review
-    "noteLabel": "[CS] tasks.noteLabel",
+    "noteLabel": "Poznámka ke kontrole",
     // EN: Note to help reviewers to check you really did it. Not mandatoy for tasks without Requires approval)
-    "notePlaceholder": "[CS] tasks.notePlaceholder",
+    "notePlaceholder": "Napiš krátkou poznámku, která pomůže adminům ověřit splnění (nepovinné, pokud úkol nevyžaduje schválení)",
     // EN: Limit for current period reached!
-    "limitReached": "[CS] tasks.limitReached",
+    "limitReached": "Dosažen limit pro toto období!",
     // EN: Wait
-    "cooldown": "[CS] tasks.cooldown",
+    "cooldown": "Počkej",
     // EN: Overview of tasks
-    "heroTitle": "[CS] tasks.heroTitle",
+    "heroTitle": "Přehled úkolů",
     // EN: Ready to complete
-    "ready": "[CS] tasks.ready",
+    "ready": "Připraveno ke splnění",
     // EN: Requires approval
-    "requiresApproval": "[CS] tasks.requiresApproval",
+    "requiresApproval": "Vyžaduje schválení",
     // EN: completed
-    "completed": "[CS] tasks.completed",
+    "completed": "splněno",
     // EN: Show lesss
-    "showLess": "[CS] tasks.showLess",
+    "showLess": "Zobrazit méně",
     // EN: Show more
-    "showMore": "[CS] tasks.showMore",
+    "showMore": "Zobrazit více",
     // EN: Task status
-    "questStatus": "[CS] tasks.questStatus",
+    "questStatus": "Stav úkolu",
     // EN: Ends
-    "ends": "[CS] tasks.ends",
+    "ends": "Končí",
     // EN: Limit reached
-    "limitReachedShort": "[CS] tasks.limitReachedShort",
+    "limitReachedShort": "Limit dosažen",
     // EN: Wait
-    "cooldownShort": "[CS] tasks.cooldownShort",
+    "cooldownShort": "Počkej",
     // EN: Lets do it
-    "startQuest": "[CS] tasks.startQuest",
-    // EN: Done in this perion: {{current}}/{{limit}}
-    "completedPeriodDetail": "[CS] tasks.completedPeriodDetail", // Variables: current, limit
+    "startQuest": "Pojď na to!",
+    // EN: Done in this period: {{current}}/{{limit}}
+    "completedPeriodDetail": "Splněno v tomto období: {{current}}/{{limit}}", // Variables: current, limit
     // EN: You still can submit: {{count}}x
-    "remainingLabel": "[CS] tasks.remainingLabel", // Variables: count
+    "remainingLabel": "Ještě můžeš splnit: {{count}}x", // Variables: count
     // EN: Done in total: {{current}}
-    "completedPeriodUnlimited": "[CS] tasks.completedPeriodUnlimited", // Variables: current
+    "completedPeriodUnlimited": "Splněno celkem: {{current}}", // Variables: current
     // EN: Completed in total: {{count}} times
-    "lifetimeTotal": "[CS] tasks.lifetimeTotal", // Variables: count
+    "lifetimeTotal": "Celkem splněno: {{count}}×", // Variables: count
     // EN: {{count}} magnificent task for you to earn some points
-    "heroSubtitle": "[CS] tasks.heroSubtitle" // Variables: count
+    "heroSubtitle": "{{count}} úkolů, za které můžeš získat body" // Variables: count
   },
   "adminTeams": {
     // EN: Member added successfully
-    "memberAdded": "[CS] adminTeams.memberAdded",
+    "memberAdded": "Člen/ka byl/a úspěšně přidán/a",
     // EN: Member removed successfully
-    "memberRemoved": "[CS] adminTeams.memberRemoved",
+    "memberRemoved": "Člen/ka byl/a úspěšně odebrán/a",
     // EN: unable to update member
-    "unableToUpdateMember": "[CS] adminTeams.unableToUpdateMember",
+    "unableToUpdateMember": "Nepodařilo se upravit člena/ku",
     // EN: Are you sure to remove this member?
-    "confirmRemoveMember": "[CS] adminTeams.confirmRemoveMember",
+    "confirmRemoveMember": "Opravdu chceš odebrat tohoto člena/ku?",
     // EN: Admin
-    "roleAdmin": "[CS] adminTeams.roleAdmin",
+    "roleAdmin": "Admin",
     // EN: Group admin
-    "roleGroupAdmin": "[CS] adminTeams.roleGroupAdmin",
+    "roleGroupAdmin": "Správce družiny",
     // EN: Member
-    "roleMember": "[CS] adminTeams.roleMember",
+    "roleMember": "Člen/ka",
     // EN: You can not remove admin role to yourself
-    "cannotRemoveOwnAdminRole": "[CS] adminTeams.cannotRemoveOwnAdminRole",
+    "cannotRemoveOwnAdminRole": "Nemůžeš si odebrat vlastní roli admina",
     // EN: Teams
-    "teams": "[CS] adminTeams.teams",
+    "teams": "Družiny",
     // EN: Add team
-    "addTeam": "[CS] adminTeams.addTeam",
+    "addTeam": "Přidat družinu",
     // EN: Loading...
-    "loading": "[CS] adminTeams.loading",
+    "loading": "Načítám...",
     // EN: Unable to load teams
-    "unableToLoadTeams": "[CS] adminTeams.unableToLoadTeams",
+    "unableToLoadTeams": "Nepodařilo se načíst družiny",
     // EN: There are no teams yet
-    "noTeamsYet": "[CS] adminTeams.noTeamsYet",
+    "noTeamsYet": "Zatím tu nejsou žádné družiny",
     // EN: No teams assigned
-    "noTeamsAssigned": "[CS] adminTeams.noTeamsAssigned",
+    "noTeamsAssigned": "Zatím nejsou přiřazeny žádné družiny",
     // EN: Join code
-    "joinCode": "[CS] adminTeams.joinCode",
+    "joinCode": "Kód pro připojení",
     // EN: Generate new
-    "rotate": "[CS] adminTeams.rotate",
+    "rotate": "Vygenerovat nový",
     // EN: Edit members
-    "editMembers": "[CS] adminTeams.editMembers",
+    "editMembers": "Upravit členy",
     // EN: Edit details
-    "editDetails": "[CS] adminTeams.editDetails",
+    "editDetails": "Upravit detaily",
     // EN: Delete
-    "delete": "[CS] adminTeams.delete",
+    "delete": "Smazat",
     // EN: Unassigned users
-    "unassignedUsers": "[CS] adminTeams.unassignedUsers",
+    "unassignedUsers": "Nepřiřazení uživatelé",
     // EN: No team
-    "noTeam": "[CS] adminTeams.noTeam",
+    "noTeam": "Bez družiny",
     // EN: Search
-    "search": "[CS] adminTeams.search",
+    "search": "Hledat",
     // EN: Name or e-mail
-    "usernameOrEmail": "[CS] adminTeams.usernameOrEmail",
+    "usernameOrEmail": "Jméno nebo e-mail",
     // EN: Filter
-    "filter": "[CS] adminTeams.filter",
+    "filter": "Filtrovat",
     // EN: All users
-    "allUsers": "[CS] adminTeams.allUsers",
+    "allUsers": "Všichni uživatelé",
     // EN: Unassigned
-    "withoutTeam": "[CS] adminTeams.withoutTeam",
+    "withoutTeam": "Bez družiny",
     // EN: Other teams
-    "otherTeams": "[CS] adminTeams.otherTeams",
+    "otherTeams": "Ostatní družiny",
     // EN: No users available
-    "noUsersAvailable": "[CS] adminTeams.noUsersAvailable",
+    "noUsersAvailable": "Žádní dostupní uživatelé",
     // EN: Select user
-    "selectUser": "[CS] adminTeams.selectUser",
+    "selectUser": "Vyber uživatele",
     // EN: Other team
-    "otherTeam": "[CS] adminTeams.otherTeam",
+    "otherTeam": "Jiná družina",
     // EN: Add
-    "add": "[CS] adminTeams.add",
+    "add": "Přidat",
     // EN: There are no members in this group yet
-    "noMembersYet": "[CS] adminTeams.noMembersYet",
+    "noMembersYet": "Zatím tu nejsou žádní členové/ky",
     // EN: Member
-    "member": "[CS] adminTeams.member",
-    // EN: E-mail
-    "email": "[CS] adminTeams.email",
-    // EN: Role
-    "role": "[CS] adminTeams.role",
+    "member": "Člen/ka",
+    "email": "E-mail",
+    "role": "Role",
     // EN: Action
-    "actions": "[CS] adminTeams.actions",
+    "actions": "Akce",
     // EN: Remove from team
-    "removeFromTeam": "[CS] adminTeams.removeFromTeam",
+    "removeFromTeam": "Odebrat z družiny",
     // EN: Name
-    "name": "[CS] adminTeams.name",
+    "name": "Název",
     // EN: Description
-    "description": "[CS] adminTeams.description",
+    "description": "Popis",
     // EN: Failed to update team
-    "failedToUpdateTeam": "[CS] adminTeams.failedToUpdateTeam",
+    "failedToUpdateTeam": "Nepodařilo se upravit družinu",
     // EN: Failed to create team
-    "failedToCreateTeam": "[CS] adminTeams.failedToCreateTeam",
+    "failedToCreateTeam": "Nepodařilo se vytvořit družinu",
     // EN: Cancel
-    "cancel": "[CS] adminTeams.cancel",
+    "cancel": "Zrušit",
     // EN: Create team
-    "createTeam": "[CS] adminTeams.createTeam",
+    "createTeam": "Vytvořit družinu",
     // EN: Are you sure to delete team '{{teamName}}'?
-    "confirmDeleteTeam": "[CS] adminTeams.confirmDeleteTeam", // Variables: teamName
+    "confirmDeleteTeam": "Opravdu smazat družinu '{{teamName}}'?", // Variables: teamName
     // EN: Rotate code for '{{teamName}}'? Old one will stop working!
-    "confirmRotateCode": "[CS] adminTeams.confirmRotateCode", // Variables: teamName
+    "confirmRotateCode": "Opravdu změnit kód pro '{{teamName}}'? Starý přestane platit!", // Variables: teamName
     // EN: {{count}} members
-    "memberCount": "[CS] adminTeams.memberCount", // Variables: count
-    // EN: Manage members of {{manageMembers}}
-    "manageMembers": "[CS] adminTeams.manageMembers", // Variables: teamName
+    "memberCount": "{{count}} členů", // Variables: count
+    // EN: Manage members of {{teamName}}
+    "manageMembers": "Spravovat členy družiny {{teamName}}", // Variables: teamName
     // EN: Edit team {{teamName}}
-    "editTeam": "[CS] adminTeams.editTeam" // Variables: teamName
+    "editTeam": "Upravit družinu {{teamName}}" // Variables: teamName
   },
   "adminUsers": {
     // EN: User created successfully
-    "userCreated": "[CS] adminUsers.userCreated",
+    "userCreated": "Uživatel byl úspěšně vytvořen",
     // EN: Failed to create user
-    "failedToCreateUser": "[CS] adminUsers.failedToCreateUser",
+    "failedToCreateUser": "Nepodařilo se vytvořit uživatele",
     // EN: User updated
-    "userUpdated": "[CS] adminUsers.userUpdated",
+    "userUpdated": "Uživatel byl upraven",
     // EN: Failed to update user
-    "failedToUpdateUser": "[CS] adminUsers.failedToUpdateUser",
+    "failedToUpdateUser": "Nepodařilo se upravit uživatele",
     // EN: User deleted
-    "userDeleted": "[CS] adminUsers.userDeleted",
+    "userDeleted": "Uživatel byl smazán",
     // EN: Failed to delete user
-    "failedToDeleteUser": "[CS] adminUsers.failedToDeleteUser",
+    "failedToDeleteUser": "Nepodařilo se smazat uživatele",
     // EN: User's completion updated
-    "completionUpdated": "[CS] adminUsers.completionUpdated",
+    "completionUpdated": "Splnění úkolu bylo aktualizováno",
     // EN: Unable to update completion
-    "unableToUpdateCompletion": "[CS] adminUsers.unableToUpdateCompletion",
+    "unableToUpdateCompletion": "Nepodařilo se aktualizovat splnění úkolu",
     // EN: User's completion removed
-    "completionRemoved": "[CS] adminUsers.completionRemoved",
+    "completionRemoved": "Splnění bylo odstraněno",
     // EN: Unable to delete completion
-    "unableToDeleteCompletion": "[CS] adminUsers.unableToDeleteCompletion",
+    "unableToDeleteCompletion": "Nepodařilo se odstranit splnění",
     // EN: Completion recorded
-    "completionRecorded": "[CS] adminUsers.completionRecorded",
+    "completionRecorded": "Splnění bylo zapsáno",
     // EN: Unable to create completion
-    "unableToCreateCompletion": "[CS] adminUsers.unableToCreateCompletion",
+    "unableToCreateCompletion": "Nepodařilo se vytvořit splnění",
     // EN: Failed to create users
-    "failedToCreateUsers": "[CS] adminUsers.failedToCreateUsers",
+    "failedToCreateUsers": "Nepodařilo se vytvořit uživatele",
     // EN: Message sent
-    "messageSent": "[CS] adminUsers.messageSent",
+    "messageSent": "Zpráva odeslána",
     // EN: Failed to send message
-    "failedToSendMessage": "[CS] adminUsers.failedToSendMessage",
+    "failedToSendMessage": "Nepodařilo se odeslat zprávu",
     // EN: Failed to generate password
-    "failedToGeneratePassword": "[CS] adminUsers.failedToGeneratePassword",
+    "failedToGeneratePassword": "Nepodařilo se vygenerovat heslo",
     // EN: Nothing to update
-    "nothingToUpdate": "[CS] adminUsers.nothingToUpdate",
+    "nothingToUpdate": "Není co aktualizovat",
     // EN: You can not delete your own account
-    "cannotDeleteOwnAccount": "[CS] adminUsers.cannotDeleteOwnAccount",
+    "cannotDeleteOwnAccount": "Nemůžeš smazat svůj vlastní účet",
     // EN: Are you sure to delete this user?
-    "confirmDeleteUser": "[CS] adminUsers.confirmDeleteUser",
+    "confirmDeleteUser": "Opravdu smazat tohoto uživatele?",
     // EN: Count must be in range
-    "countMustBeBetween": "[CS] adminUsers.countMustBeBetween",
+    "countMustBeBetween": "Počet musí být v povoleném rozsahu",
     // EN: Are you sure to remove completion
-    "confirmRemoveCompletion": "[CS] adminUsers.confirmRemoveCompletion",
+    "confirmRemoveCompletion": "Opravdu odstranit toto splnění?",
     // EN: Select an user first?
-    "selectUserFirst": "[CS] adminUsers.selectUserFirst",
+    "selectUserFirst": "Nejprve vyber uživatele",
     // EN: Select task
-    "selectTask": "[CS] adminUsers.selectTask",
+    "selectTask": "Vyber úkol",
     // EN: Message cannot be empty
-    "messageCannotBeEmpty": "[CS] adminUsers.messageCannotBeEmpty",
+    "messageCannotBeEmpty": "Zpráva nesmí být prázdná",
     // EN: Enter at least one name
-    "enterAtLeastOneName": "[CS] adminUsers.enterAtLeastOneName",
+    "enterAtLeastOneName": "Zadej alespoň jedno jméno",
     // EN: You have no access
-    "noAccess": "[CS] adminUsers.noAccess",
+    "noAccess": "Nemáš oprávnění k přístupu",
     // EN: Users
-    "users": "[CS] adminUsers.users",
+    "users": "Uživatelé",
     "bulkRegister": {
       // EN: Bulk register
-      "title": "[CS] adminUsers.bulkRegister.title",
+      "title": "Hromadná registrace",
       // EN: Names list
-      "namesLabel": "[CS] adminUsers.bulkRegister.namesLabel",
-      // EN: First name
-Second Name
-Third Name
-      "namesPlaceholder": "[CS] adminUsers.bulkRegister.namesPlaceholder",
+      "namesLabel": "Seznam jmen",
+      // EN: First name\nSecond Name\nThird Name
+      "namesPlaceholder": "První jméno\nDruhé jméno\nTřetí jméno",
       // EN: Enter full names of new users each on new line. Usernames will be created automatically
-      "namesDescription": "[CS] adminUsers.bulkRegister.namesDescription",
+      "namesDescription": "Zadej úplná jména nových uživatelů – každé na nový řádek. Přihlašovací jména se vytvoří automaticky.",
       // EN: Important
-      "important": "[CS] adminUsers.bulkRegister.important",
+      "important": "Důležité",
       // EN: Copy the login details, they will not be in readable format after you close this modal.
-      "importantMessage": "[CS] adminUsers.bulkRegister.importantMessage",
+      "importantMessage": "Zkopíruj si přihlašovací údaje – po zavření okna už nebudou čitelné.",
       // EN: Generated password
-      "generatedPassword": "[CS] adminUsers.bulkRegister.generatedPassword",
+      "generatedPassword": "Vygenerované heslo",
       // EN: Action
-      "action": "[CS] adminUsers.bulkRegister.action",
+      "action": "Akce",
       // EN: Download CSV
-      "downloadCSV": "[CS] adminUsers.bulkRegister.downloadCSV"
+      "downloadCSV": "Stáhnout CSV"
     },
     // EN: Add user
-    "addUser": "[CS] adminUsers.addUser",
+    "addUser": "Přidat uživatele",
     // EN: Loading...
-    "loading": "[CS] adminUsers.loading",
+    "loading": "Načítám...",
     // EN: No users yet
-    "noUsersYet": "[CS] adminUsers.noUsersYet",
+    "noUsersYet": "Zatím tu nejsou žádní uživatelé",
     // EN: Name
-    "name": "[CS] adminUsers.name",
+    "name": "Jméno",
     // EN: Username
-    "username": "[CS] adminUsers.username",
-    // EN: E-mail
-    "email": "[CS] adminUsers.email",
-    // EN: Role
-    "role": "[CS] adminUsers.role",
+    "username": "Uživatelské jméno",
+    "email": "E-mail",
+    "role": "Role",
     // EN: Team
-    "team": "[CS] adminUsers.team",
+    "team": "Družina",
     // EN: Manage
-    "manage": "[CS] adminUsers.manage",
+    "manage": "Spravovat",
     // EN: Real name
-    "realName": "[CS] adminUsers.realName",
+    "realName": "Skutečné jméno",
     // EN: E-mail (optional)
-    "emailOptional": "[CS] adminUsers.emailOptional",
-    // EN: Preffered language
-    "preferredLanguage": "[CS] adminUsers.preferredLanguage",
+    "emailOptional": "E-mail (nepovinné)",
+    // EN: Prefered language
+    "preferredLanguage": "Preferovaný jazyk",
     // EN: No team
-    "noTeam": "[CS] adminUsers.noTeam",
+    "noTeam": "Bez družiny",
     // EN: Member
-    "roleMember": "[CS] adminUsers.roleMember",
+    "roleMember": "Člen/ka",
     // EN: Group admin
-    "roleGroupAdmin": "[CS] adminUsers.roleGroupAdmin",
+    "roleGroupAdmin": "Správce družiny",
     // EN: Admin
-    "roleAdmin": "[CS] adminUsers.roleAdmin",
+    "roleAdmin": "Admin",
     // EN: Active
-    "active": "[CS] adminUsers.active",
+    "active": "Aktivní",
     // EN: Managed teams
-    "managedTeams": "[CS] adminUsers.managedTeams",
+    "managedTeams": "Spravované družiny",
     // EN: Reset password
-    "resetPassword": "[CS] adminUsers.resetPassword",
+    "resetPassword": "Resetovat heslo",
     // EN: Leave blank to keep current password
-    "changePasswordPlaceholder": "[CS] adminUsers.changePasswordPlaceholder",
+    "changePasswordPlaceholder": "Ponech prázdné, pokud chceš zachovat aktuální heslo",
     // EN: Generate
-    "generate": "[CS] adminUsers.generate",
+    "generate": "Vygenerovat",
     // EN: Clear password
-    "clearPassword": "[CS] adminUsers.clearPassword",
+    "clearPassword": "Vymazat heslo",
     // EN: Save changes
-    "saveChanges": "[CS] adminUsers.saveChanges",
+    "saveChanges": "Uložit změny",
     // EN: Send message to user
-    "sendMessage": "[CS] adminUsers.sendMessage",
+    "sendMessage": "Poslat zprávu uživateli",
     // EN: Write a short message for this user
-    "sendMessagePlaceholder": "[CS] adminUsers.sendMessagePlaceholder",
+    "sendMessagePlaceholder": "Napiš krátkou zprávu pro tohoto uživatele",
     // EN: Clear
-    "clear": "[CS] adminUsers.clear",
+    "clear": "Vymazat",
     // EN: Send
-    "send": "[CS] adminUsers.send",
+    "send": "Odeslat",
     // EN: Deleting an user cannot be undone
-    "deletingUserCannotBeUndone": "[CS] adminUsers.deletingUserCannotBeUndone",
+    "deletingUserCannotBeUndone": "Smazání uživatele nelze vrátit zpět",
     // EN: Delete user
-    "deleteUser": "[CS] adminUsers.deleteUser",
+    "deleteUser": "Smazat uživatele",
     // EN: Completion history
-    "completionHistory": "[CS] adminUsers.completionHistory",
+    "completionHistory": "Historie splnění",
     // EN: Add completion
-    "addCompletionBtn": "[CS] adminUsers.addCompletionBtn",
+    "addCompletionBtn": "Přidat splnění",
     // EN: All tasks
-    "allTasks": "[CS] adminUsers.allTasks",
+    "allTasks": "Všechny úkoly",
     // EN: From
-    "dateFrom": "[CS] adminUsers.dateFrom",
+    "dateFrom": "Od",
     // EN: To
-    "dateTo": "[CS] adminUsers.dateTo",
+    "dateTo": "Do",
     // EN: Total points
-    "totalPoints": "[CS] adminUsers.totalPoints",
+    "totalPoints": "Celkové body",
     // EN: Points by task
-    "pointsByTask": "[CS] adminUsers.pointsByTask",
+    "pointsByTask": "Body podle úkolů",
     // EN: No completions yet
-    "noCompletions": "[CS] adminUsers.noCompletions",
+    "noCompletions": "Zatím žádná splnění",
     // EN: Date
-    "date": "[CS] adminUsers.date",
+    "date": "Datum",
     // EN: Status
-    "status": "[CS] adminUsers.status",
+    "status": "Stav",
     // EN: Count
-    "count": "[CS] adminUsers.count",
+    "count": "Počet",
     // EN: Admin note
-    "adminNote": "[CS] adminUsers.adminNote",
+    "adminNote": "Poznámka admina",
     // EN: Actions
-    "actions": "[CS] adminUsers.actions",
+    "actions": "Akce",
     // EN: Approved
-    "approved": "[CS] adminUsers.approved",
+    "approved": "Schváleno",
     // EN: Rejected
-    "rejected": "[CS] adminUsers.rejected",
+    "rejected": "Zamítnuto",
     // EN: Create user
-    "createUser": "[CS] adminUsers.createUser",
+    "createUser": "Vytvořit uživatele",
     // EN: Password
-    "password": "[CS] adminUsers.password",
+    "password": "Heslo",
     // EN: Bulk registration completed
-    "bulkRegisterComplete": "[CS] adminUsers.bulkRegisterComplete",
+    "bulkRegisterComplete": "Hromadná registrace dokončena",
     // EN: Successfully created {{successCount}} users, {{failedCount}} users failed.
-    "bulkRegistrationSuccess": "[CS] adminUsers.bulkRegistrationSuccess", // Variables: successCount, failedCount
+    "bulkRegistrationSuccess": "Úspěšně vytvořeno {{successCount}} uživatelů, u {{failedCount}} se to nepovedlo.", // Variables: successCount, failedCount
     // EN: Edit user '{{userName}}'
-    "editUser": "[CS] adminUsers.editUser" // Variables: userName
+    "editUser": "Upravit uživatele '{{userName}}'" // Variables: userName
   },
   "dashboard": {
     "timeAgo": {
@@ -888,53 +883,53 @@ Third Name
       "daysAgo": "před {{count}} dny" // Variables: count
     },
     // EN: You have no team assigned. If you think it is weird, contact admin
-    "welcomeNoGroup": "Zatím nejsi v žádné družince. Pokud si myslíš, že to tak nemá být, kontaktuj admina.",
+    "welcomeNoGroup": "Nemáš přiřazenou družinu. Pokud si myslíš, že je to chyba, kontaktuj admina.",
     // EN: Total points
-    "totalPoints": "Celkem bodů",
+    "totalPoints": "Celkové body",
     // EN: Your rank
-    "yourRank": "Tvé pořadí",
+    "yourRank": "Tvoje pořadí",
     // EN: Your team's rank
     "teamRank": "Pořadí družiny",
     // EN: Announcements
     "announcements": "Ohlášky",
     // EN: There will be averything necessary for this competition
-    "stayInformed": "Tady najdeš vše, co je pro soutěž důležité",
+    "stayInformed": "Zde najdeš všechny důležité informace k soutěži",
     // EN: Information
     "infoTitle": "Informace",
     // EN: For all teams
-    "allTeams": "Pro všechny týmy",
+    "allTeams": "Všechny družiny",
     // EN: Team activity
-    "teamActivity": "Akivita družiny",
+    "teamActivity": "Aktivita družiny",
     // EN: Time to start doing something
-    "makeMagic": "Čas něco konečně začít dělat",
+    "makeMagic": "Je čas něco podniknout!",
     // EN: Be the first from your team to finish task and motivate others
-    "completeTasksToSee": "Buď první ze své družiny, kdo splní nějaký úkol a motivuj tak ostatní.",
+    "completeTasksToSee": "Buď první z družiny, kdo splní úkol, a motivuj ostatní!",
     // EN: Tasks done
-    "tasksDone": "Splněných úkolů",
+    "tasksDone": "Splněné úkoly",
     // EN: Points earned
-    "pointsEarned": "Získaných bodů",
+    "pointsEarned": "Získané body",
     // EN: Active heroes
-    "activeHeroes": "Aktivních borců",
+    "activeHeroes": "Aktivní členové/ky",
     // EN: You completed
     "youCompleted": "Splnil/a jsi",
     // EN: completed
     "completed": "splnil/a",
     // EN: Your messages
-    "notifications": "Zprávy pro tebe",
+    "notifications": "Tvoje zprávy",
     // EN: You have no messages yet.
-    "noMessagesYet": "Zatím nemáš žádné zprávy",
+    "noMessagesYet": "Zatím nemáš žádné zprávy.",
     // EN: Maybe some will appear if you finish some tasks
-    "messagesWillAppear": "Možná se ti tady nějaký zobrazí, když dokončíš úkol",
+    "messagesWillAppear": "Možná se něco objeví, jakmile splníš pár úkolů!",
     // EN: Recent messages
-    "recentMessages": "Zprávy za poslední dobu",
+    "recentMessages": "Nedávné zprávy",
     // EN: System
     "system": "Systém",
     // EN: Your progress
     "yourJourney": "Jak se ti daří",
     // EN: Want to shine like a star?
-    "readyToShine": "Ukaž, co v tobě je",
+    "readyToShine": "Připraven/a zazářit?",
     // EN: Complete your first task and tell the world you are worth it
-    "startCompleting": "Splň svůj první úkol a ukaž, že jsi absolutní alfa",
+    "startCompleting": "Splň první úkol a ukaž, co v tobě je!",
     // EN: Awaiting approval
     "awaitingApproval": "Čeká na schválení",
     // EN: Rejected
@@ -942,192 +937,188 @@ Third Name
     // EN: Reason
     "reason": "Důvod",
     // EN: Team leaderboard
-    "teamChampions": "Výsledky tvé družiny",
+    "teamChampions": "Výsledky družiny",
     // EN: Heroes
-    "heroes": "borců",
+    "heroes": "Hrdinů",
     // EN: Rank
     "rank": "Pořadí",
     // EN: Name
     "champion": "Jméno",
     // EN: Completed
-    "victories": "Počet splnění",
+    "victories": "Splnění",
     // EN: Earned points
     "glory": "Získané body",
     // EN: See details
-    "seeDetails": "Ukaž detaily",
+    "seeDetails": "Zobrazit detaily",
     // EN: View tasks table
-    "viewTasks": "Ukaž tabulku úkolů",
+    "viewTasks": "Zobrazit přehled úkolů",
     // EN: Keep pushing forward, team! Every completed task counts!
-    "keepPushing": "Jen taka dál! Směle do toho a půl je hotovo!",
+    "keepPushing": "Jen tak dál, družino! Každý splněný úkol se počítá!",
     // EN: Task details
-    "taskDetails": "Detaily úkolu",
+    "taskDetails": "Detaily úkolů",
     // EN: Welcome, {{username}}
-    "welcome": "Čus, {{username}}", // Variables: username
+    "welcome": "Vítej, {{username}}", // Variables: username
     // EN: Proudly representing team {{teamName}}
-    "teamPride": "Hrdě reprezentuješ družinku {{teamName}}", // Variables: teamName
+    "teamPride": "Hrdě reprezentuješ družinu {{teamName}}", // Variables: teamName
     // EN: And {{count}} more achievements
-    "moreAchievements": "A {{count}} dalších úspěchů", // Variables: count
+    "moreAchievements": "A ještě {{count}} dalších úspěchů", // Variables: count
     // EN: Scroll to see more
-    "scrollForMore": "Zaskroluj pro {{count}} dalších", // Variables: count
+    "scrollForMore": "Posuň dolů pro víc", // Variables: count
     // EN: Completed, amazing! (+{{points}} pts.)
-    "amazing": "Hotovo, získáváš +{{points}} b.", // Variables: points
+    "amazing": "Splněno, paráda! (+{{points}} bodů)", // Variables: points
     // EN: And {{count}} more in history
-    "moreInHistory": "A {{count}} dalších věcí" // Variables: count
+    "moreInHistory": "A {{count}} dalších v historii" // Variables: count
   },
   "login": {
     // EN: Cannot log in
-    "error": "[CS] login.error",
+    "error": "Nelze se přihlásit",
     "tabs": {
       // EN: Log in
-      "login": "[CS] login.tabs.login",
+      "login": "Přihlásit se",
       // EN: Member registration
-      "registerMember": "[CS] login.tabs.registerMember",
+      "registerMember": "Registrace člena/ky",
       // EN: Admin registration
-      "registerAdmin": "[CS] login.tabs.registerAdmin"
+      "registerAdmin": "Registrace admina"
     },
     // EN: Welcome to ScoutComp
-    "welcome": "[CS] login.welcome",
+    "welcome": "Vítej v aplikaci ScoutComp",
     // EN: Your username
-    "username": "[CS] login.username",
+    "username": "Uživatelské jméno",
     // EN: Enter your username
-    "usernamePlaceholder": "[CS] login.usernamePlaceholder",
+    "usernamePlaceholder": "Zadej své uživatelské jméno",
     // EN: Password
-    "password": "[CS] login.password",
+    "password": "Heslo",
     // EN: Enter your password
-    "passwordPlaceholder": "[CS] login.passwordPlaceholder",
+    "passwordPlaceholder": "Zadej své heslo",
     // EN: Signing in...
-    "signingIn": "[CS] login.signingIn",
+    "signingIn": "Přihlašuji...",
     // EN: Log in
-    "button": "[CS] login.button"
+    "button": "Přihlásit se"
   },
   "register": {
     // EN: Real name
-    "realName": "[CS] register.realName",
+    "realName": "Skutečné jméno",
     // EN: Enter your full name + nickname
-    "realNamePlaceholder": "[CS] register.realNamePlaceholder",
+    "realNamePlaceholder": "Zadej celé jméno + přezdívku",
     // EN: User name
-    "username": "[CS] register.username",
+    "username": "Uživatelské jméno",
     // EN: your_user_name
-    "usernamePlaceholder": "[CS] register.usernamePlaceholder",
-    // EN: E-mail
-    "email": "[CS] register.email",
+    "usernamePlaceholder": "tvoje_uzivatelske_jmeno",
+    "email": "E-mail",
     // EN: optional
-    "optional": "[CS] register.optional",
+    "optional": "nepovinné",
     // EN: your@email.com
-    "emailPlaceholder": "[CS] register.emailPlaceholder",
+    "emailPlaceholder": "tvoje@email.cz",
     // EN: Password
-    "password": "[CS] register.password",
+    "password": "Heslo",
     // EN: Create a secure password (8+ chars)
-    "passwordPlaceholder": "[CS] register.passwordPlaceholder",
-    // EN: join code
-    "joinCode": "[CS] register.joinCode",
+    "passwordPlaceholder": "Zadej silné heslo (min. 8 znaků)",
+    // EN: Join code
+    "joinCode": "Kód družiny",
     // EN: Enter the team join code
-    "joinCodePlaceholder": "[CS] register.joinCodePlaceholder",
+    "joinCodePlaceholder": "Zadej kód pro připojení k družině",
     // EN: Prefered language
-    "language": "[CS] register.language",
-    // EN: Česky
-    "languageCs": "[CS] register.languageCs",
+    "language": "Jazyk",
+    "languageCs": "Česky",
     // EN: English
-    "languageEn": "[CS] register.languageEn",
+    "languageEn": "Anglicky",
     // EN: Error
-    "error": "[CS] register.error",
+    "error": "Chyba",
     // EN: Registering...
-    "registering": "[CS] register.registering",
+    "registering": "Registruji...",
     // EN: Register
-    "button": "[CS] register.button",
+    "button": "Registrovat se",
     // EN: Admin account shall be created only on first start or in development mode
-    "adminHint": "[CS] register.adminHint",
+    "adminHint": "Admin účet lze vytvořit pouze při prvním spuštění nebo v režimu vývoje",
     // EN: Creating admin...
-    "creatingAdmin": "[CS] register.creatingAdmin",
+    "creatingAdmin": "Vytvářím admina...",
     // EN: Create admin
-    "adminButton": "[CS] register.adminButton"
+    "adminButton": "Vytvořit admina"
   },
   "rules": {
     // EN: Rules updated
-    "updated": "[CS] rules.updated",
+    "updated": "Pravidla byla aktualizována",
     // EN: Update failed
-    "updateFailed": "[CS] rules.updateFailed",
+    "updateFailed": "Nepodařilo se aktualizovat pravidla",
     // EN: Loading...
-    "loading": "[CS] rules.loading",
+    "loading": "Načítám...",
     // EN: Rules
-    "title": "[CS] rules.title",
+    "title": "Pravidla",
     // EN: Competition rules for fair-play
-    "subtitle": "[CS] rules.subtitle",
+    "subtitle": "Soutěžní pravidla fair-play",
     // EN: Official rules
-    "officialRules": "[CS] rules.officialRules",
+    "officialRules": "Oficiální pravidla",
     // EN: Unsaved changes!
-    "unsavedChanges": "[CS] rules.unsavedChanges",
+    "unsavedChanges": "Neuložené změny!",
     // EN: Edit rules
-    "editRules": "[CS] rules.editRules",
+    "editRules": "Upravit pravidla",
     // EN: Markdown content
-    "markdownContent": "[CS] rules.markdownContent",
+    "markdownContent": "Obsah v Markdownu",
     // EN: Enter your rules in Markdown format
-    "markdownPlaceholder": "[CS] rules.markdownPlaceholder",
+    "markdownPlaceholder": "Zadej pravidla ve formátu Markdown",
     // EN: Live preview
-    "livePreview": "[CS] rules.livePreview",
+    "livePreview": "Živý náhled",
     // EN: No rules yet
-    "comingSoon": "[CS] rules.comingSoon",
+    "comingSoon": "Zatím žádná pravidla",
     // EN: They will come soon
-    "comingSoonMessage": "[CS] rules.comingSoonMessage"
+    "comingSoonMessage": "Brzy budou doplněna"
   },
   "userSettings": {
     // EN: Profile updated
-    "profileUpdated": "[CS] userSettings.profileUpdated",
+    "profileUpdated": "Profil byl aktualizován",
     // EN: User information update failed
-    "updateFailed": "[CS] userSettings.updateFailed",
+    "updateFailed": "Nepodařilo se upravit uživatelská data",
     // EN: Password changed successfully
-    "passwordChanged": "[CS] userSettings.passwordChanged",
+    "passwordChanged": "Heslo bylo úspěšně změněno",
     // EN: Password change failed
-    "passwordChangeFailed": "[CS] userSettings.passwordChangeFailed",
+    "passwordChangeFailed": "Změna hesla se nezdařila",
     // EN: Passwords are not the same
-    "passwordMismatch": "[CS] userSettings.passwordMismatch",
+    "passwordMismatch": "Hesla se neshodují",
     // EN: Password must be at least 8 characters long
-    "passwordTooShort": "[CS] userSettings.passwordTooShort",
+    "passwordTooShort": "Heslo musí mít alespoň 8 znaků",
     // EN: User settings
-    "title": "[CS] userSettings.title",
+    "title": "Uživatelská nastavení",
     // EN: Manage your user information
-    "subtitle": "[CS] userSettings.subtitle",
+    "subtitle": "Spravuj své uživatelské údaje",
     // EN: Profile settings
-    "profileSettings": "[CS] userSettings.profileSettings",
+    "profileSettings": "Nastavení profilu",
     // EN: Basic information
-    "profileDescription": "[CS] userSettings.profileDescription",
+    "profileDescription": "Základní informace o tobě",
     // EN: Log-in name
-    "username": "[CS] userSettings.username",
-    // EN: E-mail
-    "email": "[CS] userSettings.email",
+    "username": "Přihlašovací jméno",
+    "email": "E-mail",
     // EN: Language
-    "language": "[CS] userSettings.language",
+    "language": "Jazyk",
     // EN: Saving...
-    "saving": "[CS] userSettings.saving",
+    "saving": "Ukládám...",
     // EN: Save profile
-    "saveProfile": "[CS] userSettings.saveProfile",
+    "saveProfile": "Uložit profil",
     // EN: Account info
-    "accountInfo": "[CS] userSettings.accountInfo",
+    "accountInfo": "Informace o účtu",
     // EN: Immutable fields
-    "accountDescription": "[CS] userSettings.accountDescription",
+    "accountDescription": "Pole, která nelze měnit",
     // EN: Full name
-    "currentUsername": "[CS] userSettings.currentUsername",
-    // EN: Role
-    "role": "[CS] userSettings.role",
+    "currentUsername": "Celé jméno",
+    "role": "Role",
     // EN: Team
-    "team": "[CS] userSettings.team",
+    "team": "Družina",
     // EN: Password settings
-    "passwordSettings": "[CS] userSettings.passwordSettings",
+    "passwordSettings": "Nastavení hesla",
     // EN: Be carefull here
-    "passwordDescription": "[CS] userSettings.passwordDescription",
+    "passwordDescription": "Buď opatrný/á – měníš přístup do systému",
     // EN: Password minimal requirements
-    "passwordRequirements": "[CS] userSettings.passwordRequirements",
+    "passwordRequirements": "Požadavky na heslo",
     // EN: Password must be at least 8 chars long
-    "minLength": "[CS] userSettings.minLength",
+    "minLength": "Minimálně 8 znaků",
     // EN: Must be different than the previous
-    "noCurrentPassword": "[CS] userSettings.noCurrentPassword",
+    "noCurrentPassword": "Musí se lišit od původního hesla",
     // EN: New password
-    "newPassword": "[CS] userSettings.newPassword",
+    "newPassword": "Nové heslo",
     // EN: Confirm password
-    "confirmPassword": "[CS] userSettings.confirmPassword",
+    "confirmPassword": "Potvrzení hesla",
     // EN: Changing password...
-    "changingPassword": "[CS] userSettings.changingPassword",
+    "changingPassword": "Měním heslo...",
     // EN: Change password
-    "changePassword": "[CS] userSettings.changePassword"
+    "changePassword": "Změnit heslo"
   }
 }

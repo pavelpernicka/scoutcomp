@@ -247,7 +247,7 @@
     "archive": "Archive",
     "failedToUpdate": "Failed to update",
     "deleteTask": "Delete task",
-    "cancel": "cancel",
+    "cancel": "Cancel",
     "saveChanges": "Save changes",
     "addNewVariant": "Add new variant",
     "variantName": "Variant name",
@@ -290,7 +290,7 @@
     "noVariantDescription": "No description for this variant",
     "logCompletion": "Log your completion",
     "countLabel": "Number of completions",
-    "noLimit": "no limit",
+    "noLimit": "No limit",
     "noteLabel": "Note for review",
     "notePlaceholder": "Note to help reviewers to check you really did it. Not mandatoy for tasks without Requires approval)",
     "limitReached": "Limit for current period reached!",
@@ -306,7 +306,7 @@
     "limitReachedShort": "Limit reached",
     "cooldownShort": "Wait",
     "startQuest": "Lets do it",
-    "completedPeriodDetail": "Done in this perion: {{current}}/{{limit}}", // Variables: current, limit
+    "completedPeriodDetail": "Done in this period: {{current}}/{{limit}}", // Variables: current, limit
     "remainingLabel": "You still can submit: {{count}}x", // Variables: count
     "completedPeriodUnlimited": "Done in total: {{current}}", // Variables: current
     "lifetimeTotal": "Completed in total: {{count}} times", // Variables: count
@@ -359,7 +359,7 @@
     "confirmDeleteTeam": "Are you sure to delete team '{{teamName}}'?", // Variables: teamName
     "confirmRotateCode": "Rotate code for '{{teamName}}'? Old one will stop working!", // Variables: teamName
     "memberCount": "{{count}} members", // Variables: count
-    "manageMembers": "Manage members of {{manageMembers}}", // Variables: teamName, manageMembers
+    "manageMembers": "Manage members of {{teamName}}", // Variables: teamName
     "editTeam": "Edit team {{teamName}}" // Variables: teamName
   },
   "adminUsers": {
@@ -412,7 +412,7 @@
     "manage": "Manage",
     "realName": "Real name",
     "emailOptional": "E-mail (optional)",
-    "preferredLanguage": "Preffered language",
+    "preferredLanguage": "Prefered language",
     "noTeam": "No team",
     "roleMember": "Member",
     "roleGroupAdmin": "Group admin",
@@ -527,7 +527,7 @@
     "emailPlaceholder": "your@email.com",
     "password": "Password",
     "passwordPlaceholder": "Create a secure password (8+ chars)",
-    "joinCode": "join code",
+    "joinCode": "Join code",
     "joinCodePlaceholder": "Enter the team join code",
     "language": "Prefered language",
     "languageCs": "Česky",
