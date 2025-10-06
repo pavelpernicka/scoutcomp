@@ -76,22 +76,22 @@ export default function Layout({ children }) {
               <ul className="navbar-nav me-auto mb-2 mb-lg-0 flex-column flex-lg-row">
                 <li className="nav-item">
                   <NavLink to="/" end className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
-                    {t("navigation.dashboard", "Dashboard")}
+                    {t("navigation.dashboard")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
                   <NavLink to="/tasks" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
-                    {t("navigation.tasks", "Tasks")}
+                    {t("navigation.tasks")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
                   <NavLink to="/leaderboard" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
-                    {t("navigation.leaderboard", "Leaderboard")}
+                    {t("navigation.leaderboard")}
                   </NavLink>
                 </li>
                 <li className="nav-item">
                   <NavLink to="/rules" className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
-                    {t("navigation.rules", "Rules")}
+                    {t("navigation.rules")}
                   </NavLink>
                 </li>
 
@@ -103,34 +103,34 @@ export default function Layout({ children }) {
                       type="button"
                       onClick={() => setShowAdminDropdown(!showAdminDropdown)}
                     >
-                      <span>{t("navigation.admin", "Administration")}</span>
+                      <span>{t("navigation.admin")}</span>
                     </button>
                     <ul className={`dropdown-menu shadow-lg border-0 w-100 ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                       {canReviewCompletions && (
                         <li>
                           <NavLink to="/admin/approvals" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.approvals", "Approvals")}
+                            {t("navigation.approvals")}
                           </NavLink>
                         </li>
                       )}
                       {isAdmin && (
                         <li>
                           <NavLink to="/admin/tasks" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.tasksAdmin", "Tasks Admin")}
+                            {t("navigation.tasksAdmin")}
                           </NavLink>
                         </li>
                       )}
                       {isAdmin && (
                         <li>
                           <NavLink to="/admin/stats" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.stats", "Statistics")}
+                            {t("navigation.stats")}
                           </NavLink>
                         </li>
                       )}
                       {isAdmin && (
                         <li>
                           <NavLink to="/admin/config" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.config", "Configuration")}
+                            {t("navigation.config")}
                           </NavLink>
                         </li>
                       )}
@@ -139,17 +139,17 @@ export default function Layout({ children }) {
                           <li><hr className="dropdown-divider" /></li>
                           <li>
                             <NavLink to="/admin/teams" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.teams", "Teams")}
+                              {t("navigation.teams")}
                             </NavLink>
                           </li>
                           <li>
                             <NavLink to="/admin/users" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.users", "Users")}
+                              {t("navigation.users")}
                             </NavLink>
                           </li>
                           <li>
                             <NavLink to="/admin/announcements" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.announcements", "Announcements")}
+                              {t("navigation.announcements")}
                             </NavLink>
                           </li>
                         </>
@@ -187,20 +187,20 @@ export default function Layout({ children }) {
                     <li><hr className="dropdown-divider" /></li>
                     <li>
                       <NavLink to="/settings" className="dropdown-item d-flex align-items-center" onClick={() => { setShowUserDropdown(false); setShowMobileMenu(false); }}>
-                        {t("navigation.userSettings", "User Settings")}
+                        {t("navigation.userSettings")}
                       </NavLink>
                     </li>
                     <li><hr className="dropdown-divider" /></li>
                     <li>
                       <button className="dropdown-item d-flex align-items-center text-danger" onClick={() => { logout(); setShowUserDropdown(false); setShowMobileMenu(false); }}>
-                        {t("navigation.logout", "Logout")}
+                        {t("navigation.logout")}
                       </button>
                     </li>
                   </ul>
                 </div>
               ) : (
                 <NavLink to="/login" className={`btn btn-outline-light ${showMobileMenu ? 'w-100' : ''}`} onClick={() => setShowMobileMenu(false)}>
-                  {t("navigation.login", "Login")}
+                  {t("navigation.login")}
                 </NavLink>
               )}
             </div>

@@ -218,7 +218,7 @@ export default function TasksPage() {
   const formatRelativeTime = (dateString) => {
     const diffMs = new Date(dateString).getTime() - Date.now();
     if (diffMs <= 0) {
-      return t("tasks.resetSoon", "soon");
+      return t("tasks.resetSoon");
     }
     const seconds = diffMs / 1000;
     const day = 86400;
@@ -238,7 +238,7 @@ export default function TasksPage() {
 
   const getPreview = (task) => {
     if (!task.description) {
-      return t("tasks.noDescription", "No description");
+      return t("tasks.noDescription");
     }
     const isExpanded = expandedDescriptions[task.id] ?? false;
     if (isExpanded) {
@@ -262,7 +262,7 @@ export default function TasksPage() {
   };
 
   if (authLoading || isLoading) {
-    return <div className="text-center py-5">{t("tasks.loading", "Loading…")}</div>;
+    return <div className="text-center py-5">{t("tasks.loading")}</div>;
   }
 
   if (isError) {
@@ -281,8 +281,8 @@ export default function TasksPage() {
             <div className="card shadow-lg border-0">
               <div className="card-body text-center py-5" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
                 <div className="display-1 mb-4">🎯</div>
-                <h2 className="mb-3">{t("tasks.noTasksYet", "Ready for Action!")}</h2>
-                <p className="lead mb-0">{t("tasks.noTasksMessage", "Amazing tasks are being prepared for you. Check back soon for exciting challenges!")}</p>
+                <h2 className="mb-3">{t("tasks.noTasksYet")}</h2>
+                <p className="lead mb-0">{t("tasks.noTasksMessage")}</p>
               </div>
             </div>
           </div>
@@ -314,7 +314,7 @@ export default function TasksPage() {
           current: progress.current,
         })
       );
-      lines.push(t("tasks.noLimitShort", "No limit"));
+      lines.push(t("tasks.noLimitShort"));
     }
     lines.push(
       t("tasks.lifetimeTotal", {
@@ -323,14 +323,14 @@ export default function TasksPage() {
     );
     if (progress.period_end) {
       lines.push(
-        `${t("tasks.resetsIn", "Resets in")}: ${formatRelativeTime(progress.period_end)} (${formatDateTime(
+        `${t("tasks.resetsIn")}: ${formatRelativeTime(progress.period_end)} (${formatDateTime(
           progress.period_end
         )})`
       );
     }
     if (progress.period_start && progress.period_end) {
       lines.push(
-        `${t("tasks.periodRange", "Current window")}: ${formatPeriodRange(progress)}`
+        `${t("tasks.periodRange")}: ${formatPeriodRange(progress)}`
       );
     }
 
@@ -362,7 +362,7 @@ export default function TasksPage() {
           icon="fas fa-undo"
           iconPosition="left"
         >
-          {t("common.cancel", "Cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"
@@ -391,12 +391,12 @@ export default function TasksPage() {
         >
           {isLimitReached && <span className="me-2">🏁</span>}
           {submissionMutation.isLoading
-            ? t("tasks.sending", "Sending…")
+            ? t("tasks.sending")
             : isLimitReached
-              ? t("tasks.questComplete", "Quest Complete!")
+              ? t("tasks.questComplete")
               : isCooldownActive
-                ? t("tasks.cooldownActive", "Taking a breather!")
-                : t("tasks.submit", "Log completion")}
+                ? t("tasks.cooldownActive")
+                : t("tasks.submit")}
         </Button>
       </div>
     );
@@ -406,7 +406,7 @@ export default function TasksPage() {
         isVisible={true}
         onClose={() => setSelectedTask(null)}
         title={selectedTask.name}
-        subtitle={t("tasks.questDetails", "Quest Details & Submission")}
+        subtitle={t("tasks.questDetails")}
         icon="🎯"
         size="lg"
         headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
@@ -425,7 +425,7 @@ export default function TasksPage() {
               <div className="bg-light rounded-3 p-4 mb-3 border border-info border-opacity-25">
                 <h5 className="text-primary mb-3 d-flex align-items-center">
                   <span className="me-2">📋</span>
-                  {t("tasks.questDescription", "Quest Description")}
+                  {t("tasks.questDescription")}
                 </h5>
                 <div
                   className="text-dark"
@@ -456,7 +456,7 @@ export default function TasksPage() {
                   <div className="d-flex align-items-center">
                     <span className="me-2 fw-bold">{variant.name}</span>
                     <span className="badge bg-primary bg-opacity-90 px-2 py-1">
-                      💰 {variant.points} {t("tasks.pts", "pts")}
+                      💰 {variant.points} {t("tasks.pts")}
                     </span>
                   </div>
                 </button>
@@ -470,7 +470,7 @@ export default function TasksPage() {
                   <div
                     className="text-dark"
                     dangerouslySetInnerHTML={renderMarkdown(
-                      selectedVariant.description || t("tasks.noVariantDescription", "No additional description for this variant")
+                      selectedVariant.description || t("tasks.noVariantDescription")
                     )}
                     style={{ lineHeight: '1.6' }}
                   />
@@ -483,12 +483,12 @@ export default function TasksPage() {
           <div className="bg-light rounded-3 p-4 mb-4 border border-info border-opacity-25">
             <h5 className="text-primary mb-3 d-flex align-items-center">
               <span className="me-2">📋</span>
-              {t("tasks.questDescription", "Quest Description")}
+              {t("tasks.questDescription")}
             </h5>
             <div
               className="text-dark"
               dangerouslySetInnerHTML={renderMarkdown(
-                selectedTask.description || t("tasks.noDescription", "No description")
+                selectedTask.description || t("tasks.noDescription")
               )}
               style={{ lineHeight: '1.6' }}
             />
@@ -499,12 +499,12 @@ export default function TasksPage() {
         <div className="bg-success bg-opacity-10 rounded-3 p-4 mb-4 border border-success border-opacity-25">
           <h5 className="text-success mb-3 d-flex align-items-center">
             <span className="me-2">🎯</span>
-            {t("tasks.logCompletion", "Log Your Achievement")}
+            {t("tasks.logCompletion")}
           </h5>
 
           <div className="mb-3">
             <label className="form-label fw-medium text-dark d-flex align-items-center">
-              {t("tasks.countLabel", "How many completions?")}
+              {t("tasks.countLabel")}
             </label>
             <input
               type="number"
@@ -521,21 +521,21 @@ export default function TasksPage() {
               </small>
             ) : (
               <small className="text-success d-flex align-items-center mt-2">
-                {t("tasks.noLimit", "No limit in this period")}
+                {t("tasks.noLimit")}
               </small>
             )}
           </div>
 
           <div className="mb-3">
             <label className="form-label fw-medium text-dark d-flex align-items-center">
-              {t("tasks.noteLabel", "Note")}
+              {t("tasks.noteLabel")}
             </label>
             <textarea
               className="form-control border-success border-opacity-50"
               rows={3}
               value={submissionNote}
               onChange={(event) => setSubmissionNote(event.target.value)}
-              placeholder={t("tasks.notePlaceholder", "Optional note for approver")}
+              placeholder={t("tasks.notePlaceholder")}
               style={{ resize: 'none' }}
             ></textarea>
           </div>
@@ -545,8 +545,8 @@ export default function TasksPage() {
         {isLimitReached && (
           <div className="alert alert-warning border-0 shadow-sm d-flex align-items-center" role="alert">
             <div>
-              <strong>{t("tasks.questComplete", "Quest Complete!")}</strong>
-              <div className="small opacity-75">{t("tasks.limitReached", "You have reached the limit for this period.")}</div>
+              <strong>{t("tasks.questComplete")}</strong>
+              <div className="small opacity-75">{t("tasks.limitReached")}</div>
             </div>
           </div>
         )}
@@ -554,8 +554,8 @@ export default function TasksPage() {
           <div className="alert alert-info border-0 shadow-sm d-flex align-items-center" role="alert">
             <i className="fas fa-clock text-info me-2 fs-4"></i>
             <div>
-              <strong>{t("tasks.cooldownActive", "Taking a breather!")}</strong>
-              <div className="small opacity-75">{t("tasks.cooldown", "Please wait a moment before logging again.")}</div>
+              <strong>{t("tasks.cooldownActive")}</strong>
+              <div className="small opacity-75">{t("tasks.cooldown")}</div>
             </div>
           </div>
         )}
@@ -566,8 +566,8 @@ export default function TasksPage() {
   return (
     <>
       <HeroHeader
-        title={t("tasks.heroTitle", "Your Epic Quest Awaits!")}
-        subtitle={t("tasks.heroSubtitle", "{{count}} exciting challenge(s) ready to conquer!", { count: tasks.length })}
+        title={t("tasks.heroTitle")}
+        subtitle={t("tasks.heroSubtitle", { count: tasks.length })}
         icon="🚀"
         gradient="linear-gradient(351deg, #f093fb 0%, #f5576c 100%)"
       />
@@ -616,7 +616,7 @@ export default function TasksPage() {
                     </span>
                   ) : !isLimitReached ? (
                     <span className="badge bg-success text-white px-3 py-2">
-                      {t("tasks.ready", "Ready!")}
+                      {t("tasks.ready")}
                     </span>
                   ) : null}
                 </div>
@@ -636,11 +636,11 @@ export default function TasksPage() {
                                 return minPoints === maxPoints ? `${minPoints}` : `${minPoints}-${maxPoints}`;
                               })()
                             : task.points_per_completion
-                          } {t("tasks.pts", "pts")}
+                          } {t("tasks.pts")}
                         </span>
                         {task.requires_approval && (
                           <span className="badge bg-warning text-dark px-3 py-2">
-                            🔍 {t("tasks.requiresApproval", "Needs review")}
+                            🔍 {t("tasks.requiresApproval")}
                           </span>
                         )}
                         {/* Completion count badge */}
@@ -650,7 +650,7 @@ export default function TasksPage() {
                             fontSize: '0.85rem'
                           }}>
                             <i className="fas fa-star text-warning me-1"></i>
-                            {task.progress.lifetime}x {t("tasks.completed", "completed")}
+                            {task.progress.lifetime}x {t("tasks.completed")}
                           </span>
                         )}
                       </div>
@@ -676,8 +676,8 @@ export default function TasksPage() {
                         }
                       >
                         {expandedDescriptions[task.id]
-                          ? `${t("tasks.showLess", "Show less")}`
-                          : `${t("tasks.showMore", "Show more")}`}
+                          ? `${t("tasks.showLess")}`
+                          : `${t("tasks.showMore")}`}
                       </button>
                     )}
                   </div>
@@ -686,14 +686,14 @@ export default function TasksPage() {
                   <div className="bg-light rounded-3 p-3 mb-3 border" style={{ borderColor: '#e9ecef' }}>
                     <h6 className="text-primary mb-2 fw-bold d-flex align-items-center">
                       <span className="me-2">📊</span>
-                      {t("tasks.questStatus", "Your Quest Status")}
+                      {t("tasks.questStatus")}
                     </h6>
                     <div className="small">
                       {renderProgress(task)}
                       {/* Show reset info if limit reached */}
                       {isLimitReached && task.progress?.period_end && (
                         <div className="text-muted mt-2 pt-2 border-top">
-                          <strong>{t("tasks.resetsIn", "Resets in")}: {formatRelativeTime(task.progress.period_end)}</strong>
+                          <strong>{t("tasks.resetsIn")}: {formatRelativeTime(task.progress.period_end)}</strong>
                         </div>
                       )}
                     </div>
@@ -704,7 +704,7 @@ export default function TasksPage() {
                     <div className="bg-danger bg-opacity-10 rounded p-2 mb-3">
                       <div className="text-danger small fw-medium d-flex align-items-center">
                         <i className="fas fa-clock me-2"></i>
-                        {t("tasks.ends", "Ends")}: {formatDateTime(task.end_time)}
+                        {t("tasks.ends")}: {formatDateTime(task.end_time)}
                       </div>
                     </div>
                   )}
@@ -721,10 +721,10 @@ export default function TasksPage() {
                     }}
                   >
                     {isLimitReached
-                      ? `${t("tasks.limitReachedShort", "Limit Reached")}`
+                      ? `${t("tasks.limitReachedShort")}`
                       : isCooldownActive
-                      ? <><i className="fas fa-hourglass-half text-info me-2"></i>{t("tasks.cooldownShort", "Cooldown")} ({cooldownSeconds}s)</>
-                      : <>🚀 {t("tasks.startQuest", "Start Quest!")}</>}
+                      ? <><i className="fas fa-hourglass-half text-info me-2"></i>{t("tasks.cooldownShort")} ({cooldownSeconds}s)</>
+                      : <>🚀 {t("tasks.startQuest")}</>}
                   </Button>
                 </div>
 

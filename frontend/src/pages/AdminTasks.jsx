@@ -2,15 +2,16 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 
-const periodUnits = [
-  { value: "hour", label: "Hour" },
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
+const getPeriodUnits = (t) => [
+  { value: "hour", label: t("adminTasks.periodUnits.hour") },
+  { value: "day", label: t("adminTasks.periodUnits.day") },
+  { value: "week", label: t("adminTasks.periodUnits.week") },
+  { value: "month", label: t("adminTasks.periodUnits.month") },
 ];
 
 marked.setOptions({ breaks: true });
@@ -72,10 +73,10 @@ const buildPayload = (form) => {
   return payload;
 };
 
-const formatStatus = (task) => {
-  if (task.is_archived) return "Archived";
-  if (task.end_time && new Date(task.end_time) < new Date()) return "Expired";
-  return "Active";
+const formatStatus = (task, t) => {
+  if (task.is_archived) return t("adminTasks.status.archived");
+  if (task.end_time && new Date(task.end_time) < new Date()) return t("adminTasks.status.expired");
+  return t("adminTasks.status.active");
 };
 
 const renderMarkdown = (markdown) => ({
@@ -83,6 +84,7 @@ const renderMarkdown = (markdown) => ({
 });
 
 export default function AdminTasks() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
   const [createForm, setCreateForm] = useState(emptyTaskForm);
@@ -124,7 +126,7 @@ export default function AdminTasks() {
 
   const handleDeleteVariant = (variantId) => {
     if (!variantManagementTaskId) return;
-    if (!window.confirm('Are you sure you want to delete this variant?')) return;
+    if (!window.confirm(t('adminTasks.confirmDeleteVariant'))) return;
     deleteVariantMutation.mutate({ taskId: variantManagementTaskId, variantId });
   };
 
@@ -212,7 +214,7 @@ export default function AdminTasks() {
 
   const handleDeleteTask = () => {
     if (!activeEditingTask) return;
-    if (!window.confirm(`Are you sure you want to permanently delete "${activeEditingTask.name}"?\n\nThis will delete all completions associated with this task and cannot be undone.`)) {
+    if (!window.confirm(t('adminTasks.confirmDeleteTask', { taskName: activeEditingTask.name }))) {
       return;
     }
     deleteMutation.mutate(activeEditingTask.id);
@@ -223,7 +225,7 @@ export default function AdminTasks() {
       <div className="row g-4">
         <div className="col-12 col-xl-5">
           <div className="card shadow-sm h-100">
-            <div className="card-header">Create Task</div>
+            <div className="card-header">{t('adminTasks.createTask')}</div>
             <div className="card-body">
               <form
                 className="row g-3"
@@ -234,7 +236,7 @@ export default function AdminTasks() {
                 }}
               >
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Name</label>
+                  <label className="form-label">{t('adminTasks.name')}</label>
                   <input
                     className="form-control"
                     value={createForm.name}
@@ -245,7 +247,7 @@ export default function AdminTasks() {
                   />
                 </div>
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Points per completion</label>
+                  <label className="form-label">{t('adminTasks.pointsPerCompletion')}</label>
                   <input
                     className="form-control"
                     type="number"
@@ -261,7 +263,7 @@ export default function AdminTasks() {
                   />
                 </div>
                 <div className="col-12">
-                  <label className="form-label">Description</label>
+                  <label className="form-label">{t('adminTasks.description')}</label>
                   <textarea
                     className="form-control"
                     rows={4}
@@ -269,18 +271,18 @@ export default function AdminTasks() {
                     onChange={(event) =>
                       setCreateForm((prev) => ({ ...prev, description: event.target.value }))
                     }
-                    placeholder="Supports Markdown (e.g., **bold**, _italic_, lists)"
+                    placeholder={t('adminTasks.markdownPlaceholder')}
                   ></textarea>
-                  <div className="form-text">Preview:</div>
+                  <div className="form-text">{t('adminTasks.preview')}</div>
                   <div
                     className="border rounded bg-light p-3"
                     dangerouslySetInnerHTML={renderMarkdown(
-                      createForm.description || "_No description yet_"
+                      createForm.description || t('adminTasks.noDescriptionYet')
                     )}
                   />
                 </div>
                 <div className="col-12 col-md-6">
-                  <label className="form-label">Team (optional)</label>
+                  <label className="form-label">{t('adminTasks.teamOptional')}</label>
                   <select
                     className="form-select"
                     value={createForm.team_id}
@@ -288,7 +290,7 @@ export default function AdminTasks() {
                       setCreateForm((prev) => ({ ...prev, team_id: event.target.value }))
                     }
                   >
-                    <option value="">All teams</option>
+                    <option value="">{t('adminTasks.allTeams')}</option>
                     {teams.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
@@ -296,7 +298,7 @@ export default function AdminTasks() {
                     ))}
                   </select>
                 </div>
-                <div className="col-12 col-md-6 d-flex align-items-center">
+                <div className="col-12 col-md-6">
                   <div className="form-check mb-2">
                     <input
                       className="form-check-input"
@@ -311,7 +313,7 @@ export default function AdminTasks() {
                       }
                     />
                     <label className="form-check-label" htmlFor="createRequiresApproval">
-                      Requires approval
+                      {t('adminTasks.requiresApproval')}
                     </label>
                   </div>
                   <div className="form-check">
@@ -328,12 +330,12 @@ export default function AdminTasks() {
                       }
                     />
                     <label className="form-check-label" htmlFor="createHotDeal">
-                      🔥 Hot Deal
+                      {t('adminTasks.hotDeal')}
                     </label>
                   </div>
                 </div>
                 <div className="col-12 col-md-4">
-                  <label className="form-label">Max per period</label>
+                  <label className="form-label">{t('adminTasks.maxPerPeriod')}</label>
                   <input
                     className="form-control"
                     type="number"
@@ -345,7 +347,7 @@ export default function AdminTasks() {
                   />
                 </div>
                 <div className="col-6 col-md-4">
-                  <label className="form-label">Period count</label>
+                  <label className="form-label">{t('adminTasks.periodCount')}</label>
                   <input
                     className="form-control"
                     type="number"
@@ -358,7 +360,7 @@ export default function AdminTasks() {
                   />
                 </div>
                 <div className="col-6 col-md-4">
-                  <label className="form-label">Period unit</label>
+                  <label className="form-label">{t('adminTasks.periodUnit')}</label>
                   <select
                     className="form-select"
                     value={createForm.period_unit}
@@ -367,7 +369,7 @@ export default function AdminTasks() {
                     }
                     disabled={!createForm.max_per_period}
                   >
-                    {periodUnits.map((unit) => (
+                    {getPeriodUnits(t).map((unit) => (
                       <option key={unit.value} value={unit.value}>
                         {unit.label}
                       </option>
@@ -375,7 +377,7 @@ export default function AdminTasks() {
                   </select>
                 </div>
                 <div className="col-6">
-                  <label className="form-label">Start time</label>
+                  <label className="form-label">{t('adminTasks.startTime')}</label>
                   <input
                     className="form-control"
                     type="datetime-local"
@@ -386,7 +388,7 @@ export default function AdminTasks() {
                   />
                 </div>
                 <div className="col-6">
-                  <label className="form-label">End time</label>
+                  <label className="form-label">{t('adminTasks.endTime')}</label>
                   <input
                     className="form-control"
                     type="datetime-local"
@@ -399,11 +401,11 @@ export default function AdminTasks() {
                 <div className="col-12">
                   {createMutation.isError && (
                     <div className="alert alert-danger" role="alert">
-                      {createMutation.error?.response?.data?.detail || "Failed to create task."}
+                      {createMutation.error?.response?.data?.detail || t('adminTasks.failedToCreate')}
                     </div>
                   )}
                   <button className="btn btn-primary" type="submit" disabled={createMutation.isLoading}>
-                    Create task
+                    {t('adminTasks.createTask')}
                   </button>
                 </div>
               </form>
@@ -414,27 +416,27 @@ export default function AdminTasks() {
         <div className="col-12 col-xl-7">
           <div className="card shadow-sm h-100">
             <div className="card-header d-flex justify-content-between align-items-center">
-              <span>Existing Tasks</span>
+              <span>{t('adminTasks.existingTasks')}</span>
               <span className="badge bg-secondary">{tasks.length}</span>
             </div>
             <div className="card-body">
               {isLoading ? (
-                <div className="text-center text-muted py-4">Loading…</div>
+                <div className="text-center text-muted py-4">{t('adminTasks.loading')}</div>
               ) : isError ? (
                 <div className="alert alert-danger" role="alert">
-                  {error?.response?.data?.detail || "Unable to load tasks."}
+                  {error?.response?.data?.detail || t('adminTasks.failedToLoad')}
                 </div>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-striped align-middle">
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Points/Variants</th>
-                        <th>Period limit</th>
-                        <th>Status</th>
-                        <th>Team</th>
-                        <th className="text-end">Actions</th>
+                        <th>{t('adminTasks.name')}</th>
+                        <th>{t('adminTasks.pointsVariants')}</th>
+                        <th>{t('adminTasks.periodLimit')}</th>
+                        <th>{t('adminTasks.status.label')}</th>
+                        <th>{t('adminTasks.team')}</th>
+                        <th className="text-end">{t('adminTasks.actions')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -453,30 +455,30 @@ export default function AdminTasks() {
                             {task.variants && task.variants.length > 0 ? (
                               <div>
                                 <div className="fw-semibold small text-primary">
-                                  {task.variants.length} variant{task.variants.length > 1 ? 's' : ''}
+                                  {t('adminTasks.variantCount', { count: task.variants.length })}
                                 </div>
                                 <div className="small text-muted">
-                                  {Math.min(...task.variants.map(v => v.points))}-{Math.max(...task.variants.map(v => v.points))} pts
+                                  {Math.min(...task.variants.map(v => v.points))}-{Math.max(...task.variants.map(v => v.points))} {t("tasks.pts")}
                                 </div>
                               </div>
                             ) : (
-                              <div className="text-muted small">{task.points_per_completion} pts</div>
+                              <div className="text-muted small">{task.points_per_completion} {t("tasks.pts")}</div>
                             )}
                           </td>
                           <td>
                             {task.max_per_period
-                              ? `${task.max_per_period} / ${task.period_count} ${task.period_unit}`
+                              ? `${task.max_per_period} / ${task.period_count} ${t(`adminTasks.periodUnits.${task.period_unit}`)}`
                               : "—"}
                           </td>
                           <td>
-                            <span className={`badge ${task.is_archived ? "bg-secondary" : formatStatus(task) === "Expired" ? "bg-warning text-dark" : "bg-success"}`}>
-                              {formatStatus(task)}
+                            <span className={`badge ${task.is_archived ? "bg-secondary" : formatStatus(task, t) === t('adminTasks.status.expired') ? "bg-warning text-dark" : "bg-success"}`}>
+                              {formatStatus(task, t)}
                             </span>
                           </td>
                           <td>
                             {task.team_id
                               ? teams.find((team) => team.id === task.team_id)?.name || `#${task.team_id}`
-                              : "All"}
+                              : t('adminTasks.allTeams')}
                           </td>
                           <td className="text-end">
                             <div className="d-inline-flex flex-column gap-2">
@@ -485,14 +487,14 @@ export default function AdminTasks() {
                                 className="btn btn-outline-secondary btn-sm"
                                 onClick={() => handleOpenEditModal(task)}
                               >
-                                Edit
+                                {t('adminTasks.edit')}
                               </button>
                               <button
                                 type="button"
                                 className="btn btn-outline-info btn-sm"
                                 onClick={() => handleOpenVariantModal(task)}
                               >
-                                Variants ({task.variants?.length || 0})
+                                {t('adminTasks.variants', { count: task.variants?.length || 0 })}
                               </button>
                               {task.is_archived ? (
                                 <button
@@ -500,7 +502,7 @@ export default function AdminTasks() {
                                   className="btn btn-outline-success btn-sm"
                                   onClick={() => unarchiveMutation.mutate(task.id)}
                                 >
-                                  Unarchive
+                                  {t('adminTasks.unarchive')}
                                 </button>
                               ) : (
                                 <button
@@ -508,7 +510,7 @@ export default function AdminTasks() {
                                   className="btn btn-outline-danger btn-sm"
                                   onClick={() => archiveMutation.mutate(task.id)}
                                 >
-                                  Archive
+                                  {t('adminTasks.archive')}
                                 </button>
                               )}
                             </div>
@@ -530,7 +532,7 @@ export default function AdminTasks() {
             <div className="modal-dialog modal-xl" role="document">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Edit task – {activeEditingTask.name}</h5>
+                  <h5 className="modal-title">{t('adminTasks.editTask', { taskName: activeEditingTask.name })}</h5>
                   <button
                     type="button"
                     className="btn-close"
@@ -549,7 +551,7 @@ export default function AdminTasks() {
                   <div className="modal-body">
                     <div className="row g-3">
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Name</label>
+                        <label className="form-label">{t('adminTasks.name')}</label>
                         <input
                           className="form-control"
                           value={editForm.name}
@@ -558,7 +560,7 @@ export default function AdminTasks() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Points per completion</label>
+                        <label className="form-label">{t('adminTasks.pointsPerCompletion')}</label>
                         <input
                           className="form-control"
                           type="number"
@@ -571,7 +573,7 @@ export default function AdminTasks() {
                         />
                       </div>
                       <div className="col-12">
-                        <label className="form-label">Description</label>
+                        <label className="form-label">{t('adminTasks.description')}</label>
                         <textarea
                           className="form-control"
                           rows={4}
@@ -579,24 +581,24 @@ export default function AdminTasks() {
                           onChange={(event) =>
                             setEditForm((prev) => ({ ...prev, description: event.target.value }))
                           }
-                          placeholder="Supports Markdown (e.g., **bold**, _italic_, lists)"
+                          placeholder={t('adminTasks.markdownPlaceholder')}
                         ></textarea>
-                        <div className="form-text">Preview:</div>
+                        <div className="form-text">{t('adminTasks.preview')}</div>
                         <div
                           className="border rounded bg-light p-3"
                           dangerouslySetInnerHTML={renderMarkdown(
-                            editForm.description || "_No description yet_"
+                            editForm.description || t('adminTasks.noDescriptionYet')
                           )}
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Team (optional)</label>
+                        <label className="form-label">{t('adminTasks.teamOptional')}</label>
                         <select
                           className="form-select"
                           value={editForm.team_id}
                           onChange={(event) => setEditForm((prev) => ({ ...prev, team_id: event.target.value }))}
                         >
-                          <option value="">All teams</option>
+                          <option value="">{t('adminTasks.allTeams')}</option>
                           {teams.map((team) => (
                             <option key={team.id} value={team.id}>
                               {team.name}
@@ -619,7 +621,7 @@ export default function AdminTasks() {
                             }
                           />
                           <label className="form-check-label" htmlFor="editRequiresApproval">
-                            Requires approval
+                            {t('adminTasks.requiresApproval')}
                           </label>
                         </div>
                         <div className="form-check">
@@ -636,12 +638,12 @@ export default function AdminTasks() {
                             }
                           />
                           <label className="form-check-label" htmlFor="editHotDeal">
-                            🔥 Hot Deal
+                            {t('adminTasks.hotDeal')}
                           </label>
                         </div>
                       </div>
                       <div className="col-12 col-md-4">
-                        <label className="form-label">Max per period</label>
+                        <label className="form-label">{t('adminTasks.maxPerPeriod')}</label>
                         <input
                           className="form-control"
                           type="number"
@@ -653,7 +655,7 @@ export default function AdminTasks() {
                         />
                       </div>
                       <div className="col-6 col-md-4">
-                        <label className="form-label">Period count</label>
+                        <label className="form-label">{t('adminTasks.periodCount')}</label>
                         <input
                           className="form-control"
                           type="number"
@@ -666,7 +668,7 @@ export default function AdminTasks() {
                         />
                       </div>
                       <div className="col-6 col-md-4">
-                        <label className="form-label">Period unit</label>
+                        <label className="form-label">{t('adminTasks.periodUnit')}</label>
                         <select
                           className="form-select"
                           value={editForm.period_unit}
@@ -675,7 +677,7 @@ export default function AdminTasks() {
                           }
                           disabled={!editForm.max_per_period}
                         >
-                          {periodUnits.map((unit) => (
+                          {getPeriodUnits(t).map((unit) => (
                             <option key={unit.value} value={unit.value}>
                               {unit.label}
                             </option>
@@ -683,7 +685,7 @@ export default function AdminTasks() {
                         </select>
                       </div>
                       <div className="col-6">
-                        <label className="form-label">Start time</label>
+                        <label className="form-label">{t('adminTasks.startTime')}</label>
                         <input
                           className="form-control"
                           type="datetime-local"
@@ -694,7 +696,7 @@ export default function AdminTasks() {
                         />
                       </div>
                       <div className="col-6">
-                        <label className="form-label">End time</label>
+                        <label className="form-label">{t('adminTasks.endTime')}</label>
                         <input
                           className="form-control"
                           type="datetime-local"
@@ -707,7 +709,7 @@ export default function AdminTasks() {
                       {updateMutation.isError && (
                         <div className="col-12">
                           <div className="alert alert-danger" role="alert">
-                            {updateMutation.error?.response?.data?.detail || "Failed to update task."}
+                            {updateMutation.error?.response?.data?.detail || t('adminTasks.failedToUpdate')}
                           </div>
                         </div>
                       )}
@@ -720,7 +722,7 @@ export default function AdminTasks() {
                       onClick={handleDeleteTask}
                       disabled={updateMutation.isLoading || deleteMutation.isLoading}
                     >
-                      Delete Task
+                      {t('adminTasks.deleteTask')}
                     </button>
                     <div className="d-flex gap-2">
                       <button
@@ -729,14 +731,14 @@ export default function AdminTasks() {
                         onClick={handleCloseEditModal}
                         disabled={updateMutation.isLoading || deleteMutation.isLoading}
                       >
-                        Cancel
+                        {t('adminTasks.cancel')}
                       </button>
                       <button
                         type="submit"
                         className="btn btn-primary"
                         disabled={updateMutation.isLoading || deleteMutation.isLoading}
                       >
-                        Save changes
+                        {t('adminTasks.saveChanges')}
                       </button>
                     </div>
                   </div>
@@ -756,7 +758,7 @@ export default function AdminTasks() {
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title">
-                    Manage Variants - {tasks.find(t => t.id === variantManagementTaskId)?.name}
+                    {t('adminTasks.manageVariants', { taskName: tasks.find(t => t.id === variantManagementTaskId)?.name })}
                   </h5>
                   <button
                     type="button"
@@ -767,11 +769,11 @@ export default function AdminTasks() {
                 <div className="modal-body">
                   {/* Create New Variant Form */}
                   <div className="card mb-4">
-                    <div className="card-header">Add New Variant</div>
+                    <div className="card-header">{t('adminTasks.addNewVariant')}</div>
                     <div className="card-body">
                       <form onSubmit={handleCreateVariant} className="row g-3">
                         <div className="col-md-6">
-                          <label className="form-label">Variant Name</label>
+                          <label className="form-label">{t('adminTasks.variantName')}</label>
                           <input
                             type="text"
                             className="form-control"
@@ -781,7 +783,7 @@ export default function AdminTasks() {
                           />
                         </div>
                         <div className="col-md-3">
-                          <label className="form-label">Points</label>
+                          <label className="form-label">{t('adminTasks.points')}</label>
                           <input
                             type="number"
                             step="0.1"
@@ -792,7 +794,7 @@ export default function AdminTasks() {
                           />
                         </div>
                         <div className="col-md-3">
-                          <label className="form-label">Position (optional)</label>
+                          <label className="form-label">{t('adminTasks.positionOptional')}</label>
                           <input
                             type="number"
                             className="form-control"
@@ -801,13 +803,13 @@ export default function AdminTasks() {
                           />
                         </div>
                         <div className="col-12">
-                          <label className="form-label">Description (optional)</label>
+                          <label className="form-label">{t('adminTasks.descriptionOptional')}</label>
                           <textarea
                             className="form-control"
                             rows={3}
                             value={variantForm.description}
                             onChange={(e) => setVariantForm(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder="Supports Markdown"
+                            placeholder={t('adminTasks.supportsMarkdown')}
                           />
                         </div>
                         <div className="col-12">
@@ -816,11 +818,11 @@ export default function AdminTasks() {
                             className="btn btn-primary"
                             disabled={createVariantMutation.isLoading}
                           >
-                            Add Variant
+                            {t('adminTasks.addVariant')}
                           </button>
                           {createVariantMutation.isError && (
                             <div className="text-danger mt-2 small">
-                              {createVariantMutation.error?.response?.data?.detail || "Failed to create variant"}
+                              {createVariantMutation.error?.response?.data?.detail || t('adminTasks.failedToCreateVariant')}
                             </div>
                           )}
                         </div>
@@ -830,14 +832,14 @@ export default function AdminTasks() {
 
                   {/* Existing Variants List */}
                   <div className="card">
-                    <div className="card-header">Existing Variants</div>
+                    <div className="card-header">{t('adminTasks.existingVariants')}</div>
                     <div className="card-body">
                       {(() => {
                         const currentTask = tasks.find(t => t.id === variantManagementTaskId);
                         const variants = currentTask?.variants || [];
 
                         if (variants.length === 0) {
-                          return <p className="text-muted">No variants created yet.</p>;
+                          return <p className="text-muted">{t('adminTasks.noVariantsYet')}</p>;
                         }
 
                         return (
@@ -845,11 +847,11 @@ export default function AdminTasks() {
                             <table className="table table-sm">
                               <thead>
                                 <tr>
-                                  <th>Position</th>
-                                  <th>Name</th>
-                                  <th>Points</th>
-                                  <th>Description</th>
-                                  <th>Actions</th>
+                                  <th>{t('adminTasks.position')}</th>
+                                  <th>{t('adminTasks.name')}</th>
+                                  <th>{t('adminTasks.points')}</th>
+                                  <th>{t('adminTasks.description')}</th>
+                                  <th>{t('adminTasks.actions')}</th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -868,7 +870,7 @@ export default function AdminTasks() {
                                             }}
                                           />
                                         ) : (
-                                          <em>No description</em>
+                                          <em>{t('adminTasks.noDescription')}</em>
                                         )}
                                       </td>
                                       <td>
@@ -878,7 +880,7 @@ export default function AdminTasks() {
                                           onClick={() => handleDeleteVariant(variant.id)}
                                           disabled={deleteVariantMutation.isLoading}
                                         >
-                                          Delete
+                                          {t('adminTasks.delete')}
                                         </button>
                                       </td>
                                     </tr>
@@ -898,7 +900,7 @@ export default function AdminTasks() {
                     className="btn btn-secondary"
                     onClick={handleCloseVariantModal}
                   >
-                    Close
+                    {t('adminTasks.close')}
                   </button>
                 </div>
               </div>

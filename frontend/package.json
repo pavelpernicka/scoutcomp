@@ -4,11 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "concurrently \"node scripts/watch-translations.js\" \"vite\" --names \"translations,vite\" --prefix name",
+    "build": "node scripts/build-translations.js && vite build",
     "preview": "vite preview",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
-    "test": "vitest"
+    "test": "vitest",
+    "translations:extract": "node scripts/extract-translations.js && node scripts/build-translations.js",
+    "translations:check": "node scripts/extract-translations.js --check",
+    "translations:stats": "node scripts/translation-stats.js",
+    "translations:build": "node scripts/build-translations.js"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.27.0",
@@ -28,6 +32,7 @@
     "@testing-library/react": "^14.1.2",
     "@testing-library/user-event": "^14.5.1",
     "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^9.2.1",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-react": "^7.33.2",

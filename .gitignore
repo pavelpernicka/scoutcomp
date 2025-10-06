@@ -45,6 +45,9 @@ out/
 .nuxt/
 coverage/
 
+# Generated translation files (build artifacts from .jsonc sources)
+frontend/src/translations/*.json
+
 # Env
 .env
 .env.*

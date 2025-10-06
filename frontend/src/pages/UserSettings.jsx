@@ -55,13 +55,13 @@ export default function UserSettingsPage() {
       return response;
     },
     onSuccess: () => {
-      setFeedback({ type: "success", message: t("userSettings.profileUpdated", "Profile updated successfully.") });
+      setFeedback({ type: "success", message: t("userSettings.profileUpdated") });
       queryClient.invalidateQueries(["users", "me"]);
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || t("userSettings.updateFailed", "Failed to update profile."),
+        message: error?.response?.data?.detail || t("userSettings.updateFailed"),
       });
     },
   });
@@ -75,7 +75,7 @@ export default function UserSettingsPage() {
       return response;
     },
     onSuccess: () => {
-      setPasswordFeedback({ type: "success", message: t("userSettings.passwordChanged", "Password changed successfully.") });
+      setPasswordFeedback({ type: "success", message: t("userSettings.passwordChanged") });
       setFormData(prev => ({
         ...prev,
         newPassword: "",
@@ -85,7 +85,7 @@ export default function UserSettingsPage() {
     onError: (error) => {
       setPasswordFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || t("userSettings.passwordChangeFailed", "Failed to change password."),
+        message: error?.response?.data?.detail || t("userSettings.passwordChangeFailed"),
       });
     },
   });
@@ -113,7 +113,7 @@ export default function UserSettingsPage() {
     if (formData.newPassword !== formData.confirmPassword) {
       setPasswordFeedback({
         type: "danger",
-        message: t("userSettings.passwordMismatch", "New passwords do not match."),
+        message: t("userSettings.passwordMismatch"),
       });
       return;
     }
@@ -121,7 +121,7 @@ export default function UserSettingsPage() {
     if (formData.newPassword.length < 6) {
       setPasswordFeedback({
         type: "danger",
-        message: t("userSettings.passwordTooShort", "New password must be at least 6 characters long."),
+        message: t("userSettings.passwordTooShort"),
       });
       return;
     }
@@ -142,8 +142,8 @@ export default function UserSettingsPage() {
   return (
     <>
       <HeroHeader
-        title={t("userSettings.title", "User Settings")}
-        subtitle={t("userSettings.subtitle", "Customize your account and preferences")}
+        title={t("userSettings.title")}
+        subtitle={t("userSettings.subtitle")}
         icon={<i className="fas fa-cog text-white fs-1"></i>}
       >
       </HeroHeader>
@@ -152,8 +152,8 @@ export default function UserSettingsPage() {
         {/* Profile Settings */}
         <div className="col-12 col-xl-8">
           <DecoratedCard
-            title={t("userSettings.profileSettings", "Profile Settings")}
-            subtitle={t("userSettings.profileDescription", "Update your basic account information")}
+            title={t("userSettings.profileSettings")}
+            subtitle={t("userSettings.profileDescription")}
             icon={<i className="fas fa-user fs-4"></i>}
             headerGradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
             shadow={true}
@@ -169,7 +169,7 @@ export default function UserSettingsPage() {
                 <div className="row g-3">
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
-                      {t("userSettings.username", "Username")}
+                      {t("userSettings.username")}
                     </label>
                     <Input
                       type="text"
@@ -181,7 +181,7 @@ export default function UserSettingsPage() {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
-                      {t("userSettings.email", "Email")}
+                      {t("userSettings.email")}
                     </label>
                     <Input
                       type="email"
@@ -193,7 +193,7 @@ export default function UserSettingsPage() {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
-                      {t("userSettings.language", "Preferred Language")}
+                      {t("userSettings.language")}
                     </label>
                     <Select
                       className="border-success border-opacity-50"
@@ -214,7 +214,7 @@ export default function UserSettingsPage() {
                     disabled={updateProfileMutation.isLoading}
                     loading={updateProfileMutation.isLoading}
                   >
-                    {updateProfileMutation.isLoading ? t("userSettings.saving", "Saving...") : t("userSettings.saveProfile", "Save Profile")}
+                    {updateProfileMutation.isLoading ? t("userSettings.saving") : t("userSettings.saveProfile")}
                   </Button>
                 </div>
               </form>
@@ -224,19 +224,19 @@ export default function UserSettingsPage() {
         {/* Account Info */}
         <div className="col-12 col-xl-4">
           <DecoratedCard
-            title={t("userSettings.accountInfo", "Account Information")}
-            subtitle={t("userSettings.accountDescription", "Your current account details")}
+            title={t("userSettings.accountInfo")}
+            subtitle={t("userSettings.accountDescription")}
             icon={<i className="fas fa-info-circle fs-4"></i>}
             headerGradient="linear-gradient(135deg, #17a2b8 0%, #20c997 100%)"
             shadow={true}
             className="h-100"
           >
               <div className="mb-3">
-                <h6 className="text-muted mb-1">{t("userSettings.currentUsername", "Current Username")}</h6>
+                <h6 className="text-muted mb-1">{t("userSettings.currentUsername")}</h6>
                 <p className="mb-0 fw-bold">{profile?.user?.real_name || profile?.user?.username}</p>
               </div>
               <div className="mb-3">
-                <h6 className="text-muted mb-1">{t("userSettings.role", "Role")}</h6>
+                <h6 className="text-muted mb-1">{t("userSettings.role")}</h6>
                 <p className="mb-0">
                   <span className="badge bg-primary px-3 py-2">
                     {profile?.user?.role === "admin" ? <><i className="fas fa-user-tie me-1"></i> Admin</> :
@@ -247,7 +247,7 @@ export default function UserSettingsPage() {
               </div>
               {profile?.user?.team_name && (
                 <div className="mb-3">
-                  <h6 className="text-muted mb-1">{t("userSettings.team", "Team")}</h6>
+                  <h6 className="text-muted mb-1">{t("userSettings.team")}</h6>
                   <p className="mb-0 fw-bold text-primary">{profile.user.team_name}</p>
                 </div>
               )}
@@ -257,8 +257,8 @@ export default function UserSettingsPage() {
         {/* Password Change */}
         <div className="col-12">
           <DecoratedCard
-            title={t("userSettings.passwordSettings", "Password Settings")}
-            subtitle={t("userSettings.passwordDescription", "Change your account password")}
+            title={t("userSettings.passwordSettings")}
+            subtitle={t("userSettings.passwordDescription")}
             icon={<i className="fas fa-lock fs-4"></i>}
             headerGradient="linear-gradient(135deg, #dc3545 0%, #fd7e14 100%)"
             shadow={true}
@@ -270,10 +270,10 @@ export default function UserSettingsPage() {
               )}
 
               <div className="mb-3 p-3 bg-light rounded">
-                <h6 className="mb-2 text-muted">{t("userSettings.passwordRequirements", "Password Requirements:")}</h6>
+                <h6 className="mb-2 text-muted">{t("userSettings.passwordRequirements")}</h6>
                 <ul className="mb-0 text-muted small">
-                  <li>{t("userSettings.minLength", "Minimum 6 characters long")}</li>
-                  <li>{t("userSettings.noCurrentPassword", "Current password verification not required")}</li>
+                  <li>{t("userSettings.minLength")}</li>
+                  <li>{t("userSettings.noCurrentPassword")}</li>
                 </ul>
               </div>
 
@@ -281,7 +281,7 @@ export default function UserSettingsPage() {
                 <div className="row g-3">
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
-                      {t("userSettings.newPassword", "New Password")}
+                      {t("userSettings.newPassword")}
                     </label>
                     <Input
                       type="password"
@@ -294,7 +294,7 @@ export default function UserSettingsPage() {
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
-                      {t("userSettings.confirmPassword", "Confirm Password")}
+                      {t("userSettings.confirmPassword")}
                     </label>
                     <Input
                       type="password"
@@ -314,7 +314,7 @@ export default function UserSettingsPage() {
                     disabled={changePasswordMutation.isLoading}
                     loading={changePasswordMutation.isLoading}
                   >
-                    {changePasswordMutation.isLoading ? t("userSettings.changingPassword", "Changing Password...") : t("userSettings.changePassword", "Change Password")}
+                    {changePasswordMutation.isLoading ? t("userSettings.changingPassword") : t("userSettings.changePassword")}
                   </Button>
                 </div>
               </form>

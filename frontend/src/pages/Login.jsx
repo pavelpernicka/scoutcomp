@@ -273,7 +273,7 @@ useEffect(() => {
                 />
                 <h1 className="display-5 fw-bold mb-0">{config?.app_name || "ScoutComp"}</h1>
               </div>
-              <p className="fs-5 opacity-90">{t("login.welcome", "Welcome to Scout Competition")}</p>
+              <p className="fs-5 opacity-90">{t("login.welcome")}</p>
             </div>
 
             <div className="card shadow-lg border-0">
@@ -418,7 +418,7 @@ useEffect(() => {
                     <form className="row g-4" onSubmit={handleLoginSubmit}>
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="login-username">
-                          {t("login.username", "Username")}
+                          {t("login.username")}
                         </label>
                         <input
                           id="login-username"
@@ -426,7 +426,7 @@ useEffect(() => {
                           type="text"
                           className="form-control form-control-lg"
                           autoComplete="username"
-                          placeholder={t("login.usernamePlaceholder", "Enter your username")}
+                          placeholder={t("login.usernamePlaceholder")}
                           value={loginState.username}
                           onChange={(event) =>
                             setLoginState((prev) => ({ ...prev, username: event.target.value }))
@@ -438,7 +438,7 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="login-password">
-                          {t("login.password", "Password")}
+                          {t("login.password")}
                         </label>
                         <input
                           id="login-password"
@@ -446,7 +446,7 @@ useEffect(() => {
                           type="password"
                           className="form-control form-control-lg"
                           autoComplete="current-password"
-                          placeholder={t("login.passwordPlaceholder", "Enter your password")}
+                          placeholder={t("login.passwordPlaceholder")}
                           value={loginState.password}
                           onChange={(event) =>
                             setLoginState((prev) => ({ ...prev, password: event.target.value }))
@@ -477,10 +477,10 @@ useEffect(() => {
                           {isSubmittingLogin ? (
                             <>
                               <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                              {t("login.signingIn", "Signing in...")}
+                              {t("login.signingIn")}
                             </>
                           ) : (
-                            t("login.button", "Sign In")
+                            t("login.button")
                           )}
                         </button>
                       </div>
@@ -504,12 +504,12 @@ useEffect(() => {
                     >
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-realName">
-                          {t("register.realName", "Real name")}
+                          {t("register.realName")}
                         </label>
                         <input
                           id="member-realName"
                           className="form-control form-control-lg"
-                          placeholder={t("register.realNamePlaceholder", "Enter your full name")}
+                          placeholder={t("register.realNamePlaceholder")}
                           value={memberForm.realName}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, realName: event.target.value }))
@@ -519,12 +519,12 @@ useEffect(() => {
                       </div>
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-username">
-                          {t("register.username", "Username")}
+                          {t("register.username")}
                         </label>
                         <input
                           id="member-username"
                           className="form-control form-control-lg"
-                          placeholder={t("register.usernamePlaceholder", "Choose a username")}
+                          placeholder={t("register.usernamePlaceholder")}
                           value={memberForm.username}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, username: event.target.value }))
@@ -535,13 +535,13 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-email">
-                          {t("register.email", "Email")} <span className="text-muted">({t("register.optional", "optional")})</span>
+                          {t("register.email")} <span className="text-muted">({t("register.optional")})</span>
                         </label>
                         <input
                           id="member-email"
                           className="form-control form-control-lg"
                           type="email"
-                          placeholder={t("register.emailPlaceholder", "Enter your email address (optional)")}
+                          placeholder={t("register.emailPlaceholder")}
                           value={memberForm.email}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, email: event.target.value }))
@@ -551,13 +551,13 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-password">
-                          {t("register.password", "Password")}
+                          {t("register.password")}
                         </label>
                         <input
                           id="member-password"
                           className="form-control form-control-lg"
                           type="password"
-                          placeholder={t("register.passwordPlaceholder", "Create a secure password")}
+                          placeholder={t("register.passwordPlaceholder")}
                           value={memberForm.password}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, password: event.target.value }))
@@ -568,12 +568,12 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-join">
-                          {t("register.joinCode", "Join Code")}
+                          {t("register.joinCode")}
                         </label>
                         <input
                           id="member-join"
                           className="form-control form-control-lg"
-                          placeholder={t("register.joinCodePlaceholder", "Enter the team join code")}
+                          placeholder={t("register.joinCodePlaceholder")}
                           value={memberForm.joinCode}
                           onChange={(event) =>
                             setMemberForm((prev) => ({ ...prev, joinCode: event.target.value }))
@@ -584,7 +584,7 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="member-language">
-                          {t("register.language", "Language")}
+                          {t("register.language")}
                         </label>
                         <select
                           id="member-language"
@@ -594,8 +594,8 @@ useEffect(() => {
                             setMemberForm((prev) => ({ ...prev, preferredLanguage: event.target.value }))
                           }
                         >
-                          <option value="cs">{t("register.languageCs", "Czech")}</option>
-                          <option value="en">{t("register.languageEn", "English")}</option>
+                          <option value="cs">{t("register.languageCs")}</option>
+                          <option value="en">{t("register.languageEn")}</option>
                         </select>
                       </div>
 
@@ -604,7 +604,7 @@ useEffect(() => {
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
                               <i className="fas fa-exclamation-triangle text-warning me-2"></i>
-                              {extractErrorMessage(memberRegistration.error, t("register.error", "Registration failed"))}
+                              {extractErrorMessage(memberRegistration.error, t("register.error"))}
                             </div>
                           </div>
                         </div>
@@ -619,10 +619,10 @@ useEffect(() => {
                           {memberRegistration.isLoading ? (
                             <>
                               <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                              {t("register.registering", "Creating account...")}
+                              {t("register.registering")}
                             </>
                           ) : (
-                            t("register.button", "Create Member Account")
+                            t("register.button")
                           )}
                         </button>
                       </div>
@@ -648,19 +648,19 @@ useEffect(() => {
                         <div className="alert alert-info border-0 shadow-sm">
                           <div className="d-flex align-items-center">
                             <i className="fas fa-info-circle text-info me-2"></i>
-                            {t("register.adminHint", "Create the first administrator account for this system")}
+                            {t("register.adminHint")}
                           </div>
                         </div>
                       </div>
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-realName">
-                          {t("register.realName", "Real name")}
+                          {t("register.realName")}
                         </label>
                         <input
                           id="admin-realName"
                           className="form-control form-control-lg"
-                          placeholder={t("register.realNamePlaceholder", "Enter your full name")}
+                          placeholder={t("register.realNamePlaceholder")}
                           value={adminForm.realName}
                           onChange={(event) =>
                             setAdminForm((prev) => ({ ...prev, realName: event.target.value }))
@@ -670,12 +670,12 @@ useEffect(() => {
                       </div>
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-username">
-                          {t("register.username", "Username")}
+                          {t("register.username")}
                         </label>
                         <input
                           id="admin-username"
                           className="form-control form-control-lg"
-                          placeholder={t("register.usernamePlaceholder", "Choose a username")}
+                          placeholder={t("register.usernamePlaceholder")}
                           value={adminForm.username}
                           onChange={(event) =>
                             setAdminForm((prev) => ({ ...prev, username: event.target.value }))
@@ -686,13 +686,13 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-email">
-                          {t("register.email", "Email")} <span className="text-muted">({t("register.optional", "optional")})</span>
+                          {t("register.email")} <span className="text-muted">({t("register.optional")})</span>
                         </label>
                         <input
                           id="admin-email"
                           className="form-control form-control-lg"
                           type="email"
-                          placeholder={t("register.emailPlaceholder", "Enter your email address (optional)")}
+                          placeholder={t("register.emailPlaceholder")}
                           value={adminForm.email}
                           onChange={(event) =>
                             setAdminForm((prev) => ({ ...prev, email: event.target.value }))
@@ -702,13 +702,13 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold" htmlFor="admin-password">
-                          {t("register.password", "Password")}
+                          {t("register.password")}
                         </label>
                         <input
                           id="admin-password"
                           className="form-control form-control-lg"
                           type="password"
-                          placeholder={t("register.passwordPlaceholder", "Create a secure password")}
+                          placeholder={t("register.passwordPlaceholder")}
                           value={adminForm.password}
                           onChange={(event) =>
                             setAdminForm((prev) => ({ ...prev, password: event.target.value }))
@@ -722,7 +722,7 @@ useEffect(() => {
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
                               <i className="fas fa-exclamation-triangle text-warning me-2"></i>
-                              {extractErrorMessage(adminRegistration.error, t("register.error", "Registration failed"))}
+                              {extractErrorMessage(adminRegistration.error, t("register.error"))}
                             </div>
                           </div>
                         </div>
@@ -737,10 +737,10 @@ useEffect(() => {
                           {adminRegistration.isLoading ? (
                             <>
                               <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                              {t("register.creatingAdmin", "Creating admin account...")}
+                              {t("register.creatingAdmin")}
                             </>
                           ) : (
-                            t("register.adminButton", "Create Admin Account")
+                            t("register.adminButton")
                           )}
                         </button>
                       </div>

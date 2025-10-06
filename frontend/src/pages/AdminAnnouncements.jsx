@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -7,6 +8,7 @@ import api from "../services/api";
 const initialCreateScope = (isAdmin) => (isAdmin ? "global" : "team");
 
 export default function AdminAnnouncements() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isAdmin, managedTeamIds, canManageUsers } = useAuth();
 
@@ -102,12 +104,12 @@ export default function AdminAnnouncements() {
         scope: initialCreateScope(isAdmin),
         teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "",
       });
-      setFeedback({ type: "success", message: "Announcement published." });
+      setFeedback({ type: "success", message: t('adminAnnouncements.announcementPublished') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || "Failed to publish announcement.",
+        message: error?.response?.data?.detail || t('adminAnnouncements.failedToPublish'),
       });
     },
   });
@@ -118,12 +120,12 @@ export default function AdminAnnouncements() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-messages"] });
       setEditingMessage(null);
-      setFeedback({ type: "success", message: "Announcement updated." });
+      setFeedback({ type: "success", message: t('adminAnnouncements.announcementUpdated') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || "Failed to update announcement.",
+        message: error?.response?.data?.detail || t('adminAnnouncements.failedToUpdate'),
       });
     },
   });
@@ -132,18 +134,18 @@ export default function AdminAnnouncements() {
     mutationFn: async (messageId) => api.delete(`/dashboard-messages/${messageId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-messages"] });
-      setFeedback({ type: "success", message: "Announcement removed." });
+      setFeedback({ type: "success", message: t('adminAnnouncements.announcementRemoved') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || "Failed to remove announcement.",
+        message: error?.response?.data?.detail || t('adminAnnouncements.failedToRemove'),
       });
     },
   });
 
   if (!canManageUsers) {
-    return <div className="alert alert-danger">You do not have access to manage announcements.</div>;
+    return <div className="alert alert-danger">{t('adminAnnouncements.noAccess')}</div>;
   }
 
   const handleCreateSubmit = (event) => {
@@ -152,14 +154,14 @@ export default function AdminAnnouncements() {
     const trimmedTitle = createForm.title.trim();
 
     if (!trimmedBody) {
-      setFeedback({ type: "warning", message: "Message body is required." });
+      setFeedback({ type: "warning", message: t('adminAnnouncements.messageBodyRequired') });
       return;
     }
 
     let teamId = null;
     if (createForm.scope === "team") {
       if (!createForm.teamId) {
-        setFeedback({ type: "warning", message: "Select a team for the announcement." });
+        setFeedback({ type: "warning", message: t('adminAnnouncements.selectTeam') });
         return;
       }
       teamId = Number(createForm.teamId);
@@ -183,7 +185,7 @@ export default function AdminAnnouncements() {
     const payload = {};
 
     if (!trimmedBody) {
-      setFeedback({ type: "warning", message: "Message body is required." });
+      setFeedback({ type: "warning", message: t('adminAnnouncements.messageBodyRequired') });
       return;
     }
 
@@ -200,7 +202,7 @@ export default function AdminAnnouncements() {
         payload.team_id = null;
       } else if (editForm.scope === "team") {
         if (!editForm.teamId) {
-          setFeedback({ type: "warning", message: "Select a team for the announcement." });
+          setFeedback({ type: "warning", message: t('adminAnnouncements.selectTeam') });
           return;
         }
         const nextTeamId = Number(editForm.teamId);
@@ -216,7 +218,7 @@ export default function AdminAnnouncements() {
     }
 
     if (Object.keys(payload).length === 0) {
-      setFeedback({ type: "info", message: "Nothing to update." });
+      setFeedback({ type: "info", message: t('adminAnnouncements.nothingToUpdate') });
       return;
     }
 
@@ -224,7 +226,7 @@ export default function AdminAnnouncements() {
   };
 
   const handleDeleteMessage = (messageId) => {
-    if (!window.confirm("Delete this announcement?")) {
+    if (!window.confirm(t('adminAnnouncements.confirmDelete'))) {
       return;
     }
     deleteMessageMutation.mutate(messageId);
@@ -240,9 +242,9 @@ export default function AdminAnnouncements() {
 
   const renderScopeBadge = (message) => {
     if (!message.team_id) {
-      return <span className="badge bg-primary">Global</span>;
+      return <span className="badge bg-primary">{t('adminAnnouncements.global')}</span>;
     }
-    return <span className="badge bg-secondary">Team</span>;
+    return <span className="badge bg-secondary">{t('adminAnnouncements.team')}</span>;
   };
 
   return (
@@ -256,22 +258,22 @@ export default function AdminAnnouncements() {
       <div className="row g-4">
         <div className="col-12 col-xl-5">
           <div className="card shadow-sm h-100">
-            <div className="card-header">Create announcement</div>
+            <div className="card-header">{t('adminAnnouncements.createAnnouncement')}</div>
             <div className="card-body">
               <form className="row g-3" onSubmit={handleCreateSubmit}>
                 <div className="col-12">
-                  <label className="form-label">Title</label>
+                  <label className="form-label">{t('adminAnnouncements.title')}</label>
                   <input
                     className="form-control"
                     value={createForm.title}
                     onChange={(event) =>
                       setCreateForm((prev) => ({ ...prev, title: event.target.value }))
                     }
-                    placeholder="Optional headline"
+                    placeholder={t('adminAnnouncements.optionalHeadline')}
                   />
                 </div>
                 <div className="col-12">
-                  <label className="form-label">Message</label>
+                  <label className="form-label">{t('adminAnnouncements.message')}</label>
                   <textarea
                     className="form-control"
                     rows={4}
@@ -284,7 +286,7 @@ export default function AdminAnnouncements() {
                 </div>
                 {isAdmin && (
                   <div className="col-12">
-                    <label className="form-label">Audience</label>
+                    <label className="form-label">{t('adminAnnouncements.audience')}</label>
                     <div className="form-check">
                       <input
                         className="form-check-input"
@@ -295,7 +297,7 @@ export default function AdminAnnouncements() {
                         onChange={() => setCreateForm((prev) => ({ ...prev, scope: "global" }))}
                       />
                       <label className="form-check-label" htmlFor="create-scope-global">
-                        Global (all teams)
+                        {t('adminAnnouncements.globalAllTeams')}
                       </label>
                     </div>
                     <div className="form-check">
@@ -308,14 +310,14 @@ export default function AdminAnnouncements() {
                         onChange={() => setCreateForm((prev) => ({ ...prev, scope: "team" }))}
                       />
                       <label className="form-check-label" htmlFor="create-scope-team">
-                        Specific team
+                        {t('adminAnnouncements.specificTeam')}
                       </label>
                     </div>
                   </div>
                 )}
                 {createForm.scope === "team" && (
                   <div className="col-12">
-                    <label className="form-label">Team</label>
+                    <label className="form-label">{t('adminAnnouncements.team')}</label>
                     <select
                       className="form-select"
                       value={createForm.teamId}
@@ -325,7 +327,7 @@ export default function AdminAnnouncements() {
                       disabled={teamsLoading || managedTeams.length === 0}
                     >
                       <option value="" disabled>
-                        {managedTeams.length === 0 ? "No available teams" : "Select a team"}
+                        {managedTeams.length === 0 ? t('adminAnnouncements.noAvailableTeams') : t('adminAnnouncements.selectTeam')}
                       </option>
                       {teamOptions.map((team) => (
                         <option key={team.value} value={team.value}>
@@ -335,7 +337,7 @@ export default function AdminAnnouncements() {
                     </select>
                     {managedTeams.length === 0 && (
                       <div className="form-text text-danger">
-                        Assign a managed team before publishing team announcements.
+                        {t('adminAnnouncements.assignManagedTeam')}
                       </div>
                     )}
                   </div>
@@ -354,14 +356,14 @@ export default function AdminAnnouncements() {
                     }
                     disabled={createMessageMutation.isLoading}
                   >
-                    Clear
+                    {t('adminAnnouncements.clear')}
                   </button>
                   <button
                     type="submit"
                     className="btn btn-primary"
                     disabled={createMessageMutation.isLoading}
                   >
-                    Publish
+                    {t('adminAnnouncements.publish')}
                   </button>
                 </div>
               </form>
@@ -373,15 +375,15 @@ export default function AdminAnnouncements() {
           <div className="col-12 col-xl-5">
             <div className="card shadow-sm h-100">
               <div className="card-header d-flex justify-content-between align-items-center">
-                <span>Edit announcement</span>
+                <span>{t('adminAnnouncements.editAnnouncement')}</span>
                 <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleCancelEdit}>
-                  Cancel
+                  {t('adminAnnouncements.cancel')}
                 </button>
               </div>
               <div className="card-body">
                 <form className="row g-3" onSubmit={handleEditSubmit}>
                   <div className="col-12">
-                    <label className="form-label">Title</label>
+                    <label className="form-label">{t('adminAnnouncements.title')}</label>
                     <input
                       className="form-control"
                       value={editForm.title}
@@ -391,7 +393,7 @@ export default function AdminAnnouncements() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Message</label>
+                    <label className="form-label">{t('adminAnnouncements.message')}</label>
                     <textarea
                       className="form-control"
                       rows={4}
@@ -404,7 +406,7 @@ export default function AdminAnnouncements() {
                   </div>
                   {isAdmin && (
                     <div className="col-12">
-                      <label className="form-label">Audience</label>
+                      <label className="form-label">{t('adminAnnouncements.audience')}</label>
                       <div className="form-check">
                         <input
                           className="form-check-input"
@@ -415,7 +417,7 @@ export default function AdminAnnouncements() {
                           onChange={() => setEditForm((prev) => ({ ...prev, scope: "global" }))}
                         />
                         <label className="form-check-label" htmlFor="edit-scope-global">
-                          Global (all teams)
+                          {t('adminAnnouncements.globalAllTeams')}
                         </label>
                       </div>
                       <div className="form-check">
@@ -428,14 +430,14 @@ export default function AdminAnnouncements() {
                           onChange={() => setEditForm((prev) => ({ ...prev, scope: "team" }))}
                         />
                         <label className="form-check-label" htmlFor="edit-scope-team">
-                          Specific team
+                          {t('adminAnnouncements.specificTeam')}
                         </label>
                       </div>
                     </div>
                   )}
                   {(editForm.scope === "team" || !isAdmin) && (
                     <div className="col-12">
-                      <label className="form-label">Team</label>
+                      <label className="form-label">{t('adminAnnouncements.team')}</label>
                       <select
                         className="form-select"
                         value={editForm.teamId}
@@ -445,7 +447,7 @@ export default function AdminAnnouncements() {
                         disabled={teamsLoading || managedTeams.length === 0}
                       >
                         <option value="" disabled>
-                          {managedTeams.length === 0 ? "No available teams" : "Select a team"}
+                          {managedTeams.length === 0 ? t('adminAnnouncements.noAvailableTeams') : t('adminAnnouncements.selectTeam')}
                         </option>
                         {teamOptions.map((team) => (
                           <option key={team.value} value={team.value}>
@@ -467,14 +469,14 @@ export default function AdminAnnouncements() {
                       onClick={handleCancelEdit}
                       disabled={updateMessageMutation.isLoading}
                     >
-                      Cancel
+                      {t('adminAnnouncements.cancel')}
                     </button>
                     <button
                       type="submit"
                       className="btn btn-primary"
                       disabled={updateMessageMutation.isLoading}
                     >
-                      Save
+                      {t('adminAnnouncements.save')}
                     </button>
                   </div>
                 </form>
@@ -485,22 +487,22 @@ export default function AdminAnnouncements() {
 
         <div className="col-12">
           <div className="card shadow-sm">
-            <div className="card-header">Announcements</div>
+            <div className="card-header">{t('adminAnnouncements.announcements')}</div>
             <div className="card-body p-0">
               {messagesLoading ? (
-                <div className="text-center text-muted py-3">Loading…</div>
+                <div className="text-center text-muted py-3">{t('adminAnnouncements.loading')}</div>
               ) : dashboardMessages.length === 0 ? (
-                <p className="text-muted px-3 py-2 mb-0">No announcements yet.</p>
+                <p className="text-muted px-3 py-2 mb-0">{t('adminAnnouncements.noAnnouncementsYet')}</p>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-sm align-middle mb-0">
                     <thead className="table-light">
                       <tr>
-                        <th style={{ width: "6rem" }}>Type</th>
-                        <th>Title</th>
-                        <th>Body</th>
-                        <th>Team</th>
-                        <th>Created</th>
+                        <th style={{ width: "6rem" }}>{t('adminAnnouncements.type')}</th>
+                        <th>{t('adminAnnouncements.title')}</th>
+                        <th>{t('adminAnnouncements.body')}</th>
+                        <th>{t('adminAnnouncements.team')}</th>
+                        <th>{t('adminAnnouncements.created')}</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -510,7 +512,7 @@ export default function AdminAnnouncements() {
                           <td>{renderScopeBadge(message)}</td>
                           <td>{message.title || <span className="text-muted">—</span>}</td>
                           <td>{message.body}</td>
-                          <td>{message.team_name || "All"}</td>
+                          <td>{message.team_name || t('adminAnnouncements.all')}</td>
                           <td>{new Date(message.created_at).toLocaleString()}</td>
                           <td className="text-end">
                             <div className="btn-group btn-group-sm" role="group">
@@ -520,7 +522,7 @@ export default function AdminAnnouncements() {
                                 onClick={() => handleStartEdit(message)}
                                 disabled={updateMessageMutation.isLoading}
                               >
-                                Edit
+                                {t('common.edit')}
                               </button>
                               <button
                                 type="button"
@@ -528,7 +530,7 @@ export default function AdminAnnouncements() {
                                 onClick={() => handleDeleteMessage(message.id)}
                                 disabled={deleteMessageMutation.isLoading}
                               >
-                                Delete
+                                {t('common.delete')}
                               </button>
                             </div>
                           </td>

@@ -1,0 +1,1133 @@
+{
+  "navigation": {
+    // EN: Dashboard
+    "dashboard": "Přehled",
+    // EN: Tasks
+    "tasks": "Úkoly",
+    // EN: Leaderboard
+    "leaderboard": "Výsledky",
+    // EN: Rules
+    "rules": "Pravidla",
+    // EN: Administration
+    "admin": "Administrace",
+    // EN: Approvals
+    "approvals": "Schvalování",
+    // EN: Tasks admin
+    "tasksAdmin": "Správa úkolů",
+    // EN: Stats admin
+    "stats": "Správa statistik",
+    // EN: Server settings
+    "config": "Nastavení serveru",
+    // EN: Manage teams
+    "teams": "Družiny",
+    // EN: Manage users
+    "users": "Správa uživatelů",
+    // EN: Announcements
+    "announcements": "Ohlášky",
+    // EN: User settings
+    "userSettings": "Nastavení účtu",
+    // EN: Log out
+    "logout": "Odhlásit se",
+    // EN: Log in
+    "login": "Přihlásit se"
+  },
+  "leaderboard": {
+    // EN: Task
+    "taskColumn": "[CS] leaderboard.taskColumn",
+    // EN: Task variant
+    "variantsColumn": "[CS] leaderboard.variantsColumn",
+    // EN: Completions
+    "completionsColumn": "[CS] leaderboard.completionsColumn",
+    // EN: Points
+    "pointsColumn": "[CS] leaderboard.pointsColumn",
+    // EN: Total
+    "totalRow": "[CS] leaderboard.totalRow",
+    // EN: Click for details
+    "clickForDetails": "[CS] leaderboard.clickForDetails",
+    // EN: Click for details about this team
+    "clickForTeamDetails": "[CS] leaderboard.clickForTeamDetails",
+    // EN: I am so empty...
+    "empty": "[CS] leaderboard.empty",
+    // EN: Make me happy and be the first one to be here
+    "beTheFirst": "[CS] leaderboard.beTheFirst",
+    // EN: Competition leaderboard
+    "heroTitle": "[CS] leaderboard.heroTitle",
+    // EN: That’s exactly what the numbers say. So? Do you see yourself among the top ranks?
+    "heroSubtitle": "[CS] leaderboard.heroSubtitle",
+    // EN: Members
+    "members": "[CS] leaderboard.members",
+    // EN: Best total result
+    "topPerformers": "[CS] leaderboard.topPerformers",
+    // EN: There are no champions yet
+    "noChampionsYet": "[CS] leaderboard.noChampionsYet",
+    // EN: Be the first!
+    "startQuesting": "[CS] leaderboard.startQuesting",
+    // EN: Teams
+    "teams": "[CS] leaderboard.teams",
+    // EN: Team score leaderboard
+    "teamRankings": "[CS] leaderboard.teamRankings",
+    // EN: Total
+    "totalBtn": "[CS] leaderboard.totalBtn",
+    // EN: Average
+    "averageBtn": "[CS] leaderboard.averageBtn",
+    // EN: There are no teams yet
+    "noTeamsYet": "[CS] leaderboard.noTeamsYet",
+    // EN: When admin creates them, they will appear
+    "teamsWillAppear": "[CS] leaderboard.teamsWillAppear",
+    // EN: Special statistics
+    "customStatsHeading": "[CS] leaderboard.customStatsHeading",
+    // EN: Categories defined by a combination of tasks
+    "customStatsSubtitle": "[CS] leaderboard.customStatsSubtitle",
+    // EN: There are no special stats yet
+    "noStats": "[CS] leaderboard.noStats",
+    // EN: Tasks done by member
+    "taskDetails": "[CS] leaderboard.taskDetails",
+    // EN: Team members
+    "teamMembers": "[CS] leaderboard.teamMembers",
+    // EN: Rank
+    "rankColumn": "[CS] leaderboard.rankColumn",
+    // EN: Name
+    "memberColumn": "[CS] leaderboard.memberColumn",
+    // EN: Total points
+    "totalPointsColumn": "[CS] leaderboard.totalPointsColumn",
+    // EN: Total: {{total}} • Members: {{count}}
+    "averageLine": "[CS] leaderboard.averageLine", // Variables: total, count
+    // EN: Members: {{count}}
+    "membersLine": "[CS] leaderboard.membersLine" // Variables: count
+  },
+  "common": {
+    // EN: Close
+    "close": "Zavřít",
+    // EN: Edit
+    "edit": "Upravit",
+    // EN: Delete
+    "delete": "Smazat",
+    "reset": "Reset",
+    // EN: Saving...
+    "saving": "Ukládám...",
+    // EN: Save
+    "save": "Uložit",
+    // EN: Cancel
+    "cancel": "Zrušit",
+    // EN: You
+    "you": "Ty",
+    // EN: Show all
+    "showAll": "Zobrazit vše",
+    // EN: Last updated
+    "lastUpdated": "Poslední úprava"
+  },
+  "adminAnnouncements": {
+    // EN: Announcement successfully published
+    "announcementPublished": "[CS] adminAnnouncements.announcementPublished",
+    // EN: Failed to publish!
+    "failedToPublish": "[CS] adminAnnouncements.failedToPublish",
+    // EN: Announcement updated
+    "announcementUpdated": "[CS] adminAnnouncements.announcementUpdated",
+    // EN: Failed to update announcement
+    "failedToUpdate": "[CS] adminAnnouncements.failedToUpdate",
+    // EN: Announcement removed
+    "announcementRemoved": "[CS] adminAnnouncements.announcementRemoved",
+    // EN: Failed to remove announcement
+    "failedToRemove": "[CS] adminAnnouncements.failedToRemove",
+    // EN: You have no access to modify this
+    "noAccess": "[CS] adminAnnouncements.noAccess",
+    // EN: Message body is mandatory
+    "messageBodyRequired": "[CS] adminAnnouncements.messageBodyRequired",
+    // EN: Select team
+    "selectTeam": "[CS] adminAnnouncements.selectTeam",
+    // EN: Nothing to update
+    "nothingToUpdate": "[CS] adminAnnouncements.nothingToUpdate",
+    // EN: Are you sure to delete this announcement?
+    "confirmDelete": "[CS] adminAnnouncements.confirmDelete",
+    // EN: Global
+    "global": "[CS] adminAnnouncements.global",
+    // EN: Team
+    "team": "[CS] adminAnnouncements.team",
+    // EN: Create new announcement
+    "createAnnouncement": "[CS] adminAnnouncements.createAnnouncement",
+    // EN: Title
+    "title": "[CS] adminAnnouncements.title",
+    // EN: Announcement header (optional)
+    "optionalHeadline": "[CS] adminAnnouncements.optionalHeadline",
+    // EN: Message
+    "message": "[CS] adminAnnouncements.message",
+    // EN: Who can see it:
+    "audience": "[CS] adminAnnouncements.audience",
+    // EN: All teams (global)
+    "globalAllTeams": "[CS] adminAnnouncements.globalAllTeams",
+    // EN: Specific teams
+    "specificTeam": "[CS] adminAnnouncements.specificTeam",
+    // EN: No available teams
+    "noAvailableTeams": "[CS] adminAnnouncements.noAvailableTeams",
+    // EN: Assign managed team
+    "assignManagedTeam": "[CS] adminAnnouncements.assignManagedTeam",
+    // EN: Clear
+    "clear": "[CS] adminAnnouncements.clear",
+    // EN: Publish
+    "publish": "[CS] adminAnnouncements.publish",
+    // EN: Edit announcement
+    "editAnnouncement": "[CS] adminAnnouncements.editAnnouncement",
+    // EN: Cancel
+    "cancel": "[CS] adminAnnouncements.cancel",
+    // EN: Save
+    "save": "[CS] adminAnnouncements.save",
+    // EN: Existing announcements
+    "announcements": "[CS] adminAnnouncements.announcements",
+    // EN: Loading...
+    "loading": "[CS] adminAnnouncements.loading",
+    // EN: No announcements yet
+    "noAnnouncementsYet": "[CS] adminAnnouncements.noAnnouncementsYet",
+    // EN: Type
+    "type": "[CS] adminAnnouncements.type",
+    // EN: Content
+    "body": "[CS] adminAnnouncements.body",
+    // EN: Created at
+    "created": "[CS] adminAnnouncements.created",
+    // EN: All
+    "all": "[CS] adminAnnouncements.all"
+  },
+  "approvals": {
+    // EN: Completion approved!
+    "approvedMessage": "[CS] approvals.approvedMessage",
+    // EN: Completion rejected
+    "rejectedMessage": "[CS] approvals.rejectedMessage",
+    // EN: Error occured
+    "error": "[CS] approvals.error",
+    // EN: When rejecting, reason is required
+    "reasonRequired": "[CS] approvals.reasonRequired",
+    // EN: Loading...
+    "loading": "[CS] approvals.loading",
+    // EN: Approvals
+    "title": "[CS] approvals.title",
+    // EN: Approve or reject members completions
+    "subtitle": "[CS] approvals.subtitle",
+    // EN: Pending
+    "pending": "[CS] approvals.pending",
+    // EN: Possible states:
+    "infoTitle": "[CS] approvals.infoTitle",
+    // EN: Pending review
+    "pendingStatus": "[CS] approvals.pendingStatus",
+    // EN: Task appears as 'Awaiting approval' in user's dashboard
+    "pendingDescription": "[CS] approvals.pendingDescription",
+    // EN: Approved
+    "approvedStatus": "[CS] approvals.approvedStatus",
+    // EN: Points added to score, task marked as completed
+    "approvedDescription": "[CS] approvals.approvedDescription",
+    // EN: Rejected
+    "rejectedStatus": "[CS] approvals.rejectedStatus",
+    // EN: User sees feedback and can resubmit
+    "rejectedDescription": "[CS] approvals.rejectedDescription",
+    // EN: Everything is done
+    "empty": "[CS] approvals.empty",
+    // EN: There are no pending completions
+    "emptyDescription": "[CS] approvals.emptyDescription",
+    // EN: Count
+    "count": "[CS] approvals.count",
+    // EN: Awaiting review
+    "awaitingReview": "[CS] approvals.awaitingReview",
+    // EN: Member's note
+    "memberNote": "[CS] approvals.memberNote",
+    // EN: No note provided
+    "noNote": "[CS] approvals.noNote",
+    // EN: Admin feedback
+    "adminFeedback": "[CS] approvals.adminFeedback",
+    // EN: Optional feedback (required for rejection)
+    "feedbackPlaceholder": "[CS] approvals.feedbackPlaceholder",
+    // EN: Processing...
+    "processing": "[CS] approvals.processing",
+    // EN: Approve
+    "approve": "[CS] approvals.approve",
+    // EN: Reject
+    "reject": "[CS] approvals.reject"
+  },
+  "adminConfig": {
+    // EN: Config update successfull
+    "updateSuccess": "[CS] adminConfig.updateSuccess",
+    // EN: Config update failed
+    "updateFailed": "[CS] adminConfig.updateFailed",
+    // EN: Server settings
+    "title": "[CS] adminConfig.title",
+    // EN: Global server-side settings
+    "subtitle": "[CS] adminConfig.subtitle",
+    // EN: General settings
+    "generalSettings": "[CS] adminConfig.generalSettings",
+    // EN: Configure basic application settings
+    "generalDescription": "[CS] adminConfig.generalDescription",
+    // EN: Application name
+    "appName": "[CS] adminConfig.appName",
+    // EN: This name will appear in the navigation bar and page titles
+    "appNameHelp": "[CS] adminConfig.appNameHelp",
+    // EN: Application icon
+    "appIcon": "[CS] adminConfig.appIcon",
+    // EN: Upload a custom icon for your application. Recommended: SVG, PNG, or JPG (max 1MB, square format recommended)
+    "appIconHelp": "[CS] adminConfig.appIconHelp",
+    // EN: Preview
+    "iconPreview": "[CS] adminConfig.iconPreview",
+    // EN: Leaderboard default view
+    "leaderboardDefault": "[CS] adminConfig.leaderboardDefault",
+    // EN: Total points
+    "totalPoints": "[CS] adminConfig.totalPoints",
+    // EN: Average points
+    "averagePoints": "[CS] adminConfig.averagePoints",
+    // EN: Choose which view users see by default when opening the leaderboard
+    "leaderboardHelp": "[CS] adminConfig.leaderboardHelp",
+    // EN: Allow self registration with team code
+    "allowSelfRegistration": "[CS] adminConfig.allowSelfRegistration",
+    // EN: When enabled, users can register themselves using a team join code without admin approval
+    "selfRegistrationHelp": "[CS] adminConfig.selfRegistrationHelp",
+    // EN: Only administrators can modify these settings
+    "adminOnly": "[CS] adminConfig.adminOnly"
+  },
+  "adminStats": {
+    // EN: Category created
+    "categoryCreated": "[CS] adminStats.categoryCreated",
+    // EN: Failed to create category
+    "failedToCreateCategory": "[CS] adminStats.failedToCreateCategory",
+    // EN: Category updated
+    "categoryUpdated": "[CS] adminStats.categoryUpdated",
+    // EN: Failed to update category
+    "failedToUpdateCategory": "[CS] adminStats.failedToUpdateCategory",
+    // EN: Category deleted
+    "categoryDeleted": "[CS] adminStats.categoryDeleted",
+    // EN: Failed to delete category
+    "failedToDeleteCategory": "[CS] adminStats.failedToDeleteCategory",
+    // EN: Component added
+    "componentAdded": "[CS] adminStats.componentAdded",
+    // EN: Failed to add component
+    "failedToAddComponent": "[CS] adminStats.failedToAddComponent",
+    // EN: Component updated
+    "componentUpdated": "[CS] adminStats.componentUpdated",
+    // EN: Failed to update component
+    "failedToUpdateComponent": "[CS] adminStats.failedToUpdateComponent",
+    // EN: Component removed
+    "componentRemoved": "[CS] adminStats.componentRemoved",
+    // EN: Failed to remove component
+    "failedToRemoveComponent": "[CS] adminStats.failedToRemoveComponent",
+    // EN: Name is required
+    "nameRequired": "[CS] adminStats.nameRequired",
+    // EN: Nothing to update
+    "nothingToUpdate": "[CS] adminStats.nothingToUpdate",
+    // EN: Select task
+    "selectTask": "[CS] adminStats.selectTask",
+    // EN: Weight must be number
+    "weightMustBeNumber": "[CS] adminStats.weightMustBeNumber",
+    // EN: Position must be positive
+    "positionMustBeNonNegative": "[CS] adminStats.positionMustBeNonNegative",
+    // EN: Component not found
+    "componentNotFound": "[CS] adminStats.componentNotFound",
+    // EN: Really remove this component?
+    "confirmRemoveComponent": "[CS] adminStats.confirmRemoveComponent",
+    // EN: You have no access
+    "noAccess": "[CS] adminStats.noAccess",
+    // EN: Icon must be image
+    "iconMustBeImage": "[CS] adminStats.iconMustBeImage",
+    // EN: Failed to read icon
+    "failedToReadIcon": "[CS] adminStats.failedToReadIcon",
+    // EN: Create custom category
+    "createCategory": "[CS] adminStats.createCategory",
+    // EN: Name
+    "name": "[CS] adminStats.name",
+    // EN: Description
+    "description": "[CS] adminStats.description",
+    // EN: Icon
+    "icon": "[CS] adminStats.icon",
+    // EN: Emoji or paste URL
+    "iconPlaceholder": "[CS] adminStats.iconPlaceholder",
+    // EN: Upload file
+    "uploadFile": "[CS] adminStats.uploadFile",
+    // EN: Clear
+    "clear": "[CS] adminStats.clear",
+    // EN: Uploaded image
+    "uploadedImage": "[CS] adminStats.uploadedImage",
+    // EN: Text or emoji icon
+    "textOrEmojiIcon": "[CS] adminStats.textOrEmojiIcon",
+    // EN: PNG, JPG, SVG, GIF or WEBP up to 150 KB. You can also use an emoji.
+    "iconFormats": "[CS] adminStats.iconFormats",
+    // EN: Categories
+    "categories": "[CS] adminStats.categories",
+    // EN: Loading...
+    "loading": "[CS] adminStats.loading",
+    // EN: No categories yet
+    "noCategoriesYet": "[CS] adminStats.noCategoriesYet",
+    // EN: Select category to manage
+    "selectCategoryToManage": "[CS] adminStats.selectCategoryToManage",
+    // EN: Category detail
+    "categoryDetail": "[CS] adminStats.categoryDetail",
+    // EN: Delete
+    "delete": "[CS] adminStats.delete",
+    // EN: Component count
+    "componentCount": "[CS] adminStats.componentCount",
+    // EN: Make sure to click save to apply changes.
+    "uploadedImageSaveToApply": "[CS] adminStats.uploadedImageSaveToApply",
+    // EN: Leave empty to remove the icon. Changes apply after saving.
+    "leaveEmptyToRemoveIcon": "[CS] adminStats.leaveEmptyToRemoveIcon",
+    // EN: Save changes
+    "saveChanges": "[CS] adminStats.saveChanges",
+    // EN: Components
+    "components": "[CS] adminStats.components",
+    // EN: No components yet
+    "noComponentsYet": "[CS] adminStats.noComponentsYet",
+    // EN: Task
+    "task": "[CS] adminStats.task",
+    // EN: Metric
+    "metric": "[CS] adminStats.metric",
+    // EN: Weight
+    "weight": "[CS] adminStats.weight",
+    // EN: Position
+    "position": "[CS] adminStats.position",
+    // EN: Actions
+    "actions": "[CS] adminStats.actions",
+    // EN: Points
+    "points": "[CS] adminStats.points",
+    // EN: Completions
+    "completions": "[CS] adminStats.completions",
+    // EN: Update
+    "update": "[CS] adminStats.update",
+    // EN: Add component
+    "addComponent": "[CS] adminStats.addComponent",
+    // EN: Auto
+    "auto": "[CS] adminStats.auto",
+    // EN: Define heuristics by combining task metrics. Positive weights add points, negative weights subtract. If only one task is used, choose between points or completions via the metric selector.
+    "defineHeuristics": "[CS] adminStats.defineHeuristics",
+    // EN: Are you sure to delete category?
+    "confirmDeleteCategory": "[CS] adminStats.confirmDeleteCategory",
+    // EN: Icon is too large. Maximum size is {{maxSize}} KB.
+    "iconTooLarge": "[CS] adminStats.iconTooLarge" // Variables: maxSize
+  },
+  "adminTasks": {
+    "periodUnits": {
+      // EN: hour
+      "hour": "[CS] adminTasks.periodUnits.hour",
+      // EN: day
+      "day": "[CS] adminTasks.periodUnits.day",
+      // EN: week
+      "week": "[CS] adminTasks.periodUnits.week",
+      // EN: month
+      "month": "[CS] adminTasks.periodUnits.month"
+    },
+    "status": {
+      // EN: archived
+      "archived": "[CS] adminTasks.status.archived",
+      // EN: epired
+      "expired": "[CS] adminTasks.status.expired",
+      // EN: active
+      "active": "[CS] adminTasks.status.active",
+      // EN: label
+      "label": "[CS] adminTasks.status.label"
+    },
+    // EN: Really delete this variant?
+    "confirmDeleteVariant": "[CS] adminTasks.confirmDeleteVariant",
+    // EN: Create task
+    "createTask": "[CS] adminTasks.createTask",
+    // EN: Name
+    "name": "[CS] adminTasks.name",
+    // EN: Points per completion
+    "pointsPerCompletion": "[CS] adminTasks.pointsPerCompletion",
+    // EN: Description
+    "description": "[CS] adminTasks.description",
+    // EN: Supports Markdown
+    "markdownPlaceholder": "[CS] adminTasks.markdownPlaceholder",
+    // EN: Preview
+    "preview": "[CS] adminTasks.preview",
+    // EN: No description yet
+    "noDescriptionYet": "[CS] adminTasks.noDescriptionYet",
+    // EN: Team (optional)
+    "teamOptional": "[CS] adminTasks.teamOptional",
+    // EN: All teams
+    "allTeams": "[CS] adminTasks.allTeams",
+    // EN: Requires approval
+    "requiresApproval": "[CS] adminTasks.requiresApproval",
+    // EN: Hot deal
+    "hotDeal": "[CS] adminTasks.hotDeal",
+    // EN: Max per period
+    "maxPerPeriod": "[CS] adminTasks.maxPerPeriod",
+    // EN: Period count
+    "periodCount": "[CS] adminTasks.periodCount",
+    // EN: Period unit
+    "periodUnit": "[CS] adminTasks.periodUnit",
+    // EN: Start time
+    "startTime": "[CS] adminTasks.startTime",
+    // EN: End time
+    "endTime": "[CS] adminTasks.endTime",
+    // EN: Failed to create task
+    "failedToCreate": "[CS] adminTasks.failedToCreate",
+    // EN: Existing tasks
+    "existingTasks": "[CS] adminTasks.existingTasks",
+    // EN: Loading...
+    "loading": "[CS] adminTasks.loading",
+    // EN: Failed to load tasks
+    "failedToLoad": "[CS] adminTasks.failedToLoad",
+    // EN: Points/Variants
+    "pointsVariants": "[CS] adminTasks.pointsVariants",
+    // EN: Period limit
+    "periodLimit": "[CS] adminTasks.periodLimit",
+    // EN: Team
+    "team": "[CS] adminTasks.team",
+    // EN: Actions
+    "actions": "[CS] adminTasks.actions",
+    // EN: Edit
+    "edit": "[CS] adminTasks.edit",
+    // EN: Unarchive
+    "unarchive": "[CS] adminTasks.unarchive",
+    // EN: Archive
+    "archive": "[CS] adminTasks.archive",
+    // EN: Failed to update
+    "failedToUpdate": "[CS] adminTasks.failedToUpdate",
+    // EN: Delete task
+    "deleteTask": "[CS] adminTasks.deleteTask",
+    // EN: cancel
+    "cancel": "[CS] adminTasks.cancel",
+    // EN: Save changes
+    "saveChanges": "[CS] adminTasks.saveChanges",
+    // EN: Add new variant
+    "addNewVariant": "[CS] adminTasks.addNewVariant",
+    // EN: Variant name
+    "variantName": "[CS] adminTasks.variantName",
+    // EN: Points
+    "points": "[CS] adminTasks.points",
+    // EN: Position (optional)
+    "positionOptional": "[CS] adminTasks.positionOptional",
+    // EN: Description (optional)
+    "descriptionOptional": "[CS] adminTasks.descriptionOptional",
+    // EN: Supports Markdown
+    "supportsMarkdown": "[CS] adminTasks.supportsMarkdown",
+    // EN: Add variant
+    "addVariant": "[CS] adminTasks.addVariant",
+    // EN: Failed to create variant
+    "failedToCreateVariant": "[CS] adminTasks.failedToCreateVariant",
+    // EN: Existing variants
+    "existingVariants": "[CS] adminTasks.existingVariants",
+    // EN: There are no variants of this task yet
+    "noVariantsYet": "[CS] adminTasks.noVariantsYet",
+    // EN: Position
+    "position": "[CS] adminTasks.position",
+    // EN: No description
+    "noDescription": "[CS] adminTasks.noDescription",
+    // EN: Delete
+    "delete": "[CS] adminTasks.delete",
+    // EN: Close
+    "close": "[CS] adminTasks.close",
+    // EN: Are you sure to delete {{taskName}}?
+    "confirmDeleteTask": "[CS] adminTasks.confirmDeleteTask", // Variables: taskName
+    // EN: {{count}} variants
+    "variantCount": "[CS] adminTasks.variantCount", // Variables: count
+    // EN: Variants ({{count}})
+    "variants": "[CS] adminTasks.variants", // Variables: count
+    // EN: Edit {{taskName}}
+    "editTask": "[CS] adminTasks.editTask", // Variables: taskName
+    // EN: Manage variants of {{taskName}}
+    "manageVariants": "[CS] adminTasks.manageVariants" // Variables: taskName
+  },
+  "tasks": {
+    // EN: pts.
+    "pts": "[CS] tasks.pts",
+    // EN: Loading...
+    "loading": "[CS] tasks.loading",
+    // EN: Well done! Your completion was successfully submited.
+    "submitSuccess": "[CS] tasks.submitSuccess",
+    // EN: Oh no... Something went wrong. Try to submit it later.
+    "error": "[CS] tasks.error",
+    // EN: soon
+    "resetSoon": "[CS] tasks.resetSoon",
+    // EN: No description given
+    "noDescription": "[CS] tasks.noDescription",
+    // EN: There are no tasks yet
+    "noTasksYet": "[CS] tasks.noTasksYet",
+    // EN: Maybe the competition did not started yet?
+    "noTasksMessage": "[CS] tasks.noTasksMessage",
+    // EN: No limit
+    "noLimitShort": "[CS] tasks.noLimitShort",
+    // EN: Limit resets
+    "resetsIn": "[CS] tasks.resetsIn",
+    // EN: Current period
+    "periodRange": "[CS] tasks.periodRange",
+    // EN: Sending...
+    "sending": "[CS] tasks.sending",
+    // EN: Already completed
+    "questComplete": "[CS] tasks.questComplete",
+    // EN: Wait
+    "cooldownActive": "[CS] tasks.cooldownActive",
+    // EN: Submit task
+    "submit": "[CS] tasks.submit",
+    // EN: Task details
+    "questDetails": "[CS] tasks.questDetails",
+    // EN: Task description
+    "questDescription": "[CS] tasks.questDescription",
+    // EN: No description for this variant
+    "noVariantDescription": "[CS] tasks.noVariantDescription",
+    // EN: Log your completion
+    "logCompletion": "[CS] tasks.logCompletion",
+    // EN: Number of completions
+    "countLabel": "[CS] tasks.countLabel",
+    // EN: no limit
+    "noLimit": "[CS] tasks.noLimit",
+    // EN: Note for review
+    "noteLabel": "[CS] tasks.noteLabel",
+    // EN: Note to help reviewers to check you really did it. Not mandatoy for tasks without Requires approval)
+    "notePlaceholder": "[CS] tasks.notePlaceholder",
+    // EN: Limit for current period reached!
+    "limitReached": "[CS] tasks.limitReached",
+    // EN: Wait
+    "cooldown": "[CS] tasks.cooldown",
+    // EN: Overview of tasks
+    "heroTitle": "[CS] tasks.heroTitle",
+    // EN: Ready to complete
+    "ready": "[CS] tasks.ready",
+    // EN: Requires approval
+    "requiresApproval": "[CS] tasks.requiresApproval",
+    // EN: completed
+    "completed": "[CS] tasks.completed",
+    // EN: Show lesss
+    "showLess": "[CS] tasks.showLess",
+    // EN: Show more
+    "showMore": "[CS] tasks.showMore",
+    // EN: Task status
+    "questStatus": "[CS] tasks.questStatus",
+    // EN: Ends
+    "ends": "[CS] tasks.ends",
+    // EN: Limit reached
+    "limitReachedShort": "[CS] tasks.limitReachedShort",
+    // EN: Wait
+    "cooldownShort": "[CS] tasks.cooldownShort",
+    // EN: Lets do it
+    "startQuest": "[CS] tasks.startQuest",
+    // EN: Done in this perion: {{current}}/{{limit}}
+    "completedPeriodDetail": "[CS] tasks.completedPeriodDetail", // Variables: current, limit
+    // EN: You still can submit: {{count}}x
+    "remainingLabel": "[CS] tasks.remainingLabel", // Variables: count
+    // EN: Done in total: {{current}}
+    "completedPeriodUnlimited": "[CS] tasks.completedPeriodUnlimited", // Variables: current
+    // EN: Completed in total: {{count}} times
+    "lifetimeTotal": "[CS] tasks.lifetimeTotal", // Variables: count
+    // EN: {{count}} magnificent task for you to earn some points
+    "heroSubtitle": "[CS] tasks.heroSubtitle" // Variables: count
+  },
+  "adminTeams": {
+    // EN: Member added successfully
+    "memberAdded": "[CS] adminTeams.memberAdded",
+    // EN: Member removed successfully
+    "memberRemoved": "[CS] adminTeams.memberRemoved",
+    // EN: unable to update member
+    "unableToUpdateMember": "[CS] adminTeams.unableToUpdateMember",
+    // EN: Are you sure to remove this member?
+    "confirmRemoveMember": "[CS] adminTeams.confirmRemoveMember",
+    // EN: Admin
+    "roleAdmin": "[CS] adminTeams.roleAdmin",
+    // EN: Group admin
+    "roleGroupAdmin": "[CS] adminTeams.roleGroupAdmin",
+    // EN: Member
+    "roleMember": "[CS] adminTeams.roleMember",
+    // EN: You can not remove admin role to yourself
+    "cannotRemoveOwnAdminRole": "[CS] adminTeams.cannotRemoveOwnAdminRole",
+    // EN: Teams
+    "teams": "[CS] adminTeams.teams",
+    // EN: Add team
+    "addTeam": "[CS] adminTeams.addTeam",
+    // EN: Loading...
+    "loading": "[CS] adminTeams.loading",
+    // EN: Unable to load teams
+    "unableToLoadTeams": "[CS] adminTeams.unableToLoadTeams",
+    // EN: There are no teams yet
+    "noTeamsYet": "[CS] adminTeams.noTeamsYet",
+    // EN: No teams assigned
+    "noTeamsAssigned": "[CS] adminTeams.noTeamsAssigned",
+    // EN: Join code
+    "joinCode": "[CS] adminTeams.joinCode",
+    // EN: Generate new
+    "rotate": "[CS] adminTeams.rotate",
+    // EN: Edit members
+    "editMembers": "[CS] adminTeams.editMembers",
+    // EN: Edit details
+    "editDetails": "[CS] adminTeams.editDetails",
+    // EN: Delete
+    "delete": "[CS] adminTeams.delete",
+    // EN: Unassigned users
+    "unassignedUsers": "[CS] adminTeams.unassignedUsers",
+    // EN: No team
+    "noTeam": "[CS] adminTeams.noTeam",
+    // EN: Search
+    "search": "[CS] adminTeams.search",
+    // EN: Name or e-mail
+    "usernameOrEmail": "[CS] adminTeams.usernameOrEmail",
+    // EN: Filter
+    "filter": "[CS] adminTeams.filter",
+    // EN: All users
+    "allUsers": "[CS] adminTeams.allUsers",
+    // EN: Unassigned
+    "withoutTeam": "[CS] adminTeams.withoutTeam",
+    // EN: Other teams
+    "otherTeams": "[CS] adminTeams.otherTeams",
+    // EN: No users available
+    "noUsersAvailable": "[CS] adminTeams.noUsersAvailable",
+    // EN: Select user
+    "selectUser": "[CS] adminTeams.selectUser",
+    // EN: Other team
+    "otherTeam": "[CS] adminTeams.otherTeam",
+    // EN: Add
+    "add": "[CS] adminTeams.add",
+    // EN: There are no members in this group yet
+    "noMembersYet": "[CS] adminTeams.noMembersYet",
+    // EN: Member
+    "member": "[CS] adminTeams.member",
+    // EN: E-mail
+    "email": "[CS] adminTeams.email",
+    // EN: Role
+    "role": "[CS] adminTeams.role",
+    // EN: Action
+    "actions": "[CS] adminTeams.actions",
+    // EN: Remove from team
+    "removeFromTeam": "[CS] adminTeams.removeFromTeam",
+    // EN: Name
+    "name": "[CS] adminTeams.name",
+    // EN: Description
+    "description": "[CS] adminTeams.description",
+    // EN: Failed to update team
+    "failedToUpdateTeam": "[CS] adminTeams.failedToUpdateTeam",
+    // EN: Failed to create team
+    "failedToCreateTeam": "[CS] adminTeams.failedToCreateTeam",
+    // EN: Cancel
+    "cancel": "[CS] adminTeams.cancel",
+    // EN: Create team
+    "createTeam": "[CS] adminTeams.createTeam",
+    // EN: Are you sure to delete team '{{teamName}}'?
+    "confirmDeleteTeam": "[CS] adminTeams.confirmDeleteTeam", // Variables: teamName
+    // EN: Rotate code for '{{teamName}}'? Old one will stop working!
+    "confirmRotateCode": "[CS] adminTeams.confirmRotateCode", // Variables: teamName
+    // EN: {{count}} members
+    "memberCount": "[CS] adminTeams.memberCount", // Variables: count
+    // EN: Manage members of {{manageMembers}}
+    "manageMembers": "[CS] adminTeams.manageMembers", // Variables: teamName
+    // EN: Edit team {{teamName}}
+    "editTeam": "[CS] adminTeams.editTeam" // Variables: teamName
+  },
+  "adminUsers": {
+    // EN: User created successfully
+    "userCreated": "[CS] adminUsers.userCreated",
+    // EN: Failed to create user
+    "failedToCreateUser": "[CS] adminUsers.failedToCreateUser",
+    // EN: User updated
+    "userUpdated": "[CS] adminUsers.userUpdated",
+    // EN: Failed to update user
+    "failedToUpdateUser": "[CS] adminUsers.failedToUpdateUser",
+    // EN: User deleted
+    "userDeleted": "[CS] adminUsers.userDeleted",
+    // EN: Failed to delete user
+    "failedToDeleteUser": "[CS] adminUsers.failedToDeleteUser",
+    // EN: User's completion updated
+    "completionUpdated": "[CS] adminUsers.completionUpdated",
+    // EN: Unable to update completion
+    "unableToUpdateCompletion": "[CS] adminUsers.unableToUpdateCompletion",
+    // EN: User's completion removed
+    "completionRemoved": "[CS] adminUsers.completionRemoved",
+    // EN: Unable to delete completion
+    "unableToDeleteCompletion": "[CS] adminUsers.unableToDeleteCompletion",
+    // EN: Completion recorded
+    "completionRecorded": "[CS] adminUsers.completionRecorded",
+    // EN: Unable to create completion
+    "unableToCreateCompletion": "[CS] adminUsers.unableToCreateCompletion",
+    // EN: Failed to create users
+    "failedToCreateUsers": "[CS] adminUsers.failedToCreateUsers",
+    // EN: Message sent
+    "messageSent": "[CS] adminUsers.messageSent",
+    // EN: Failed to send message
+    "failedToSendMessage": "[CS] adminUsers.failedToSendMessage",
+    // EN: Failed to generate password
+    "failedToGeneratePassword": "[CS] adminUsers.failedToGeneratePassword",
+    // EN: Nothing to update
+    "nothingToUpdate": "[CS] adminUsers.nothingToUpdate",
+    // EN: You can not delete your own account
+    "cannotDeleteOwnAccount": "[CS] adminUsers.cannotDeleteOwnAccount",
+    // EN: Are you sure to delete this user?
+    "confirmDeleteUser": "[CS] adminUsers.confirmDeleteUser",
+    // EN: Count must be in range
+    "countMustBeBetween": "[CS] adminUsers.countMustBeBetween",
+    // EN: Are you sure to remove completion
+    "confirmRemoveCompletion": "[CS] adminUsers.confirmRemoveCompletion",
+    // EN: Select an user first?
+    "selectUserFirst": "[CS] adminUsers.selectUserFirst",
+    // EN: Select task
+    "selectTask": "[CS] adminUsers.selectTask",
+    // EN: Message cannot be empty
+    "messageCannotBeEmpty": "[CS] adminUsers.messageCannotBeEmpty",
+    // EN: Enter at least one name
+    "enterAtLeastOneName": "[CS] adminUsers.enterAtLeastOneName",
+    // EN: You have no access
+    "noAccess": "[CS] adminUsers.noAccess",
+    // EN: Users
+    "users": "[CS] adminUsers.users",
+    "bulkRegister": {
+      // EN: Bulk register
+      "title": "[CS] adminUsers.bulkRegister.title",
+      // EN: Names list
+      "namesLabel": "[CS] adminUsers.bulkRegister.namesLabel",
+      // EN: First name
+Second Name
+Third Name
+      "namesPlaceholder": "[CS] adminUsers.bulkRegister.namesPlaceholder",
+      // EN: Enter full names of new users each on new line. Usernames will be created automatically
+      "namesDescription": "[CS] adminUsers.bulkRegister.namesDescription",
+      // EN: Important
+      "important": "[CS] adminUsers.bulkRegister.important",
+      // EN: Copy the login details, they will not be in readable format after you close this modal.
+      "importantMessage": "[CS] adminUsers.bulkRegister.importantMessage",
+      // EN: Generated password
+      "generatedPassword": "[CS] adminUsers.bulkRegister.generatedPassword",
+      // EN: Action
+      "action": "[CS] adminUsers.bulkRegister.action",
+      // EN: Download CSV
+      "downloadCSV": "[CS] adminUsers.bulkRegister.downloadCSV"
+    },
+    // EN: Add user
+    "addUser": "[CS] adminUsers.addUser",
+    // EN: Loading...
+    "loading": "[CS] adminUsers.loading",
+    // EN: No users yet
+    "noUsersYet": "[CS] adminUsers.noUsersYet",
+    // EN: Name
+    "name": "[CS] adminUsers.name",
+    // EN: Username
+    "username": "[CS] adminUsers.username",
+    // EN: E-mail
+    "email": "[CS] adminUsers.email",
+    // EN: Role
+    "role": "[CS] adminUsers.role",
+    // EN: Team
+    "team": "[CS] adminUsers.team",
+    // EN: Manage
+    "manage": "[CS] adminUsers.manage",
+    // EN: Real name
+    "realName": "[CS] adminUsers.realName",
+    // EN: E-mail (optional)
+    "emailOptional": "[CS] adminUsers.emailOptional",
+    // EN: Preffered language
+    "preferredLanguage": "[CS] adminUsers.preferredLanguage",
+    // EN: No team
+    "noTeam": "[CS] adminUsers.noTeam",
+    // EN: Member
+    "roleMember": "[CS] adminUsers.roleMember",
+    // EN: Group admin
+    "roleGroupAdmin": "[CS] adminUsers.roleGroupAdmin",
+    // EN: Admin
+    "roleAdmin": "[CS] adminUsers.roleAdmin",
+    // EN: Active
+    "active": "[CS] adminUsers.active",
+    // EN: Managed teams
+    "managedTeams": "[CS] adminUsers.managedTeams",
+    // EN: Reset password
+    "resetPassword": "[CS] adminUsers.resetPassword",
+    // EN: Leave blank to keep current password
+    "changePasswordPlaceholder": "[CS] adminUsers.changePasswordPlaceholder",
+    // EN: Generate
+    "generate": "[CS] adminUsers.generate",
+    // EN: Clear password
+    "clearPassword": "[CS] adminUsers.clearPassword",
+    // EN: Save changes
+    "saveChanges": "[CS] adminUsers.saveChanges",
+    // EN: Send message to user
+    "sendMessage": "[CS] adminUsers.sendMessage",
+    // EN: Write a short message for this user
+    "sendMessagePlaceholder": "[CS] adminUsers.sendMessagePlaceholder",
+    // EN: Clear
+    "clear": "[CS] adminUsers.clear",
+    // EN: Send
+    "send": "[CS] adminUsers.send",
+    // EN: Deleting an user cannot be undone
+    "deletingUserCannotBeUndone": "[CS] adminUsers.deletingUserCannotBeUndone",
+    // EN: Delete user
+    "deleteUser": "[CS] adminUsers.deleteUser",
+    // EN: Completion history
+    "completionHistory": "[CS] adminUsers.completionHistory",
+    // EN: Add completion
+    "addCompletionBtn": "[CS] adminUsers.addCompletionBtn",
+    // EN: All tasks
+    "allTasks": "[CS] adminUsers.allTasks",
+    // EN: From
+    "dateFrom": "[CS] adminUsers.dateFrom",
+    // EN: To
+    "dateTo": "[CS] adminUsers.dateTo",
+    // EN: Total points
+    "totalPoints": "[CS] adminUsers.totalPoints",
+    // EN: Points by task
+    "pointsByTask": "[CS] adminUsers.pointsByTask",
+    // EN: No completions yet
+    "noCompletions": "[CS] adminUsers.noCompletions",
+    // EN: Date
+    "date": "[CS] adminUsers.date",
+    // EN: Status
+    "status": "[CS] adminUsers.status",
+    // EN: Count
+    "count": "[CS] adminUsers.count",
+    // EN: Admin note
+    "adminNote": "[CS] adminUsers.adminNote",
+    // EN: Actions
+    "actions": "[CS] adminUsers.actions",
+    // EN: Approved
+    "approved": "[CS] adminUsers.approved",
+    // EN: Rejected
+    "rejected": "[CS] adminUsers.rejected",
+    // EN: Create user
+    "createUser": "[CS] adminUsers.createUser",
+    // EN: Password
+    "password": "[CS] adminUsers.password",
+    // EN: Bulk registration completed
+    "bulkRegisterComplete": "[CS] adminUsers.bulkRegisterComplete",
+    // EN: Successfully created {{successCount}} users, {{failedCount}} users failed.
+    "bulkRegistrationSuccess": "[CS] adminUsers.bulkRegistrationSuccess", // Variables: successCount, failedCount
+    // EN: Edit user '{{userName}}'
+    "editUser": "[CS] adminUsers.editUser" // Variables: userName
+  },
+  "dashboard": {
+    "timeAgo": {
+      // EN: Just now
+      "justNow": "Právě teď",
+      // EN: {{count}} minutes ago
+      "minutesAgo": "před {{count}} minutami", // Variables: count
+      // EN: {{count}} hours ago
+      "hoursAgo": "před {{count}} hodinami", // Variables: count
+      // EN: {{count}} days ago
+      "daysAgo": "před {{count}} dny" // Variables: count
+    },
+    // EN: You have no team assigned. If you think it is weird, contact admin
+    "welcomeNoGroup": "Zatím nejsi v žádné družince. Pokud si myslíš, že to tak nemá být, kontaktuj admina.",
+    // EN: Total points
+    "totalPoints": "Celkem bodů",
+    // EN: Your rank
+    "yourRank": "Tvé pořadí",
+    // EN: Your team's rank
+    "teamRank": "Pořadí družiny",
+    // EN: Announcements
+    "announcements": "Ohlášky",
+    // EN: There will be averything necessary for this competition
+    "stayInformed": "Tady najdeš vše, co je pro soutěž důležité",
+    // EN: Information
+    "infoTitle": "Informace",
+    // EN: For all teams
+    "allTeams": "Pro všechny týmy",
+    // EN: Team activity
+    "teamActivity": "Akivita družiny",
+    // EN: Time to start doing something
+    "makeMagic": "Čas něco konečně začít dělat",
+    // EN: Be the first from your team to finish task and motivate others
+    "completeTasksToSee": "Buď první ze své družiny, kdo splní nějaký úkol a motivuj tak ostatní.",
+    // EN: Tasks done
+    "tasksDone": "Splněných úkolů",
+    // EN: Points earned
+    "pointsEarned": "Získaných bodů",
+    // EN: Active heroes
+    "activeHeroes": "Aktivních borců",
+    // EN: You completed
+    "youCompleted": "Splnil/a jsi",
+    // EN: completed
+    "completed": "splnil/a",
+    // EN: Your messages
+    "notifications": "Zprávy pro tebe",
+    // EN: You have no messages yet.
+    "noMessagesYet": "Zatím nemáš žádné zprávy",
+    // EN: Maybe some will appear if you finish some tasks
+    "messagesWillAppear": "Možná se ti tady nějaký zobrazí, když dokončíš úkol",
+    // EN: Recent messages
+    "recentMessages": "Zprávy za poslední dobu",
+    // EN: System
+    "system": "Systém",
+    // EN: Your progress
+    "yourJourney": "Jak se ti daří",
+    // EN: Want to shine like a star?
+    "readyToShine": "Ukaž, co v tobě je",
+    // EN: Complete your first task and tell the world you are worth it
+    "startCompleting": "Splň svůj první úkol a ukaž, že jsi absolutní alfa",
+    // EN: Awaiting approval
+    "awaitingApproval": "Čeká na schválení",
+    // EN: Rejected
+    "rejected": "Zamítnuto",
+    // EN: Reason
+    "reason": "Důvod",
+    // EN: Team leaderboard
+    "teamChampions": "Výsledky tvé družiny",
+    // EN: Heroes
+    "heroes": "borců",
+    // EN: Rank
+    "rank": "Pořadí",
+    // EN: Name
+    "champion": "Jméno",
+    // EN: Completed
+    "victories": "Počet splnění",
+    // EN: Earned points
+    "glory": "Získané body",
+    // EN: See details
+    "seeDetails": "Ukaž detaily",
+    // EN: View tasks table
+    "viewTasks": "Ukaž tabulku úkolů",
+    // EN: Keep pushing forward, team! Every completed task counts!
+    "keepPushing": "Jen taka dál! Směle do toho a půl je hotovo!",
+    // EN: Task details
+    "taskDetails": "Detaily úkolu",
+    // EN: Welcome, {{username}}
+    "welcome": "Čus, {{username}}", // Variables: username
+    // EN: Proudly representing team {{teamName}}
+    "teamPride": "Hrdě reprezentuješ družinku {{teamName}}", // Variables: teamName
+    // EN: And {{count}} more achievements
+    "moreAchievements": "A {{count}} dalších úspěchů", // Variables: count
+    // EN: Scroll to see more
+    "scrollForMore": "Zaskroluj pro {{count}} dalších", // Variables: count
+    // EN: Completed, amazing! (+{{points}} pts.)
+    "amazing": "Hotovo, získáváš +{{points}} b.", // Variables: points
+    // EN: And {{count}} more in history
+    "moreInHistory": "A {{count}} dalších věcí" // Variables: count
+  },
+  "login": {
+    // EN: Cannot log in
+    "error": "[CS] login.error",
+    "tabs": {
+      // EN: Log in
+      "login": "[CS] login.tabs.login",
+      // EN: Member registration
+      "registerMember": "[CS] login.tabs.registerMember",
+      // EN: Admin registration
+      "registerAdmin": "[CS] login.tabs.registerAdmin"
+    },
+    // EN: Welcome to ScoutComp
+    "welcome": "[CS] login.welcome",
+    // EN: Your username
+    "username": "[CS] login.username",
+    // EN: Enter your username
+    "usernamePlaceholder": "[CS] login.usernamePlaceholder",
+    // EN: Password
+    "password": "[CS] login.password",
+    // EN: Enter your password
+    "passwordPlaceholder": "[CS] login.passwordPlaceholder",
+    // EN: Signing in...
+    "signingIn": "[CS] login.signingIn",
+    // EN: Log in
+    "button": "[CS] login.button"
+  },
+  "register": {
+    // EN: Real name
+    "realName": "[CS] register.realName",
+    // EN: Enter your full name + nickname
+    "realNamePlaceholder": "[CS] register.realNamePlaceholder",
+    // EN: User name
+    "username": "[CS] register.username",
+    // EN: your_user_name
+    "usernamePlaceholder": "[CS] register.usernamePlaceholder",
+    // EN: E-mail
+    "email": "[CS] register.email",
+    // EN: optional
+    "optional": "[CS] register.optional",
+    // EN: your@email.com
+    "emailPlaceholder": "[CS] register.emailPlaceholder",
+    // EN: Password
+    "password": "[CS] register.password",
+    // EN: Create a secure password (8+ chars)
+    "passwordPlaceholder": "[CS] register.passwordPlaceholder",
+    // EN: join code
+    "joinCode": "[CS] register.joinCode",
+    // EN: Enter the team join code
+    "joinCodePlaceholder": "[CS] register.joinCodePlaceholder",
+    // EN: Prefered language
+    "language": "[CS] register.language",
+    // EN: Česky
+    "languageCs": "[CS] register.languageCs",
+    // EN: English
+    "languageEn": "[CS] register.languageEn",
+    // EN: Error
+    "error": "[CS] register.error",
+    // EN: Registering...
+    "registering": "[CS] register.registering",
+    // EN: Register
+    "button": "[CS] register.button",
+    // EN: Admin account shall be created only on first start or in development mode
+    "adminHint": "[CS] register.adminHint",
+    // EN: Creating admin...
+    "creatingAdmin": "[CS] register.creatingAdmin",
+    // EN: Create admin
+    "adminButton": "[CS] register.adminButton"
+  },
+  "rules": {
+    // EN: Rules updated
+    "updated": "[CS] rules.updated",
+    // EN: Update failed
+    "updateFailed": "[CS] rules.updateFailed",
+    // EN: Loading...
+    "loading": "[CS] rules.loading",
+    // EN: Rules
+    "title": "[CS] rules.title",
+    // EN: Competition rules for fair-play
+    "subtitle": "[CS] rules.subtitle",
+    // EN: Official rules
+    "officialRules": "[CS] rules.officialRules",
+    // EN: Unsaved changes!
+    "unsavedChanges": "[CS] rules.unsavedChanges",
+    // EN: Edit rules
+    "editRules": "[CS] rules.editRules",
+    // EN: Markdown content
+    "markdownContent": "[CS] rules.markdownContent",
+    // EN: Enter your rules in Markdown format
+    "markdownPlaceholder": "[CS] rules.markdownPlaceholder",
+    // EN: Live preview
+    "livePreview": "[CS] rules.livePreview",
+    // EN: No rules yet
+    "comingSoon": "[CS] rules.comingSoon",
+    // EN: They will come soon
+    "comingSoonMessage": "[CS] rules.comingSoonMessage"
+  },
+  "userSettings": {
+    // EN: Profile updated
+    "profileUpdated": "[CS] userSettings.profileUpdated",
+    // EN: User information update failed
+    "updateFailed": "[CS] userSettings.updateFailed",
+    // EN: Password changed successfully
+    "passwordChanged": "[CS] userSettings.passwordChanged",
+    // EN: Password change failed
+    "passwordChangeFailed": "[CS] userSettings.passwordChangeFailed",
+    // EN: Passwords are not the same
+    "passwordMismatch": "[CS] userSettings.passwordMismatch",
+    // EN: Password must be at least 8 characters long
+    "passwordTooShort": "[CS] userSettings.passwordTooShort",
+    // EN: User settings
+    "title": "[CS] userSettings.title",
+    // EN: Manage your user information
+    "subtitle": "[CS] userSettings.subtitle",
+    // EN: Profile settings
+    "profileSettings": "[CS] userSettings.profileSettings",
+    // EN: Basic information
+    "profileDescription": "[CS] userSettings.profileDescription",
+    // EN: Log-in name
+    "username": "[CS] userSettings.username",
+    // EN: E-mail
+    "email": "[CS] userSettings.email",
+    // EN: Language
+    "language": "[CS] userSettings.language",
+    // EN: Saving...
+    "saving": "[CS] userSettings.saving",
+    // EN: Save profile
+    "saveProfile": "[CS] userSettings.saveProfile",
+    // EN: Account info
+    "accountInfo": "[CS] userSettings.accountInfo",
+    // EN: Immutable fields
+    "accountDescription": "[CS] userSettings.accountDescription",
+    // EN: Full name
+    "currentUsername": "[CS] userSettings.currentUsername",
+    // EN: Role
+    "role": "[CS] userSettings.role",
+    // EN: Team
+    "team": "[CS] userSettings.team",
+    // EN: Password settings
+    "passwordSettings": "[CS] userSettings.passwordSettings",
+    // EN: Be carefull here
+    "passwordDescription": "[CS] userSettings.passwordDescription",
+    // EN: Password minimal requirements
+    "passwordRequirements": "[CS] userSettings.passwordRequirements",
+    // EN: Password must be at least 8 chars long
+    "minLength": "[CS] userSettings.minLength",
+    // EN: Must be different than the previous
+    "noCurrentPassword": "[CS] userSettings.noCurrentPassword",
+    // EN: New password
+    "newPassword": "[CS] userSettings.newPassword",
+    // EN: Confirm password
+    "confirmPassword": "[CS] userSettings.confirmPassword",
+    // EN: Changing password...
+    "changingPassword": "[CS] userSettings.changingPassword",
+    // EN: Change password
+    "changePassword": "[CS] userSettings.changePassword"
+  }
+}

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -76,6 +77,7 @@ const getErrorMessage = (error, fallbackMessage) => {
 };
 
 export default function AdminUsers() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isAdmin, canManageUsers, managedTeamIds, userId } = useAuth();
 
@@ -278,13 +280,13 @@ export default function AdminUsers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       setCreateForm(emptyCreateForm);
-      setFeedback({ type: "success", message: "User created successfully." });
+      setFeedback({ type: "success", message: t('adminUsers.userCreated') });
       setShowCreateModal(false);
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: getErrorMessage(error, "Failed to create user."),
+        message: getErrorMessage(error, t('adminUsers.failedToCreateUser')),
       });
     },
   });
@@ -299,12 +301,12 @@ export default function AdminUsers() {
         });
       }
       setEditForm((prev) => ({ ...prev, password: "" }));
-      setFeedback({ type: "success", message: "User updated." });
+      setFeedback({ type: "success", message: t('adminUsers.userUpdated') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: getErrorMessage(error, "Failed to update user."),
+        message: getErrorMessage(error, t('adminUsers.failedToUpdateUser')),
       });
     },
   });
@@ -316,12 +318,12 @@ export default function AdminUsers() {
       if (selectedUserId === deletedId) {
         setSelectedUserId(null);
       }
-      setFeedback({ type: "success", message: "User deleted." });
+      setFeedback({ type: "success", message: t('adminUsers.userDeleted') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: getErrorMessage(error, "Failed to delete user."),
+        message: getErrorMessage(error, t('adminUsers.failedToDeleteUser')),
       });
     },
   });
@@ -336,10 +338,10 @@ export default function AdminUsers() {
         });
       }
       setCompletionError(null);
-      setFeedback({ type: "success", message: "Completion updated." });
+      setFeedback({ type: "success", message: t('adminUsers.completionUpdated') });
     },
     onError: (error) => {
-      setCompletionError(getErrorMessage(error, "Unable to update completion."));
+      setCompletionError(getErrorMessage(error, t('adminUsers.unableToUpdateCompletion')));
     },
   });
 
@@ -353,10 +355,10 @@ export default function AdminUsers() {
         });
       }
       setCompletionError(null);
-      setFeedback({ type: "success", message: "Completion removed." });
+      setFeedback({ type: "success", message: t('adminUsers.completionRemoved') });
     },
     onError: (error) => {
-      setCompletionError(getErrorMessage(error, "Unable to delete completion."));
+      setCompletionError(getErrorMessage(error, t('adminUsers.unableToDeleteCompletion')));
     },
   });
 
@@ -373,10 +375,10 @@ export default function AdminUsers() {
       }
       setShowCreateCompletionModal(false);
       setNewCompletionForm(emptyCompletionForm);
-      setFeedback({ type: "success", message: "Completion recorded." });
+      setFeedback({ type: "success", message: t('adminUsers.completionRecorded') });
     },
     onError: (error) => {
-      setCompletionCreateError(getErrorMessage(error, "Unable to create completion."));
+      setCompletionCreateError(getErrorMessage(error, t('adminUsers.unableToCreateCompletion')));
     },
   });
 
@@ -401,11 +403,11 @@ export default function AdminUsers() {
       }
       setFeedback({
         type: "success",
-        message: `Successfully created ${result.success_count} users. ${result.failed_count} failed.`,
+        message: t('adminUsers.bulkRegistrationSuccess', { successCount: result.success_count, failedCount: result.failed_count }),
       });
     },
     onError: (error) => {
-      setBulkRegistrationError(getErrorMessage(error, "Failed to create users."));
+      setBulkRegistrationError(getErrorMessage(error, t('adminUsers.failedToCreateUsers')));
     },
   });
 
@@ -476,12 +478,12 @@ export default function AdminUsers() {
     mutationFn: async (message) => api.post(`/notifications/users/${selectedUserId}`, { message }),
     onSuccess: () => {
       setMessageText("");
-      setFeedback({ type: "success", message: "Message sent." });
+      setFeedback({ type: "success", message: t('adminUsers.messageSent') });
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: getErrorMessage(error, "Failed to send message."),
+        message: getErrorMessage(error, t('adminUsers.failedToSendMessage')),
       });
     },
   });
@@ -505,7 +507,7 @@ export default function AdminUsers() {
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: getErrorMessage(error, "Failed to generate password."),
+        message: getErrorMessage(error, t('adminUsers.failedToGeneratePassword')),
       });
     },
   });
@@ -560,7 +562,7 @@ export default function AdminUsers() {
     }
 
     if (Object.keys(payload).length === 0) {
-      setFeedback({ type: "info", message: "Nothing to update." });
+      setFeedback({ type: "info", message: t('adminUsers.nothingToUpdate') });
       return;
     }
 
@@ -569,10 +571,10 @@ export default function AdminUsers() {
 
   const handleDeleteUser = (userIdToDelete) => {
     if (userIdToDelete === userId) {
-      setFeedback({ type: "warning", message: "You cannot delete your own account." });
+      setFeedback({ type: "warning", message: t('adminUsers.cannotDeleteOwnAccount') });
       return;
     }
-    if (!window.confirm("Delete this user? This cannot be undone.")) {
+    if (!window.confirm(t('adminUsers.confirmDeleteUser'))) {
       return;
     }
     deleteUserMutation.mutate(userIdToDelete);
@@ -583,7 +585,7 @@ export default function AdminUsers() {
     if (!selectedUserId || !countValue) return;
     const parsed = Number(countValue);
     if (!Number.isFinite(parsed) || parsed < 1 || parsed > 50) {
-      setCompletionError("Count must be between 1 and 50.");
+      setCompletionError(t('adminUsers.countMustBeBetween'));
       return;
     }
     updateCompletionMutation.mutate({
@@ -603,7 +605,7 @@ export default function AdminUsers() {
   };
 
   const handleCompletionDelete = (completionId) => {
-    if (!window.confirm("Remove this completion record?")) {
+    if (!window.confirm(t('adminUsers.confirmRemoveCompletion'))) {
       return;
     }
     deleteCompletionMutation.mutate(completionId);
@@ -612,16 +614,16 @@ export default function AdminUsers() {
   const handleCreateCompletion = (event) => {
     event.preventDefault();
     if (!selectedUserId) {
-      setCompletionCreateError("Select a user first.");
+      setCompletionCreateError(t('adminUsers.selectUserFirst'));
       return;
     }
     if (!newCompletionForm.taskId) {
-      setCompletionCreateError("Select a task.");
+      setCompletionCreateError(t('adminUsers.selectTask'));
       return;
     }
     const countValue = Number(newCompletionForm.count);
     if (!Number.isFinite(countValue) || countValue < 1 || countValue > 50) {
-      setCompletionCreateError("Count must be between 1 and 50.");
+      setCompletionCreateError(t('adminUsers.countMustBeBetween'));
       return;
     }
 
@@ -640,7 +642,7 @@ export default function AdminUsers() {
     event.preventDefault();
     const trimmed = messageText.trim();
     if (!trimmed) {
-      setFeedback({ type: "warning", message: "Message cannot be empty." });
+      setFeedback({ type: "warning", message: t('adminUsers.messageCannotBeEmpty') });
       return;
     }
     sendMessageMutation.mutate(trimmed);
@@ -654,7 +656,7 @@ export default function AdminUsers() {
       .filter(name => name.length > 0);
 
     if (names.length === 0) {
-      setBulkRegistrationError("Please enter at least one name.");
+      setBulkRegistrationError(t('adminUsers.enterAtLeastOneName'));
       return;
     }
 
@@ -765,7 +767,7 @@ export default function AdminUsers() {
   }, [teams]);
 
   if (!canManageUsers) {
-    return <div className="alert alert-danger">You do not have access to manage users.</div>;
+    return <div className="alert alert-danger">{t('adminUsers.noAccess')}</div>;
   }
 
   return (
@@ -780,33 +782,33 @@ export default function AdminUsers() {
         <div className="col-12">
           <div className="card shadow-sm mb-4">
             <div className="card-header d-flex justify-content-between align-items-center">
-              <span>Users</span>
+              <span>{t('adminUsers.users')}</span>
               {isAdmin && (
                 <div className="d-flex gap-2">
                   <button type="button" className="btn btn-outline-primary btn-sm" onClick={openBulkRegistrationModal}>
-                    Bulk register
+                    {t('adminUsers.bulkRegister.title')}
                   </button>
                   <button type="button" className="btn btn-primary btn-sm" onClick={openCreateModal}>
-                    Add user
+                    {t('adminUsers.addUser')}
                   </button>
                 </div>
               )}
             </div>
             <div className="card-body p-0">
               {usersLoading ? (
-                <div className="text-center text-muted py-3">Loading…</div>
+                <div className="text-center text-muted py-3">{t('adminUsers.loading')}</div>
               ) : users.length === 0 ? (
-                <p className="text-muted px-3 py-2 mb-0">No users yet.</p>
+                <p className="text-muted px-3 py-2 mb-0">{t('adminUsers.noUsersYet')}</p>
               ) : (
                 <div className="table-responsive">
                   <table className="table table-hover table-sm align-middle mb-0">
                     <thead className="table-light">
                       <tr>
-                        <th>Name</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Team</th>
+                        <th>{t('adminUsers.name')}</th>
+                        <th>{t('adminUsers.username')}</th>
+                        <th>{t('adminUsers.email')}</th>
+                        <th>{t('adminUsers.role')}</th>
+                        <th>{t('adminUsers.team')}</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -828,7 +830,7 @@ export default function AdminUsers() {
                               className="btn btn-outline-primary btn-sm"
                               onClick={() => setSelectedUserId(user.id)}
                             >
-                              Manage
+                              {t('adminUsers.manage')}
                             </button>
                           </td>
                         </tr>
@@ -844,11 +846,11 @@ export default function AdminUsers() {
         {selectedUser && (
           <div className="col-12 col-xl-6">
             <div className="card shadow-sm mb-4">
-              <div className="card-header">Edit user – {selectedUser.real_name || selectedUser.username}</div>
+              <div className="card-header">{t('adminUsers.editUser', { userName: selectedUser.real_name || selectedUser.username })}</div>
               <div className="card-body">
                 <form className="row g-3" onSubmit={handleEditUser}>
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Real name</label>
+                    <label className="form-label">{t('adminUsers.realName')}</label>
                     <input
                       className="form-control"
                       value={editForm.realName}
@@ -861,7 +863,7 @@ export default function AdminUsers() {
                   {isAdmin && (
                     <>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Username</label>
+                        <label className="form-label">{t('adminUsers.username')}</label>
                         <input
                           className="form-control"
                           value={editForm.username}
@@ -872,7 +874,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Email (optional)</label>
+                        <label className="form-label">{t('adminUsers.emailOptional')}</label>
                         <input
                           className="form-control"
                           type="email"
@@ -886,7 +888,7 @@ export default function AdminUsers() {
                   )}
 
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Preferred language</label>
+                    <label className="form-label">{t('adminUsers.preferredLanguage')}</label>
                     <select
                       className="form-select"
                       value={editForm.preferredLanguage}
@@ -903,7 +905,7 @@ export default function AdminUsers() {
                   </div>
 
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Team</label>
+                    <label className="form-label">{t('adminUsers.team')}</label>
                     <select
                       className="form-select"
                       value={editForm.teamId}
@@ -911,7 +913,7 @@ export default function AdminUsers() {
                         setEditForm((prev) => ({ ...prev, teamId: event.target.value }))
                       }
                     >
-                      <option value="">No team</option>
+                      <option value="">{t('adminUsers.noTeam')}</option>
                       {teamOptions.map((team) => (
                         <option key={team.value} value={team.value}>
                           {team.label}
@@ -923,7 +925,7 @@ export default function AdminUsers() {
                   {isAdmin && (
                     <>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Role</label>
+                        <label className="form-label">{t('adminUsers.role')}</label>
                         <select
                           className="form-select"
                           value={editForm.role}
@@ -931,9 +933,9 @@ export default function AdminUsers() {
                             setEditForm((prev) => ({ ...prev, role: event.target.value }))
                           }
                         >
-                          <option value="member">Member</option>
-                          <option value="group_admin">Group admin</option>
-                          <option value="admin">Admin</option>
+                          <option value="member">{t('adminUsers.roleMember')}</option>
+                          <option value="group_admin">{t('adminUsers.roleGroupAdmin')}</option>
+                          <option value="admin">{t('adminUsers.roleAdmin')}</option>
                         </select>
                       </div>
                       <div className="col-12 col-md-6 d-flex align-items-center">
@@ -948,7 +950,7 @@ export default function AdminUsers() {
                             }
                           />
                           <label className="form-check-label" htmlFor="edit-user-active">
-                            Active
+                            {t('adminUsers.active')}
                           </label>
                         </div>
                       </div>
@@ -957,7 +959,7 @@ export default function AdminUsers() {
 
                   {isAdmin && editForm.role === "group_admin" && (
                     <div className="col-12">
-                      <label className="form-label">Managed teams</label>
+                      <label className="form-label">{t('adminUsers.managedTeams')}</label>
                       <select
                         className="form-select"
                         multiple
@@ -982,11 +984,7 @@ export default function AdminUsers() {
                   )}
 
                   <div className="col-12">
-                    <label className="form-label">Reset password</label>
-                    <div className="form-text mb-2">
-                      <i className="fas fa-info-circle me-1"></i>
-                      Click Generate to create a secure random password. Generated passwords will be visible for 10 seconds.
-                    </div>
+                    <label className="form-label">{t('adminUsers.resetPassword')}</label>
                     {editPasswordGenerated && (
                       <div className="alert alert-success py-2 mb-2" role="alert">
                         <i className="fas fa-check-circle me-1"></i>
@@ -998,7 +996,7 @@ export default function AdminUsers() {
                         className="form-control"
                         type={showEditPassword ? "text" : "password"}
                         value={editForm.password}
-                        placeholder="Leave blank to keep current password"
+                        placeholder={t('adminUsers.changePasswordPlaceholder')}
                         onChange={(event) =>
                           setEditForm((prev) => ({ ...prev, password: event.target.value }))
                         }
@@ -1020,7 +1018,7 @@ export default function AdminUsers() {
                         disabled={generatePasswordMutation.isLoading}
                         title="Generate random password"
                       >
-                        <i className="fas fa-dice me-1"></i>Generate
+                        <i className="fas fa-dice me-1"></i>{t('adminUsers.generate')}
                       </button>
                     </div>
                   </div>
@@ -1039,14 +1037,14 @@ export default function AdminUsers() {
                       className="btn btn-outline-secondary"
                       onClick={() => setEditForm((prev) => ({ ...prev, password: "" }))}
                     >
-                      Clear password
+                      {t('adminUsers.clearPassword')}
                     </button>
                     <button
                       type="submit"
                       className="btn btn-primary"
                       disabled={updateUserMutation.isLoading}
                     >
-                      Save changes
+                      {t('adminUsers.saveChanges')}
                     </button>
                   </div>
                 </form>
@@ -1056,13 +1054,13 @@ export default function AdminUsers() {
                     <hr />
                     <form className="row g-3" onSubmit={handleSendMessage}>
                       <div className="col-12">
-                        <label className="form-label">Send message</label>
+                        <label className="form-label">{t('adminUsers.sendMessage')}</label>
                         <textarea
                           className="form-control"
                           rows={2}
                           value={messageText}
                           onChange={(event) => setMessageText(event.target.value)}
-                          placeholder="Write a short message to this user"
+                          placeholder={t('adminUsers.sendMessagePlaceholder')}
                         ></textarea>
                       </div>
                       <div className="col-12 d-flex justify-content-end gap-2">
@@ -1072,14 +1070,14 @@ export default function AdminUsers() {
                           onClick={() => setMessageText("")}
                           disabled={sendMessageMutation.isLoading}
                         >
-                          Clear
+                          {t('adminUsers.clear')}
                         </button>
                         <button
                           type="submit"
                           className="btn btn-outline-primary"
                           disabled={sendMessageMutation.isLoading}
                         >
-                          Send
+                          {t('adminUsers.send')}
                         </button>
                       </div>
                     </form>
@@ -1090,8 +1088,8 @@ export default function AdminUsers() {
                 <div className="card-footer d-flex justify-content-between align-items-center">
                   <span className="text-muted small">
                     {selectedUser.id === userId
-                      ? "You cannot delete your own account."
-                      : "Deleting a user cannot be undone."}
+                      ? t('adminUsers.cannotDeleteOwnAccount')
+                      : t('adminUsers.deletingUserCannotBeUndone')}
                   </span>
                   <button
                     type="button"
@@ -1099,7 +1097,7 @@ export default function AdminUsers() {
                     onClick={() => handleDeleteUser(selectedUser.id)}
                     disabled={deleteUserMutation.isLoading || selectedUser.id === userId}
                   >
-                    Delete user
+                    {t('adminUsers.deleteUser')}
                   </button>
                 </div>
               )}
@@ -1112,7 +1110,7 @@ export default function AdminUsers() {
             <div className="card shadow-sm">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center gap-2">
-                  <span>Completion history</span>
+                  <span>{t('adminUsers.completionHistory')}</span>
                   <span className="badge bg-secondary">{filteredCompletions.length}</span>
                 </div>
                 <button
@@ -1121,7 +1119,7 @@ export default function AdminUsers() {
                   onClick={openCreateCompletionModal}
                   disabled={!assignableTasks.length || tasksLoading}
                 >
-                  Add completion
+                  {t('adminUsers.addCompletionBtn')}
                 </button>
               </div>
               <div className="card-body p-0">
@@ -1132,13 +1130,13 @@ export default function AdminUsers() {
                 )}
                 <div className="p-3 border-bottom d-flex flex-wrap gap-3 align-items-end">
                   <div>
-                    <label className="form-label mb-1">Task</label>
+                    <label className="form-label mb-1">{t('leaderboard.taskColumn')}</label>
                     <select
                       className="form-select form-select-sm"
                       value={completionTaskFilter}
                       onChange={(event) => setCompletionTaskFilter(event.target.value)}
                     >
-                      <option value="all">All tasks</option>
+                      <option value="all">{t('adminUsers.allTasks')}</option>
                       {availableTasks.map((task) => (
                         <option key={task.value} value={task.value}>
                           {task.label}
@@ -1147,7 +1145,7 @@ export default function AdminUsers() {
                     </select>
                   </div>
                   <div>
-                    <label className="form-label mb-1">From</label>
+                    <label className="form-label mb-1">{t('adminUsers.dateFrom')}</label>
                     <input
                       type="date"
                       className="form-control form-control-sm"
@@ -1156,7 +1154,7 @@ export default function AdminUsers() {
                     />
                   </div>
                   <div>
-                    <label className="form-label mb-1">To</label>
+                    <label className="form-label mb-1">{t('adminUsers.dateTo')}</label>
                     <input
                       type="date"
                       className="form-control form-control-sm"
@@ -1166,7 +1164,7 @@ export default function AdminUsers() {
                   </div>
                   <div className="ms-auto d-flex gap-2 align-items-center">
                     <div className="text-end">
-                      <div className="fw-semibold">Total points</div>
+                      <div className="fw-semibold">{t('adminUsers.totalPoints')}</div>
                       <div className="text-primary fs-5">{totalPoints.toFixed(2)}</div>
                     </div>
                     <button
@@ -1174,19 +1172,19 @@ export default function AdminUsers() {
                       className="btn btn-outline-secondary btn-sm"
                       onClick={handleResetCompletionFilters}
                     >
-                      Reset
+                      {t('common.reset')}
                     </button>
                   </div>
                 </div>
                 {pointsByTask.length > 0 && (
                   <div className="p-3 border-bottom">
-                    <div className="fw-semibold mb-2">Points by task</div>
+                    <div className="fw-semibold mb-2">{t('adminUsers.pointsByTask')}</div>
                     <div className="table-responsive">
                       <table className="table table-sm align-middle mb-0">
                         <thead className="table-light">
                           <tr>
-                            <th>Task</th>
-                            <th className="text-end">Points</th>
+                            <th>{t('leaderboard.taskColumn')}</th>
+                            <th className="text-end">{t('leaderboard.pointsColumn')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1203,20 +1201,20 @@ export default function AdminUsers() {
                 )}
 
                 {completionsLoading ? (
-                  <div className="text-center text-muted py-3">Loading…</div>
+                  <div className="text-center text-muted py-3">{t('adminUsers.loading')}</div>
                 ) : filteredCompletions.length === 0 ? (
-                  <p className="text-muted px-3 py-2 mb-0">No completions recorded.</p>
+                  <p className="text-muted px-3 py-2 mb-0">{t('adminUsers.noCompletions')}</p>
                 ) : (
                   <div className="table-responsive">
                     <table className="table table-sm align-middle mb-0">
                       <thead className="table-light">
                         <tr>
-                          <th>Date</th>
-                          <th>Task</th>
-                          <th>Status</th>
-                          <th>Count</th>
-                          <th>Admin note</th>
-                          <th className="text-end">Actions</th>
+                          <th>{t('adminUsers.date')}</th>
+                          <th>{t('leaderboard.taskColumn')}</th>
+                          <th>{t('adminUsers.status')}</th>
+                          <th>{t('adminUsers.count')}</th>
+                          <th>{t('adminUsers.adminNote')}</th>
+                          <th className="text-end">{t('adminUsers.actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1232,8 +1230,8 @@ export default function AdminUsers() {
                                   handleCompletionStatusChange(item.id, event.target.value)
                                 }
                               >
-                                <option value="approved">Approved</option>
-                                <option value="rejected">Rejected</option>
+                                <option value="approved">{t('adminUsers.approved')}</option>
+                                <option value="rejected">{t('adminUsers.rejected')}</option>
                                 {item.status === "pending" && (
                                   <option value="pending" disabled>
                                     Pending
@@ -1266,7 +1264,7 @@ export default function AdminUsers() {
                                 onClick={() => handleCompletionSave(item.id)}
                                 disabled={updateCompletionMutation.isLoading}
                               >
-                                Save count
+                                {t('common.save')}
                               </button>
                               <button
                                 type="button"
@@ -1274,7 +1272,7 @@ export default function AdminUsers() {
                                 onClick={() => handleCompletionDelete(item.id)}
                                 disabled={deleteCompletionMutation.isLoading}
                               >
-                                Remove
+                                {t('common.delete')}
                               </button>
                             </td>
                           </tr>
@@ -1301,14 +1299,14 @@ export default function AdminUsers() {
             <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(event) => event.stopPropagation()}>
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Add user</h5>
+                  <h5 className="modal-title">{t('adminUsers.createUser')}</h5>
                   <button type="button" className="btn-close" aria-label="Close" onClick={closeCreateModal}></button>
                 </div>
                 <form onSubmit={handleCreateUser}>
                   <div className="modal-body">
                     <div className="row g-3">
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Real name</label>
+                        <label className="form-label">{t('adminUsers.realName')}</label>
                         <input
                           className="form-control"
                           value={createForm.realName}
@@ -1319,7 +1317,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Username</label>
+                        <label className="form-label">{t('adminUsers.username')}</label>
                         <input
                           className="form-control"
                           value={createForm.username}
@@ -1330,7 +1328,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Email (optional)</label>
+                        <label className="form-label">{t('adminUsers.emailOptional')}</label>
                         <input
                           className="form-control"
                           type="email"
@@ -1341,11 +1339,7 @@ export default function AdminUsers() {
                         />
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Password</label>
-                        <div className="form-text mb-2">
-                          <i className="fas fa-info-circle me-1"></i>
-                          Generate secure random passwords. Will be visible for 10 seconds.
-                        </div>
+                        <label className="form-label">{t('adminUsers.password')}</label>
                         {createPasswordGenerated && (
                           <div className="alert alert-success py-2 mb-2" role="alert">
                             <i className="fas fa-check-circle me-1"></i>
@@ -1383,7 +1377,7 @@ export default function AdminUsers() {
                         </div>
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Preferred language</label>
+                        <label className="form-label">{t('adminUsers.preferredLanguage')}</label>
                         <select
                           className="form-select"
                           value={createForm.preferredLanguage}
@@ -1399,7 +1393,7 @@ export default function AdminUsers() {
                         </select>
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Role</label>
+                        <label className="form-label">{t('adminUsers.role')}</label>
                         <select
                           className="form-select"
                           value={createForm.role}
@@ -1407,13 +1401,13 @@ export default function AdminUsers() {
                             setCreateForm((prev) => ({ ...prev, role: event.target.value }))
                           }
                         >
-                          <option value="member">Member</option>
-                          <option value="group_admin">Group admin</option>
-                          <option value="admin">Admin</option>
+                          <option value="member">{t('adminUsers.roleMember')}</option>
+                          <option value="group_admin">{t('adminUsers.roleGroupAdmin')}</option>
+                          <option value="admin">{t('adminUsers.roleAdmin')}</option>
                         </select>
                       </div>
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Team</label>
+                        <label className="form-label">{t('adminUsers.team')}</label>
                         <select
                           className="form-select"
                           value={createForm.teamId}
@@ -1421,7 +1415,7 @@ export default function AdminUsers() {
                             setCreateForm((prev) => ({ ...prev, teamId: event.target.value }))
                           }
                         >
-                          <option value="">No team</option>
+                          <option value="">{t('adminUsers.noTeam')}</option>
                           {teams.map((team) => (
                             <option key={team.id} value={team.id}>
                               {team.name}
@@ -1431,7 +1425,7 @@ export default function AdminUsers() {
                       </div>
                       {createForm.role === "group_admin" && (
                         <div className="col-12">
-                          <label className="form-label">Managed teams</label>
+                          <label className="form-label">{t('adminUsers.managedTeams')}</label>
                           <select
                             className="form-select"
                             multiple
@@ -1470,14 +1464,14 @@ export default function AdminUsers() {
                       onClick={closeCreateModal}
                       disabled={createUserMutation.isLoading}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="submit"
                       className="btn btn-primary"
                       disabled={createUserMutation.isLoading}
                     >
-                      Create user
+                      {t('common.save')}
                     </button>
                   </div>
                 </form>
@@ -1650,7 +1644,7 @@ export default function AdminUsers() {
             <div className="modal-dialog modal-lg modal-dialog-centered" onClick={(event) => event.stopPropagation()}>
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Bulk user registration</h5>
+                  <h5 className="modal-title">{t('adminUsers.bulkRegister.title')}</h5>
                   <button type="button" className="btn-close" aria-label="Close" onClick={closeBulkRegistrationModal}></button>
                 </div>
                 <form onSubmit={handleBulkRegistration}>
@@ -1662,22 +1656,22 @@ export default function AdminUsers() {
                     )}
                     <div className="row g-3">
                       <div className="col-12">
-                        <label className="form-label">Names (one per line)</label>
+                        <label className="form-label">{t('adminUsers.bulkRegister.namesLabel')}</label>
                         <textarea
                           className="form-control"
                           rows={8}
                           value={bulkForm.names}
                           onChange={(event) => handleBulkFormChange('names', event.target.value)}
-                          placeholder="Enter real names, one per line&#10;Example:&#10;John Doe&#10;Jane Smith&#10;Michael Johnson"
+                          placeholder={t('adminUsers.bulkRegister.namesPlaceholder')}
                           required
                         />
                         <div className="form-text">
-                          Usernames will be automatically generated from these names.
+                          {t('adminUsers.bulkRegister.namesDescription')}
                         </div>
                       </div>
 
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Preferred language</label>
+                        <label className="form-label">{t('adminUsers.preferredLanguage')}</label>
                         <select
                           className="form-select"
                           value={bulkForm.preferredLanguage}
@@ -1689,26 +1683,26 @@ export default function AdminUsers() {
                       </div>
 
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Role</label>
+                        <label className="form-label">{t('adminUsers.role')}</label>
                         <select
                           className="form-select"
                           value={bulkForm.role}
                           onChange={(event) => handleBulkFormChange('role', event.target.value)}
                         >
-                          <option value="member">Member</option>
-                          <option value="group_admin">Group admin</option>
-                          <option value="admin">Admin</option>
+                          <option value="member">{t('adminUsers.roleMember')}</option>
+                          <option value="group_admin">{t('adminUsers.roleGroupAdmin')}</option>
+                          <option value="admin">{t('adminUsers.roleAdmin')}</option>
                         </select>
                       </div>
 
                       <div className="col-12 col-md-6">
-                        <label className="form-label">Team</label>
+                        <label className="form-label">{t('adminUsers.team')}</label>
                         <select
                           className="form-select"
                           value={bulkForm.teamId}
                           onChange={(event) => handleBulkFormChange('teamId', event.target.value)}
                         >
-                          <option value="">No team</option>
+                          <option value="">{t('adminUsers.noTeam')}</option>
                           {teams.map((team) => (
                             <option key={team.id} value={team.id}>
                               {team.name}
@@ -1751,7 +1745,7 @@ export default function AdminUsers() {
                       onClick={closeBulkRegistrationModal}
                       disabled={bulkRegisterMutation.isLoading}
                     >
-                      Cancel
+                      {t('common.close')}
                     </button>
                     <button
                       type="submit"
@@ -1776,7 +1770,7 @@ export default function AdminUsers() {
             <div className="modal-dialog modal-lg" role="document">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">📋 Bulk Registration Complete</h5>
+                  <h5 className="modal-title">{t('adminUsers.bulkRegisterComplete')}</h5>
                   <button
                     type="button"
                     className="btn-close"
@@ -1790,8 +1784,7 @@ export default function AdminUsers() {
                   <div className="alert alert-warning d-flex align-items-center mb-4">
                     <i className="fas fa-exclamation-triangle me-2"></i>
                     <div>
-                      <strong>Important:</strong> These passwords will only be shown once! Make sure to save them securely.
-                      Users will be prompted to change their password on first login.
+                      <strong>{t('adminUsers.bulkRegister.important')}:</strong> {t('adminUsers.bulkRegister.importantMessage')}
                     </div>
                   </div>
 
@@ -1799,10 +1792,10 @@ export default function AdminUsers() {
                     <table className="table table-hover border">
                       <thead className="table-dark">
                         <tr>
-                          <th>Real Name</th>
-                          <th>Username</th>
-                          <th>Generated Password</th>
-                          <th>Action</th>
+                          <th>{t('adminUsers.name')}</th>
+                          <th>{t('adminUsers.username')}</th>
+                          <th>{t('adminUsers.bulkRegister.generatedPassword')}</th>
+                          <th>{t('adminUsers.bulkRegister.action')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1862,7 +1855,7 @@ export default function AdminUsers() {
                     }}
                   >
                     <i className="fas fa-download me-2"></i>
-                    Download CSV
+                    {t('adminUsers.bulkRegister.downloadCSV')}
                   </button>
                   <button
                     type="button"
@@ -1872,7 +1865,7 @@ export default function AdminUsers() {
                       setBulkRegistrationResults(null);
                     }}
                   >
-                    Close
+                    {t('common.close')}
                   </button>
                 </div>
               </div>

@@ -48,19 +48,19 @@ const TaskCompletionDetailsModal = ({
                           <tr>
                             <th className="border-0">
                               <i className="fas fa-tasks me-2 text-primary"></i>
-                              {t("leaderboard.taskColumn", "Task")}
+                              {t("leaderboard.taskColumn")}
                             </th>
                             <th className="text-center border-0">
                               <i className="fas fa-layer-group me-2 text-secondary"></i>
-                              Variants
+                              {t("leaderboard.variantsColumn")}
                             </th>
                             <th className="text-end border-0">
                               <i className="fas fa-chart-bar me-2 text-info"></i>
-                              {t("leaderboard.completionsColumn", "Completions")}
+                              {t("leaderboard.completionsColumn")}
                             </th>
                             <th className="text-end border-0">
                               <i className="fas fa-trophy me-2 text-warning"></i>
-                              {t("leaderboard.pointsColumn", "Points")}
+                              {t("leaderboard.pointsColumn")}
                             </th>
                           </tr>
                         </thead>
@@ -98,7 +98,7 @@ const TaskCompletionDetailsModal = ({
                         </tbody>
                         <tfoot className="table-light">
                           <tr>
-                            <th>Total</th>
+                            <th>{t("leaderboard.totalRow")}</th>
                             <th className="text-center">
                               <span className="text-muted small">—</span>
                             </th>
@@ -128,7 +128,7 @@ const TaskCompletionDetailsModal = ({
                 onClick={onClose}
               >
                 <i className="fas fa-times me-2"></i>
-                Close
+                {t("common.close")}
               </button>
             </div>
           </div>

@@ -9,11 +9,36 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import Card from "../components/Card";
 import DecoratedCard from "../components/DecoratedCard";
 
-const formatDate = (value) => new Date(value).toLocaleString();
+const formatDate = (value, language = 'en') => {
+  const locale = language === 'cs' ? 'cs-CZ' : 'en-US';
+  return new Date(value).toLocaleString(locale);
+};
+
+const formatRelativeTime = (value, language = 'en', t) => {
+  const date = new Date(value);
+  const now = new Date();
+  const diffInMs = now - date;
+  const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+  const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+  const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  if (diffInMinutes < 1) {
+    return t('dashboard.timeAgo.justNow');
+  } else if (diffInMinutes < 60) {
+    return t('dashboard.timeAgo.minutesAgo', { count: diffInMinutes });
+  } else if (diffInHours < 24) {
+    return t('dashboard.timeAgo.hoursAgo', { count: diffInHours });
+  } else if (diffInDays < 7) {
+    return t('dashboard.timeAgo.daysAgo', { count: diffInDays });
+  } else {
+    // For longer periods, show the actual date
+    return formatDate(value, language);
+  }
+};
 
 export default function Dashboard() {
   const { profile, isLoading } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
@@ -89,7 +114,7 @@ export default function Dashboard() {
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
-        <LoadingSpinner text={t("tasks.loading", "Loading…")} />
+        <LoadingSpinner text={t("tasks.loading")} />
       </div>
     );
   }
@@ -109,15 +134,15 @@ export default function Dashboard() {
                 <div className="d-flex align-items-center mb-2">
                   <span className="fs-1 me-3">👋</span>
                   <div>
-                    <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", "Welcome, {{username}}!", { username: profile?.user?.real_name || profile?.user?.username })}</h3>
+                    <h3 className="mb-1 fw-bold text-white h2">{t("dashboard.welcome", { username: profile?.user?.real_name || profile?.user?.username })}</h3>
                     {profile?.user?.team_name && (
                       <p className="mb-0 opacity-90">
-                        {t("dashboard.teamPride", "Proudly representing {{teamName}}", { teamName: profile.user.team_name })}
+                        {t("dashboard.teamPride", { teamName: profile.user.team_name })}
                       </p>
                     )}
                     {!profile?.user?.team_name && profile?.user?.team_id === null && (
                       <p className="mb-0 opacity-90">
-                        {t("dashboard.welcomeNoGroup", "You are not in any group yet, it you think you should be, contact admin")}
+                        {t("dashboard.welcomeNoGroup")}
                       </p>
                     )}
                   </div>
@@ -126,14 +151,14 @@ export default function Dashboard() {
                   <div className="col-6 col-lg-3">
                     <div className="text-center bg-white text-black bg-opacity-20 rounded p-2">
                       <div className="fs-5 fw-bold">{totalPoints}</div>
-                      <small className="opacity-90">{t("dashboard.totalPoints", "Total Points")}</small>
+                      <small className="opacity-90">{t("dashboard.totalPoints")}</small>
                     </div>
                   </div>
                   {memberRank !== "–" && (
                     <div className="col-6 col-lg-3">
                       <div className="text-center bg-white text-black bg-opacity-20 rounded p-2">
                         <div className="fs-5 fw-bold">#{memberRank}</div>
-                        <small className="opacity-90">{t("dashboard.yourRank", "Your Rank")}</small>
+                        <small className="opacity-90">{t("dashboard.yourRank")}</small>
                       </div>
                     </div>
                   )}
@@ -141,7 +166,7 @@ export default function Dashboard() {
                     <div className="col-6 col-lg-3">
                       <div className="text-center bg-white text-black bg-opacity-20 rounded p-2">
                         <div className="fs-5 fw-bold">#{teamRank}</div>
-                        <small className="opacity-90">{t("dashboard.teamRank", "Team Rank")}</small>
+                        <small className="opacity-90">{t("dashboard.teamRank")}</small>
                       </div>
                     </div>
                   )}
@@ -167,8 +192,8 @@ export default function Dashboard() {
       {dashboardMessages.length > 0 && (
         <div className="col-12">
           <DecoratedCard
-            title={t("dashboard.announcements", "Important Announcements")}
-            subtitle={t("dashboard.stayInformed", "Stay informed about what's happening!")}
+            title={t("dashboard.announcements")}
+            subtitle={t("dashboard.stayInformed")}
             icon={<span className="flip_vert fs-2">📢</span>}
             headerGradient="linear-gradient(135deg, #4834d4 0%, #686de0 100%)"
             shadow={true}
@@ -181,19 +206,19 @@ export default function Dashboard() {
                     <div className="position-absolute start-0 top-0 bottom-0 bg-primary" style={{ width: '4px' }}></div>
                     <div className="d-flex justify-content-between align-items-start mb-3">
                       <div className="d-flex align-items-center gap-2">
-                        <h5 className="mb-0 text-dark display-6">{message.title || t("dashboard.infoTitle", "Information")}</h5>
+                        <h5 className="mb-0 text-dark display-6">{message.title || t("dashboard.infoTitle")}</h5>
                       </div>
                       <div className="text-end">
                         <small className="text-muted d-flex align-items-center gap-1">
                           <i className="fas fa-clock text-muted"></i>
-                          {formatDate(message.created_at)}
+                          {formatDate(message.created_at, i18n.language)}
                         </small>
                       </div>
                     </div>
                     <div className="AnnText">
                       <p className="mb-2 text-dark lead" style={{ lineHeight: '1.6' }}>{message.body}</p>
                       <span className="badge bg-primary px-2 py-2">
-                        {message.team_name || t("dashboard.allTeams", "All Teams")}
+                        {message.team_name || t("dashboard.allTeams")}
                       </span>
                     </div>
                   </div>
@@ -205,7 +230,7 @@ export default function Dashboard() {
 
       <div className="col-12 col-xl-4">
         <DecoratedCard
-          title={t("dashboard.teamActivity", "Team Activity")}
+          title={t("dashboard.teamActivity")}
           icon={<i className="fas fa-chart-line text-white"></i>}
           headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
           rightContent={
@@ -222,8 +247,8 @@ export default function Dashboard() {
             <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4">
               <div className="text-center py-4 text-muted">
                 <div className="display-4 mb-3">🚀</div>
-                <h5 className="text-muted">{t("dashboard.makeMagic", "Time to make some magic happen!")}</h5>
-                <p className="small text-muted mb-0">{t("dashboard.completeTasksToSee", "Complete tasks to see your team's amazing progress here")}</p>
+                <h5 className="text-muted">{t("dashboard.makeMagic")}</h5>
+                <p className="small text-muted mb-0">{t("dashboard.completeTasksToSee")}</p>
               </div>
             </div>
             ) : (
@@ -233,15 +258,15 @@ export default function Dashboard() {
                   <div className="row text-center g-0">
                     <div className="col-4">
                       <div className="fw-bold text-primary fs-5">{teamActivity.stats.total_completions_this_week}</div>
-                      <div className="small text-muted">{t("dashboard.tasksDone", "Tasks Done!")}</div>
+                      <div className="small text-muted">{t("dashboard.tasksDone")}</div>
                     </div>
                     <div className="col-4">
                       <div className="fw-bold text-success fs-5">{teamActivity.stats.total_points_this_week.toFixed(0)}</div>
-                      <div className="small text-muted">{t("dashboard.pointsEarned", "Points Earned!")}</div>
+                      <div className="small text-muted">{t("dashboard.pointsEarned")}</div>
                     </div>
                     <div className="col-4">
                       <div className="fw-bold text-warning fs-5">{teamActivity.stats.active_members}</div>
-                      <div className="small text-muted">{t("dashboard.activeHeroes", "Active Heroes!")}</div>
+                      <div className="small text-muted">{t("dashboard.activeHeroes")}</div>
                     </div>
                   </div>
                 </div>
@@ -253,7 +278,7 @@ export default function Dashboard() {
                       <div className="d-block align-items-start gap-2">
                         <div className="flex-shrink-0">
                           {activity.is_current_user ? (
-                            <span className="badge bg-primary rounded-pill">You</span>
+                            <span className="badge bg-primary rounded-pill">{t("common.you")}</span>
                           ) : (
                             <div className="bg-secondary rounded-circle d-flex align-items-center justify-content-center" style={{ width: '28px', height: '28px', fontSize: '12px', color: 'white' }}>
                               {activity.member_name.charAt(0).toUpperCase()}
@@ -265,16 +290,16 @@ export default function Dashboard() {
                             <div className="min-w-0">
                               <div className="fw-medium mb-1">
                                 {activity.is_current_user ? (
-                                  <span className="text-primary">{t("dashboard.youCompleted", "You completed")}</span>
+                                  <span className="text-primary">{t("dashboard.youCompleted")}</span>
                                 ) : (
-                                  <span><strong>{activity.member_name}</strong> {t("dashboard.completed", "completed")}</span>
+                                  <span><strong>{activity.member_name}</strong> {t("dashboard.completed")}</span>
                                 )} <span className="text-dark">{activity.task_name}</span>
                                 {activity.count > 1 && (
                                   <span className="badge bg-done ms-2">{activity.count}x</span>
                                 )}
                               </div>
                               <div className="small text-muted">
-                                {activity.time_ago}
+                                {activity.submitted_at ? formatRelativeTime(activity.submitted_at, i18n.language, t) : activity.time_ago}
                               </div>
                             </div>
                             <div className="text-end flex-shrink-0">
@@ -289,7 +314,7 @@ export default function Dashboard() {
 
                 {teamActivity.activities.length > 8 && (
                   <div className="p-3 text-center">
-                    <small className="text-muted">{t("dashboard.moreAchievements", "And {{count}} more amazing achievements! 🎉", { count: teamActivity.activities.length - 8 })}</small>
+                    <small className="text-muted">{t("dashboard.moreAchievements", { count: teamActivity.activities.length - 8 })}</small>
                   </div>
                 )}
               </div>
@@ -299,7 +324,7 @@ export default function Dashboard() {
 
       <div className="col-12 col-xl-4">
         <DecoratedCard
-          title={t("dashboard.notifications", "Messages")}
+          title={t("dashboard.notifications")}
           icon={<i className="fas fa-envelope text-white"></i>}
           headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
           shadow={true}
@@ -311,15 +336,15 @@ export default function Dashboard() {
               <div className="flex-grow-1 d-flex align-items-center justify-content-center p-4">
                 <div className="text-center">
                   <div className="display-4 mb-3"><i className="fas fa-inbox text-muted"></i></div>
-                  <h5 className="text-muted">{t("dashboard.noMessagesYet", "No messages yet")}</h5>
-                  <p className="small text-muted mb-0">{t("dashboard.messagesWillAppear", "Important messages will appear here when available")}</p>
+                  <h5 className="text-muted">{t("dashboard.noMessagesYet")}</h5>
+                  <p className="small text-muted mb-0">{t("dashboard.messagesWillAppear")}</p>
                 </div>
               </div>
             ) : (
               <div className="d-block">
                 <div className="p-3 bg-light border-bottom">
                   <div className="d-flex align-items-center justify-content-between">
-                    <span className="fw-medium text-dark">{t("dashboard.recentMessages", "Recent Messages")}</span>
+                    <span className="fw-medium text-dark">{t("dashboard.recentMessages")}</span>
                     <span className="badge bg-primary">{notifications.length}</span>
                   </div>
                 </div>
@@ -337,10 +362,10 @@ export default function Dashboard() {
                             </div>
                             <div>
                               <span className="fw-semibold text-dark">
-                                {notification.sender_real_name || notification.sender_username || t("dashboard.system", "System")}
+                                {notification.sender_real_name || notification.sender_username || t("dashboard.system")}
                               </span>
                               <div className="small text-muted">
-                                {formatDate(notification.created_at)}
+                                {formatDate(notification.created_at, i18n.language)}
                               </div>
                             </div>
                           </div>
@@ -357,7 +382,7 @@ export default function Dashboard() {
                 {notifications.length > 10 && (
                    <div className="p-3 text-center">
                     <small className="text-muted">
-                      <i className="fas fa-envelope me-2 text-primary"></i>{t("dashboard.scrollForMore", "Scroll up to see all {{count}} messages", { count: notifications.length })}
+                      <i className="fas fa-envelope me-2 text-primary"></i>{t("dashboard.scrollForMore", { count: notifications.length })}
                     </small>
                   </div>
                 )}
@@ -368,7 +393,7 @@ export default function Dashboard() {
 
       <div className="col-12 col-xl-4">
         <DecoratedCard
-          title={t("dashboard.yourJourney", "How is it going")}
+          title={t("dashboard.yourJourney")}
           icon={<i className="fas fa-bolt text-white"></i>}
           headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
           headerClassName="text-black"
@@ -380,14 +405,14 @@ export default function Dashboard() {
             {isLoadingCompletions ? (
               <div className="text-center py-4">
                 <div className="spinner-border text-primary" role="status">
-                  <span className="visually-hidden">{t("tasks.loading", "Loading…")}</span>
+                  <span className="visually-hidden">{t("tasks.loading")}</span>
                 </div>
               </div>
             ) : completions.length === 0 ? (
               <div className="flex-grow-1 d-flex flex-column align-items-center justify-content-center text-center py-4">
                 <div className="display-4 mb-3"><i className="fas fa-star text-warning"></i></div>
-                <h5 className="text-muted">{t("dashboard.readyToShine", "Ready to shine?")}</h5>
-                <p className="small text-muted mb-0">{t("dashboard.startCompleting", "Start completing tasks to see your amazing progress!")}</p>
+                <h5 className="text-muted">{t("dashboard.readyToShine")}</h5>
+                <p className="small text-muted mb-0">{t("dashboard.startCompleting")}</p>
               </div>
             ) : (
               <div className="d-flex flex-column gap-3 flex-grow-1 justify-content-between">
@@ -412,26 +437,26 @@ export default function Dashboard() {
                         <div className="small mb-1">
                           {entry.status === "pending" && (
                             <span className="text-warning fw-medium">
-                              {t("dashboard.awaitingApproval", "Awaiting approval")}
+                              {t("dashboard.awaitingApproval")}
                             </span>
                           )}
                           {entry.status === "approved" && (
                             <span className="text-success fw-medium">
-                              {t("dashboard.amazing", "Amazing! +{{points}} points", { points: entry.points_awarded })}
+                              {t("dashboard.amazing", { points: entry.points_awarded })}
                             </span>
                           )}
                           {entry.status === "rejected" && (
                             <div className="text-danger">
-                              <div className="fw-medium">{t("dashboard.rejected", "Rejected")}</div>
+                              <div className="fw-medium">{t("dashboard.rejected")}</div>
                               {entry.admin_note && (
                                 <div className="small mt-1 text-muted">
-                                  {t("dashboard.reason", "Reason")}: {entry.admin_note}
+                                  {t("dashboard.reason")}: {entry.admin_note}
                                 </div>
                               )}
                             </div>
                           )}
                         </div>
-                        <div className="small text-muted">{formatDate(entry.submitted_at)}</div>
+                        <div className="small text-muted">{formatDate(entry.submitted_at, i18n.language)}</div>
                       </div>
                     </div>
                   </div>
@@ -439,7 +464,7 @@ export default function Dashboard() {
                 </div>
                 {completions.length > 5 && (
                   <div className="p-3 text-center">
-                    <small className="text-muted">{t("dashboard.moreInHistory", "And {{count}} more in your history!", { count: completions.length - 5 })}</small>
+                    <small className="text-muted">{t("dashboard.moreInHistory", { count: completions.length - 5 })}</small>
                   </div>
 
                 )}
@@ -451,10 +476,10 @@ export default function Dashboard() {
       {profile?.user?.team_id && teamMembers.length > 0 && (
         <div className="col-12">
           <DecoratedCard
-            title={t("dashboard.teamChampions", "Team Champions")}
+            title={t("dashboard.teamChampions")}
             subtitle={profile.user.team_name}
             icon="🏆"
-            rightBadge={`${teamMembers.length} ${t("dashboard.heroes", "Heroes")}`}
+            rightBadge={`${teamMembers.length} ${t("dashboard.heroes")}`}
             shadow={true}
             border={false}
             bodyClassName="p-0"
@@ -463,10 +488,10 @@ export default function Dashboard() {
                 <table className="table table-hover mb-0">
                   <thead className="bg-light">
                     <tr>
-                      <th className="py-3 text-center">{t("dashboard.rank", "Rank")}</th>
-                      <th className="py-3">{t("dashboard.champion", "Name")}</th>
-                      <th className="py-3 text-end">{t("dashboard.victories", "Completions")}</th>
-                      <th className="py-3 text-end">{t("dashboard.glory", "Points")}</th>
+                      <th className="py-3 text-center">{t("dashboard.rank")}</th>
+                      <th className="py-3">{t("dashboard.champion")}</th>
+                      <th className="py-3 text-end">{t("dashboard.victories")}</th>
+                      <th className="py-3 text-end">{t("dashboard.glory")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -486,13 +511,13 @@ export default function Dashboard() {
                               type="button"
                               className="btn btn-link p-0 text-start fw-medium text-decoration-none"
                               onClick={() => handleShowDetails(member.entity_id, member.name)}
-                              title={t("dashboard.seeDetails", "Click to see task breakdown")}
+                              title={t("dashboard.seeDetails")}
                             >
                               {member.name}
                             </button>
                             {member.entity_id === profile.user.id && (
                               <span className="badge bg-primary rounded-pill px-2 py-1">
-                                {t("dashboard.you", "You")} <i className="fas fa-star text-warning"></i>
+                                {t("common.you")} <i className="fas fa-star text-warning"></i>
                               </span>
                             )}
                           </div>
@@ -502,7 +527,7 @@ export default function Dashboard() {
                             type="button"
                             className="btn btn-sm btn-outline-primary"
                             onClick={() => handleShowDetails(member.entity_id, member.name)}
-                            title={t("dashboard.viewTasks", "View completed tasks")}
+                            title={t("dashboard.viewTasks")}
                           >
                             {member.member_count || 0} <i className="fas fa-tasks ms-1"></i>
                           </button>
@@ -510,7 +535,7 @@ export default function Dashboard() {
                         <td className="py-3 text-end">
                           <span className="fs-5 fw-bold text-success">
                             {member.score.toFixed(0)}
-                            <small className="text-muted ms-1">{t("tasks.pts", "pts.")}</small>
+                            <small className="text-muted ms-1">{t("tasks.pts")}</small>
                           </span>
                         </td>
                       </tr>
@@ -520,7 +545,7 @@ export default function Dashboard() {
               </div>
               <div className="bg-light p-3 text-center">
                 <small className="text-muted">
-                  {t("dashboard.keepPushing", "Keep pushing forward, team! Every task completed makes us stronger!")} 💪
+                  {t("dashboard.keepPushing")} 💪
                 </small>
               </div>
           </DecoratedCard>
@@ -533,7 +558,7 @@ export default function Dashboard() {
         onClose={handleCloseModal}
         userTaskDetails={userTaskDetails}
         isLoading={isLoadingDetails}
-        title={t("dashboard.taskDetails", "Task Completion Details")}
+        title={t("dashboard.taskDetails")}
       />
     </div>
   );

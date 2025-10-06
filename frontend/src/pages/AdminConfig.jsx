@@ -60,14 +60,14 @@ export default function AdminConfig() {
       return response;
     },
     onSuccess: () => {
-      setFeedback({ type: "success", message: t("adminConfig.updateSuccess", "Configuration updated successfully.") });
+      setFeedback({ type: "success", message: t("adminConfig.updateSuccess") });
       queryClient.invalidateQueries(["admin", "config"]);
       refetchConfig(); // Update the global config context
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || t("adminConfig.updateFailed", "Failed to update configuration."),
+        message: error?.response?.data?.detail || t("adminConfig.updateFailed"),
       });
     },
   });
@@ -139,9 +139,9 @@ export default function AdminConfig() {
                 <div className="col-md-8">
                   <div className="d-flex align-items-center mb-2">
                     <div>
-                      <h1 className="mb-1">{t("adminConfig.title", "Global Configuration")}</h1>
+                      <h1 className="mb-1">{t("adminConfig.title")}</h1>
                       <p className="mb-0 opacity-90 fs-5">
-                        {t("adminConfig.subtitle", "Configure application-wide settings")}
+                        {t("adminConfig.subtitle")}
                       </p>
                     </div>
                   </div>
@@ -159,8 +159,8 @@ export default function AdminConfig() {
             <div className="card-header bg-light border-0">
               <div className="d-flex align-items-center gap-2">
                 <div>
-                  <h5 className="mb-0 fw-bold" style={{ color: '#6f42c1' }}>{t("adminConfig.generalSettings", "General Settings")}</h5>
-                  <small className="text-muted">{t("adminConfig.generalDescription", "Configure basic application settings")}</small>
+                  <h5 className="mb-0 fw-bold" style={{ color: '#6f42c1' }}>{t("adminConfig.generalSettings")}</h5>
+                  <small className="text-muted">{t("adminConfig.generalDescription")}</small>
                 </div>
               </div>
             </div>
@@ -178,7 +178,7 @@ export default function AdminConfig() {
                   {/* App Name */}
                   <div className="col-12">
                     <label className="form-label fw-medium">
-                      {t("adminConfig.appName", "Application Name")}
+                      {t("adminConfig.appName")}
                     </label>
                     <input
                       type="text"
@@ -189,14 +189,14 @@ export default function AdminConfig() {
                       required
                     />
                     <div className="form-text">
-                      {t("adminConfig.appNameHelp", "This name will appear in the navigation bar and page titles")}
+                      {t("adminConfig.appNameHelp")}
                     </div>
                   </div>
 
                   {/* App Icon */}
                   <div className="col-12">
                     <label className="form-label fw-medium">
-                      {t("adminConfig.appIcon", "Application Icon")}
+                      {t("adminConfig.appIcon")}
                     </label>
                     <div className="row g-3">
                       <div className="col-md-8">
@@ -213,11 +213,11 @@ export default function AdminConfig() {
                             onClick={resetIcon}
                             title="Reset to default icon"
                           >
-                            <i className="fas fa-undo me-1"></i>Reset
+                            <i className="fas fa-undo me-1"></i>{t("common.reset")}
                           </button>
                         </div>
                         <div className="form-text">
-                          {t("adminConfig.appIconHelp", "Upload a custom icon for your application. Recommended: SVG, PNG, or JPG (max 1MB, square format recommended)")}
+                          {t("adminConfig.appIconHelp")}
                         </div>
                       </div>
                       <div className="col-md-4">
@@ -234,7 +234,7 @@ export default function AdminConfig() {
                             />
                           </div>
                           <div className="mt-2">
-                            <small className="text-muted">Preview</small>
+                            <small className="text-muted">{t("adminConfig.iconPreview")}</small>
                           </div>
                         </div>
                       </div>
@@ -244,18 +244,18 @@ export default function AdminConfig() {
                   {/* Leaderboard Default View */}
                   <div className="col-12">
                     <label className="form-label fw-medium">
-                      {t("adminConfig.leaderboardDefault", "Leaderboard Default View")}
+                      {t("adminConfig.leaderboardDefault")}
                     </label>
                     <select
                       className="form-select border-primary border-opacity-50"
                       value={formData.leaderboardDefaultView}
                       onChange={(e) => handleInputChange("leaderboardDefaultView", e.target.value)}
                     >
-                      <option value="total">{t("adminConfig.totalPoints", "Total Points")}</option>
-                      <option value="average">{t("adminConfig.averagePoints", "Average Points")}</option>
+                      <option value="total">{t("adminConfig.totalPoints")}</option>
+                      <option value="average">{t("adminConfig.averagePoints")}</option>
                     </select>
                     <div className="form-text">
-                      {t("adminConfig.leaderboardHelp", "Choose which view users see by default when opening the leaderboard")}
+                      {t("adminConfig.leaderboardHelp")}
                     </div>
                   </div>
 
@@ -272,26 +272,26 @@ export default function AdminConfig() {
                           onChange={(e) => handleInputChange("allowSelfRegistration", e.target.checked)}
                         />
                         <label className="form-check-label fw-medium" htmlFor="allowSelfRegistration">
-                          {t("adminConfig.allowSelfRegistration", "Allow Self Registration with Team Code")}
+                          {t("adminConfig.allowSelfRegistration")}
                         </label>
                       </div>
                     </div>
                     <div className="form-text mt-2">
-                      {t("adminConfig.selfRegistrationHelp", "When enabled, users can register themselves using a team join code without admin approval")}
+                      {t("adminConfig.selfRegistrationHelp")}
                     </div>
                   </div>
                 </div>
 
                 <div className="mt-4 d-flex justify-content-between align-items-center">
                   <div className="text-muted">
-                    <small>{t("adminConfig.adminOnly", "Only administrators can modify these settings")}</small>
+                    <small>{t("adminConfig.adminOnly")}</small>
                   </div>
                   <button
                     type="submit"
                     className="btn btn-primary px-4 py-2"
                     disabled={updateConfigMutation.isLoading}
                   >
-                    {updateConfigMutation.isLoading ? t("adminConfig.saving", "Saving...") : t("adminConfig.saveConfig", "Save Configuration")}
+                    {updateConfigMutation.isLoading ? t("common.saving") : t("common.save")}
                   </button>
                 </div>
               </form>

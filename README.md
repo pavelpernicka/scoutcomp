@@ -164,3 +164,59 @@ SCOUTCOMP_FRONTEND_PORT=3200
   - Activate this config: `ln -s /etc/nginx/sites-available/scoutcomp /etc/nginx/sites-enabled/`
   - Reload nginx: `systemctl reload nginx`
   
+# Frontend Translation System
+
+## Overview
+The application uses a JSONC-based translation system that automatically extracts translation keys from source code and provides helpful comments for translators.
+
+## Translation Workflow
+
+1. **Extract translation keys** from source code:
+   ```bash
+   npm run translations:extract
+   ```
+   This creates/updates `.jsonc` files in `src/translations/` with:
+   - English reference comments for context
+   - Variable information from source code usage
+   - Placeholder values for untranslated keys
+
+2. **Start development server** (with auto-rebuilding):
+   ```bash
+   npm run dev
+   ```
+   This automatically watches `.jsonc` files and rebuilds `.json` files when you make changes.
+
+3. **View translation statistics**:
+   ```bash
+   npm run translations:stats
+   ```
+
+4. **Translate the strings** by editing the `.jsonc` files:
+   - Remove placeholder prefixes like `[CS]` and `[EN]`
+   - Use English reference comments for context
+   - Use variable comments to know what interpolations are available
+   - Changes are automatically built into `.json` files while `npm run dev` is running
+
+## File Structure
+- `src/translations/*.jsonc` - Source files for translators (with comments)
+- `src/translations/*.json` - Generated build files (auto-created, gitignored)
+
+## Usage in Code
+Translation strings use `t("key")` and `t("key", { params })`:
+```jsx
+t("dashboard.welcome", { username: "John" })
+t("tasks.completed")
+```
+
+## Example JSONC Format
+```jsonc
+{
+  "dashboard": {
+    // EN: Welcome {{username}}! Join a team to get started.
+    "welcomeNoGroup": "[CS] dashboard.welcomeNoGroup",
+    "totalPoints": "Celkem bodů: {{points}}", // Variables: points
+    // EN: Announcements
+    "announcements": "Oznámení"
+  }
+}
+```

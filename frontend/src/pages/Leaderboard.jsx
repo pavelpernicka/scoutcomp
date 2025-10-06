@@ -183,7 +183,7 @@ export default function LeaderboardPage() {
                         variant="link"
                         className="p-0 fw-bold text-start text-decoration-none"
                         onClick={() => handleShowUserDetails(entry.entity_id)}
-                        title={t("leaderboard.clickForDetails", "Click to see task breakdown")}
+                        title={t("leaderboard.clickForDetails")}
                         style={{ color: isTopThree ? '#6f42c1' : '#0d6efd' }}
                       >
                         {entry.name}
@@ -193,7 +193,7 @@ export default function LeaderboardPage() {
                         variant="link"
                         className="p-0 fw-bold text-start text-decoration-none"
                         onClick={() => handleShowTeamBreakdown(entry.entity_id, entry.name)}
-                        title={t("leaderboard.clickForTeamDetails", "Click to see team members")}
+                        title={t("leaderboard.clickForTeamDetails")}
                         style={{ color: isTopThree ? '#6f42c1' : '#0d6efd' }}
                       >
                         {entry.name}
@@ -274,17 +274,17 @@ export default function LeaderboardPage() {
             icon="fas fa-eye"
             iconPosition="left"
           >
-            {t("leaderboard.showAll", "Show all")}
+            {t("common.showAll")}
           </Button>
         )}
       >
         {isLoading ? (
-          <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
+          <LoadingSpinner size="small" text={t("tasks.loading")} />
         ) : topEntries.length === 0 ? (
           <div className="text-center py-4">
             <div className="display-4 mb-2">📊</div>
-            <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
-            <small className="text-muted">{t("leaderboard.beTheFirst", "Be the first to earn points here!")}</small>
+            <p className="text-muted mb-0">{t("leaderboard.empty")}</p>
+            <small className="text-muted">{t("leaderboard.beTheFirst")}</small>
           </div>
         ) : (
           renderEntryList(topEntries, maxScore, null, true)
@@ -317,8 +317,8 @@ export default function LeaderboardPage() {
   return (
     <>
       <HeroHeader
-        title={t("leaderboard.heroTitle", "Hall of Champions!")}
-        subtitle={t("leaderboard.heroSubtitle", "Celebrating our amazing quest heroes and their incredible achievements!")}
+        title={t("leaderboard.heroTitle")}
+        subtitle={t("leaderboard.heroSubtitle")}
         icon="🏆"
         gradient="linear-gradient(350deg, #f093fb 0%, #f5576c 100%)"
       />
@@ -328,7 +328,7 @@ export default function LeaderboardPage() {
         <div className="col-12 col-xl-6">
           <DecoratedCard
             title={t("leaderboard.members")}
-            subtitle={t("leaderboard.topPerformers", "Top Performers")}
+            subtitle={t("leaderboard.topPerformers")}
             icon="🏆"
             headerGradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
             shadow={true}
@@ -355,17 +355,17 @@ export default function LeaderboardPage() {
                 icon="fas fa-eye"
                 iconPosition="left"
               >
-                {t("leaderboard.showAll", "Show all")}
+                {t("common.showAll")}
               </Button>
             )}
           >
             {membersLoading ? (
-              <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
+              <LoadingSpinner size="small" text={t("tasks.loading")} />
             ) : topMembers.length === 0 ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3"><i className="fas fa-trophy text-warning"></i></div>
-                <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet", "No champions yet!")}</h6>
-                <small className="text-muted">{t("leaderboard.startQuesting", "Complete tasks to appear on the leaderboard")}</small>
+                <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet")}</h6>
+                <small className="text-muted">{t("leaderboard.startQuesting")}</small>
               </div>
             ) : (
               renderEntryList(topMembers, memberMax, null, true)
@@ -376,8 +376,8 @@ export default function LeaderboardPage() {
         {/* Teams Leaderboard */}
         <div className="col-12 col-xl-6">
           <DecoratedCard
-            title={t("leaderboard.teams", "Teams")}
-            subtitle={t("leaderboard.teamRankings", "Team Rankings")}
+            title={t("leaderboard.teams")}
+            subtitle={t("leaderboard.teamRankings")}
             icon="🏅"
             headerGradient="linear-gradient(45deg, rgb(233, 30, 99), rgb(255, 127, 39))"
             shadow={true}
@@ -392,7 +392,7 @@ export default function LeaderboardPage() {
                   icon="fas fa-calculator"
                   iconPosition="left"
                 >
-                  {t("leaderboard.totalBtn", "Total")}
+                  {t("leaderboard.totalBtn")}
                 </Button>
                 <Button
                   variant={teamMode === "average" ? "warning" : "secondary"}
@@ -401,18 +401,18 @@ export default function LeaderboardPage() {
                   icon="fas fa-chart-bar"
                   iconPosition="left"
                 >
-                  {t("leaderboard.averageBtn", "Average")}
+                  {t("leaderboard.averageBtn")}
                 </Button>
               </div>
             }
           >
             {teamsLoading ? (
-              <LoadingSpinner size="small" text={t("tasks.loading", "Loading…")} />
+              <LoadingSpinner size="small" text={t("tasks.loading")} />
             ) : teamBoard.length === 0 ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3">🏅</div>
-                <h6 className="text-muted mb-1">{t("leaderboard.noTeamsYet", "No team rankings yet!")}</h6>
-                <small className="text-muted">{t("leaderboard.teamsWillAppear", "Team standings will appear as members complete tasks")}</small>
+                <h6 className="text-muted mb-1">{t("leaderboard.noTeamsYet")}</h6>
+                <small className="text-muted">{t("leaderboard.teamsWillAppear")}</small>
               </div>
             ) : (
               renderEntryList(teamBoard, teamMax, (entry) => {
@@ -420,12 +420,10 @@ export default function LeaderboardPage() {
                 const memberCount = entry.member_count ?? 0;
                 return teamMode === "average"
                   ? t("leaderboard.averageLine", {
-                      defaultValue: "Total {{total}} • Members {{count}}",
-                      total: formatScore(totalPoints),
+                      total: totalPoints,
                       count: memberCount,
                     })
                   : t("leaderboard.membersLine", {
-                      defaultValue: "Members {{count}}",
                       count: memberCount,
                     });
               }, false, true)
@@ -438,7 +436,7 @@ export default function LeaderboardPage() {
           <div className="col-12">
             <div className="card shadow-sm">
               <div className="card-body text-center text-muted py-3">
-                {t("tasks.loading", "Loading…")}
+                {t("tasks.loading")}
               </div>
             </div>
           </div>
@@ -450,8 +448,8 @@ export default function LeaderboardPage() {
             <div className="d-flex align-items-center gap-3 mb-4">
               <span className="fs-1">📈</span>
               <div>
-                <h2 className="h4 mb-0 fw-bold text-primary">{t("leaderboard.statsHeading", "Custom Statistics")}</h2>
-                <small className="text-muted">{t("leaderboard.specialAchievements", "Special achievement categories")}</small>
+                <h2 className="h4 mb-0 fw-bold text-primary">{t("leaderboard.customStatsHeading")}</h2>
+                <small className="text-muted">{t("leaderboard.customStatsSubtitle")}</small>
               </div>
             </div>
             <div className="row g-4">
@@ -469,7 +467,7 @@ export default function LeaderboardPage() {
           <div className="col-12">
             <div className="card shadow-sm">
               <div className="card-body text-muted">
-                {t("leaderboard.noStats", "No custom statistics configured yet.")}
+                {t("leaderboard.noStats")}
               </div>
             </div>
           </div>
@@ -482,14 +480,14 @@ export default function LeaderboardPage() {
         onClose={handleCloseUserDetailsModal}
         userTaskDetails={userTaskDetails}
         isLoading={userDetailsLoading}
-        title={t("leaderboard.taskDetails", "Task Completion Details")}
+        title={t("leaderboard.taskDetails")}
       />
 
       {/* Team Members Breakdown Modal */}
       <Modal
         isVisible={showTeamBreakdownModal}
         onClose={handleCloseTeamBreakdownModal}
-        title={t("leaderboard.teamMembers", "Team Members")}
+        title={t("leaderboard.teamMembers")}
         subtitle={teamBoard.find(t => t.entity_id === selectedTeamId)?.name}
         icon={<i className="fas fa-users fs-3"></i>}
         size="lg"
@@ -499,7 +497,7 @@ export default function LeaderboardPage() {
             variant="secondary"
             onClick={handleCloseTeamBreakdownModal}
           >
-            Close
+            {t("common.close")}
           </Button>
         }
       >
@@ -514,19 +512,19 @@ export default function LeaderboardPage() {
                     <tr>
                       <th className="border-0">
                         <span className="me-2">🏅</span>
-                        {t("leaderboard.rankColumn", "Rank")}
+                        {t("leaderboard.rankColumn")}
                       </th>
                       <th className="border-0">
                         <i className="fas fa-user me-2 text-secondary"></i>
-                        {t("leaderboard.memberColumn", "Member")}
+                        {t("leaderboard.memberColumn")}
                       </th>
                       <th className="text-end border-0">
                         <span className="me-2">📊</span>
-                        {t("leaderboard.completionsColumn", "Completions")}
+                        {t("leaderboard.completionsColumn")}
                       </th>
                       <th className="text-end border-0">
                         <span className="me-2">💰</span>
-                        {t("leaderboard.totalPointsColumn", "Total Points")}
+                        {t("leaderboard.totalPointsColumn")}
                       </th>
                     </tr>
                   </thead>
@@ -574,7 +572,7 @@ export default function LeaderboardPage() {
         size="lg"
         footer={
           <Button variant="secondary" onClick={closeBoardModal}>
-            {t("common.close", "Close")}
+            {t("common.close")}
           </Button>
         }
       >
@@ -582,7 +580,7 @@ export default function LeaderboardPage() {
           <p className="text-muted small">{expandedBoard.description}</p>
         ) : null}
         {expandedBoard?.data.length === 0 ? (
-          <p className="text-muted mb-0">{t("leaderboard.empty", "No entries yet.")}</p>
+          <p className="text-muted mb-0">{t("leaderboard.empty")}</p>
         ) : (
           renderEntryList(
             expandedBoard?.data || [],

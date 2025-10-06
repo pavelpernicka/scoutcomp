@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -7,6 +8,7 @@ import api from "../services/api";
 const emptyTeamForm = { name: "", description: "" };
 
 export default function AdminTeams() {
+  const { t } = useTranslation();
   const { isAdmin, canManageUsers, managedTeamIds, userId } = useAuth();
   const queryClient = useQueryClient();
   const [teamForm, setTeamForm] = useState(emptyTeamForm);
@@ -82,9 +84,9 @@ export default function AdminTeams() {
     onSuccess: (updatedUser, variables) => {
       setMemberActionError(null);
       if (variables?.meta?.action === "add") {
-        setMemberActionFeedback("Member added to the team.");
+        setMemberActionFeedback(t('adminTeams.memberAdded'));
       } else if (variables?.meta?.action === "remove") {
-        setMemberActionFeedback("Member removed from the team.");
+        setMemberActionFeedback(t('adminTeams.memberRemoved'));
       }
       queryClient.setQueryData(["admin", "users"], (previous) => {
         if (!previous) return previous;
@@ -112,7 +114,7 @@ export default function AdminTeams() {
     onError: (error) => {
       setMemberActionFeedback(null);
       setMemberActionError(
-        error?.response?.data?.detail || "Unable to update member. Check permissions."
+        error?.response?.data?.detail || t('adminTeams.unableToUpdateMember')
       );
     },
   });
@@ -202,7 +204,7 @@ export default function AdminTeams() {
   const handleDeleteTeam = (team) => {
     if (!isAdmin) return;
     const confirmed = window.confirm(
-      `Delete team "${team.name}"? Members will become unassigned.`
+      t('adminTeams.confirmDeleteTeam', { teamName: team.name })
     );
     if (!confirmed) return;
     if (membersModalTeamId === team.id) {
@@ -214,7 +216,7 @@ export default function AdminTeams() {
 
   const handleRotateCode = (team) => {
     if (!isAdmin) return;
-    if (!window.confirm(`Rotate join code for "${team.name}"?`)) {
+    if (!window.confirm(t('adminTeams.confirmRotateCode', { teamName: team.name }))) {
       return;
     }
     rotateCodeMutation.mutate(team.id);
@@ -256,7 +258,7 @@ export default function AdminTeams() {
   };
 
   const handleRemoveMember = (userId) => {
-    if (!window.confirm("Remove this member from the team?")) {
+    if (!window.confirm(t('adminTeams.confirmRemoveMember'))) {
       return;
     }
     setMemberActionError(null);
@@ -278,9 +280,9 @@ export default function AdminTeams() {
   };
 
   const roleLabel = (role) => {
-    if (role === "admin") return "Admin";
-    if (role === "group_admin") return "Group admin";
-    return "Member";
+    if (role === "admin") return t('adminTeams.roleAdmin');
+    if (role === "group_admin") return t('adminTeams.roleGroupAdmin');
+    return t('adminTeams.roleMember');
   };
 
   const openCreateTeamModal = () => {
@@ -298,7 +300,7 @@ export default function AdminTeams() {
   const handleRoleChange = (user, nextRole) => {
     if (!isAdmin) return;
     if (user.id === userId && user.role === "admin" && nextRole !== "admin") {
-      window.alert("You cannot remove your own admin role.");
+      window.alert(t('adminTeams.cannotRemoveOwnAdminRole'));
       return;
     }
 
@@ -319,23 +321,23 @@ export default function AdminTeams() {
     <div className="container px-0">
       <div className="card shadow-sm mt-4">
         <div className="card-header d-flex justify-content-between align-items-center">
-          <span>Teams</span>
+          <span>{t('adminTeams.teams')}</span>
           {isAdmin && (
             <button type="button" className="btn btn-primary btn-sm" onClick={openCreateTeamModal}>
-              Add team
+              {t('adminTeams.addTeam')}
             </button>
           )}
         </div>
         <div className="card-body">
           {teamsLoading ? (
-            <div className="text-center text-muted py-4">Loading…</div>
+            <div className="text-center text-muted py-4">{t('adminTeams.loading')}</div>
           ) : teamsError ? (
             <div className="alert alert-danger" role="alert">
-              {teamsErr?.response?.data?.detail || "Unable to load teams."}
+              {teamsErr?.response?.data?.detail || t('adminTeams.unableToLoadTeams')}
             </div>
           ) : teams.length === 0 ? (
             <p className="text-muted mb-0">
-              {isAdmin ? "No teams yet." : "No teams assigned to you."}
+              {isAdmin ? t('adminTeams.noTeamsYet') : t('adminTeams.noTeamsAssigned')}
             </p>
           ) : (
             <div className="row g-3">
@@ -348,14 +350,14 @@ export default function AdminTeams() {
                         <div>
                           <div className="d-flex justify-content-between align-items-start">
                             <h5 className="card-title mb-0">{team.name}</h5>
-                            <span className="badge bg-secondary">{members.length} members</span>
+                            <span className="badge bg-secondary">{t('adminTeams.memberCount', { count: members.length })}</span>
                           </div>
                           {team.description && (
                             <p className="text-muted small mt-2 mb-0">{team.description}</p>
                           )}
                         </div>
                         <div>
-                          <span className="fw-semibold">Join code</span>
+                          <span className="fw-semibold">{t('adminTeams.joinCode')}</span>
                           <div className="d-flex align-items-center gap-2 mt-1">
                             <code className="bg-dark text-light px-2 py-1 rounded">{team.join_code}</code>
                             {isAdmin && (
@@ -365,7 +367,7 @@ export default function AdminTeams() {
                                 onClick={() => handleRotateCode(team)}
                                 disabled={rotateCodeMutation.isLoading}
                               >
-                                Rotate
+                                {t('adminTeams.rotate')}
                               </button>
                             )}
                           </div>
@@ -376,7 +378,7 @@ export default function AdminTeams() {
                             className="btn btn-outline-primary btn-sm w-100"
                             onClick={() => setMembersModalTeamId(team.id)}
                           >
-                            Edit members
+                            {t('adminTeams.editMembers')}
                           </button>
                           {isAdmin && (
                             <button
@@ -384,7 +386,7 @@ export default function AdminTeams() {
                               className="btn btn-outline-secondary btn-sm"
                               onClick={() => handleOpenEditTeam(team)}
                             >
-                              Edit details
+                              {t('adminTeams.editDetails')}
                             </button>
                           )}
                           {isAdmin && (
@@ -394,7 +396,7 @@ export default function AdminTeams() {
                               onClick={() => handleDeleteTeam(team)}
                               disabled={deleteTeamMutation.isLoading}
                             >
-                              Delete
+                              {t('adminTeams.delete')}
                             </button>
                           )}
                         </div>
@@ -410,7 +412,7 @@ export default function AdminTeams() {
 
       {unassignedUsers.length > 0 && (
         <div className="card shadow-sm mt-4">
-          <div className="card-header">Unassigned Users</div>
+          <div className="card-header">{t('adminTeams.unassignedUsers')}</div>
           <div className="card-body">
             <ul className="list-group list-group-flush">
               {unassignedUsers.map((user) => (
@@ -431,7 +433,7 @@ export default function AdminTeams() {
                       })
                     }
                   >
-                    <option value="">No team</option>
+                    <option value="">{t('adminTeams.noTeam')}</option>
                     {teams.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
@@ -451,7 +453,7 @@ export default function AdminTeams() {
             <div className="modal-dialog modal-lg" role="document">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Manage members – {activeTeam.name}</h5>
+                  <h5 className="modal-title">{t('adminTeams.manageMembers', { teamName: activeTeam.name })}</h5>
                   <button
                     type="button"
                     className="btn-close"
@@ -463,25 +465,25 @@ export default function AdminTeams() {
                   <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
                     <div className="flex-grow-1">
                       <div className="input-group input-group-sm mb-2">
-                        <span className="input-group-text">Search</span>
+                        <span className="input-group-text">{t('adminTeams.search')}</span>
                         <input
                           type="text"
                           className="form-control"
                           value={memberSearch}
                           onChange={(event) => setMemberSearch(event.target.value)}
-                          placeholder="Username or email"
+                          placeholder={t('adminTeams.usernameOrEmail')}
                         />
                       </div>
                       <div className="input-group input-group-sm">
-                        <span className="input-group-text">Filter</span>
+                        <span className="input-group-text">{t('adminTeams.filter')}</span>
                         <select
                           className="form-select"
                           value={memberFilter}
                           onChange={(event) => setMemberFilter(event.target.value)}
                         >
-                          <option value="all">All users</option>
-                          <option value="unassigned">Without team</option>
-                          <option value="other-teams">Other teams</option>
+                          <option value="all">{t('adminTeams.allUsers')}</option>
+                          <option value="unassigned">{t('adminTeams.withoutTeam')}</option>
+                          <option value="other-teams">{t('adminTeams.otherTeams')}</option>
                         </select>
                       </div>
                     </div>
@@ -494,15 +496,15 @@ export default function AdminTeams() {
                     >
                       <option value="">
                         {availableUsersForActiveTeam.length === 0
-                          ? "No users available"
-                          : "Select user"}
+                          ? t('adminTeams.noUsersAvailable')
+                          : t('adminTeams.selectUser')}
                       </option>
                       {availableUsersForActiveTeam.map((user) => (
                         <option key={user.id} value={user.id}>
                           {user.real_name || user.username}
                           {user.team_id
-                            ? ` – ${teamNameById[user.team_id] || "Other team"}`
-                            : " – No team"}
+                            ? ` – ${teamNameById[user.team_id] || t('adminTeams.otherTeam')}`
+                            : ` – ${t('adminTeams.noTeam')}`}
                         </option>
                       ))}
                     </select>
@@ -512,7 +514,7 @@ export default function AdminTeams() {
                       disabled={!selectedMemberId || updateUserMutation.isLoading}
                       onClick={handleAddMemberToTeam}
                     >
-                      + Add
+                      {t('adminTeams.add')}
                     </button>
                   </div>
                   {memberActionFeedback && (
@@ -527,16 +529,16 @@ export default function AdminTeams() {
                   )}
 
                   {activeTeamMembersLocal.length === 0 ? (
-                    <p className="text-muted mb-0">No members yet.</p>
+                    <p className="text-muted mb-0">{t('adminTeams.noMembersYet')}</p>
                   ) : (
                     <div className="table-responsive">
                       <table className="table table-sm align-middle">
                         <thead className="table-light">
                           <tr>
-                            <th>Member</th>
-                            <th>Email</th>
-                            <th>Role</th>
-                            <th className="text-end">Actions</th>
+                            <th>{t('adminTeams.member')}</th>
+                            <th>{t('adminTeams.email')}</th>
+                            <th>{t('adminTeams.role')}</th>
+                            <th className="text-end">{t('adminTeams.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -564,9 +566,9 @@ export default function AdminTeams() {
                                           handleRoleChange(user, event.target.value)
                                         }
                                       >
-                                        <option value="member">Member</option>
-                                        <option value="group_admin">Group admin</option>
-                                        <option value="admin">Admin</option>
+                                        <option value="member">{t('adminTeams.roleMember')}</option>
+                                        <option value="group_admin">{t('adminTeams.roleGroupAdmin')}</option>
+                                        <option value="admin">{t('adminTeams.roleAdmin')}</option>
                                       </select>
                                     );
                                   })()
@@ -583,7 +585,7 @@ export default function AdminTeams() {
                                   disabled={updateUserMutation.isLoading}
                                   onClick={() => handleRemoveMember(user.id)}
                                 >
-                                  Remove from team
+                                  {t('adminTeams.removeFromTeam')}
                                 </button>
                               </td>
                             </tr>
@@ -599,7 +601,7 @@ export default function AdminTeams() {
                     className="btn btn-secondary"
                     onClick={closeMembersModal}
                   >
-                    Close
+                    {t('common.close')}
                   </button>
                 </div>
               </div>
@@ -615,7 +617,7 @@ export default function AdminTeams() {
             <div className="modal-dialog" role="document">
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Edit team – {editingTeam.name}</h5>
+                  <h5 className="modal-title">{t('adminTeams.editTeam', { teamName: editingTeam.name })}</h5>
                   <button
                     type="button"
                     className="btn-close"
@@ -627,7 +629,7 @@ export default function AdminTeams() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label" htmlFor="edit-team-name">
-                        Name
+                        {t('adminTeams.name')}
                       </label>
                       <input
                         id="edit-team-name"
@@ -641,7 +643,7 @@ export default function AdminTeams() {
                     </div>
                     <div className="mb-3">
                       <label className="form-label" htmlFor="edit-team-description">
-                        Description
+                        {t('adminTeams.description')}
                       </label>
                       <textarea
                         id="edit-team-description"
@@ -659,7 +661,7 @@ export default function AdminTeams() {
                     {updateTeamMutation.isError && (
                       <div className="alert alert-danger" role="alert">
                         {updateTeamMutation.error?.response?.data?.detail ||
-                          "Failed to update team."}
+                          t('adminTeams.failedToUpdateTeam')}
                       </div>
                     )}
                   </div>
@@ -670,14 +672,14 @@ export default function AdminTeams() {
                       onClick={handleCloseEditTeam}
                       disabled={updateTeamMutation.isLoading}
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="submit"
                       className="btn btn-primary"
                       disabled={updateTeamMutation.isLoading}
                     >
-                      Save changes
+                      {t('common.save')}
                     </button>
                   </div>
                 </form>
@@ -699,7 +701,7 @@ export default function AdminTeams() {
             <div className="modal-dialog" role="document" onClick={(event) => event.stopPropagation()}>
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Add team</h5>
+                  <h5 className="modal-title">{t('adminTeams.addTeam')}</h5>
                   <button type="button" className="btn-close" aria-label="Close" onClick={closeCreateTeamModal}></button>
                 </div>
                 <form
@@ -711,7 +713,7 @@ export default function AdminTeams() {
                   <div className="modal-body">
                     <div className="mb-3">
                       <label className="form-label" htmlFor="create-team-name">
-                        Name
+                        {t('adminTeams.name')}
                       </label>
                       <input
                         id="create-team-name"
@@ -725,7 +727,7 @@ export default function AdminTeams() {
                     </div>
                     <div className="mb-3">
                       <label className="form-label" htmlFor="create-team-description">
-                        Description
+                        {t('adminTeams.description')}
                       </label>
                       <textarea
                         id="create-team-description"
@@ -739,7 +741,7 @@ export default function AdminTeams() {
                     </div>
                     {createTeamMutation.isError && (
                       <div className="alert alert-danger" role="alert">
-                        {createTeamMutation.error?.response?.data?.detail || "Failed to create team."}
+                        {createTeamMutation.error?.response?.data?.detail || t('adminTeams.failedToCreateTeam')}
                       </div>
                     )}
                   </div>
@@ -750,14 +752,14 @@ export default function AdminTeams() {
                       onClick={closeCreateTeamModal}
                       disabled={createTeamMutation.isLoading}
                     >
-                      Cancel
+                      {t('adminTeams.cancel')}
                     </button>
                     <button
                       type="submit"
                       className="btn btn-primary"
                       disabled={createTeamMutation.isLoading}
                     >
-                      Create team
+                      {t('adminTeams.createTeam')}
                     </button>
                   </div>
                 </form>

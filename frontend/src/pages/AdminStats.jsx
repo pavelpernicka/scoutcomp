@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -66,6 +67,7 @@ const getErrorMessage = (error, fallbackMessage) => {
 };
 
 export default function AdminStats() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
 
@@ -160,10 +162,10 @@ export default function AdminStats() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
       setCreateForm({ ...emptyCategoryForm });
-      setFeedback({ type: "success", message: "Category created." });
+      setFeedback({ type: "success", message: t('adminStats.categoryCreated') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to create category.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToCreateCategory')) });
     },
   });
 
@@ -171,10 +173,10 @@ export default function AdminStats() {
     mutationFn: async ({ categoryId, payload }) => api.patch(`/stats-categories/${categoryId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
-      setFeedback({ type: "success", message: "Category updated." });
+      setFeedback({ type: "success", message: t('adminStats.categoryUpdated') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to update category.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToUpdateCategory')) });
     },
   });
 
@@ -183,10 +185,10 @@ export default function AdminStats() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
       setSelectedCategoryId(null);
-      setFeedback({ type: "success", message: "Category deleted." });
+      setFeedback({ type: "success", message: t('adminStats.categoryDeleted') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to delete category.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToDeleteCategory')) });
     },
   });
 
@@ -195,10 +197,10 @@ export default function AdminStats() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
       setComponentForm((prev) => ({ ...prev, weight: "1", position: "" }));
-      setFeedback({ type: "success", message: "Component added." });
+      setFeedback({ type: "success", message: t('adminStats.componentAdded') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to add component.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToAddComponent')) });
     },
   });
 
@@ -207,10 +209,10 @@ export default function AdminStats() {
       api.patch(`/stats-categories/components/${componentId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
-      setFeedback({ type: "success", message: "Component updated." });
+      setFeedback({ type: "success", message: t('adminStats.componentUpdated') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to update component.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToUpdateComponent')) });
     },
   });
 
@@ -218,10 +220,10 @@ export default function AdminStats() {
     mutationFn: async (componentId) => api.delete(`/stats-categories/components/${componentId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
-      setFeedback({ type: "success", message: "Component removed." });
+      setFeedback({ type: "success", message: t('adminStats.componentRemoved') });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: getErrorMessage(error, "Failed to remove component.") });
+      setFeedback({ type: "danger", message: getErrorMessage(error, t('adminStats.failedToRemoveComponent')) });
     },
   });
 
@@ -240,7 +242,7 @@ export default function AdminStats() {
     const description = createForm.description.trim();
     const iconValue = normalizeIconForPayload(createForm.icon);
     if (!name) {
-      setFeedback({ type: "warning", message: "Name is required." });
+      setFeedback({ type: "warning", message: t('adminStats.nameRequired') });
       return;
     }
     createCategoryMutation.mutate({
@@ -269,14 +271,14 @@ export default function AdminStats() {
       payload.icon = draftIcon;
     }
     if (Object.keys(payload).length === 0) {
-      setFeedback({ type: "info", message: "Nothing to update." });
+      setFeedback({ type: "info", message: t('adminStats.nothingToUpdate') });
       return;
     }
     updateCategoryMutation.mutate({ categoryId: selectedCategory.id, payload });
   };
 
   const handleDeleteCategory = (categoryId, name) => {
-    if (!window.confirm(`Delete category "${name}"? This cannot be undone.`)) {
+    if (!window.confirm(t('adminStats.confirmDeleteCategory', { name }))) {
       return;
     }
     deleteCategoryMutation.mutate(categoryId);
@@ -286,12 +288,12 @@ export default function AdminStats() {
     event.preventDefault();
     if (!selectedCategory) return;
     if (!componentForm.taskId) {
-      setFeedback({ type: "warning", message: "Select a task." });
+      setFeedback({ type: "warning", message: t('adminStats.selectTask') });
       return;
     }
     const weightValue = Number(componentForm.weight);
     if (!Number.isFinite(weightValue)) {
-      setFeedback({ type: "warning", message: "Weight must be a number." });
+      setFeedback({ type: "warning", message: t('adminStats.weightMustBeNumber') });
       return;
     }
     const payload = {
@@ -302,7 +304,7 @@ export default function AdminStats() {
     if (componentForm.position.trim()) {
       const posValue = Number(componentForm.position);
       if (!Number.isFinite(posValue) || posValue < 0) {
-        setFeedback({ type: "warning", message: "Position must be a non-negative number." });
+        setFeedback({ type: "warning", message: t('adminStats.positionMustBeNonNegative') });
         return;
       }
       payload.position = posValue;
@@ -325,7 +327,7 @@ export default function AdminStats() {
     const draft = componentDrafts[componentId];
     const original = selectedCategory.components.find((component) => component.id === componentId);
     if (!draft || !original) {
-      setFeedback({ type: "danger", message: "Component not found." });
+      setFeedback({ type: "danger", message: t('adminStats.componentNotFound') });
       return;
     }
 
@@ -339,7 +341,7 @@ export default function AdminStats() {
     if (draft.weight !== undefined && draft.weight !== null) {
       const weightValue = Number(draft.weight);
       if (!Number.isFinite(weightValue)) {
-        setFeedback({ type: "warning", message: "Weight must be a number." });
+        setFeedback({ type: "warning", message: t('adminStats.weightMustBeNumber') });
         return;
       }
       if (weightValue !== original.weight) {
@@ -352,7 +354,7 @@ export default function AdminStats() {
       } else {
         const posValue = Number(draft.position);
         if (!Number.isFinite(posValue) || posValue < 0) {
-          setFeedback({ type: "warning", message: "Position must be a non-negative number." });
+          setFeedback({ type: "warning", message: t('adminStats.positionMustBeNonNegative') });
           return;
         }
         if (posValue !== original.position) {
@@ -362,7 +364,7 @@ export default function AdminStats() {
     }
 
     if (Object.keys(payload).length === 0) {
-      setFeedback({ type: "info", message: "Nothing to update." });
+      setFeedback({ type: "info", message: t('adminStats.nothingToUpdate') });
       return;
     }
 
@@ -370,14 +372,14 @@ export default function AdminStats() {
   };
 
   const handleDeleteComponent = (componentId) => {
-    if (!window.confirm("Remove this component?")) {
+    if (!window.confirm(t('adminStats.confirmRemoveComponent'))) {
       return;
     }
     deleteComponentMutation.mutate(componentId);
   };
 
   if (!isAdmin) {
-    return <div className="alert alert-danger">You do not have access to manage statistics.</div>;
+    return <div className="alert alert-danger">{t('adminStats.noAccess')}</div>;
   }
 
   const isWorking =
@@ -416,14 +418,14 @@ export default function AdminStats() {
     if (!file.type.startsWith("image/")) {
       setFeedback({
         type: "danger",
-        message: "Icon must be an image file (PNG, JPG, SVG, GIF, WEBP).",
+        message: t('adminStats.iconMustBeImage'),
       });
       return;
     }
     if (file.size > MAX_ICON_BYTES) {
       setFeedback({
         type: "danger",
-        message: `Icon is too large. Maximum size is ${Math.round(MAX_ICON_BYTES / 1024)} KB.`,
+        message: t('adminStats.iconTooLarge', { maxSize: Math.round(MAX_ICON_BYTES / 1024) }),
       });
       return;
     }
@@ -433,7 +435,7 @@ export default function AdminStats() {
     } catch (error) {
       setFeedback({
         type: "danger",
-        message: error?.message || "Failed to read icon file.",
+        message: error?.message || t('adminStats.failedToReadIcon'),
       });
     }
   };
@@ -475,11 +477,11 @@ export default function AdminStats() {
       <div className="row g-4">
         <div className="col-12 col-xl-4">
           <div className="card shadow-sm h-100">
-            <div className="card-header">Create category</div>
+            <div className="card-header">{t('adminStats.createCategory')}</div>
             <div className="card-body">
               <form className="row g-3" onSubmit={handleCreateCategory}>
                 <div className="col-12">
-                  <label className="form-label">Name</label>
+                  <label className="form-label">{t('adminStats.name')}</label>
                   <input
                     className="form-control"
                     value={createForm.name}
@@ -490,7 +492,7 @@ export default function AdminStats() {
                   />
                 </div>
                 <div className="col-12">
-                  <label className="form-label">Description</label>
+                  <label className="form-label">{t('adminStats.description')}</label>
                   <textarea
                     className="form-control"
                     rows={3}
@@ -501,7 +503,7 @@ export default function AdminStats() {
                   ></textarea>
                 </div>
                 <div className="col-12">
-                  <label className="form-label">Icon</label>
+                  <label className="form-label">{t('adminStats.icon')}</label>
                   <div className="d-flex flex-column gap-2">
                     <div className="d-flex flex-wrap gap-2">
                       <input
@@ -514,14 +516,14 @@ export default function AdminStats() {
                             iconFilename: "",
                           }))
                         }
-                        placeholder="🔥 or paste data URL"
+                        placeholder={t('adminStats.iconPlaceholder')}
                       />
                       <button
                         type="button"
                         className="btn btn-outline-secondary"
                         onClick={() => createIconInputRef.current?.click()}
                       >
-                        Upload file
+                        {t('adminStats.uploadFile')}
                       </button>
                       <button
                         type="button"
@@ -535,7 +537,7 @@ export default function AdminStats() {
                         }
                         disabled={!createForm.icon}
                       >
-                        Clear
+                        {t('adminStats.clear')}
                       </button>
                     </div>
                     <input
@@ -550,13 +552,13 @@ export default function AdminStats() {
                         {renderIconPreview(createForm.icon, 40)}
                         <span className="text-muted small">
                           {isImageDataUrl(createForm.icon)
-                            ? createForm.iconFilename || "Uploaded image"
-                            : "Text or emoji icon"}
+                            ? createForm.iconFilename || t('adminStats.uploadedImage')
+                            : t('adminStats.textOrEmojiIcon')}
                         </span>
                       </div>
                     ) : (
                       <span className="text-muted small">
-                        PNG, JPG, SVG, GIF or WEBP up to 150 KB. You can also use an emoji.
+                        {t('adminStats.iconFormats')}
                       </span>
                     )}
                   </div>
@@ -567,17 +569,17 @@ export default function AdminStats() {
                     className="btn btn-primary"
                     disabled={createCategoryMutation.isLoading}
                   >
-                    Create category
+                    {t('adminStats.createCategory')}
                   </button>
                 </div>
               </form>
               <hr />
               <div>
-                <h6>Categories</h6>
+                <h6>{t('adminStats.categories')}</h6>
                 {categoriesLoading ? (
-                  <div className="text-muted">Loading…</div>
+                  <div className="text-muted">{t('adminStats.loading')}</div>
                 ) : categories.length === 0 ? (
-                  <p className="text-muted mb-0">No categories yet.</p>
+                  <p className="text-muted mb-0">{t('adminStats.noCategoriesYet')}</p>
                 ) : (
                   <div className="list-group">
                     {categories.map((category) => {
@@ -615,25 +617,25 @@ export default function AdminStats() {
         <div className="col-12 col-xl-8">
           {!selectedCategory ? (
             <div className="card shadow-sm h-100">
-              <div className="card-body text-muted">Select a category to manage.</div>
+              <div className="card-body text-muted">{t('adminStats.selectCategoryToManage')}</div>
             </div>
           ) : (
             <div className="card shadow-sm h-100">
               <div className="card-header d-flex justify-content-between align-items-center">
-                <span>Category detail</span>
+                <span>{t('adminStats.categoryDetail')}</span>
                 <button
                   type="button"
                   className="btn btn-outline-danger btn-sm"
                   onClick={() => handleDeleteCategory(selectedCategory.id, selectedCategory.name)}
                   disabled={deleteCategoryMutation.isLoading}
                 >
-                  Delete
+                  {t('adminStats.delete')}
                 </button>
               </div>
               <div className="card-body">
                 <form className="row g-3" onSubmit={handleUpdateCategory}>
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Name</label>
+                    <label className="form-label">{t('adminStats.name')}</label>
                     <input
                       className="form-control"
                       value={categoryEditForm.name}
@@ -647,7 +649,7 @@ export default function AdminStats() {
                     />
                   </div>
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Component count</label>
+                    <label className="form-label">{t('adminStats.componentCount')}</label>
                     <input
                       className="form-control"
                       value={selectedCategory.components.length}
@@ -655,7 +657,7 @@ export default function AdminStats() {
                     />
                   </div>
                   <div className="col-12">
-                    <label className="form-label">Description</label>
+                    <label className="form-label">{t('adminStats.description')}</label>
                     <textarea
                       className="form-control"
                       rows={3}
@@ -669,7 +671,7 @@ export default function AdminStats() {
                     ></textarea>
                   </div>
                   <div className="col-12 col-md-6">
-                    <label className="form-label">Icon</label>
+                    <label className="form-label">{t('adminStats.icon')}</label>
                     <div className="d-flex flex-column gap-2">
                       <div className="d-flex flex-wrap gap-2">
                         <input
@@ -682,14 +684,14 @@ export default function AdminStats() {
                               iconFilename: "",
                             }))
                           }
-                          placeholder="🔥 or paste data URL"
+                          placeholder={t('adminStats.iconPlaceholder')}
                         />
                         <button
                           type="button"
                           className="btn btn-outline-secondary"
                           onClick={() => editIconInputRef.current?.click()}
                         >
-                          Upload file
+                          {t('adminStats.uploadFile')}
                         </button>
                         <button
                           type="button"
@@ -703,7 +705,7 @@ export default function AdminStats() {
                           }
                           disabled={!categoryEditForm.icon}
                         >
-                          Clear
+                          {t('adminStats.clear')}
                         </button>
                       </div>
                       <input
@@ -718,13 +720,13 @@ export default function AdminStats() {
                           {renderIconPreview(categoryEditForm.icon, 40)}
                           <span className="text-muted small">
                             {isImageDataUrl(categoryEditForm.icon)
-                              ? categoryEditForm.iconFilename || "Uploaded image (save to apply)"
-                              : "Text or emoji icon"}
+                              ? categoryEditForm.iconFilename || t('adminStats.uploadedImageSaveToApply')
+                              : t('adminStats.textOrEmojiIcon')}
                           </span>
                         </div>
                       ) : (
                         <span className="text-muted small">
-                          Leave empty to remove the icon. Changes apply after saving.
+                          {t('adminStats.leaveEmptyToRemoveIcon')}
                         </span>
                       )}
                     </div>
@@ -735,25 +737,25 @@ export default function AdminStats() {
                       className="btn btn-primary"
                       disabled={updateCategoryMutation.isLoading}
                     >
-                      Save changes
+                      {t('adminStats.saveChanges')}
                     </button>
                   </div>
                 </form>
                 <hr />
                 <div>
-                  <h6>Components</h6>
+                  <h6>{t('adminStats.components')}</h6>
                   {selectedCategory.components.length === 0 ? (
-                    <p className="text-muted">No components yet. Add at least one task below.</p>
+                    <p className="text-muted">{t('adminStats.noComponentsYet')}</p>
                   ) : (
                     <div className="table-responsive">
                       <table className="table table-sm align-middle">
                         <thead className="table-light">
                           <tr>
-                            <th>Task</th>
-                            <th>Metric</th>
-                            <th>Weight</th>
-                            <th>Position</th>
-                            <th className="text-end">Actions</th>
+                            <th>{t('adminStats.task')}</th>
+                            <th>{t('adminStats.metric')}</th>
+                            <th>{t('adminStats.weight')}</th>
+                            <th>{t('adminStats.position')}</th>
+                            <th className="text-end">{t('adminStats.actions')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -792,8 +794,8 @@ export default function AdminStats() {
                                         handleComponentDraftChange(component.id, "metric", event.target.value)
                                       }
                                     >
-                                      <option value="points">Points</option>
-                                      <option value="completions">Completions</option>
+                                      <option value="points">{t('adminStats.points')}</option>
+                                      <option value="completions">{t('adminStats.completions')}</option>
                                     </select>
                                   </td>
                                   <td style={{ width: "100px" }}>
@@ -826,7 +828,7 @@ export default function AdminStats() {
                                         onClick={() => handleUpdateComponent(component.id)}
                                         disabled={updateComponentMutation.isLoading}
                                       >
-                                        Update
+                                        {t('adminStats.update')}
                                       </button>
                                       <button
                                         type="button"
@@ -834,7 +836,7 @@ export default function AdminStats() {
                                         onClick={() => handleDeleteComponent(component.id)}
                                         disabled={deleteComponentMutation.isLoading}
                                       >
-                                        Delete
+                                        {t('adminStats.delete')}
                                       </button>
                                     </div>
                                   </td>
@@ -848,10 +850,10 @@ export default function AdminStats() {
                 </div>
                 <hr />
                 <div>
-                  <h6>Add component</h6>
+                  <h6>{t('adminStats.addComponent')}</h6>
                   <form className="row g-3" onSubmit={handleAddComponent}>
                     <div className="col-12 col-md-6">
-                      <label className="form-label">Task</label>
+                      <label className="form-label">{t('adminStats.task')}</label>
                       <select
                         className="form-select"
                         value={componentForm.taskId}
@@ -861,7 +863,7 @@ export default function AdminStats() {
                         required
                       >
                         <option value="" disabled>
-                          Select task
+                          {t('adminStats.selectTask')}
                         </option>
                         {tasksOptions.map((taskOption) => (
                           <option key={taskOption.value} value={taskOption.value}>
@@ -871,7 +873,7 @@ export default function AdminStats() {
                       </select>
                     </div>
                     <div className="col-6 col-md-3">
-                      <label className="form-label">Metric</label>
+                      <label className="form-label">{t('adminStats.metric')}</label>
                       <select
                         className="form-select"
                         value={componentForm.metric}
@@ -879,12 +881,12 @@ export default function AdminStats() {
                           setComponentForm((prev) => ({ ...prev, metric: event.target.value }))
                         }
                       >
-                        <option value="points">Points</option>
-                        <option value="completions">Completions</option>
+                        <option value="points">{t('adminStats.points')}</option>
+                        <option value="completions">{t('adminStats.completions')}</option>
                       </select>
                     </div>
                     <div className="col-6 col-md-3">
-                      <label className="form-label">Weight</label>
+                      <label className="form-label">{t('adminStats.weight')}</label>
                       <input
                         className="form-control"
                         type="number"
@@ -897,7 +899,7 @@ export default function AdminStats() {
                       />
                     </div>
                     <div className="col-12 col-md-3">
-                      <label className="form-label">Position</label>
+                      <label className="form-label">{t('adminStats.position')}</label>
                       <input
                         className="form-control"
                         type="number"
@@ -906,7 +908,7 @@ export default function AdminStats() {
                         onChange={(event) =>
                           setComponentForm((prev) => ({ ...prev, position: event.target.value }))
                         }
-                        placeholder="Auto"
+                        placeholder={t('adminStats.auto')}
                       />
                     </div>
                     <div className="col-12 d-flex justify-content-end gap-2">
@@ -921,16 +923,15 @@ export default function AdminStats() {
                         }
                         disabled={isWorking}
                       >
-                        Clear
+                        {t('adminStats.clear')}
                       </button>
                       <button type="submit" className="btn btn-primary" disabled={isWorking}>
-                        Add component
+                        {t('adminStats.addComponent')}
                       </button>
                     </div>
                   </form>
                   <p className="text-muted small mt-3 mb-0">
-                    Define heuristics by combining task metrics. Positive weights add points, negative weights subtract.
-                    If only one task is used, choose between points or completions via the metric selector.
+                    {t('adminStats.defineHeuristics')}
                   </p>
                 </div>
               </div>

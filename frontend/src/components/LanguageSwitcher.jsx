@@ -1,17 +1,20 @@
 import { useTranslation } from "react-i18next";
 import { useState, useRef, useEffect } from "react";
 import PropTypes from 'prop-types';
+import { getAvailableLanguages, getLanguageDisplayName, getLanguageFlag } from "../utils/translationLoader";
 
 export default function LanguageSwitcher({ isMobile = false }) {
   const { i18n } = useTranslation();
-  const languages = i18n.options.supportedLngs?.filter((lng) => lng !== "cimode") || ["cs", "en"];
+  const [availableLanguages, setAvailableLanguages] = useState(["cs", "en"]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
 
-  const languageNames = {
-    cs: "Čeština",
-    en: "English"
-  };
+  // Load available languages on component mount
+  useEffect(() => {
+    getAvailableLanguages().then(setAvailableLanguages).catch(console.error);
+  }, []);
+
+  const languages = i18n.options.supportedLngs?.filter((lng) => lng !== "cimode") || availableLanguages;
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -41,7 +44,7 @@ export default function LanguageSwitcher({ isMobile = false }) {
         aria-label="Select language"
       >
         <div className="d-flex align-items-center">
-          <i className="fas fa-globe me-2"></i>
+          <span className="me-2">{getLanguageFlag(i18n.language)}</span>
           <span className="fw-bold">{i18n.language.toUpperCase()}</span>
         </div>
         <i className="fas fa-chevron-down ms-2"></i>
@@ -53,8 +56,8 @@ export default function LanguageSwitcher({ isMobile = false }) {
               className={`dropdown-item d-flex align-items-center ${i18n.language === lang ? 'active' : ''}`}
               onClick={() => handleLanguageChange(lang)}
             >
-              <i className="fas fa-language me-2"></i>
-              {languageNames[lang] || lang.toUpperCase()}
+              <span className="me-2">{getLanguageFlag(lang)}</span>
+              {getLanguageDisplayName(lang)}
             </button>
           </li>
         ))}

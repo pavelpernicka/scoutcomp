@@ -70,8 +70,8 @@ export default function AdminApprovals() {
     onSuccess: (_, variables) => {
       const message =
         variables.status === "approved"
-          ? t("approvals.approvedMessage", "Completion approved")
-          : t("approvals.rejectedMessage", "Completion rejected");
+          ? t("approvals.approvedMessage")
+          : t("approvals.rejectedMessage");
       setFeedback({ type: "success", message });
       queryClient.invalidateQueries({ queryKey: ["completions", "pending"] });
       queryClient.invalidateQueries({ queryKey: ["leaderboard", "members"] });
@@ -81,14 +81,14 @@ export default function AdminApprovals() {
       setReasonMap((prev) => ({ ...prev, [variables.id]: "" }));
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: extractErrorMessage(error, t("approvals.error", "Action failed.")) });
+      setFeedback({ type: "danger", message: extractErrorMessage(error, t("approvals.error")) });
     },
   });
 
   const handleReview = (item, status) => {
     const reason = reasonMap[item.id]?.trim();
     if (status === "rejected" && !reason) {
-      setFeedback({ type: "warning", message: t("approvals.reasonRequired", "Please provide a reason for rejection.") });
+      setFeedback({ type: "warning", message: t("approvals.reasonRequired") });
       return;
     }
     reviewMutation.mutate({ id: item.id, status, note: reason });
@@ -97,7 +97,7 @@ export default function AdminApprovals() {
   if (isLoading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '200px' }}>
-        <LoadingSpinner text={t("approvals.loading", "Loading...")} />
+        <LoadingSpinner text={t("approvals.loading")} />
       </div>
     );
   }
@@ -105,26 +105,26 @@ export default function AdminApprovals() {
   return (
     <>
       <HeroHeader
-        title={t("approvals.title", "Task Approvals")}
-        subtitle={t("approvals.subtitle", "Review and approve member task completions")}
+        title={t("approvals.title")}
+        subtitle={t("approvals.subtitle")}
         icon="🔍"
         gradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
       >
         <div className="badge bg-light text-success px-3 py-2 fs-4">
-          {pending.length} {t("approvals.pending", "pending")}
+          {pending.length} {t("approvals.pending")}
         </div>
       </HeroHeader>
 
       {/* Information Panel */}
       <Alert type="info" className="shadow-sm border-0 mb-4" icon={<></>}>
-        <h6 className="alert-heading mb-3">{t("approvals.infoTitle", "What users see:")}</h6>
+        <h6 className="alert-heading mb-3">{t("approvals.infoTitle")}</h6>
         <div className="row g-3">
           <div className="col-md-4">
             <div className="d-flex align-items-start">
               <div className="badge bg-warning text-dark me-2 mt-1">&nbsp;</div>
               <div>
-                <strong>{t("approvals.pendingStatus", "Pending Review")}</strong>
-                <div className="text-muted small">{t("approvals.pendingDescription", "Task appears as 'Awaiting approval' in user's dashboard")}</div>
+                <strong>{t("approvals.pendingStatus")}</strong>
+                <div className="text-muted small">{t("approvals.pendingDescription")}</div>
               </div>
             </div>
           </div>
@@ -132,8 +132,8 @@ export default function AdminApprovals() {
             <div className="d-flex align-items-start">
               <div className="badge bg-success me-2 mt-1">&nbsp;</div>
               <div>
-                <strong>{t("approvals.approvedStatus", "Approved")}</strong>
-                <div className="text-muted small">{t("approvals.approvedDescription", "Points added to score, task marked as completed")}</div>
+                <strong>{t("approvals.approvedStatus")}</strong>
+                <div className="text-muted small">{t("approvals.approvedDescription")}</div>
               </div>
             </div>
           </div>
@@ -141,8 +141,8 @@ export default function AdminApprovals() {
             <div className="d-flex align-items-start">
               <div className="badge bg-danger me-2 mt-1">&nbsp;</div>
               <div>
-                <strong>{t("approvals.rejectedStatus", "Rejected")}</strong>
-                <div className="text-muted small">{t("approvals.rejectedDescription", "User sees feedback and can resubmit")}</div>
+                <strong>{t("approvals.rejectedStatus")}</strong>
+                <div className="text-muted small">{t("approvals.rejectedDescription")}</div>
               </div>
             </div>
           </div>
@@ -159,8 +159,8 @@ export default function AdminApprovals() {
       {/* Approvals List */}
       {!pending.length ? (
         <DecoratedCard
-          title={t("approvals.empty", "All caught up!")}
-          subtitle={t("approvals.emptyDescription", "No task completions are waiting for review right now.")}
+          title={t("approvals.empty")}
+          subtitle={t("approvals.emptyDescription")}
           icon={<i className="fas fa-check-circle text-success"></i>}
           shadow={true}
           bodyClassName="text-center py-5"
@@ -171,12 +171,12 @@ export default function AdminApprovals() {
               <DecoratedCard
                 key={item.id}
                 title={item.task?.name || `Task #${item.task_id}`}
-                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count", "Count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${new Date(item.submitted_at).toLocaleString()}`}
+                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${new Date(item.submitted_at).toLocaleString()}`}
                 icon="📝"
                 headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                 shadow={true}
                 className="m-2"
-                rightBadge={t("approvals.awaitingReview", "Awaiting Review")}
+                rightBadge={t("approvals.awaitingReview")}
               >
                   <div className="row">
                     <div className="col-md-8">
@@ -196,17 +196,17 @@ export default function AdminApprovals() {
                         </div>
                       )}
 
-                      <p className="text-muted mb-2">{t("approvals.memberNote", "Member's Note:")}</p>
+                      <p className="text-muted mb-2">{t("approvals.memberNote")}</p>
                       <div className="bg-light p-3 rounded border">
-                        {item.member_note || <em className="text-muted">{t("approvals.noNote", "No note provided")}</em>}
+                        {item.member_note || <em className="text-muted">{t("approvals.noNote")}</em>}
                       </div>
                     </div>
                     <div className="col-md-4">
-                      <p className="text-muted mb-2">{t("approvals.adminFeedback", "Admin Feedback:")}</p>
+                      <p className="text-muted mb-2">{t("approvals.adminFeedback")}</p>
                       <Textarea
                         className="mb-3"
                         rows={3}
-                        placeholder={t("approvals.feedbackPlaceholder", "Optional feedback (required for rejection)")}
+                        placeholder={t("approvals.feedbackPlaceholder")}
                         value={reasonMap[item.id] || ""}
                         onChange={(event) =>
                           setReasonMap((prev) => ({ ...prev, [item.id]: event.target.value }))
@@ -220,7 +220,7 @@ export default function AdminApprovals() {
                           loading={reviewMutation.isLoading}
                           onClick={() => handleReview(item, "approved")}
                         >
-                          {reviewMutation.isLoading ? t("approvals.processing", "Processing...") : t("approvals.approve", "Approve")}
+                          {reviewMutation.isLoading ? t("approvals.processing") : t("approvals.approve")}
                         </Button>
                         <Button
                           variant="danger"
@@ -229,7 +229,7 @@ export default function AdminApprovals() {
                           loading={reviewMutation.isLoading}
                           onClick={() => handleReview(item, "rejected")}
                         >
-                          {reviewMutation.isLoading ? t("approvals.processing", "Processing...") : t("approvals.reject", "Reject")}
+                          {reviewMutation.isLoading ? t("approvals.processing") : t("approvals.reject")}
                         </Button>
                       </div>
                     </div>

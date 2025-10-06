@@ -55,13 +55,13 @@ export default function RulesPage() {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(["pages", "rules"], data);
-      setFeedback({ type: "success", message: t("rules.updated", "Rules updated.") });
+      setFeedback({ type: "success", message: t("rules.updated") });
       setIsEditing(false);
     },
     onError: (error) => {
       setFeedback({
         type: "danger",
-        message: error?.response?.data?.detail || t("rules.updateFailed", "Failed to update rules."),
+        message: error?.response?.data?.detail || t("rules.updateFailed"),
       });
     },
   });
@@ -91,14 +91,14 @@ export default function RulesPage() {
   };
 
   if (isLoading || !page) {
-    return <LoadingSpinner className="py-5" text={t("rules.loading", "Loading rules…")} centered />;
+    return <LoadingSpinner className="py-5" text={t("rules.loading")} centered />;
   }
 
   return (
     <>
       <HeroHeader
-        title={t("rules.title", "Quest Guidelines & Rules")}
-        subtitle={t("rules.subtitle", "Your essential guide to fair play and adventure!")}
+        title={t("rules.title")}
+        subtitle={t("rules.subtitle")}
         icon="📋"
       >
       </HeroHeader>
@@ -111,7 +111,7 @@ export default function RulesPage() {
         )}
 
         <DecoratedCard
-          title={t("rules.officialRules", "Official Rules")}
+          title={t("rules.officialRules")}
           icon="📜"
           headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
           shadow={true}
@@ -120,7 +120,7 @@ export default function RulesPage() {
               {isEditing && hasChanges && (
                 <span className="badge text-dark px-3 py-2 d-flex align-items-center" style={{ backgroundColor: '#ffc107' }}>
                   <i className="fas fa-exclamation-triangle me-1"></i>
-                  {t("rules.unsavedChanges", "Unsaved changes")}
+                  {t("rules.unsavedChanges")}
                 </span>
               )}
               {isEditing ? (
@@ -134,7 +134,7 @@ export default function RulesPage() {
                     icon="fas fa-undo"
                     iconPosition="left"
                   >
-                    {t("common.cancel", "Cancel")}
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     variant="success"
@@ -146,7 +146,7 @@ export default function RulesPage() {
                     icon="fas fa-save"
                     iconPosition="left"
                   >
-                    {updateMutation.isLoading ? t("rules.saving", "Saving...") : t("rules.save", "Save")}
+                    {updateMutation.isLoading ? t("common.saving") : t("common.save")}
                   </Button>
                 </>
               ) : (
@@ -158,7 +158,7 @@ export default function RulesPage() {
                   icon="fas fa-edit"
                   iconPosition="left"
                 >
-                  {t("rules.editRules", "Edit Rules")}
+                  {t("rules.editRules")}
                 </Button>
               )}
             </div>
@@ -167,7 +167,7 @@ export default function RulesPage() {
             {updatedAtLabel && (
               <div className="bg-light rounded p-2 mb-4 d-flex align-items-center">
                 <i className="fas fa-clock text-muted me-2"></i>
-                <small className="text-muted">{t("rules.lastUpdated", "Last updated")} {updatedAtLabel}</small>
+                <small className="text-muted">{t("common.lastUpdated")} {updatedAtLabel}</small>
               </div>
             )}
 
@@ -177,7 +177,7 @@ export default function RulesPage() {
                   <div className="mb-3">
                     <label className="form-label fw-bold d-flex align-items-center">
                       <span className="me-2">📝</span>
-                      {t("rules.markdownContent", "Markdown Content")}
+                      {t("rules.markdownContent")}
                     </label>
                     <Textarea
                       className="border-2"
@@ -185,7 +185,7 @@ export default function RulesPage() {
                       value={draft}
                       onChange={(event) => setDraft(event.target.value)}
                       disabled={updateMutation.isLoading}
-                      placeholder={t("rules.markdownPlaceholder", "Enter your rules in Markdown format...")}
+                      placeholder={t("rules.markdownPlaceholder")}
                       style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '0.9rem' }}
                     />
                   </div>
@@ -194,7 +194,7 @@ export default function RulesPage() {
                   <div className="mb-3">
                     <label className="form-label fw-bold d-flex align-items-center">
                       <i className="fas fa-eye text-secondary me-2"></i>
-                      {t("rules.livePreview", "Live Preview")}
+                      {t("rules.livePreview")}
                     </label>
                     <div
                       className="border-2 border-info rounded p-4 bg-light markdown-preview"
@@ -211,8 +211,8 @@ export default function RulesPage() {
             ) : (
               <div className="text-center py-5">
                 <div className="display-1 mb-3">📝</div>
-                <h3 className="text-muted mb-2">{t("rules.comingSoon", "Rules Coming Soon!")}</h3>
-                <p className="text-muted mb-0">{t("rules.comingSoonMessage", "The official quest rules are being prepared and will be available here soon.")}</p>
+                <h3 className="text-muted mb-2">{t("rules.comingSoon")}</h3>
+                <p className="text-muted mb-0">{t("rules.comingSoonMessage")}</p>
               </div>
             )}
         </DecoratedCard>
