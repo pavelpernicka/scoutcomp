@@ -6,7 +6,7 @@ import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import { formatDateToLocal, isDateExpired } from "../utils/dateUtils";
+import { formatDateToLocal } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";

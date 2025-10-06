@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import { convertLocalToUTC, formatDateToLocal, isDateExpired } from "../utils/dateUtils";
+import { convertLocalToUTC, isDateExpired } from "../utils/dateUtils";
 
 const getPeriodUnits = (t) => [
   { value: "hour", label: t("adminTasks.periodUnits.hour") },
