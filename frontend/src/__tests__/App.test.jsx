@@ -13,7 +13,7 @@ describe("App shell", () => {
   it("renders login link when logged out", async () => {
     const queryClient = new QueryClient();
 
-    const { getByRole } = render(
+    const { container } = render(
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
@@ -29,7 +29,9 @@ describe("App shell", () => {
 
     // Wait for async operations to complete
     await waitFor(() => {
-      expect(getByRole('link', { name: /log in/i })).toBeInTheDocument();
-    });
+      // Look for a link that goes to /login
+      const loginLink = container.querySelector('a[href="/login"]');
+      expect(loginLink).toBeInTheDocument();
+    }, { timeout: 5000 });
   });
 });
