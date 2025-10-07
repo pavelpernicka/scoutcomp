@@ -8,13 +8,21 @@ import { useConfig } from "../providers/ConfigProvider";
 import api from "../services/api";
 import defaultAppIcon from "../assets/default-app-icon.svg";
 
-const extractErrorMessage = (error, fallback) => {
+const extractErrorMessage = (error, fallback, t) => {
   const detail = error?.response?.data?.detail;
   if (!detail) {
     return fallback;
   }
   if (typeof detail === "string") {
-    return detail;
+    // Translate specific server error messages
+    switch (detail) {
+      case "Invalid credentials":
+        return t("login.invalidCredentials");
+      case "Invalid current password":
+        return t("login.passwordChange.invalidCurrentPassword");
+      default:
+        return detail;
+    }
   }
   if (Array.isArray(detail)) {
     return detail
@@ -146,7 +154,7 @@ useEffect(() => {
         }));
         setPasswordChangeRequired(true);
       } else {
-        setLoginError(extractErrorMessage(error, t("login.error")));
+        setLoginError(extractErrorMessage(error, t("login.error"), t));
       }
     } finally {
       setIsSubmittingLogin(false);
@@ -156,7 +164,7 @@ useEffect(() => {
   const handlePasswordChangeSubmit = async (event) => {
     event.preventDefault();
     if (passwordChangeForm.newPassword !== passwordChangeForm.confirmPassword) {
-      setPasswordChangeError("Passwords do not match");
+      setPasswordChangeError(t("login.passwordChange.passwordsDoNotMatch"));
       return;
     }
     setIsSubmittingPasswordChange(true);
@@ -169,7 +177,7 @@ useEffect(() => {
       });
       navigate("/");
     } catch (error) {
-      setPasswordChangeError(extractErrorMessage(error, "Failed to change password"));
+      setPasswordChangeError(extractErrorMessage(error, t("login.passwordChange.changePasswordFailed"), t));
     } finally {
       setIsSubmittingPasswordChange(false);
     }
@@ -280,9 +288,9 @@ useEffect(() => {
               <div className="card-body p-4">
               {passwordChangeRequired ? (
                 <div className="text-center mb-4">
-                  <h4 className="text-primary fw-bold">🔒 Password Change Required</h4>
+                  <h4 className="text-primary fw-bold">🔒 {t('login.passwordChange.title')}</h4>
                   <p className="text-muted">
-                    Your password needs to be changed before you can continue.
+                    {t('login.passwordChange.subtitle')}
                   </p>
                 </div>
               ) : (
@@ -295,7 +303,7 @@ useEffect(() => {
                     <form className="row g-4" onSubmit={handlePasswordChangeSubmit}>
                       <div className="col-12">
                         <label className="form-label fw-semibold">
-                          Username
+                          {t('login.passwordChange.username')}
                         </label>
                         <input
                           type="text"
@@ -307,7 +315,7 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold">
-                          Current Password
+                          {t('login.passwordChange.currentPassword')}
                         </label>
                         <input
                           type="password"
@@ -323,12 +331,12 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold">
-                          New Password
+                          {t('login.passwordChange.newPassword')}
                         </label>
                         <input
                           type="password"
                           className="form-control form-control-lg"
-                          placeholder="Enter your new password"
+                          placeholder={t('login.passwordChange.newPasswordPlaceholder')}
                           value={passwordChangeForm.newPassword}
                           onChange={(event) =>
                             setPasswordChangeForm((prev) => ({ ...prev, newPassword: event.target.value }))
@@ -341,12 +349,12 @@ useEffect(() => {
 
                       <div className="col-12">
                         <label className="form-label fw-semibold">
-                          Confirm New Password
+                          {t('login.passwordChange.confirmPassword')}
                         </label>
                         <input
                           type="password"
                           className="form-control form-control-lg"
-                          placeholder="Confirm your new password"
+                          placeholder={t('login.passwordChange.confirmPasswordPlaceholder')}
                           value={passwordChangeForm.confirmPassword}
                           onChange={(event) =>
                             setPasswordChangeForm((prev) => ({ ...prev, confirmPassword: event.target.value }))
@@ -378,10 +386,10 @@ useEffect(() => {
                           {isSubmittingPasswordChange ? (
                             <>
                               <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                              Changing Password...
+                              {t('login.passwordChange.submitting')}
                             </>
                           ) : (
-                            "Change Password"
+                            t('login.passwordChange.button')
                           )}
                         </button>
                       </div>
@@ -401,7 +409,7 @@ useEffect(() => {
                             setPasswordChangeError(null);
                           }}
                         >
-                          Back to Login
+{t('login.passwordChange.backToLogin')}
                         </button>
                       </div>
                     </form>
@@ -604,7 +612,7 @@ useEffect(() => {
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
                               <i className="fas fa-exclamation-triangle text-warning me-2"></i>
-                              {extractErrorMessage(memberRegistration.error, t("register.error"))}
+                              {extractErrorMessage(memberRegistration.error, t("register.error"), t)}
                             </div>
                           </div>
                         </div>
@@ -722,7 +730,7 @@ useEffect(() => {
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
                             <div className="d-flex align-items-center">
                               <i className="fas fa-exclamation-triangle text-warning me-2"></i>
-                              {extractErrorMessage(adminRegistration.error, t("register.error"))}
+                              {extractErrorMessage(adminRegistration.error, t("register.error"), t)}
                             </div>
                           </div>
                         </div>

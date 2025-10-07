@@ -504,6 +504,7 @@
   },
   "login": {
     "error": "Cannot log in",
+    "invalidCredentials": "Invalid credentials",
     "tabs": {
       "login": "Log in",
       "registerMember": "Member registration",
@@ -515,7 +516,23 @@
     "password": "Password",
     "passwordPlaceholder": "Enter your password",
     "signingIn": "Signing in...",
-    "button": "Log in"
+    "button": "Log in",
+    "passwordChange": {
+      "title": "Password Change Required",
+      "subtitle": "Your password needs to be changed before you can continue.",
+      "username": "Username",
+      "currentPassword": "Current Password",
+      "newPassword": "New Password",
+      "newPasswordPlaceholder": "Enter your new password",
+      "confirmPassword": "Confirm New Password",
+      "confirmPasswordPlaceholder": "Confirm your new password",
+      "submitting": "Changing Password...",
+      "button": "Change Password",
+      "backToLogin": "Back to Login",
+      "passwordsDoNotMatch": "Passwords do not match",
+      "changePasswordFailed": "Failed to change password",
+      "invalidCurrentPassword": "Invalid current password"
+    }
   },
   "register": {
     "realName": "Real name",

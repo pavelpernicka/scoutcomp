@@ -972,6 +972,8 @@
   "login": {
     // EN: Cannot log in
     "error": "Nelze se přihlásit",
+    // EN: Invalid credentials
+    "invalidCredentials": "Neplatné přihlašovací údaje",
     "tabs": {
       // EN: Log in
       "login": "Přihlásit se",
@@ -993,7 +995,37 @@
     // EN: Signing in...
     "signingIn": "Přihlašuji...",
     // EN: Log in
-    "button": "Přihlásit se"
+    "button": "Přihlásit se",
+    "passwordChange": {
+      // EN: Password Change Required
+      "title": "Je vyžadována změna hesla",
+      // EN: Your password needs to be changed before you can continue.
+      "subtitle": "Než budeš pokračovat, musíš změnit své heslo.",
+      // EN: Username
+      "username": "Uživatelské jméno",
+      // EN: Current Password
+      "currentPassword": "Aktuální heslo",
+      // EN: New Password
+      "newPassword": "Nové heslo",
+      // EN: Enter your new password
+      "newPasswordPlaceholder": "Zadej své nové heslo",
+      // EN: Confirm New Password
+      "confirmPassword": "Potvrď nové heslo",
+      // EN: Confirm your new password
+      "confirmPasswordPlaceholder": "Potvrď své nové heslo",
+      // EN: Changing Password...
+      "submitting": "Měním heslo...",
+      // EN: Change Password
+      "button": "Změnit heslo",
+      // EN: Back to Login
+      "backToLogin": "Zpět na přihlášení",
+      // EN: Passwords do not match
+      "passwordsDoNotMatch": "Hesla se neshodují",
+      // EN: Failed to change password
+      "changePasswordFailed": "Nepodařilo se změnit heslo",
+      // EN: Invalid current password
+      "invalidCurrentPassword": "Neplatné současné heslo"
+    }
   },
   "register": {
     // EN: Real name
