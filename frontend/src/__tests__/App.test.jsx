@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { render } from "@testing-library/react";
+import { render, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nextProvider } from "react-i18next";
@@ -10,7 +10,7 @@ import { ConfigProvider } from "../providers/ConfigProvider";
 import i18n from "../i18n";
 
 describe("App shell", () => {
-  it("renders login link when logged out", () => {
+  it("renders login link when logged out", async () => {
     const queryClient = new QueryClient();
 
     const { getByRole } = render(
@@ -27,6 +27,9 @@ describe("App shell", () => {
       </I18nextProvider>
     );
 
-    expect(getByRole('link', { name: /log in/i })).toBeInTheDocument();
+    // Wait for async operations to complete
+    await waitFor(() => {
+      expect(getByRole('link', { name: /log in/i })).toBeInTheDocument();
+    });
   });
 });
