@@ -26,7 +26,7 @@ run_migrations(engine)
 
 app = FastAPI(
     title="ScoutComp API",
-    version="0.1.0",
+    version="0.2.0",
     description="API for ScoutComp - Scout Competition Management System",
     openapi_url=None, # disable automatic docs - managed by myself to fix issue with proxy
     docs_url=None,
