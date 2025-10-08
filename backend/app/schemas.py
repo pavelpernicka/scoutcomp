@@ -214,7 +214,7 @@ class TaskPublic(TaskBase):
 
 class CompletionSubmission(BaseModel):
     member_note: Optional[str] = Field(default=None, max_length=500)
-    count: int = Field(default=1, ge=1, le=50)
+    count: int = Field(default=1, ge=1, le=999)
 
 
 class CompletionCreate(CompletionSubmission):
@@ -272,7 +272,7 @@ class CompletionPublic(BaseModel):
 
 
 class CompletionAdminUpdate(BaseModel):
-    count: Optional[int] = Field(default=None, ge=1, le=50)
+    count: Optional[int] = Field(default=None, ge=1, le=999)
     status: Optional[CompletionStatus] = None
     admin_note: Optional[str] = Field(default=None, max_length=500)
 

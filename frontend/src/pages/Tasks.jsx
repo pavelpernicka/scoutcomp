@@ -351,7 +351,7 @@ export default function TasksPage() {
     const cooldownMs = cooldownRemaining(selectedTask.id);
     const isLimitReached = remaining !== null && remaining <= 0;
     const isCooldownActive = cooldownMs > 0;
-    const maxCount = remaining !== null ? Math.max(remaining, 1) : 50;
+    const maxCount = remaining !== null ? Math.max(remaining, 1) : 999;
 
     const modalFooter = (
       <div className="bg-light bg-opacity-50 px-4 py-3">
@@ -510,7 +510,7 @@ export default function TasksPage() {
               type="number"
               className="form-control form-control-lg border-success border-opacity-50"
               min={1}
-              max={maxCount || 50}
+              max={maxCount || 999}
               value={submissionCount}
               onChange={(event) => setSubmissionCount(Number(event.target.value))}
               disabled={isLimitReached}

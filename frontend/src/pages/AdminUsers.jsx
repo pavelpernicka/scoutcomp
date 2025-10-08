@@ -621,7 +621,7 @@ export default function AdminUsers() {
     const countValue = completionDrafts[completionId];
     if (!selectedUserId || !countValue) return;
     const parsed = Number(countValue);
-    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 50) {
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 999) {
       setCompletionError(t('adminUsers.countMustBeBetween'));
       return;
     }
@@ -659,7 +659,7 @@ export default function AdminUsers() {
       return;
     }
     const countValue = Number(newCompletionForm.count);
-    if (!Number.isFinite(countValue) || countValue < 1 || countValue > 50) {
+    if (!Number.isFinite(countValue) || countValue < 1 || countValue > 999) {
       setCompletionCreateError(t('adminUsers.countMustBeBetween'));
       return;
     }
@@ -1313,7 +1313,7 @@ export default function AdminUsers() {
                               <input
                                 type="number"
                                 min="1"
-                                max="50"
+                                max="999"
                                 className="form-control form-control-sm"
                                 value={completionDrafts[item.id] ?? ""}
                                 onChange={(event) =>
@@ -1645,7 +1645,7 @@ export default function AdminUsers() {
                             className="form-control"
                             type="number"
                             min="1"
-                            max="50"
+                            max="999"
                             value={newCompletionForm.count}
                             onChange={(event) =>
                               setNewCompletionForm((prev) => ({
