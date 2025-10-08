@@ -37,6 +37,7 @@ def member_leaderboard(
             Completion,
             (Completion.member_id == User.id) & (Completion.status == CompletionStatus.APPROVED),
         )
+        .filter(User.team_id.is_not(None))  # Only show users assigned to teams
         .group_by(User.id)
         .order_by(func.coalesce(func.sum(Completion.points_awarded), 0).desc())
         .all()
