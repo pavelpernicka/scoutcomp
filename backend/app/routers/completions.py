@@ -10,7 +10,7 @@ from ..dependencies import (
     get_managed_team_ids,
     require_admin_or_group_admin,
 )
-from ..models import Completion, CompletionStatus, Notification, RoleEnum, Task, User
+from ..models import Completion, CompletionStatus, Notification, RoleEnum, Task, TaskVariant, User
 from ..schemas import (
     CompletionAdminCreate,
     CompletionAdminUpdate,
@@ -211,10 +211,21 @@ def create_user_completion(
     if status_value == CompletionStatus.PENDING:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status cannot be pending")
 
+    # Validate variant if provided
+    variant = None
+    if payload.variant_id:
+        variant = db.get(TaskVariant, payload.variant_id)
+        if not variant or variant.task_id != task.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid variant for this task"
+            )
+
     submitted_at = datetime.now(timezone.utc).replace(tzinfo=None)
     completion = Completion(
         task_id=task.id,
         member_id=member.id,
+        variant_id=payload.variant_id,
         member_note=payload.member_note,
         admin_note=payload.admin_note,
         count=payload.count,
@@ -225,8 +236,9 @@ def create_user_completion(
     )
 
     if status_value == CompletionStatus.APPROVED:
-        # For admin-created completions, use task points by default (no variant support in admin creation yet)
-        completion.points_awarded = task.points_per_completion * payload.count
+        # Use variant points if variant is provided, otherwise use task points
+        points_per_completion = variant.points if variant else task.points_per_completion
+        completion.points_awarded = points_per_completion * payload.count
         message = get_admin_completion_approval_message(
             task_name=task.name,
             count=payload.count,

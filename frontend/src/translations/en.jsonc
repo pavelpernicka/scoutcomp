@@ -439,6 +439,7 @@
     "pointsByTask": "Points by task",
     "noCompletions": "No completions yet",
     "date": "Date",
+    "type": "Type",
     "status": "Status",
     "count": "Count",
     "adminNote": "Admin note",

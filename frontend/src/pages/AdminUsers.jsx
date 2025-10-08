@@ -31,6 +31,7 @@ const emptyEditForm = {
 
 const emptyCompletionForm = {
   taskId: "",
+  variantId: "",
   count: "1",
   status: "approved",
   memberNote: "",
@@ -222,6 +223,20 @@ export default function AdminUsers() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [activeTasks, isAdmin, managedTeamIds, selectedUser]);
 
+  const selectedTaskForCompletion = useMemo(() => {
+    if (!newCompletionForm.taskId) return null;
+    return assignableTasks.find((task) => task.value === newCompletionForm.taskId)?.task || null;
+  }, [assignableTasks, newCompletionForm.taskId]);
+
+  const availableVariants = useMemo(() => {
+    if (!selectedTaskForCompletion?.variants) return [];
+    return selectedTaskForCompletion.variants.map((variant) => ({
+      value: String(variant.id),
+      label: `${variant.name} (${variant.points} pts)`,
+      variant,
+    }));
+  }, [selectedTaskForCompletion]);
+
   useEffect(() => {
     if (!selectedUser) {
       setNewCompletionForm(emptyCompletionForm);
@@ -235,9 +250,25 @@ export default function AdminUsers() {
       return {
         ...prev,
         taskId: nextTaskId,
+        variantId: "", // Reset variant when task changes or user changes
       };
     });
   }, [assignableTasks, selectedUser]);
+
+  // Reset variant when task changes
+  useEffect(() => {
+    if (availableVariants.length > 0 && !newCompletionForm.variantId) {
+      setNewCompletionForm((prev) => ({
+        ...prev,
+        variantId: availableVariants[0]?.value || "",
+      }));
+    } else if (availableVariants.length === 0) {
+      setNewCompletionForm((prev) => ({
+        ...prev,
+        variantId: "",
+      }));
+    }
+  }, [availableVariants, newCompletionForm.variantId]);
 
   const { data: userCompletions = [], isFetching: completionsLoading } = useQuery({
     queryKey: ["admin", "user-completions", selectedUserId],
@@ -430,9 +461,14 @@ export default function AdminUsers() {
 
   const openCreateCompletionModal = () => {
     setCompletionCreateError(null);
+    const defaultTaskId = assignableTasks[0]?.value || "";
+    const defaultTask = assignableTasks[0]?.task;
+    const defaultVariantId = defaultTask?.variants?.[0]?.id ? String(defaultTask.variants[0].id) : "";
+
     setNewCompletionForm({
       ...emptyCompletionForm,
-      taskId: assignableTasks[0]?.value || "",
+      taskId: defaultTaskId,
+      variantId: defaultVariantId,
     });
     setShowCreateCompletionModal(true);
   };
@@ -635,6 +671,11 @@ export default function AdminUsers() {
       member_note: newCompletionForm.memberNote.trim() || null,
       admin_note: newCompletionForm.adminNote.trim() || null,
     };
+
+    // Add variant_id if selected and task has variants
+    if (newCompletionForm.variantId && selectedTaskForCompletion?.variants?.length > 0) {
+      payload.variant_id = Number(newCompletionForm.variantId);
+    }
 
     createCompletionMutation.mutate(payload);
   };
@@ -845,7 +886,7 @@ export default function AdminUsers() {
         </div>
 
         {selectedUser && (
-          <div className="col-12 col-xl-6">
+          <div className="col-12 col-xl-4">
             <div className="card shadow-sm mb-4">
               <div className="card-header">{t('adminUsers.editUser', { userName: selectedUser.real_name || selectedUser.username })}</div>
               <div className="card-body">
@@ -1107,7 +1148,7 @@ export default function AdminUsers() {
         )}
 
         {selectedUser && (
-          <div className="col-12 col-xl-6">
+          <div className="col-12 col-xl-8">
             <div className="card shadow-sm">
               <div className="card-header d-flex justify-content-between align-items-center">
                 <div className="d-flex align-items-center gap-2">
@@ -1212,6 +1253,7 @@ export default function AdminUsers() {
                         <tr>
                           <th>{t('adminUsers.date')}</th>
                           <th>{t('leaderboard.taskColumn')}</th>
+                          <th>{t('adminUsers.type')}</th>
                           <th>{t('adminUsers.status')}</th>
                           <th>{t('adminUsers.count')}</th>
                           <th>{t('adminUsers.adminNote')}</th>
@@ -1223,6 +1265,33 @@ export default function AdminUsers() {
                           <tr key={item.id}>
                             <td>{formatDateToLocal(item.submitted_at)}</td>
                             <td>{item.task?.name || `Task #${item.task_id}`}</td>
+                            <td>
+                              {(() => {
+                                // First try item.variant (if available)
+                                if (item.variant && item.variant.name) {
+                                  return (
+                                    <span className="badge bg-info text-dark px-2 py-1">
+                                      {item.variant.name}
+                                    </span>
+                                  );
+                                }
+
+                                // If no variant but has variant_id, try to find it in the task variants
+                                if (item.variant_id && item.task?.variants) {
+                                  const variant = item.task.variants.find(v => v.id === item.variant_id);
+                                  if (variant && variant.name) {
+                                    return (
+                                      <span className="badge bg-info text-dark px-2 py-1">
+                                        {variant.name}
+                                      </span>
+                                    );
+                                  }
+                                }
+
+
+                                return <span className="text-muted small">—</span>;
+                              })()}
+                            </td>
                             <td>
                               <select
                                 className="form-select form-select-sm"
@@ -1529,6 +1598,7 @@ export default function AdminUsers() {
                             setNewCompletionForm((prev) => ({
                               ...prev,
                               taskId: event.target.value,
+                              variantId: "", // Reset variant when task changes
                             }))
                           }
                           required
@@ -1543,6 +1613,31 @@ export default function AdminUsers() {
                           ))}
                         </select>
                       </div>
+                      {availableVariants.length > 0 && (
+                        <div className="mb-3">
+                          <label className="form-label">Task Type</label>
+                          <select
+                            className="form-select"
+                            value={newCompletionForm.variantId}
+                            onChange={(event) =>
+                              setNewCompletionForm((prev) => ({
+                                ...prev,
+                                variantId: event.target.value,
+                              }))
+                            }
+                            required
+                          >
+                            <option value="" disabled>
+                              Select task type
+                            </option>
+                            {availableVariants.map((variant) => (
+                              <option key={variant.value} value={variant.value}>
+                                {variant.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <div className="row g-3">
                         <div className="col-12 col-md-6">
                           <label className="form-label">Count</label>

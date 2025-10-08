@@ -848,6 +848,8 @@
     "noCompletions": "Zatím žádná splnění",
     // EN: Date
     "date": "Datum",
+    // EN: Type
+    "type": "Typ",
     // EN: Status
     "status": "Stav",
     // EN: Count
