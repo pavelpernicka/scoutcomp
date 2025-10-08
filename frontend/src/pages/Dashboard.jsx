@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -9,6 +11,12 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import Card from "../components/Card";
 import DecoratedCard from "../components/DecoratedCard";
 import { formatDateToLocal } from "../utils/dateUtils";
+
+marked.setOptions({ breaks: true });
+
+const renderMarkdown = (markdown) => ({
+  __html: DOMPurify.sanitize(marked.parse(markdown || "")),
+});
 
 const formatDate = (value, language = 'en') => {
   const locale = language === 'cs' ? 'cs-CZ' : 'en-US';
@@ -217,7 +225,11 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <div className="AnnText">
-                      <p className="mb-2 text-dark lead" style={{ lineHeight: '1.6' }}>{message.body}</p>
+                      <div
+                        className="mb-2 text-dark lead"
+                        style={{ lineHeight: '1.6' }}
+                        dangerouslySetInnerHTML={renderMarkdown(message.body)}
+                      />
                       <span className="badge bg-primary px-2 py-2">
                         {message.team_name || t("dashboard.allTeams")}
                       </span>
