@@ -213,7 +213,7 @@ class TaskPublic(TaskBase):
 
 
 class CompletionSubmission(BaseModel):
-    member_note: Optional[str] = Field(default=None, max_length=500)
+    member_note: Optional[str] = Field(default=None, max_length=5000)
     count: int = Field(default=1, ge=1, le=999)
 
 
@@ -226,12 +226,12 @@ class CompletionAdminCreate(CompletionSubmission):
     task_id: int
     variant_id: Optional[int] = None
     status: Optional[CompletionStatus] = CompletionStatus.APPROVED
-    admin_note: Optional[str] = Field(default=None, max_length=500)
+    admin_note: Optional[str] = Field(default=None, max_length=5000)
 
 
 class CompletionReview(BaseModel):
     status: CompletionStatus
-    admin_note: Optional[str] = Field(default=None, max_length=500)
+    admin_note: Optional[str] = Field(default=None, max_length=5000)
 
     @field_validator("status")
     @classmethod
@@ -274,7 +274,7 @@ class CompletionPublic(BaseModel):
 class CompletionAdminUpdate(BaseModel):
     count: Optional[int] = Field(default=None, ge=1, le=999)
     status: Optional[CompletionStatus] = None
-    admin_note: Optional[str] = Field(default=None, max_length=500)
+    admin_note: Optional[str] = Field(default=None, max_length=5000)
 
 
 class TaskProgress(BaseModel):
@@ -339,7 +339,7 @@ class AuditLogEntry(BaseModel):
 
 
 class NotificationCreate(BaseModel):
-    message: str = Field(min_length=1, max_length=500)
+    message: str = Field(min_length=1, max_length=5000)
 
 
 class NotificationPublic(BaseModel):
