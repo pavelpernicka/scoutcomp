@@ -6,14 +6,14 @@ from typing import Dict, Any, Optional
 # Translation dictionary for supported languages
 TRANSLATIONS = {
     "cs": {
-        "completion_approved": "Tvé splnění '{task_name}' ({count}x) bylo schváleno. +{points} bodů.",
+        "completion_approved": "{reviewer} ti schválil/a splnění '{task_name}' ({count}x). +{points} bodů. {note}",
         "completion_rejected": "Tvé splnění '{task_name}' bylo zamítnuto. Důvod: {reason}",
         "admin_completion_approved": "Admin zaznamenal splnění '{task_name}' ({count}x). +{points} bodů.",
         "admin_completion_rejected": "Admin přidal splnění '{task_name}', ale označil ho jako zamítnuté. Důvod: {reason}",
         "no_reason_provided": "Nebyl uveden důvod.",
     },
     "en": {
-        "completion_approved": "Your completion of '{task_name}' ({count}x) was approved. +{points} points.",
+        "completion_approved": "{reviewer} approved your completion of '{task_name}' ({count}x). +{points} points. {note}",
         "completion_rejected": "Your completion of '{task_name}' was rejected. Reason: {reason}",
         "admin_completion_approved": "An admin recorded a completion of '{task_name}' ({count}x). +{points} points.",
         "admin_completion_rejected": "An admin added a completion of '{task_name}' but marked it rejected. Reason: {reason}",
@@ -59,14 +59,16 @@ def translate_message(key: str, language: Optional[str] = None, **kwargs) -> str
         return translation
 
 
-def get_completion_approval_message(task_name: str, count: int, points: float, language: Optional[str] = None) -> str:
+def get_completion_approval_message(task_name: str, count: int, points: float, note: Optional[str], reviewer: str, language: Optional[str] = None) -> str:
     """Generate a completion approval notification message."""
     return translate_message(
         "completion_approved",
         language,
         task_name=task_name,
         count=count,
-        points=f"{points:g}"
+        points=f"{points:g}",
+        note=note,
+        reviewer=reviewer
     )
 
 

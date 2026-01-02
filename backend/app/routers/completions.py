@@ -111,6 +111,8 @@ def review_completion(
             task_name=completion.task.name,
             count=completion.count,
             points=completion.points_awarded,
+            note=completion.admin_note,
+            reviewer=reviewer.real_name,
             language=completion.member.preferred_language
         )
     else:
