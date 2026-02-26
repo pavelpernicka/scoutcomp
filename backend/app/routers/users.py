@@ -3,7 +3,7 @@ import secrets
 import string
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -154,7 +154,7 @@ def list_users(
         managed_ids = get_managed_team_ids(current_user)
         if not managed_ids:
             return []
-        query = query.filter(or_(User.team_id == None, User.team_id.in_(managed_ids)))  # noqa: E711
+        query = query.filter(User.team_id.in_(managed_ids))
 
     if team_id is not None:
         if current_user.role == RoleEnum.GROUP_ADMIN and team_id not in managed_ids:
@@ -179,7 +179,7 @@ def get_user(
 
     if current_user.role == RoleEnum.GROUP_ADMIN:
         managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or (user.team_id not in managed_ids and user.team_id is not None):
+        if not managed_ids or user.team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
 
     return user
@@ -244,10 +244,15 @@ def update_user(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="No managed teams configured",
             )
-        if user.team_id not in managed_ids and user.team_id is not None:
+        if user.team_id not in managed_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User outside managed teams",
+            )
+        if "team_id" in payload.model_fields_set and payload.team_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Group admins cannot remove team assignment",
             )
         if payload.team_id is not None and payload.team_id not in managed_ids:
             raise HTTPException(

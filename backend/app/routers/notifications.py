@@ -59,7 +59,7 @@ def send_notification_to_user(
 
     if current_user.role == RoleEnum.GROUP_ADMIN:
         managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or (user.team_id not in managed_ids and user.team_id is not None):
+        if not managed_ids or user.team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
 
     notification = Notification(

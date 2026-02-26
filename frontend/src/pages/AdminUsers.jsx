@@ -158,16 +158,29 @@ export default function AdminUsers() {
     staleTime: 30_000,
   });
 
+  const managedTeamIdSet = useMemo(() => new Set(managedTeamIds), [managedTeamIds]);
+
+  const scopedUsers = useMemo(() => {
+    if (isAdmin) return users;
+    return users.filter((user) => user.team_id != null && managedTeamIdSet.has(user.team_id));
+  }, [isAdmin, managedTeamIdSet, users]);
+
   const selectedUser = useMemo(
-    () => users.find((user) => user.id === selectedUserId) || null,
-    [users, selectedUserId]
+    () => scopedUsers.find((user) => user.id === selectedUserId) || null,
+    [scopedUsers, selectedUserId]
   );
 
   useEffect(() => {
-    if (!selectedUserId && users.length > 0) {
-      setSelectedUserId(users[0].id);
+    if (scopedUsers.length === 0) {
+      if (selectedUserId !== null) {
+        setSelectedUserId(null);
+      }
+      return;
     }
-  }, [selectedUserId, users]);
+    if (!selectedUserId || !scopedUsers.some((user) => user.id === selectedUserId)) {
+      setSelectedUserId(scopedUsers[0].id);
+    }
+  }, [scopedUsers, selectedUserId]);
 
   useEffect(() => {
     setCompletionTaskFilter("all");
@@ -202,8 +215,8 @@ export default function AdminUsers() {
 
   const availableTeamsForSelect = useMemo(() => {
     if (isAdmin) return teams;
-    return teams.filter((team) => managedTeamIds.includes(team.id));
-  }, [isAdmin, managedTeamIds, teams]);
+    return teams.filter((team) => managedTeamIdSet.has(team.id));
+  }, [isAdmin, managedTeamIdSet, teams]);
 
   const assignableTasks = useMemo(() => {
     if (!selectedUser) return [];
@@ -277,7 +290,7 @@ export default function AdminUsers() {
       const { data } = await api.get(`/completions/users/${selectedUserId}`);
       return data;
     },
-    enabled: Boolean(selectedUserId && canManageUsers),
+    enabled: Boolean(selectedUserId && selectedUser && canManageUsers),
   });
 
   useEffect(() => {
@@ -839,7 +852,7 @@ export default function AdminUsers() {
             <div className="card-body p-0">
               {usersLoading ? (
                 <div className="text-center text-muted py-3">{t('adminUsers.loading')}</div>
-              ) : users.length === 0 ? (
+              ) : scopedUsers.length === 0 ? (
                 <p className="text-muted px-3 py-2 mb-0">{t('adminUsers.noUsersYet')}</p>
               ) : (
                 <div className="table-responsive">
@@ -855,7 +868,7 @@ export default function AdminUsers() {
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((user) => (
+                      {scopedUsers.map((user) => (
                         <tr key={user.id} className={user.id === selectedUserId ? "table-primary" : ""}>
                           <td>{user.real_name || user.username}</td>
                           <td className="font-monospace text-muted">{user.username}</td>
@@ -955,7 +968,7 @@ export default function AdminUsers() {
                         setEditForm((prev) => ({ ...prev, teamId: event.target.value }))
                       }
                     >
-                      <option value="">{t('adminUsers.noTeam')}</option>
+                      {isAdmin && <option value="">{t('adminUsers.noTeam')}</option>}
                       {teamOptions.map((team) => (
                         <option key={team.value} value={team.value}>
                           {team.label}
