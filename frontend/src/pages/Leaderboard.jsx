@@ -111,6 +111,10 @@ export default function LeaderboardPage() {
     () => Math.max(...memberBoard.map((entry) => entry.score || 0), 1),
     [memberBoard]
   );
+  const hasAnyMemberPoints = useMemo(
+    () => memberBoard.some((entry) => (entry.score || 0) > 0),
+    [memberBoard]
+  );
   const teamMax = useMemo(
     () => Math.max(...teamBoard.map((entry) => entry.score || 0), 1),
     [teamBoard]
@@ -334,7 +338,7 @@ export default function LeaderboardPage() {
             shadow={true}
             className="h-100"
             rightBadge={memberBoard.length}
-            rightContent={memberBoard.length > 5 && (
+            rightContent={hasAnyMemberPoints && memberBoard.length > 5 && (
               <Button
                 variant="success"
                 size="sm"
@@ -361,7 +365,7 @@ export default function LeaderboardPage() {
           >
             {membersLoading ? (
               <LoadingSpinner size="small" text={t("tasks.loading")} />
-            ) : topMembers.length === 0 ? (
+            ) : topMembers.length === 0 || !hasAnyMemberPoints ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3"><i className="fas fa-trophy text-warning"></i></div>
                 <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet")}</h6>
@@ -408,6 +412,12 @@ export default function LeaderboardPage() {
           >
             {teamsLoading ? (
               <LoadingSpinner size="small" text={t("tasks.loading")} />
+            ) : !hasAnyMemberPoints ? (
+              <div className="text-center py-4">
+                <div className="display-3 mb-3">🏅</div>
+                <h6 className="text-muted mb-1">{t("leaderboard.noChampionsYet")}</h6>
+                <small className="text-muted">{t("leaderboard.startQuesting")}</small>
+              </div>
             ) : teamBoard.length === 0 ? (
               <div className="text-center py-4">
                 <div className="display-3 mb-3">🏅</div>

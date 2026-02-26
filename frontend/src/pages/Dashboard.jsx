@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
@@ -131,6 +131,10 @@ export default function Dashboard() {
   const totalPoints = profile?.scoreboard?.total_points ?? 0;
   const memberRank = profile?.scoreboard?.member_rank ?? "–";
   const teamRank = profile?.scoreboard?.team_rank ?? "–";
+  const hasAnyTeamMemberPoints = useMemo(
+    () => teamMembers.some((member) => (member.score || 0) > 0),
+    [teamMembers]
+  );
 
   return (
     <div className="row g-4">
@@ -486,7 +490,7 @@ export default function Dashboard() {
         </DecoratedCard>
       </div>
 
-      {profile?.user?.team_id && teamMembers.length > 0 && (
+      {profile?.user?.team_id && teamMembers.length > 0 && hasAnyTeamMemberPoints && (
         <div className="col-12">
           <DecoratedCard
             title={t("dashboard.teamChampions")}
