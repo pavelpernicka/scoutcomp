@@ -146,8 +146,8 @@ def list_users(
     current_user: User = Depends(require_admin_or_group_admin),
     team_id: Optional[int] = Query(default=None),
     role: Optional[RoleEnum] = Query(default=None),
-) -> List[User]:
-    query = db.query(User)
+) -> List[UserPublic]:
+    query = db.query(User).options(joinedload(User.team), joinedload(User.managed_teams))
     managed_ids: set[int] = set()
 
     if current_user.role == RoleEnum.GROUP_ADMIN:
@@ -164,7 +164,7 @@ def list_users(
     if role is not None:
         query = query.filter(User.role == role)
 
-    return query.all()
+    return [_user_to_public(user) for user in query.all()]
 
 
 @router.get("/{user_id}", response_model=UserPublic)
@@ -172,8 +172,13 @@ def get_user(
     user_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_group_admin),
-) -> User:
-    user = db.get(User, user_id)
+) -> UserPublic:
+    user = (
+        db.query(User)
+        .options(joinedload(User.team), joinedload(User.managed_teams))
+        .filter(User.id == user_id)
+        .first()
+    )
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -182,7 +187,7 @@ def get_user(
         if not managed_ids or user.team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
 
-    return user
+    return _user_to_public(user)
 
 
 @router.post("/", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
@@ -191,7 +196,7 @@ def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
-) -> User:
+) -> UserPublic:
     if payload.team_id is not None:
         team = db.get(Team, payload.team_id)
         if not team:
@@ -223,7 +228,7 @@ def create_user(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already exists") from exc
     db.refresh(user)
-    return user
+    return _user_to_public(user)
 
 
 @router.patch("/{user_id}", response_model=UserPublic)
@@ -232,7 +237,7 @@ def update_user(
     payload: UserUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_group_admin),
-) -> User:
+) -> UserPublic:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -337,7 +342,7 @@ def update_user(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username or email already exists") from exc
     db.refresh(user)
-    return user
+    return _user_to_public(user)
 
 
 def generate_password(length: int = 12) -> str:
