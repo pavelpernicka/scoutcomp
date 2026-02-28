@@ -232,6 +232,7 @@
     "maxPerPeriod": "Max per period",
     "periodCount": "Period count",
     "periodUnit": "Period unit",
+    "resetLimit": "Set no limit",
     "startTime": "Start time",
     "endTime": "End time",
     "failedToCreate": "Failed to create task",

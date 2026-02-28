@@ -446,6 +446,8 @@
     "periodCount": "Počet období",
     // EN: Period unit
     "periodUnit": "Jednotka období",
+    // EN: Set no limit
+    "resetLimit": "Nastavit bez limitu",
     // EN: Start time
     "startTime": "Začátek",
     // EN: End time

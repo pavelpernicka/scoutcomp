@@ -74,6 +74,15 @@ const buildPayload = (form) => {
   return payload;
 };
 
+const clearPeriodLimit = (setForm) => {
+  setForm((prev) => ({
+    ...prev,
+    max_per_period: "",
+    period_count: "",
+    period_unit: "day",
+  }));
+};
+
 const formatStatus = (task, t) => {
   if (task.is_archived) return t("adminTasks.status.archived");
   if (task.end_time && isDateExpired(task.end_time)) return t("adminTasks.status.expired");
@@ -389,6 +398,14 @@ export default function AdminTasks() {
                       setCreateForm((prev) => ({ ...prev, max_per_period: event.target.value }))
                     }
                   />
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm mt-2"
+                    onClick={() => clearPeriodLimit(setCreateForm)}
+                    disabled={!createForm.max_per_period}
+                  >
+                    {t('adminTasks.resetLimit')}
+                  </button>
                 </div>
                 <div className="col-6 col-md-4">
                   <label className="form-label">{t('adminTasks.periodCount')}</label>
@@ -697,6 +714,14 @@ export default function AdminTasks() {
                             setEditForm((prev) => ({ ...prev, max_per_period: event.target.value }))
                           }
                         />
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm mt-2"
+                          onClick={() => clearPeriodLimit(setEditForm)}
+                          disabled={!editForm.max_per_period}
+                        >
+                          {t('adminTasks.resetLimit')}
+                        </button>
                       </div>
                       <div className="col-6 col-md-4">
                         <label className="form-label">{t('adminTasks.periodCount')}</label>
