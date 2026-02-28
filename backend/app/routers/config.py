@@ -13,6 +13,7 @@ DEFAULT_CONFIG = {
     "app_name": "ScoutComp",
     "app_icon": "",
     "leaderboard_default_view": "total",
+    "leaderboard_show_only_default_mode": "false",
     "allow_self_registration": "false"
 }
 
@@ -51,6 +52,7 @@ def get_public_config(
         app_name=get_config_value(db, "app_name"),
         app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        leaderboard_show_only_default_mode=get_config_bool(db, "leaderboard_show_only_default_mode"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
 
@@ -65,6 +67,7 @@ def get_config(
         app_name=get_config_value(db, "app_name"),
         app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        leaderboard_show_only_default_mode=get_config_bool(db, "leaderboard_show_only_default_mode"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )
 
@@ -86,6 +89,13 @@ def update_config(
     if payload.leaderboard_default_view is not None:
         set_config_value(db, "leaderboard_default_view", payload.leaderboard_default_view)
 
+    if payload.leaderboard_show_only_default_mode is not None:
+        set_config_value(
+            db,
+            "leaderboard_show_only_default_mode",
+            str(payload.leaderboard_show_only_default_mode).lower(),
+        )
+
     if payload.allow_self_registration is not None:
         set_config_value(db, "allow_self_registration", str(payload.allow_self_registration).lower())
 
@@ -94,5 +104,6 @@ def update_config(
         app_name=get_config_value(db, "app_name"),
         app_icon=get_config_value(db, "app_icon"),
         leaderboard_default_view=get_config_value(db, "leaderboard_default_view"),
+        leaderboard_show_only_default_mode=get_config_bool(db, "leaderboard_show_only_default_mode"),
         allow_self_registration=get_config_bool(db, "allow_self_registration"),
     )

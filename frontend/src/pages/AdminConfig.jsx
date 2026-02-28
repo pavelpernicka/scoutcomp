@@ -17,6 +17,7 @@ export default function AdminConfig() {
     appName: "",
     appIcon: "",
     leaderboardDefaultView: "total", // "total" or "average"
+    leaderboardShowOnlyDefaultMode: false,
     allowSelfRegistration: false,
   });
   const [iconPreview, setIconPreview] = useState(defaultAppIcon);
@@ -43,6 +44,7 @@ export default function AdminConfig() {
         appName: config.app_name || "ScoutComp",
         appIcon: config.app_icon || "",
         leaderboardDefaultView: config.leaderboard_default_view || "total",
+        leaderboardShowOnlyDefaultMode: config.leaderboard_show_only_default_mode || false,
         allowSelfRegistration: config.allow_self_registration || false,
       });
       setIconPreview(config.app_icon || defaultAppIcon);
@@ -55,6 +57,7 @@ export default function AdminConfig() {
         app_name: data.appName,
         app_icon: data.appIcon,
         leaderboard_default_view: data.leaderboardDefaultView,
+        leaderboard_show_only_default_mode: data.leaderboardShowOnlyDefaultMode,
         allow_self_registration: data.allowSelfRegistration,
       });
       return response;
@@ -256,6 +259,28 @@ export default function AdminConfig() {
                     </select>
                     <div className="form-text">
                       {t("adminConfig.leaderboardHelp")}
+                    </div>
+                  </div>
+
+                  {/* Leaderboard: Show Only Default Mode */}
+                  <div className="col-12">
+                    <div className="d-flex align-items-center gap-3">
+                      <div className="form-check form-switch">
+                        <input
+                          className="form-check-input"
+                          type="checkbox"
+                          role="switch"
+                          id="leaderboardShowOnlyDefaultMode"
+                          checked={formData.leaderboardShowOnlyDefaultMode}
+                          onChange={(e) => handleInputChange("leaderboardShowOnlyDefaultMode", e.target.checked)}
+                        />
+                        <label className="form-check-label fw-medium" htmlFor="leaderboardShowOnlyDefaultMode">
+                          {t("adminConfig.showOnlyDefaultMode")}
+                        </label>
+                      </div>
+                    </div>
+                    <div className="form-text mt-2">
+                      {t("adminConfig.showOnlyDefaultModeHelp")}
                     </div>
                   </div>
 

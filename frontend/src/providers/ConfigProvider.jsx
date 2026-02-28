@@ -13,6 +13,7 @@ const ConfigContext = createContext(undefined);
 const DEFAULT_CONFIG = { // unify one definition with backend
   app_name: "ScoutComp",
   leaderboard_default_view: "total",
+  leaderboard_show_only_default_mode: false,
   allow_self_registration: false
 };
 

@@ -142,6 +142,8 @@
     "totalPoints": "Total points",
     "averagePoints": "Average points",
     "leaderboardHelp": "Choose which view users see by default when opening the leaderboard",
+    "showOnlyDefaultMode": "Show only this mode",
+    "showOnlyDefaultModeHelp": "Hide the Total/Average switch on leaderboard and always show only the selected default mode",
     "allowSelfRegistration": "Allow self registration with team code",
     "selfRegistrationHelp": "When enabled, users can register themselves using a team join code without admin approval",
     "adminOnly": "Only administrators can modify these settings"

@@ -505,6 +505,7 @@ class ConfigUpdate(BaseModel):
     app_name: Optional[str] = None
     app_icon: Optional[str] = None
     leaderboard_default_view: Optional[str] = Field(default=None, pattern="^(total|average)$")
+    leaderboard_show_only_default_mode: Optional[bool] = None
     allow_self_registration: Optional[bool] = None
 
 
@@ -512,6 +513,7 @@ class ConfigResponse(BaseModel):
     app_name: str
     app_icon: str
     leaderboard_default_view: str
+    leaderboard_show_only_default_mode: bool
     allow_self_registration: bool
 
 

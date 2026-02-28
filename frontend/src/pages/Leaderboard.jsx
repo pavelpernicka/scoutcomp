@@ -120,6 +120,7 @@ export default function LeaderboardPage() {
     [teamBoard]
   );
   const topMembers = useMemo(() => memberBoard.slice(0, 5), [memberBoard]);
+  const isTeamModeLocked = Boolean(config.leaderboard_show_only_default_mode);
 
   const [expandedBoard, setExpandedBoard] = useState(null);
 
@@ -388,7 +389,7 @@ export default function LeaderboardPage() {
             shadow={true}
             className="h-100"
             rightBadge={teamBoard.length}
-            rightContent={
+            rightContent={isTeamModeLocked ? null : (
               <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label="Team leaderboard mode">
                 <Button
                   variant={teamMode === "total" ? "warning" : "secondary"}
@@ -409,7 +410,7 @@ export default function LeaderboardPage() {
                   {t("leaderboard.averageBtn")}
                 </Button>
               </div>
-            }
+            )}
           >
             {teamsLoading ? (
               <LoadingSpinner size="small" text={t("tasks.loading")} />

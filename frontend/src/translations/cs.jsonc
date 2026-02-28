@@ -274,6 +274,10 @@
     "averagePoints": "Průměrné body",
     // EN: Choose which view users see by default when opening the leaderboard
     "leaderboardHelp": "Vyber, jaké zobrazení se uživatelům otevře jako první",
+    // EN: Show only this mode
+    "showOnlyDefaultMode": "Zobrazovat jen tento režim",
+    // EN: Hide the Total/Average switch on leaderboard and always show only the selected default mode
+    "showOnlyDefaultModeHelp": "Skryje přepínač Celkem/Průměr ve výsledcích a vždy zobrazí jen vybraný výchozí režim",
     // EN: Allow self registration with team code
     "allowSelfRegistration": "Povolit samoregistraci pomocí kódu družiny",
     // EN: When enabled, users can register themselves using a team join code without admin approval
