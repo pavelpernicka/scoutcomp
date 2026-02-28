@@ -58,6 +58,8 @@
     "members": "Členi",
     // EN: Best total result
     "topPerformers": "Nejlepší celkový výsledek",
+    // EN: Total approved points per member
+    "membersDescription": "Celkový počet schválených bodů na člena/ku",
     // EN: There are no champions yet
     "noChampionsYet": "Zatím tu nejsou žádní šampioni",
     // EN: Be the first!

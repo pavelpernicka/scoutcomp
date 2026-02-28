@@ -133,6 +133,7 @@ export default function LeaderboardPage() {
 
   // Handlers for user details modal
   const handleShowUserDetails = (userId) => {
+    // Keep current modal open and stack member details above it.
     setSelectedUserId(userId);
     setShowUserDetailsModal(true);
   };
@@ -348,7 +349,7 @@ export default function LeaderboardPage() {
                     title: t("leaderboard.members"),
                     description: t(
                       "leaderboard.membersDescription",
-                      "Total approved points per member"
+                      { defaultValue: "Total approved points per member" }
                     ),
                     data: memberBoard,
                     maxScore: memberMax,
@@ -484,15 +485,6 @@ export default function LeaderboardPage() {
         )}
       </div>
 
-      {/* User Task Details Modal */}
-      <TaskCompletionDetailsModal
-        isVisible={showUserDetailsModal}
-        onClose={handleCloseUserDetailsModal}
-        userTaskDetails={userTaskDetails}
-        isLoading={userDetailsLoading}
-        title={t("leaderboard.taskDetails")}
-      />
-
       {/* Team Members Breakdown Modal */}
       <Modal
         isVisible={showTeamBreakdownModal}
@@ -550,10 +542,7 @@ export default function LeaderboardPage() {
                           <Button
                             variant="link"
                             className="p-0 text-start"
-                            onClick={() => {
-                              handleCloseTeamBreakdownModal();
-                              handleShowUserDetails(member.entity_id);
-                            }}
+                            onClick={() => handleShowUserDetails(member.entity_id)}
                             title="Click to see task breakdown"
                           >
                             {member.name}
@@ -601,6 +590,15 @@ export default function LeaderboardPage() {
           )
         )}
       </Modal>
+
+      {/* User Task Details Modal (rendered last so it stacks above other modals) */}
+      <TaskCompletionDetailsModal
+        isVisible={showUserDetailsModal}
+        onClose={handleCloseUserDetailsModal}
+        userTaskDetails={userTaskDetails}
+        isLoading={userDetailsLoading}
+        title={t("leaderboard.taskDetails")}
+      />
     </>
   );
 }
