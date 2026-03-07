@@ -140,7 +140,7 @@ export default function TasksPage() {
   }, [cooldownTick]);
 
   const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+    return [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [tasks]);
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const [selectedVariant, setSelectedVariant] = useState(null);
