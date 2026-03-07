@@ -139,9 +139,7 @@ export default function TasksPage() {
     });
   }, [cooldownTick]);
 
-  const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-  }, [tasks]);
+  const sortedTasks = tasks;
   const [expandedDescriptions, setExpandedDescriptions] = useState({});
   const [selectedVariant, setSelectedVariant] = useState(null);
 

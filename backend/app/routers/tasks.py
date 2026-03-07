@@ -186,7 +186,10 @@ def list_tasks(
             query = query.filter((Task.team_id == current_user.team_id) | (Task.team_id.is_(None)))
         else:
             query = query.filter(Task.team_id.is_(None))
-    tasks = query.order_by(Task.start_time.desc()).all()
+    if status == "active":
+        tasks = query.order_by(Task.hot_deal.desc(), Task.created_at.desc()).all()
+    else:
+        tasks = query.order_by(Task.start_time.desc()).all()
 
     for task in tasks:
         task.progress = _calculate_progress(db, task, current_user)
