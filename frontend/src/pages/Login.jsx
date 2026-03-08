@@ -128,11 +128,6 @@ useEffect(() => {
 
   
 
-  if (isAuthenticated) {
-    const redirectTo = location.state?.from ?? "/";
-    return <Navigate to={redirectTo} replace />;
-  }
-
   const [loginError, setLoginError] = useState(null);
   const [passwordChangeError, setPasswordChangeError] = useState(null);
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
@@ -263,6 +258,10 @@ useEffect(() => {
     );
   }, [activeTab, options, t]);
   
+  if (isAuthenticated) {
+    const redirectTo = location.state?.from ?? "/";
+    return <Navigate to={redirectTo} replace />;
+  }
   
 
   return (
