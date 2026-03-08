@@ -15,6 +15,11 @@ const getPeriodUnits = (t) => [
   { value: "month", label: t("adminTasks.periodUnits.month") },
 ];
 
+const getAutoCloseScopes = (t) => [
+  { value: "global", label: t("adminTasks.autoCloseScope.global") },
+  { value: "team", label: t("adminTasks.autoCloseScope.team") },
+];
+
 marked.setOptions({ breaks: true });
 
 const emptyTaskForm = {
@@ -26,6 +31,8 @@ const emptyTaskForm = {
   max_per_period: "",
   period_unit: "day",
   period_count: "",
+  auto_close_after_completions: "",
+  auto_close_scope: "global",
   start_time: "",
   end_time: "",
   team_id: "",
@@ -40,6 +47,10 @@ const mapTaskToForm = (task) => ({
   max_per_period: task.max_per_period ? String(task.max_per_period) : "",
   period_unit: task.period_unit || "day",
   period_count: task.period_count ? String(task.period_count) : "",
+  auto_close_after_completions: task.auto_close_after_completions
+    ? String(task.auto_close_after_completions)
+    : "",
+  auto_close_scope: task.auto_close_scope || "global",
   start_time: task.start_time ? task.start_time.slice(0, 16) : "",
   end_time: task.end_time ? task.end_time.slice(0, 16) : "",
   team_id: task.team_id ? String(task.team_id) : "",
@@ -70,6 +81,13 @@ const buildPayload = (form) => {
     payload.period_unit = null;
     payload.period_count = null;
   }
+  if (form.auto_close_after_completions) {
+    payload.auto_close_after_completions = Number(form.auto_close_after_completions);
+    payload.auto_close_scope = form.auto_close_scope;
+  } else {
+    payload.auto_close_after_completions = null;
+    payload.auto_close_scope = null;
+  }
 
   return payload;
 };
@@ -83,8 +101,17 @@ const clearPeriodLimit = (setForm) => {
   }));
 };
 
+const clearAutoCloseLimit = (setForm) => {
+  setForm((prev) => ({
+    ...prev,
+    auto_close_after_completions: "",
+    auto_close_scope: "global",
+  }));
+};
+
 const formatStatus = (task, t) => {
   if (task.is_archived) return t("adminTasks.status.archived");
+  if (task.auto_closed_at) return t("adminTasks.status.limit");
   if (task.end_time && isDateExpired(task.end_time)) return t("adminTasks.status.expired");
   return t("adminTasks.status.active");
 };
@@ -230,6 +257,13 @@ export default function AdminTasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
       handleCloseEditModal();
+    },
+  });
+
+  const resetAutoCloseMutation = useMutation({
+    mutationFn: async (id) => api.post(`/tasks/${id}/auto-close-reset`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
     },
   });
 
@@ -437,6 +471,46 @@ export default function AdminTasks() {
                     ))}
                   </select>
                 </div>
+                <div className="col-12 col-md-4">
+                  <label className="form-label">{t('adminTasks.autoCloseAfterCompletions')}</label>
+                  <input
+                    className="form-control"
+                    type="number"
+                    min="1"
+                    value={createForm.auto_close_after_completions}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        auto_close_after_completions: event.target.value,
+                      }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary btn-sm mt-2"
+                    onClick={() => clearAutoCloseLimit(setCreateForm)}
+                    disabled={!createForm.auto_close_after_completions}
+                  >
+                    {t('adminTasks.resetLimit')}
+                  </button>
+                </div>
+                <div className="col-12 col-md-8">
+                  <label className="form-label">{t('adminTasks.autoCloseScopeLabel')}</label>
+                  <select
+                    className="form-select"
+                    value={createForm.auto_close_scope}
+                    onChange={(event) =>
+                      setCreateForm((prev) => ({ ...prev, auto_close_scope: event.target.value }))
+                    }
+                    disabled={!createForm.auto_close_after_completions}
+                  >
+                    {getAutoCloseScopes(t).map((scope) => (
+                      <option key={scope.value} value={scope.value}>
+                        {scope.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="col-6">
                   <label className="form-label">{t('adminTasks.startTime')}</label>
                   <input
@@ -532,9 +606,17 @@ export default function AdminTasks() {
                               : "—"}
                           </td>
                           <td>
-                            <span className={`badge ${task.is_archived ? "bg-secondary" : formatStatus(task, t) === t('adminTasks.status.expired') ? "bg-warning text-dark" : "bg-success"}`}>
-                              {formatStatus(task, t)}
-                            </span>
+                            {(() => {
+                              const statusLabel = formatStatus(task, t);
+                              const badgeClass = task.is_archived
+                                ? "bg-secondary"
+                                : statusLabel === t("adminTasks.status.expired")
+                                ? "bg-warning text-dark"
+                                : statusLabel === t("adminTasks.status.limit")
+                                ? "bg-info text-dark"
+                                : "bg-success";
+                              return <span className={`badge ${badgeClass}`}>{statusLabel}</span>;
+                            })()}
                           </td>
                           <td>
                             {task.team_id
@@ -752,6 +834,68 @@ export default function AdminTasks() {
                             </option>
                           ))}
                         </select>
+                      </div>
+                      <div className="col-12 col-md-4">
+                        <label className="form-label">{t('adminTasks.autoCloseAfterCompletions')}</label>
+                        <input
+                          className="form-control"
+                          type="number"
+                          min="1"
+                          value={editForm.auto_close_after_completions}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({
+                              ...prev,
+                              auto_close_after_completions: event.target.value,
+                            }))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline-secondary btn-sm mt-2"
+                          onClick={() => clearAutoCloseLimit(setEditForm)}
+                          disabled={!editForm.auto_close_after_completions}
+                        >
+                          {t('adminTasks.resetLimit')}
+                        </button>
+                      </div>
+                      <div className="col-12 col-md-8">
+                        <label className="form-label">{t('adminTasks.autoCloseScopeLabel')}</label>
+                        <select
+                          className="form-select"
+                          value={editForm.auto_close_scope}
+                          onChange={(event) =>
+                            setEditForm((prev) => ({ ...prev, auto_close_scope: event.target.value }))
+                          }
+                          disabled={!editForm.auto_close_after_completions}
+                        >
+                          {getAutoCloseScopes(t).map((scope) => (
+                            <option key={scope.value} value={scope.value}>
+                              {scope.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-12">
+                        <button
+                          type="button"
+                          className="btn btn-outline-warning btn-sm"
+                          disabled={
+                            !activeEditingTask?.auto_close_after_completions ||
+                            resetAutoCloseMutation.isLoading
+                          }
+                          onClick={() => {
+                            if (!activeEditingTask) return;
+                            if (!window.confirm(t("adminTasks.confirmResetAutoCloseCounts"))) return;
+                            resetAutoCloseMutation.mutate(activeEditingTask.id);
+                          }}
+                        >
+                          {t("adminTasks.resetAutoCloseCounts")}
+                        </button>
+                        {resetAutoCloseMutation.isError && (
+                          <div className="text-danger mt-2 small">
+                            {resetAutoCloseMutation.error?.response?.data?.detail || t('adminTasks.failedToUpdate')}
+                          </div>
+                        )}
                       </div>
                       <div className="col-6">
                         <label className="form-label">{t('adminTasks.startTime')}</label>

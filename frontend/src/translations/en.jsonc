@@ -217,6 +217,7 @@
     "status": {
       "archived": "archived",
       "expired": "epired",
+      "limit": "Limit",
       "active": "active",
       "label": "label"
     },
@@ -236,6 +237,14 @@
     "periodCount": "Period count",
     "periodUnit": "Period unit",
     "resetLimit": "Set no limit",
+    "autoCloseAfterCompletions": "Close after completion count",
+    "autoCloseScopeLabel": "Count scope",
+    "autoCloseScope": {
+      "global": "All completions",
+      "team": "Completions in team"
+    },
+    "resetAutoCloseCounts": "Reset completion counts",
+    "confirmResetAutoCloseCounts": "Reset completion counts for this task auto-close?",
     "startTime": "Start time",
     "endTime": "End time",
     "failedToCreate": "Failed to create task",
@@ -278,11 +287,19 @@
     "loading": "Loading...",
     "submitSuccess": "Well done! Your completion was successfully submited.",
     "error": "Oh no... Something went wrong. Try to submit it later.",
+    "autoCloseExceeded": "This submission would exceed the maximum completion limit for this task.",
     "resetSoon": "soon",
     "noDescription": "No description given",
     "noTasksYet": "There are no tasks yet",
     "noTasksMessage": "Maybe the competition did not started yet?",
     "noLimitShort": "No limit",
+    "autoCloseTitle": "Auto close",
+    "autoCloseScopeText": {
+      "global": "After {{count}} completions in all teams", // Variables: count
+      "team": "After {{count}} completions in your team" // Variables: count
+    },
+    "autoCloseDone": "Completed {{current}}/{{limit}}", // Variables: current, limit
+    "autoCloseApprovalInfo": "For tasks requiring approval, only approved completions count.",
     "resetsIn": "Limit resets",
     "periodRange": "Current period",
     "sending": "Sending...",
@@ -313,7 +330,7 @@
     "completedPeriodDetail": "Done in this period: {{current}}/{{limit}}", // Variables: current, limit
     "remainingLabel": "You still can submit: {{count}}x", // Variables: count
     "completedPeriodUnlimited": "Done in total: {{current}}", // Variables: current
-    "lifetimeTotal": "Completed in total: {{count}} times", // Variables: count
+    "lifetimeTotal": "Completed by you: {{count}} times", // Variables: count
     "heroSubtitle": "{{count}} magnificent task for you to earn some points" // Variables: count
   },
   "adminTeams": {

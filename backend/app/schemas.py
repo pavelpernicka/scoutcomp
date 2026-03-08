@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
-from .models import CompletionStatus, RoleEnum, StatMetricEnum, TaskPeriodUnit
+from .models import CompletionStatus, RoleEnum, StatMetricEnum, TaskAutoCloseScope, TaskPeriodUnit
 
 
 class TokenPair(BaseModel):
@@ -179,6 +179,8 @@ class TaskBase(BaseModel):
     period_count: Optional[int] = Field(default=None, ge=1)
     requires_approval: bool = False
     hot_deal: bool = False
+    auto_close_after_completions: Optional[int] = Field(default=None, ge=1)
+    auto_close_scope: Optional[TaskAutoCloseScope] = None
     team_id: Optional[int] = None
 
 
@@ -198,12 +200,18 @@ class TaskUpdate(BaseModel):
     requires_approval: Optional[bool] = None
     is_archived: Optional[bool] = None
     hot_deal: Optional[bool] = None
+    auto_close_after_completions: Optional[int] = Field(default=None, ge=1)
+    auto_close_scope: Optional[TaskAutoCloseScope] = None
     team_id: Optional[int] = None
 
 
 class TaskPublic(TaskBase):
     id: int
     is_archived: bool
+    is_closed_for_user: bool = False
+    auto_close_current_count: Optional[int] = None
+    auto_closed_at: Optional[datetime] = None
+    auto_close_reset_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     progress: Optional["TaskProgress"] = None

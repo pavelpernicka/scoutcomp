@@ -61,6 +61,9 @@ const formatPeriodRange = (progress) => {
   return `${formatDateTime(progress.period_start)} → ${formatDateTime(progress.period_end)}`;
 };
 
+const isAutoCloseExceededError = (error) =>
+  error?.response?.data?.detail === "Auto-close limit would be exceeded";
+
 export default function TasksPage() {
   const { t, i18n } = useTranslation();
   const { profile, isLoading: authLoading } = useAuth();
@@ -109,7 +112,11 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ["completions", "me"] });
     },
     onError: (err) => {
-      setFeedback({ type: "danger", message: extractErrorMessage(err, t("tasks.error")) });
+      if (isAutoCloseExceededError(err)) {
+        return;
+      }
+      const message = extractErrorMessage(err, t("tasks.error"));
+      setFeedback({ type: "danger", message });
     },
   });
 
@@ -164,6 +171,7 @@ export default function TasksPage() {
   }, [tasks]);
 
   const handleOpenModal = (task) => {
+    submissionMutation.reset();
     setSelectedTask(task);
     setSubmissionCount(1);
     setSubmissionNote("");
@@ -307,18 +315,23 @@ export default function TasksPage() {
         })
       );
     } else {
-      lines.push(
-        t("tasks.completedPeriodUnlimited", {
-          current: progress.current,
-        })
-      );
-      lines.push(t("tasks.noLimitShort"));
+      if (!task.auto_close_after_completions) {
+        lines.push(t("tasks.noLimitShort"));
+      }
     }
     lines.push(
       t("tasks.lifetimeTotal", {
         count: progress.lifetime,
       })
     );
+    if (task.auto_close_after_completions && task.auto_close_scope) {
+      lines.push(
+        t("tasks.autoCloseDone", {
+          current: task.auto_close_current_count ?? 0,
+          limit: task.auto_close_after_completions,
+        })
+      );
+    }
     if (progress.period_end) {
       lines.push(
         `${t("tasks.resetsIn")}: ${formatRelativeTime(progress.period_end)} (${formatDateTime(
@@ -341,15 +354,43 @@ export default function TasksPage() {
     );
   };
 
+  const renderAutoCloseInfo = (task) => {
+    if (!task.auto_close_after_completions || !task.auto_close_scope) {
+      return null;
+    }
+    const scopeKey = task.auto_close_scope === "team" ? "team" : "global";
+    return (
+      <div className="text-muted">
+        <div className="mt-2 pt-2 border-top">
+          <div>
+            <strong>{t("tasks.autoCloseTitle")}:</strong>{" "}
+            {t(`tasks.autoCloseScopeText.${scopeKey}`, {
+              count: task.auto_close_after_completions,
+            })}
+          </div>
+          {task.requires_approval && (
+            <div className="small">{t("tasks.autoCloseApprovalInfo")}</div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderModal = () => {
     if (!selectedTask) return null;
     const progress = selectedTask.progress;
     const limit = progress?.limit ?? null;
     const remaining = progress?.remaining ?? null;
+    const isAutoClosed = Boolean(selectedTask.is_closed_for_user);
     const cooldownMs = cooldownRemaining(selectedTask.id);
-    const isLimitReached = remaining !== null && remaining <= 0;
+    const isLimitReached = isAutoClosed || (remaining !== null && remaining <= 0);
     const isCooldownActive = cooldownMs > 0;
     const maxCount = remaining !== null ? Math.max(remaining, 1) : 999;
+    const isAutoCloseExceeded = isAutoCloseExceededError(submissionMutation.error);
+    const modalErrorMessage =
+      isAutoCloseExceeded
+        ? t("tasks.autoCloseExceeded")
+        : extractErrorMessage(submissionMutation.error, t("tasks.error"));
 
     const modalFooter = (
       <div className="bg-light bg-opacity-50 px-4 py-3">
@@ -557,6 +598,14 @@ export default function TasksPage() {
             </div>
           </div>
         )}
+        {submissionMutation.isError && (
+          <div className="alert alert-danger border-0 shadow-sm d-flex align-items-center" role="alert">
+            <div>
+              {!isAutoCloseExceeded && <strong>{t("tasks.error")}</strong>}
+              <div className="small opacity-75">{modalErrorMessage}</div>
+            </div>
+          </div>
+        )}
       </Modal>
     );
   };
@@ -584,7 +633,8 @@ export default function TasksPage() {
         {sortedTasks.map((task) => {
           const cooldownMs = cooldownRemaining(task.id);
           const progress = task.progress;
-          const isLimitReached = progress?.limit !== null && progress?.remaining === 0;
+          const isAutoClosed = Boolean(task.is_closed_for_user);
+          const isLimitReached = isAutoClosed || (progress?.limit !== null && progress?.remaining === 0);
           const isCooldownActive = cooldownMs > 0;
           const cooldownSeconds = Math.ceil(cooldownMs / 1000);
 
@@ -688,6 +738,7 @@ export default function TasksPage() {
                     </h6>
                     <div className="small">
                       {renderProgress(task)}
+                      {renderAutoCloseInfo(task)}
                       {/* Show reset info if limit reached */}
                       {isLimitReached && task.progress?.period_end && (
                         <div className="text-muted mt-2 pt-2 border-top">

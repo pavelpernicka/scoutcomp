@@ -33,6 +33,11 @@ class TaskPeriodUnit(str, Enum):
     MONTH = "month"
 
 
+class TaskAutoCloseScope(str, Enum):
+    GLOBAL = "global"
+    TEAM = "team"
+
+
 class StatMetricEnum(str, Enum):
     POINTS = "points"
     COMPLETIONS = "completions"
@@ -148,12 +153,30 @@ class Task(Base):
     requires_approval = Column(Boolean, default=False, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
     hot_deal = Column(Boolean, default=False, nullable=False)
+    auto_close_after_completions = Column(Integer, nullable=True)
+    auto_close_scope = Column(SAEnum(TaskAutoCloseScope), nullable=True)
+    auto_closed_at = Column(DateTime, nullable=True)
+    auto_close_reset_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     team = relationship("Team", back_populates="tasks")
     completions = relationship("Completion", back_populates="task")
     variants = relationship("TaskVariant", back_populates="task", order_by="TaskVariant.position")
+    team_closures = relationship("TaskTeamClosure", back_populates="task", cascade="all, delete-orphan")
+
+
+class TaskTeamClosure(Base):
+    __tablename__ = "task_team_closures"
+    __table_args__ = (UniqueConstraint("task_id", "team_id", name="uq_task_team_closure"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    task_id = Column(Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True)
+    closed_at = Column(DateTime, default=func.now(), nullable=False)
+
+    task = relationship("Task", back_populates="team_closures")
+    team = relationship("Team")
 
 
 class TaskVariant(Base):

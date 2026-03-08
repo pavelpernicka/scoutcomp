@@ -347,6 +347,64 @@ def _add_hot_deal_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE tasks ADD COLUMN hot_deal BOOLEAN NOT NULL DEFAULT FALSE"))
 
 
+def _add_task_auto_close_columns(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "tasks" not in inspector.get_table_names():
+        logger.debug("Table 'tasks' missing; auto-close columns addition skipped")
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("tasks")}
+    if "auto_close_after_completions" not in columns:
+        logger.info("Adding 'auto_close_after_completions' column to tasks table")
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_close_after_completions INTEGER"))
+    if "auto_close_scope" not in columns:
+        logger.info("Adding 'auto_close_scope' column to tasks table")
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_close_scope VARCHAR(16)"))
+    if "auto_closed_at" not in columns:
+        logger.info("Adding 'auto_closed_at' column to tasks table")
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_closed_at TIMESTAMP"))
+    if "auto_close_reset_at" not in columns:
+        logger.info("Adding 'auto_close_reset_at' column to tasks table")
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_close_reset_at TIMESTAMP"))
+
+
+def _create_task_team_closures_table(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "task_team_closures" in inspector.get_table_names():
+        logger.debug("Table 'task_team_closures' already exists")
+        return
+
+    logger.info("Creating 'task_team_closures' table")
+    conn.execute(
+        text(
+            """
+            CREATE TABLE task_team_closures (
+                id INTEGER PRIMARY KEY,
+                task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+                team_id INTEGER REFERENCES teams(id) ON DELETE CASCADE,
+                closed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(task_id, team_id)
+            )
+            """
+        )
+    )
+
+
+def _add_task_auto_close_reset_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "tasks" not in inspector.get_table_names():
+        logger.debug("Table 'tasks' missing; auto_close_reset_at column addition skipped")
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("tasks")}
+    if "auto_close_reset_at" in columns:
+        logger.debug("Column 'auto_close_reset_at' already present on tasks table")
+        return
+
+    logger.info("Adding 'auto_close_reset_at' column to tasks table")
+    conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_close_reset_at TIMESTAMP"))
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -422,6 +480,21 @@ MIGRATIONS: List[Migration] = [
         "20251005_add_hot_deal_to_tasks",
         _add_hot_deal_column,
         "Add hot_deal column to tasks table",
+    ),
+    Migration(
+        "20260307_add_task_auto_close_columns",
+        _add_task_auto_close_columns,
+        "Add auto-close configuration fields to tasks",
+    ),
+    Migration(
+        "20260307_create_task_team_closures",
+        _create_task_team_closures_table,
+        "Create per-team task closure table for auto-close",
+    ),
+    Migration(
+        "20260308_add_task_auto_close_reset_at",
+        _add_task_auto_close_reset_column,
+        "Add auto_close_reset_at column to tasks table",
     ),
 ]
 

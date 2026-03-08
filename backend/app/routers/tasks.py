@@ -11,6 +11,7 @@ from ..models import (
     CompletionStatus,
     RoleEnum,
     Task,
+    TaskAutoCloseScope,
     TaskPeriodUnit,
     TaskVariant,
     Team,
@@ -26,6 +27,14 @@ from ..schemas import (
     TaskVariantCreate,
     TaskVariantPublic,
     TaskVariantUpdate,
+)
+from ..task_auto_close import (
+    get_auto_close_current_count_for_user,
+    is_task_closed_for_user,
+    maybe_auto_close_task_for_member,
+    reset_task_auto_close_counters,
+    reset_task_auto_close_state,
+    would_exceed_auto_close_limit,
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -54,6 +63,24 @@ def _validate_period_fields(max_per_period: Optional[int], period_unit: Optional
         )
 
 
+def _validate_auto_close_fields(
+    auto_close_after_completions: Optional[int],
+    auto_close_scope: Optional[TaskAutoCloseScope],
+) -> None:
+    if auto_close_after_completions is None:
+        if auto_close_scope is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="auto_close_scope must be empty when auto_close_after_completions is not set",
+            )
+        return
+    if auto_close_scope is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="auto_close_scope is required when auto_close_after_completions is set",
+        )
+
+
 def _ensure_team_exists(db: Session, team_id: Optional[int]) -> None:
     if team_id is None:
         return
@@ -62,11 +89,16 @@ def _ensure_team_exists(db: Session, team_id: Optional[int]) -> None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
 
-def _assert_task_access(task: Task, user: User) -> None:
+def _assert_task_access(task: Task, user: User, db: Session) -> None:
     if task.team_id and user.role != RoleEnum.ADMIN and task.team_id != user.team_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Task restricted to another team")
     if task.is_archived:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Task archived")
+
+
+def _assert_task_open_for_submissions(task: Task, user: User, db: Session) -> None:
+    if is_task_closed_for_user(db, task, user):
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Task closed")
 
 
 def _assert_task_window(task: Task) -> None:
@@ -192,6 +224,8 @@ def list_tasks(
         tasks = query.order_by(Task.start_time.desc()).all()
 
     for task in tasks:
+        task.is_closed_for_user = is_task_closed_for_user(db, task, current_user)
+        task.auto_close_current_count = get_auto_close_current_count_for_user(db, task, current_user)
         task.progress = _calculate_progress(db, task, current_user)
     return tasks
 
@@ -204,6 +238,7 @@ def create_task(
     _: User = Depends(require_admin),
 ) -> Task:
     _validate_period_fields(payload.max_per_period, payload.period_unit, payload.period_count)
+    _validate_auto_close_fields(payload.auto_close_after_completions, payload.auto_close_scope)
     _ensure_team_exists(db, payload.team_id)
     task = Task(
         name=payload.name,
@@ -215,6 +250,9 @@ def create_task(
         period_unit=payload.period_unit,
         period_count=payload.period_count,
         requires_approval=payload.requires_approval,
+        hot_deal=payload.hot_deal,
+        auto_close_after_completions=payload.auto_close_after_completions,
+        auto_close_scope=payload.auto_close_scope,
         team_id=payload.team_id,
     )
     db.add(task)
@@ -232,7 +270,10 @@ def get_task(
     task = db.query(Task).options(joinedload(Task.variants)).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    _assert_task_access(task, current_user)
+    _assert_task_access(task, current_user, db)
+    task.is_closed_for_user = is_task_closed_for_user(db, task, current_user)
+    task.auto_close_current_count = get_auto_close_current_count_for_user(db, task, current_user)
+    task.progress = _calculate_progress(db, task, current_user)
     return task
 
 
@@ -253,8 +294,27 @@ def update_task(
         period_unit = patch_data.get("period_unit", task.period_unit)
         period_count = patch_data.get("period_count", task.period_count)
         _validate_period_fields(max_per_period, period_unit, period_count)
+    auto_close_fields_touched = bool({"auto_close_after_completions", "auto_close_scope"} & patch_data.keys())
+    if "auto_close_after_completions" in patch_data and patch_data["auto_close_after_completions"] is None:
+        patch_data["auto_close_scope"] = None
+    if auto_close_fields_touched:
+        auto_close_after_completions = patch_data.get(
+            "auto_close_after_completions",
+            task.auto_close_after_completions,
+        )
+        auto_close_scope = patch_data.get("auto_close_scope", task.auto_close_scope)
+        _validate_auto_close_fields(auto_close_after_completions, auto_close_scope)
     if "team_id" in patch_data:
         _ensure_team_exists(db, patch_data["team_id"])
+
+    if auto_close_fields_touched:
+        updated_limit = patch_data.get("auto_close_after_completions", task.auto_close_after_completions)
+        updated_scope = patch_data.get("auto_close_scope", task.auto_close_scope)
+        if (
+            updated_limit != task.auto_close_after_completions
+            or updated_scope != task.auto_close_scope
+        ):
+            reset_task_auto_close_state(db, task)
 
     for field, value in patch_data.items():
         setattr(task, field, value)
@@ -290,7 +350,8 @@ def submit_completion(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    _assert_task_access(task, current_user)
+    _assert_task_access(task, current_user, db)
+    _assert_task_open_for_submissions(task, current_user, db)
     _assert_task_window(task)
     count = payload.count or 1
 
@@ -299,6 +360,15 @@ def submit_completion(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Submission limit reached")
 
     status_target = CompletionStatus.PENDING if task.requires_approval else CompletionStatus.APPROVED
+    if would_exceed_auto_close_limit(
+        db,
+        task,
+        current_user,
+        new_status=status_target,
+        new_count=count,
+    ):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Auto-close limit would be exceeded")
+
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     # Handle variant selection
     variant = None
@@ -331,6 +401,8 @@ def submit_completion(
         completion.reviewed_at = now
 
     db.add(completion)
+    if status_target == CompletionStatus.APPROVED:
+        maybe_auto_close_task_for_member(db, task, current_user)
     db.commit()
     db.refresh(completion)
 
@@ -350,6 +422,24 @@ def unarchive_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    return task
+
+
+@router.post("/{task_id}/auto-close-reset", response_model=TaskPublic)
+def reset_task_auto_close(
+    task_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_admin),
+) -> Task:
+    task = db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
+    reset_task_auto_close_counters(db, task)
+    db.commit()
+    db.refresh(task)
+    task.is_closed_for_user = is_task_closed_for_user(db, task, admin_user)
+    task.auto_close_current_count = get_auto_close_current_count_for_user(db, task, admin_user)
+    task.progress = _calculate_progress(db, task, admin_user)
     return task
 
 
@@ -378,7 +468,7 @@ def list_task_submissions(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    _assert_task_access(task, current_user)
+    _assert_task_access(task, current_user, db)
 
     query = db.query(Completion).filter(Completion.task_id == task.id)
     if current_user.role != RoleEnum.ADMIN:
@@ -451,7 +541,7 @@ def list_task_variants(
     task = db.get(Task, task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    _assert_task_access(task, current_user)
+    _assert_task_access(task, current_user, db)
 
     return db.query(TaskVariant).filter(TaskVariant.task_id == task_id).order_by(TaskVariant.position).all()
 

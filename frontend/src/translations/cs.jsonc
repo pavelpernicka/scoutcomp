@@ -417,6 +417,8 @@
       "archived": "archivováno",
       // EN: epired
       "expired": "vypršelo",
+      // EN: Limit
+      "limit": "Limit",
       // EN: active
       "active": "aktivní",
       // EN: label
@@ -454,6 +456,20 @@
     "periodUnit": "Jednotka období",
     // EN: Set no limit
     "resetLimit": "Nastavit bez limitu",
+    // EN: Close after completion count
+    "autoCloseAfterCompletions": "Uzavřít po počtu splnění",
+    // EN: Count scope
+    "autoCloseScopeLabel": "Počítat v rámci",
+    "autoCloseScope": {
+      // EN: All completions
+      "global": "Všechna splnění",
+      // EN: Completions in team
+      "team": "Splnění ve družině"
+    },
+    // EN: Reset completion counts
+    "resetAutoCloseCounts": "Resetovat počty splnění",
+    // EN: Reset completion counts for this task auto-close?
+    "confirmResetAutoCloseCounts": "Resetovat počty splnění pro automatické uzavření tohoto úkolu?",
     // EN: Start time
     "startTime": "Začátek",
     // EN: End time
@@ -533,9 +549,11 @@
     // EN: Loading...
     "loading": "Načítám...",
     // EN: Well done! Your completion was successfully submited.
-    "submitSuccess": "Hotovo! Tvoje splnění bylo odesláno ke schválení.",
+    "submitSuccess": "Hotovo! Tvoje splnění bylo odesláno.",
     // EN: Oh no... Something went wrong. Try to submit it later.
     "error": "Jejda... Něco se pokazilo. Zkus to později.",
+    // EN: This submission would exceed the maximum completion limit for this task.
+    "autoCloseExceeded": "Tímto by byl překročen maximální limit splnění pro tento úkol. Zkus zvolit menší počet.",
     // EN: soon
     "resetSoon": "brzy se obnoví",
     // EN: No description given
@@ -546,6 +564,18 @@
     "noTasksMessage": "Možná soutěž ještě nezačala?",
     // EN: No limit
     "noLimitShort": "Bez limitu",
+    // EN: Auto close
+    "autoCloseTitle": "Automatické uzavření",
+    "autoCloseScopeText": {
+      // EN: After {{count}} completions in all teams
+      "global": "Po {{count}} dokončeních napříč všemi družinami", // Variables: count
+      // EN: After {{count}} completions in your team
+      "team": "Po {{count}} dokončeních v tvojí družině" // Variables: count
+    },
+    // EN: Completed {{current}}/{{limit}}
+    "autoCloseDone": "Zatím splněno {{current}}/{{limit}}", // Variables: current, limit
+    // EN: For tasks requiring approval, only approved completions count.
+    "autoCloseApprovalInfo": "U úkolů se schválením se započítávají jen schválená splnění.",
     // EN: Limit resets
     "resetsIn": "Limit se obnoví za",
     // EN: Current period
@@ -595,7 +625,7 @@
     // EN: Ends
     "ends": "Končí",
     // EN: Limit reached
-    "limitReachedShort": "Limit dosažen",
+    "limitReachedShort": "Dosáhl/a jsi limitu",
     // EN: Wait
     "cooldownShort": "Počkej",
     // EN: Lets do it
@@ -607,7 +637,7 @@
     // EN: Done in total: {{current}}
     "completedPeriodUnlimited": "Splněno celkem: {{current}}", // Variables: current
     // EN: Completed in total: {{count}} times
-    "lifetimeTotal": "Celkem splněno: {{count}}×", // Variables: count
+    "lifetimeTotal": "Celkem splněno tebou: {{count}}×", // Variables: count
     // EN: {{count}} magnificent task for you to earn some points
     "heroSubtitle": "{{count}} úkolů, za které můžeš získat body" // Variables: count
   },

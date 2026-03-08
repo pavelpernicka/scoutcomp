@@ -17,6 +17,7 @@ from ..schemas import (
     CompletionPublic,
     CompletionReview,
 )
+from ..task_auto_close import maybe_auto_close_task_for_member, would_exceed_auto_close_limit
 from ..translation import (
     get_completion_approval_message,
     get_completion_rejection_message,
@@ -97,6 +98,7 @@ def review_completion(
         if completion.member.team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
 
+    original_status = completion.status
     completion.status = payload.status
     completion.admin_note = payload.admin_note
     completion.reviewer_id = reviewer.id
@@ -104,9 +106,23 @@ def review_completion(
 
     message = None
     if payload.status == CompletionStatus.APPROVED:
+        if would_exceed_auto_close_limit(
+            db,
+            completion.task,
+            completion.member,
+            new_status=payload.status,
+            new_count=completion.count,
+            old_status=original_status,
+            old_count=completion.count,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Auto-close limit would be exceeded",
+            )
         # Calculate points based on variant or task default
         points_per_completion = completion.variant.points if completion.variant else completion.task.points_per_completion
         completion.points_awarded = points_per_completion * completion.count
+        maybe_auto_close_task_for_member(db, completion.task, completion.member)
         message = get_completion_approval_message(
             task_name=completion.task.name,
             count=completion.count,
@@ -236,11 +252,24 @@ def create_user_completion(
         reviewer_id=current_user.id,
         reviewed_at=submitted_at,
     )
+    db.add(completion)
 
     if status_value == CompletionStatus.APPROVED:
+        if would_exceed_auto_close_limit(
+            db,
+            task,
+            member,
+            new_status=status_value,
+            new_count=payload.count,
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Auto-close limit would be exceeded",
+            )
         # Use variant points if variant is provided, otherwise use task points
         points_per_completion = variant.points if variant else task.points_per_completion
         completion.points_awarded = points_per_completion * payload.count
+        maybe_auto_close_task_for_member(db, task, member)
         message = get_admin_completion_approval_message(
             task_name=task.name,
             count=payload.count,
@@ -261,7 +290,6 @@ def create_user_completion(
         sender_id=current_user.id,
     )
 
-    db.add(completion)
     db.add(notification)
     db.commit()
     db.refresh(completion)
@@ -309,6 +337,9 @@ def update_user_completion(
     if payload.count is None and payload.status is None and payload.admin_note is None:
         return completion
 
+    original_status = completion.status
+    original_count = completion.count
+
     if payload.status == CompletionStatus.PENDING:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Status cannot be set to pending")
 
@@ -326,10 +357,26 @@ def update_user_completion(
         completion.admin_note = payload.admin_note
 
     if payload.count is not None or status_changed:
+        if completion.status == CompletionStatus.APPROVED and completion.task and completion.member:
+            if would_exceed_auto_close_limit(
+                db,
+                completion.task,
+                completion.member,
+                new_status=completion.status,
+                new_count=completion.count,
+                old_status=original_status,
+                old_count=original_count,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Auto-close limit would be exceeded",
+                )
         if completion.status == CompletionStatus.APPROVED and completion.task:
             # Calculate points based on variant or task default
             points_per_completion = completion.variant.points if completion.variant else completion.task.points_per_completion
             completion.points_awarded = points_per_completion * completion.count
+            if completion.member:
+                maybe_auto_close_task_for_member(db, completion.task, completion.member)
         else:
             completion.points_awarded = 0
 
