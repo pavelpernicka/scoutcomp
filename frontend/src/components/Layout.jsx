@@ -172,15 +172,40 @@ export default function Layout({ children }) {
                     onClick={() => setShowUserDropdown(!showUserDropdown)}
                     style={{ borderRadius: '20px' }}
                   >
-                    <span className="fw-bold">{profile?.user?.real_name || profile?.user?.username}</span>
+                    <span
+                      className={`fw-bold ${showMobileMenu ? '' : 'text-truncate d-inline-block'}`}
+                      style={showMobileMenu ? undefined : { maxWidth: '180px' }}
+                    >
+                      {profile?.user?.real_name || profile?.user?.username}
+                    </span>
                     <i className="fas fa-chevron-down ms-2"></i>
                   </button>
-                  <ul className={`dropdown-menu dropdown-menu-end ${showMobileMenu ? 'w-100' : ''} shadow-lg border-0 mt-2 ${showUserDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
+                  <ul
+                    className={`dropdown-menu dropdown-menu-end ${showMobileMenu ? 'w-100' : ''} shadow-lg border-0 mt-2 ${showUserDropdown ? 'show' : ''}`}
+                    style={{
+                      position: showMobileMenu ? 'static' : 'absolute',
+                      right: showMobileMenu ? undefined : 0,
+                      left: showMobileMenu ? undefined : 'auto',
+                      maxWidth: showMobileMenu ? undefined : 'min(22rem, calc(100vw - 1rem))',
+                      minWidth: showMobileMenu ? undefined : '14rem',
+                      overflowX: 'hidden',
+                    }}
+                  >
                     <li className="dropdown-header d-flex align-items-center">
                       <div>
-                        <div className="fw-bold">{profile?.user?.real_name || profile?.user?.username}</div>
+                        <div
+                          className="fw-bold"
+                          style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.2 }}
+                        >
+                          {profile?.user?.real_name || profile?.user?.username}
+                        </div>
                         {profile?.user?.team_name && (
-                          <small className="text-muted">{profile.user.team_name}</small>
+                          <small
+                            className="text-muted"
+                            style={{ whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.2 }}
+                          >
+                            {profile.user.team_name}
+                          </small>
                         )}
                       </div>
                     </li>
