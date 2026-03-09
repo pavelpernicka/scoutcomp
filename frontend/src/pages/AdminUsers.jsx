@@ -945,7 +945,7 @@ export default function AdminUsers() {
                   ) : (
                     <div className="table-responsive" style={{ maxHeight: "340px" }}>
                       <table className="table table-hover table-sm align-middle mb-0">
-                        <thead className="table-light sticky-top">
+                        <thead className="table-light sticky-top" style={{ zIndex: 5 }}>
                           <tr>
                             <th>{t('adminUsers.name')}</th>
                             <th>{t('adminUsers.username')}</th>
