@@ -818,6 +818,18 @@
     "loading": "Načítám...",
     // EN: No users yet
     "noUsersYet": "Zatím tu nejsou žádní uživatelé",
+    // EN: Search member
+    "searchUsers": "Vyhledat člena",
+    // EN: Name, username, e-mail
+    "searchUsersPlaceholder": "Jméno, uživatelské jméno, e-mail",
+    // EN: All teams
+    "allTeams": "Všechny družiny",
+    // EN: All roles
+    "allRoles": "Všechny role",
+    // EN: Showing {{shown}} of {{total}} users
+    "usersShown": "Zobrazeno {{shown}} z {{total}} uživatelů", // Variables: shown, total
+    // EN: No users match selected filters
+    "noUsersMatchFilters": "Žádný uživatel neodpovídá zvoleným filtrům",
     // EN: Name
     "name": "Jméno",
     // EN: Username

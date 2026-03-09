@@ -425,6 +425,12 @@
     "addUser": "Add user",
     "loading": "Loading...",
     "noUsersYet": "No users yet",
+    "searchUsers": "Search members",
+    "searchUsersPlaceholder": "Name, username, e-mail",
+    "allTeams": "All teams",
+    "allRoles": "All roles",
+    "usersShown": "Showing {{shown}} of {{total}} users", // Variables: shown, total
+    "noUsersMatchFilters": "No users match selected filters",
     "name": "Name",
     "username": "Username",
     "email": "E-mail",
