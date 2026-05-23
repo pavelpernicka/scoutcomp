@@ -1,3 +1,4 @@
+import React from "react";
 import { Link, NavLink } from "react-router-dom";
 import PropTypes from "prop-types";
 import { useState, useEffect, useRef } from "react";
@@ -110,6 +111,14 @@ export default function Layout({ children }) {
                         <li>
                           <NavLink to="/admin/approvals" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
                             {t("navigation.approvals")}
+                          </NavLink>
+                        </li>
+                      )}
+                      {(isAdmin || isGroupAdmin) && (
+                        <li>
+                          <NavLink to="/inventory" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
+                            <i className="fas fa-warehouse me-2 text-primary"></i>
+                            {t("navigation.inventory")}
                           </NavLink>
                         </li>
                       )}

@@ -405,6 +405,378 @@ def _add_task_auto_close_reset_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE tasks ADD COLUMN auto_close_reset_at TIMESTAMP"))
 
 
+def _create_inventory_tables(conn: Connection) -> None:
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "inventory_flags" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_flags (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    name VARCHAR(120) NOT NULL,
+                    description TEXT,
+                    color VARCHAR(32) NOT NULL DEFAULT 'neutral',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_flags_team_id ON inventory_flags(team_id)"))
+        tables.add("inventory_flags")
+
+    if "inventory_items" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_items (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    category VARCHAR(120),
+                    flag_id INTEGER REFERENCES inventory_flags(id) ON DELETE SET NULL,
+                    quantity INTEGER NOT NULL DEFAULT 1,
+                    quantity_unit VARCHAR(32) NOT NULL DEFAULT 'ks',
+                    default_location VARCHAR(200),
+                    current_location VARCHAR(200),
+                    status VARCHAR(32) NOT NULL DEFAULT 'available',
+                    notes TEXT,
+                    qr_identifier VARCHAR(64) NOT NULL UNIQUE,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_team_id ON inventory_items(team_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_name ON inventory_items(name)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_category ON inventory_items(category)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_flag_id ON inventory_items(flag_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_qr_identifier ON inventory_items(qr_identifier)"))
+
+    if "inventory_photos" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_photos (
+                    id INTEGER PRIMARY KEY,
+                    item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                    image_url TEXT NOT NULL,
+                    caption VARCHAR(200),
+                    position INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "inventory_events" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_events (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    start_date TIMESTAMP,
+                    end_date TIMESTAMP,
+                    note TEXT,
+                    status VARCHAR(32) NOT NULL DEFAULT 'planned',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "inventory_event_items" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_event_items (
+                    id INTEGER PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES inventory_events(id) ON DELETE CASCADE,
+                    item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                    planned_quantity INTEGER NOT NULL DEFAULT 1,
+                    returned_quantity INTEGER NOT NULL DEFAULT 0,
+                    damaged_quantity INTEGER NOT NULL DEFAULT 0,
+                    note TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(event_id, item_id)
+                )
+                """
+            )
+        )
+
+    if "inventory_loans" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_loans (
+                    id INTEGER PRIMARY KEY,
+                    item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                    borrower_name VARCHAR(200) NOT NULL,
+                    borrowed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    due_at TIMESTAMP,
+                    returned_at TIMESTAMP,
+                    quantity INTEGER NOT NULL DEFAULT 1,
+                    note TEXT
+                )
+                """
+            )
+        )
+
+    if "inventory_history" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_history (
+                    id INTEGER PRIMARY KEY,
+                    item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                    event_id INTEGER REFERENCES inventory_events(id) ON DELETE SET NULL,
+                    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    action VARCHAR(32) NOT NULL,
+                    payload JSON,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "inventory_event_scans" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_event_scans (
+                    id INTEGER PRIMARY KEY,
+                    event_id INTEGER NOT NULL REFERENCES inventory_events(id) ON DELETE CASCADE,
+                    item_id INTEGER REFERENCES inventory_items(id) ON DELETE SET NULL,
+                    actor_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    qr_identifier VARCHAR(64) NOT NULL,
+                    result VARCHAR(32) NOT NULL DEFAULT 'returned',
+                    condition VARCHAR(32),
+                    note TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "inventory_label_templates" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_label_templates (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    width_mm REAL NOT NULL DEFAULT 62,
+                    height_mm REAL NOT NULL DEFAULT 29,
+                    qr_x_mm REAL NOT NULL DEFAULT 3,
+                    qr_y_mm REAL NOT NULL DEFAULT 3,
+                    qr_size_mm REAL NOT NULL DEFAULT 18,
+                    title_font_size REAL NOT NULL DEFAULT 14,
+                    meta_font_size REAL NOT NULL DEFAULT 9,
+                    fields JSON NOT NULL DEFAULT '[]',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "inventory_locations" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_locations (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    parent_id INTEGER REFERENCES inventory_locations(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    path VARCHAR(500) NOT NULL,
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_locations_team_id ON inventory_locations(team_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_locations_parent_id ON inventory_locations(parent_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_locations_path ON inventory_locations(path)"))
+
+    if "inventory_categories" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_categories (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    parent_id INTEGER REFERENCES inventory_categories(id) ON DELETE CASCADE,
+                    name VARCHAR(200) NOT NULL,
+                    description TEXT,
+                    path VARCHAR(500) NOT NULL,
+                    color VARCHAR(16) NOT NULL DEFAULT '#5b8def',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_categories_team_id ON inventory_categories(team_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_categories_parent_id ON inventory_categories(parent_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_categories_path ON inventory_categories(path)"))
+
+
+def _extend_inventory_items_with_unit(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "inventory_items" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("inventory_items")}
+    if "quantity_unit" in columns:
+        return
+    conn.execute(text("ALTER TABLE inventory_items ADD COLUMN quantity_unit VARCHAR(32) NOT NULL DEFAULT 'ks'"))
+
+
+def _extend_inventory_categories_and_flags(conn: Connection) -> None:
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "inventory_categories" in tables:
+        category_columns = {col["name"] for col in inspector.get_columns("inventory_categories")}
+        if "description" not in category_columns:
+            conn.execute(text("ALTER TABLE inventory_categories ADD COLUMN description TEXT"))
+        if "color" not in category_columns:
+            conn.execute(text("ALTER TABLE inventory_categories ADD COLUMN color VARCHAR(16) NOT NULL DEFAULT '#5b8def'"))
+
+    if "inventory_flags" not in tables:
+        conn.execute(
+            text(
+                """
+                CREATE TABLE inventory_flags (
+                    id INTEGER PRIMARY KEY,
+                    team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+                    name VARCHAR(120) NOT NULL,
+                    description TEXT,
+                    color VARCHAR(32) NOT NULL DEFAULT 'neutral',
+                    sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_flags_team_id ON inventory_flags(team_id)"))
+
+    if "inventory_items" in tables:
+        item_columns = {col["name"] for col in inspector.get_columns("inventory_items")}
+        if "flag_id" not in item_columns:
+            conn.execute(text("ALTER TABLE inventory_items ADD COLUMN flag_id INTEGER REFERENCES inventory_flags(id) ON DELETE SET NULL"))
+            conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_flag_id ON inventory_items(flag_id)"))
+
+    if "inventory_flags" in inspector.get_table_names():
+        flag_columns = {col["name"] for col in inspector.get_columns("inventory_flags")}
+        if "color" in flag_columns:
+            conn.execute(text("UPDATE inventory_flags SET color = 'neutral' WHERE color IS NULL OR color = ''"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'neutral' WHERE color = '#6c757d' OR color = 'secondary'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'mismatch' WHERE color = '#dc3545' OR color = 'danger'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'match' WHERE color = 'success'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'loan' WHERE color = 'warning'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'event' WHERE color = 'info' OR color = 'primary'"))
+
+
+def _add_inventory_category_and_flag_descriptions(conn: Connection) -> None:
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "inventory_categories" in tables:
+        category_columns = {col["name"] for col in inspector.get_columns("inventory_categories")}
+        if "description" not in category_columns:
+            conn.execute(text("ALTER TABLE inventory_categories ADD COLUMN description TEXT"))
+
+    if "inventory_flags" in tables:
+        flag_columns = {col["name"] for col in inspector.get_columns("inventory_flags")}
+        if "description" not in flag_columns:
+            conn.execute(text("ALTER TABLE inventory_flags ADD COLUMN description TEXT"))
+        if "color" in flag_columns:
+            conn.execute(text("UPDATE inventory_flags SET color = 'neutral' WHERE color IS NULL OR color = ''"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'neutral' WHERE color = '#6c757d' OR color = 'secondary'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'mismatch' WHERE color = '#dc3545' OR color = 'danger'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'match' WHERE color = 'success'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'loan' WHERE color = 'warning'"))
+            conn.execute(text("UPDATE inventory_flags SET color = 'event' WHERE color = 'info' OR color = 'primary'"))
+
+    if "teams" not in tables or "inventory_flags" not in inspector.get_table_names():
+        return
+
+    team_ids = [row[0] for row in conn.execute(text("SELECT id FROM teams")).fetchall()]
+    for team_id in team_ids:
+        existing = {
+            row[0]: row[1]
+            for row in conn.execute(
+                text("SELECT name, id FROM inventory_flags WHERE team_id = :team_id"),
+                {"team_id": team_id},
+            ).fetchall()
+        }
+        defaults = [
+            ("OK", "#6c757d", 0),
+            ("Potřebuje opravu", "#dc3545", 1),
+        ]
+        for name, color, sort_order in defaults:
+            if name not in existing:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO inventory_flags (team_id, name, color, sort_order, created_at, updated_at)
+                        VALUES (:team_id, :name, :color, :sort_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """
+                    ),
+                    {"team_id": team_id, "name": name, "color": color, "sort_order": sort_order},
+                )
+
+        ok_flag_id = conn.execute(
+            text("SELECT id FROM inventory_flags WHERE team_id = :team_id AND name = 'OK' ORDER BY id LIMIT 1"),
+            {"team_id": team_id},
+        ).scalar()
+        repair_flag_id = conn.execute(
+            text("SELECT id FROM inventory_flags WHERE team_id = :team_id AND name = 'Potřebuje opravu' ORDER BY id LIMIT 1"),
+            {"team_id": team_id},
+        ).scalar()
+        if repair_flag_id is not None:
+            conn.execute(
+                text(
+                    """
+                    UPDATE inventory_items
+                    SET flag_id = :flag_id
+                    WHERE team_id = :team_id
+                      AND flag_id IS NULL
+                      AND status IN ('maintenance', 'damaged')
+                    """
+                ),
+                {"team_id": team_id, "flag_id": repair_flag_id},
+            )
+        if ok_flag_id is not None:
+            conn.execute(
+                text(
+                    """
+                    UPDATE inventory_items
+                    SET flag_id = :flag_id
+                    WHERE team_id = :team_id
+                      AND flag_id IS NULL
+                    """
+                ),
+                {"team_id": team_id, "flag_id": ok_flag_id},
+            )
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -495,6 +867,26 @@ MIGRATIONS: List[Migration] = [
         "20260308_add_task_auto_close_reset_at",
         _add_task_auto_close_reset_column,
         "Add auto_close_reset_at column to tasks table",
+    ),
+    Migration(
+        "20260523_create_inventory_tables",
+        _create_inventory_tables,
+        "Create tables for the inventory module",
+    ),
+    Migration(
+        "20260524_add_inventory_quantity_unit",
+        _extend_inventory_items_with_unit,
+        "Add quantity unit to inventory items",
+    ),
+    Migration(
+        "20260525_add_inventory_flags_and_category_colors",
+        _extend_inventory_categories_and_flags,
+        "Add configurable inventory flags and colors for categories",
+    ),
+    Migration(
+        "20260525_add_inventory_category_and_flag_descriptions",
+        _add_inventory_category_and_flag_descriptions,
+        "Add description fields for inventory categories and flags",
     ),
 ]
 

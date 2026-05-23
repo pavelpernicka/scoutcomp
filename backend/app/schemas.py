@@ -5,7 +5,16 @@ from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
-from .models import CompletionStatus, RoleEnum, StatMetricEnum, TaskAutoCloseScope, TaskPeriodUnit
+from .models import (
+    CompletionStatus,
+    InventoryEventStatus,
+    InventoryHistoryAction,
+    InventoryItemStatus,
+    RoleEnum,
+    StatMetricEnum,
+    TaskAutoCloseScope,
+    TaskPeriodUnit,
+)
 
 
 class TokenPair(BaseModel):
@@ -525,5 +534,369 @@ class ConfigResponse(BaseModel):
     allow_self_registration: bool
 
 
+class InventoryPhotoCreate(BaseModel):
+    image_url: str = Field(min_length=1)
+    caption: Optional[str] = None
+
+
+class InventoryPhotoPublic(BaseModel):
+    id: int
+    image_url: str
+    caption: Optional[str]
+    position: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryItemBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=120)
+    flag_id: Optional[int] = None
+    quantity: int = Field(default=1, ge=0)
+    quantity_unit: str = Field(default="ks", min_length=1, max_length=32)
+    default_location: Optional[str] = Field(default=None, max_length=200)
+    current_location: Optional[str] = Field(default=None, max_length=200)
+    status: InventoryItemStatus = InventoryItemStatus.AVAILABLE
+    notes: Optional[str] = None
+    team_id: int
+
+
+class InventoryItemCreate(InventoryItemBase):
+    photos: List[InventoryPhotoCreate] = Field(default_factory=list)
+
+
+class InventoryItemUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    category: Optional[str] = Field(default=None, max_length=120)
+    flag_id: Optional[int] = None
+    quantity: Optional[int] = Field(default=None, ge=0)
+    quantity_unit: Optional[str] = Field(default=None, min_length=1, max_length=32)
+    default_location: Optional[str] = Field(default=None, max_length=200)
+    current_location: Optional[str] = Field(default=None, max_length=200)
+    status: Optional[InventoryItemStatus] = None
+    notes: Optional[str] = None
+    team_id: Optional[int] = None
+
+
+class InventoryHistoryPublic(BaseModel):
+    id: int
+    action: InventoryHistoryAction
+    payload: Optional[dict]
+    created_at: datetime
+    actor_id: Optional[int]
+    event_id: Optional[int]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryLoanCreate(BaseModel):
+    borrower_name: str = Field(min_length=1, max_length=200)
+    borrowed_at: Optional[datetime] = None
+    due_at: Optional[datetime] = None
+    quantity: int = Field(default=1, ge=1)
+    note: Optional[str] = None
+
+
+class InventoryLoanReturn(BaseModel):
+    returned_at: Optional[datetime] = None
+    note: Optional[str] = None
+
+
+class InventoryLoanPublic(BaseModel):
+    id: int
+    borrower_name: str
+    borrowed_at: datetime
+    due_at: Optional[datetime]
+    returned_at: Optional[datetime]
+    quantity: int
+    note: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryEventBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    team_id: int
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    note: Optional[str] = None
+    status: InventoryEventStatus = InventoryEventStatus.PLANNED
+
+
+class InventoryEventCreate(InventoryEventBase):
+    pass
+
+
+class InventoryEventUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    team_id: Optional[int] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    note: Optional[str] = None
+    status: Optional[InventoryEventStatus] = None
+
+
+class InventoryEventItemAssign(BaseModel):
+    item_id: int
+    planned_quantity: int = Field(default=1, ge=1)
+    note: Optional[str] = None
+
+
+class InventoryEventItemPublic(BaseModel):
+    id: int
+    item_id: int
+    planned_quantity: int
+    returned_quantity: int
+    damaged_quantity: int
+    note: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryEventPublic(BaseModel):
+    id: int
+    team_id: int
+    name: str
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    note: Optional[str]
+    status: InventoryEventStatus
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryEventScanRequest(BaseModel):
+    qr_identifier: str = Field(min_length=1, max_length=64)
+    condition: Optional[str] = None
+    note: Optional[str] = None
+
+
+class InventoryEventScanPublic(BaseModel):
+    id: int
+    event_id: int
+    item_id: Optional[int]
+    qr_identifier: str
+    result: str
+    condition: Optional[str]
+    note: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryLabelTemplateBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    team_id: int
+    width_mm: float = Field(default=62, gt=0)
+    height_mm: float = Field(default=29, gt=0)
+    qr_x_mm: float = Field(default=3, ge=0)
+    qr_y_mm: float = Field(default=3, ge=0)
+    qr_size_mm: float = Field(default=18, gt=0)
+    title_font_size: float = Field(default=14, gt=0)
+    meta_font_size: float = Field(default=9, gt=0)
+    fields: List[str] = Field(default_factory=lambda: ["name", "category", "current_location", "qr_identifier"])
+
+
+class InventoryLabelTemplateCreate(InventoryLabelTemplateBase):
+    pass
+
+
+class InventoryLabelTemplateUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    team_id: Optional[int] = None
+    width_mm: Optional[float] = Field(default=None, gt=0)
+    height_mm: Optional[float] = Field(default=None, gt=0)
+    qr_x_mm: Optional[float] = Field(default=None, ge=0)
+    qr_y_mm: Optional[float] = Field(default=None, ge=0)
+    qr_size_mm: Optional[float] = Field(default=None, gt=0)
+    title_font_size: Optional[float] = Field(default=None, gt=0)
+    meta_font_size: Optional[float] = Field(default=None, gt=0)
+    fields: Optional[List[str]] = None
+
+
+class InventoryLabelTemplatePublic(InventoryLabelTemplateBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryLocationBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    team_id: int
+    parent_id: Optional[int] = None
+    sort_order: int = Field(default=0, ge=0)
+
+
+class InventoryLocationCreate(InventoryLocationBase):
+    pass
+
+
+class InventoryLocationUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    team_id: Optional[int] = None
+    parent_id: Optional[int] = None
+    sort_order: Optional[int] = Field(default=None, ge=0)
+
+
+class InventoryLocationPublic(BaseModel):
+    id: int
+    team_id: int
+    parent_id: Optional[int]
+    name: str
+    path: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    children: List["InventoryLocationPublic"] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryCategoryBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    team_id: int
+    parent_id: Optional[int] = None
+    color: str = Field(default="#5b8def", min_length=4, max_length=16)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class InventoryCategoryCreate(InventoryCategoryBase):
+    pass
+
+
+class InventoryCategoryUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    team_id: Optional[int] = None
+    parent_id: Optional[int] = None
+    color: Optional[str] = Field(default=None, min_length=4, max_length=16)
+    sort_order: Optional[int] = Field(default=None, ge=0)
+
+
+class InventoryCategoryPublic(BaseModel):
+    id: int
+    team_id: int
+    parent_id: Optional[int]
+    name: str
+    description: Optional[str]
+    path: str
+    color: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+    children: List["InventoryCategoryPublic"] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryFlagBase(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    description: Optional[str] = None
+    team_id: int
+    color: str = Field(default="neutral", min_length=3, max_length=32)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class InventoryFlagCreate(InventoryFlagBase):
+    pass
+
+
+class InventoryFlagUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    description: Optional[str] = None
+    team_id: Optional[int] = None
+    color: Optional[str] = Field(default=None, min_length=3, max_length=32)
+    sort_order: Optional[int] = Field(default=None, ge=0)
+
+
+class InventoryFlagPublic(BaseModel):
+    id: int
+    team_id: int
+    name: str
+    description: Optional[str]
+    color: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryItemPublic(BaseModel):
+    id: int
+    team_id: int
+    name: str
+    description: Optional[str]
+    category: Optional[str]
+    flag_id: Optional[int]
+    flag: Optional[InventoryFlagPublic] = None
+    quantity: int
+    quantity_unit: str
+    default_location: Optional[str]
+    current_location: Optional[str]
+    status: InventoryItemStatus
+    notes: Optional[str]
+    qr_identifier: str
+    created_at: datetime
+    updated_at: datetime
+    team_name: Optional[str] = None
+    available_quantity: int = 0
+    open_loan_quantity: int = 0
+    active_event_quantity: int = 0
+    current_event_name: Optional[str] = None
+    photos: List[InventoryPhotoPublic] = Field(default_factory=list)
+    loans: List[InventoryLoanPublic] = Field(default_factory=list)
+    history_entries: List[InventoryHistoryPublic] = Field(default_factory=list)
+
+
+class InventoryOverviewResponse(BaseModel):
+    items: List[InventoryItemPublic]
+    events: List[InventoryEventPublic]
+    label_templates: List[InventoryLabelTemplatePublic]
+    locations: List[InventoryLocationPublic]
+    categories: List[InventoryCategoryPublic]
+    flags: List[InventoryFlagPublic]
+
+
+class InventoryEventDetail(BaseModel):
+    event: InventoryEventPublic
+    items: List[InventoryEventItemPublic]
+    scans: List[InventoryEventScanPublic]
+    summary: dict
+
+
+class InventoryLabelsPreviewRequest(BaseModel):
+    item_ids: List[int] = Field(min_length=1)
+    template_id: int
+
+
+class InventoryLabelsPreviewResponse(BaseModel):
+    template: InventoryLabelTemplatePublic
+    items: List[InventoryItemPublic]
+
+
+class InventoryBulkUpdateRequest(BaseModel):
+    item_ids: List[int] = Field(min_length=1)
+    set_status: Optional[InventoryItemStatus] = None
+    set_default_location: Optional[str] = Field(default=None, max_length=200)
+    set_current_location: Optional[str] = Field(default=None, max_length=200)
+    set_category: Optional[str] = Field(default=None, max_length=120)
+    set_flag_id: Optional[int] = None
+    assign_event_id: Optional[int] = None
+    assign_event_quantity: int = Field(default=1, ge=1)
+
+
 TaskPublic.model_rebuild()
 CompletionPublic.model_rebuild()
+InventoryLocationPublic.model_rebuild()
+InventoryCategoryPublic.model_rebuild()

@@ -1,3 +1,4 @@
+import React from "react";
 import { Suspense, useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
@@ -11,6 +12,7 @@ import AdminTeams from "./pages/AdminTeams";
 import AdminUsers from "./pages/AdminUsers";
 import AdminStats from "./pages/AdminStats";
 import Dashboard from "./pages/Dashboard";
+import InventoryPage from "./pages/Inventory";
 import LeaderboardPage from "./pages/Leaderboard";
 import LoginPage from "./pages/Login";
 import TasksPage from "./pages/Tasks";
@@ -40,6 +42,7 @@ export default function App() {
             <Route path="/settings" element={<UserSettingsPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedRoles={["admin", "group_admin"]} />}>
+            <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/admin/approvals" element={<AdminApprovals />} />
             <Route path="/admin/teams" element={<AdminTeams />} />
             <Route path="/admin/users" element={<AdminUsers />} />

@@ -1,3 +1,4 @@
+import React from "react";
 import { useConfig } from "../providers/ConfigProvider";
 import packageJson from "../../package.json";
 

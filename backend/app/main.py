@@ -6,6 +6,7 @@ from fastapi.openapi.utils import get_openapi
 
 from .config import settings
 from .database import Base, engine
+from .inventory import router as inventory_router
 from .migrations import run_migrations
 from .routers import (
     auth,
@@ -53,6 +54,7 @@ app.include_router(completions.router)
 app.include_router(leaderboard.router)
 app.include_router(notifications.router)
 app.include_router(dashboard_messages.router)
+app.include_router(inventory_router)
 app.include_router(stat_categories.router)
 app.include_router(static_pages.router)
 app.include_router(config.router)
@@ -103,7 +105,5 @@ def get_redoc():
         openapi_url="./openapi.json",  # use relative URL for proxied use
         title="Scout Competition API - Documentation"
     )
-
-
 
 

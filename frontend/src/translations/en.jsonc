@@ -6,6 +6,7 @@
     "rules": "Rules",
     "admin": "Administration",
     "approvals": "Approvals",
+    "inventory": "Inventory",
     "tasksAdmin": "Tasks admin",
     "stats": "Stats admin",
     "config": "Server settings",

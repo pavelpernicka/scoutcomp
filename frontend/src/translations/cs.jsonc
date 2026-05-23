@@ -12,6 +12,8 @@
     "admin": "Admin",
     // EN: Approvals
     "approvals": "Schválení",
+    // EN: Inventory
+    "inventory": "Sklad",
     // EN: Tasks admin
     "tasksAdmin": "Správa úkolů",
     // EN: Stats admin
