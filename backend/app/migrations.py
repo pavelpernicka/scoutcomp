@@ -419,6 +419,7 @@ def _create_inventory_tables(conn: Connection) -> None:
                     name VARCHAR(120) NOT NULL,
                     description TEXT,
                     color VARCHAR(32) NOT NULL DEFAULT 'neutral',
+                    is_system BOOLEAN NOT NULL DEFAULT 0,
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -600,6 +601,7 @@ def _create_inventory_tables(conn: Connection) -> None:
                     team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
                     parent_id INTEGER REFERENCES inventory_locations(id) ON DELETE CASCADE,
                     name VARCHAR(200) NOT NULL,
+                    description TEXT,
                     path VARCHAR(500) NOT NULL,
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -667,6 +669,7 @@ def _extend_inventory_categories_and_flags(conn: Connection) -> None:
                     name VARCHAR(120) NOT NULL,
                     description TEXT,
                     color VARCHAR(32) NOT NULL DEFAULT 'neutral',
+                    is_system BOOLEAN NOT NULL DEFAULT 0,
                     sort_order INTEGER NOT NULL DEFAULT 0,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -713,6 +716,15 @@ def _add_inventory_category_and_flag_descriptions(conn: Connection) -> None:
             conn.execute(text("UPDATE inventory_flags SET color = 'match' WHERE color = 'success'"))
             conn.execute(text("UPDATE inventory_flags SET color = 'loan' WHERE color = 'warning'"))
             conn.execute(text("UPDATE inventory_flags SET color = 'event' WHERE color = 'info' OR color = 'primary'"))
+
+
+def _add_inventory_location_descriptions(conn: Connection) -> None:
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "inventory_locations" in tables:
+        location_columns = {col["name"] for col in inspector.get_columns("inventory_locations")}
+        if "description" not in location_columns:
+            conn.execute(text("ALTER TABLE inventory_locations ADD COLUMN description TEXT"))
 
     if "teams" not in tables or "inventory_flags" not in inspector.get_table_names():
         return
@@ -775,6 +787,87 @@ def _add_inventory_category_and_flag_descriptions(conn: Connection) -> None:
                 ),
                 {"team_id": team_id, "flag_id": ok_flag_id},
             )
+
+
+def _add_inventory_system_flags(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "inventory_flags" not in inspector.get_table_names():
+        return
+
+    flag_columns = {col["name"] for col in inspector.get_columns("inventory_flags")}
+    if "is_system" not in flag_columns:
+        conn.execute(text("ALTER TABLE inventory_flags ADD COLUMN is_system BOOLEAN NOT NULL DEFAULT 0"))
+
+    conn.execute(text("UPDATE inventory_flags SET is_system = 1 WHERE lower(trim(name)) = 'došlo'"))
+
+    if "teams" not in inspector.get_table_names():
+        return
+
+    team_ids = [row[0] for row in conn.execute(text("SELECT id FROM teams")).fetchall()]
+    for team_id in team_ids:
+        sold_out_flag_id = conn.execute(
+            text("SELECT id FROM inventory_flags WHERE team_id = :team_id AND lower(trim(name)) = 'došlo' ORDER BY id LIMIT 1"),
+            {"team_id": team_id},
+        ).scalar()
+        if sold_out_flag_id is None:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO inventory_flags (team_id, name, description, color, is_system, sort_order, created_at, updated_at)
+                    VALUES (:team_id, 'Došlo', 'Systémový příznak pro nulové množství.', 'mismatch', 1, 999, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """
+                ),
+                {"team_id": team_id},
+            )
+            sold_out_flag_id = conn.execute(
+                text("SELECT id FROM inventory_flags WHERE team_id = :team_id AND lower(trim(name)) = 'došlo' ORDER BY id LIMIT 1"),
+                {"team_id": team_id},
+            ).scalar()
+        if sold_out_flag_id is not None:
+            conn.execute(
+                text(
+                    """
+                    UPDATE inventory_items
+                    SET flag_id = :flag_id, status = 'MISSING'
+                    WHERE team_id = :team_id AND quantity <= 0
+                    """
+                ),
+                {"team_id": team_id, "flag_id": sold_out_flag_id},
+            )
+
+
+def _normalize_inventory_item_status_values(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "inventory_items" not in inspector.get_table_names():
+        return
+
+    conn.execute(
+        text(
+            """
+            UPDATE inventory_items
+            SET status = CASE lower(status)
+                WHEN 'available' THEN 'AVAILABLE'
+                WHEN 'missing' THEN 'MISSING'
+                WHEN 'damaged' THEN 'DAMAGED'
+                WHEN 'maintenance' THEN 'MAINTENANCE'
+                ELSE status
+            END
+            """
+        )
+    )
+
+
+def _add_latex_template_column(conn: Connection) -> None:
+    """Add latex_template column to inventory_label_templates table."""
+    inspector = inspect(conn)
+    if "inventory_label_templates" not in inspector.get_table_names():
+        return
+
+    try:
+        conn.execute(text("ALTER TABLE inventory_label_templates ADD COLUMN latex_template TEXT"))
+    except (OperationalError, ProgrammingError) as e:
+        if "duplicate column name" not in str(e).lower():
+            raise
 
 
 MIGRATIONS: List[Migration] = [
@@ -887,6 +980,26 @@ MIGRATIONS: List[Migration] = [
         "20260525_add_inventory_category_and_flag_descriptions",
         _add_inventory_category_and_flag_descriptions,
         "Add description fields for inventory categories and flags",
+    ),
+    Migration(
+        "20260525_add_inventory_location_descriptions",
+        _add_inventory_location_descriptions,
+        "Add description fields for inventory locations",
+    ),
+    Migration(
+        "20260525_add_inventory_system_flags",
+        _add_inventory_system_flags,
+        "Add system flag support for inventory flags",
+    ),
+    Migration(
+        "20260525_normalize_inventory_item_status_values",
+        _normalize_inventory_item_status_values,
+        "Normalize inventory item status enum values",
+    ),
+    Migration(
+        "20260524_add_latex_template_column",
+        _add_latex_template_column,
+        "Add latex_template column to inventory label templates",
     ),
 ]
 

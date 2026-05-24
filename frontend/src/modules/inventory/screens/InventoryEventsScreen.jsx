@@ -1,28 +1,70 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { useMemo, useState } from "react";
 
 import Card from "../../../components/Card";
-import { getEventSummaryCards } from "../helpers";
+import { buildColorStyle, getEventSummaryCards, getItemCurrentLocation, getItemFlagBadge } from "../helpers";
 
 export default function InventoryEventsScreen({
   events,
   selectedEvent,
   eventDetail,
+  items,
+  categoryMetaByPath,
   onSelectEvent,
   onOpenCreate,
   onOpenEdit,
-  selectedItem,
-  assignQuantity,
-  onAssignQuantityChange,
-  onAssignSelectedItem,
-  onRemoveEventItem,
+  onDeleteEvent,
+  onOpenReturnItem,
+  onOpenItem,
 }) {
+  const [search, setSearch] = useState("");
+  const [scanValue, setScanValue] = useState("");
   const summaryCards = getEventSummaryCards(eventDetail);
+  const eventItems = (eventDetail?.items || [])
+    .filter((entry) => {
+      // Show only items that haven't been fully returned
+      const plannedQuantity = entry.planned_quantity || 0;
+      const returnedQuantity = entry.returned_quantity || 0;
+      return plannedQuantity > returnedQuantity;
+    })
+    .map((entry) => ({
+      entry,
+      item: items.find((item) => item.id === entry.item_id) || null,
+    }));
+  const filteredEventItems = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) return eventItems;
+    return eventItems.filter(({ entry, item }) => (
+      [
+        item?.name,
+        item?.qr_identifier,
+        String(entry?.item_id || ""),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    ));
+  }, [eventItems, search]);
+
+  const handleScan = () => {
+    const normalized = scanValue.trim().toLowerCase();
+    if (!normalized) return;
+    const match = eventItems.find(({ item, entry }) => (
+      String(item?.qr_identifier || "").trim().toLowerCase() === normalized
+      && Math.max((entry?.planned_quantity || 0) - (entry?.returned_quantity || 0), 0) > 0
+    ));
+    if (match) {
+      onOpenReturnItem(match.entry, match.item);
+      setScanValue("");
+    }
+  };
 
   return (
-    <div className="row g-4">
-      <div className="col-12 col-xl-4">
-        <Card className="border-0 shadow-lg h-100" title="Akce a tábory" icon={<i className="fas fa-campground"></i>}>
+    <div className="inventory-events-screen">
+      <section className="inventory-events-sidebar-col">
+        <Card className="border-0 shadow-lg h-100 inventory-events-sidebar-card" title="Akce a tábory" icon={<i className="fas fa-campground"></i>}>
           <button type="button" className="btn btn-primary w-100 mb-3" onClick={onOpenCreate}>
             <i className="fas fa-plus me-2"></i>Nová akce
           </button>
@@ -34,46 +76,32 @@ export default function InventoryEventsScreen({
                 className={`inventory-event-card ${selectedEvent?.id === event.id ? "active" : ""}`}
                 onClick={() => onSelectEvent(event.id)}
               >
-                <div>
+                <div className="inventory-event-card-main">
                   <strong>{event.name}</strong>
-                  <div className="small text-muted">{event.note || "Bez poznámky"}</div>
+                  {event.note ? <div className="small text-muted">{event.note}</div> : null}
                 </div>
-                <span className={`badge ${event.status === "active" ? "text-bg-success" : event.status === "planned" ? "text-bg-info" : "text-bg-secondary"}`}>
+                <span className={`badge inventory-event-status ${event.status === "active" ? "text-bg-success" : event.status === "planned" ? "text-bg-info" : "text-bg-secondary"}`}>
                   {event.status}
                 </span>
               </button>
             ))}
           </div>
         </Card>
-      </div>
+      </section>
 
-      <div className="col-12 col-xl-8">
-        <Card className="border-0 shadow-lg h-100" title={selectedEvent?.name || "Detail akce"} icon={<i className="fas fa-map-location-dot"></i>}>
+      <section className="inventory-events-detail-col">
+        <Card className="border-0 shadow-lg h-100 inventory-events-detail-card" title={selectedEvent?.name || "Detail akce"} icon={<i className="fas fa-map-location-dot"></i>}>
           {!selectedEvent ? (
             <div className="text-muted">Vyber akci vlevo.</div>
           ) : (
             <>
-              <div className="d-flex flex-wrap gap-2 mb-3">
+              <div className="inventory-events-actions mb-3">
                 <button type="button" className="btn btn-outline-primary" onClick={onOpenEdit}>
                   <i className="fas fa-pen me-2"></i>Upravit akci
                 </button>
-                {selectedItem ? (
-                  <>
-                    <input
-                      className="form-control"
-                      style={{ maxWidth: 110 }}
-                      type="number"
-                      min="1"
-                      value={assignQuantity}
-                      onChange={(event) => onAssignQuantityChange(Number(event.target.value))}
-                    />
-                    <button type="button" className="btn btn-primary" onClick={onAssignSelectedItem}>
-                      <i className="fas fa-arrow-right me-2"></i>Přidat vybranou věc
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-muted small align-self-center">Vyber věc na obrazovce Věci a pak ji přidej na akci.</span>
-                )}
+                <button type="button" className="btn btn-outline-danger" onClick={onDeleteEvent}>
+                  <i className="fas fa-trash me-2"></i>Smazat akci
+                </button>
               </div>
               <div className="inventory-kpi-grid mb-4">
                 {summaryCards.map((card) => (
@@ -83,38 +111,91 @@ export default function InventoryEventsScreen({
                   </div>
                 ))}
               </div>
-              <div className="table-responsive">
-                <table className="table inventory-modern-table align-middle">
+              <div className="inventory-searchbar-wrap mb-3">
+                <i className="fas fa-magnifying-glass"></i>
+                <input
+                  className="inventory-searchbar"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Hledej podle názvu věci nebo QR kódu"
+                />
+              </div>
+              <div className="d-flex gap-2 mb-4">
+                <input
+                  className="form-control"
+                  value={scanValue}
+                  onChange={(event) => setScanValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleScan();
+                  }}
+                  placeholder="Naskenuj QR kód věci z akce"
+                />
+                <button type="button" className="btn btn-outline-primary" onClick={handleScan}>
+                  <i className="fas fa-qrcode me-2"></i>Skenovat
+                </button>
+              </div>
+              <div className="table-responsive inventory-events-table-wrap">
+                <table className="table inventory-modern-table inventory-events-table align-middle">
                   <thead>
                     <tr>
-                      <th>Item</th>
-                      <th>Plán</th>
-                      <th>Vráceno</th>
-                      <th>Poškozené</th>
-                      <th></th>
+                      <th>Věc</th>
+                      <th>Kat.</th>
+                      <th>QR</th>
+                      <th>Množství</th>
+                      <th>Umístění</th>
+                      <th>Příznak</th>
+                      <th className="text-center">Na akci</th>
+                      <th className="text-end">Akce</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(eventDetail?.items || []).map((entry) => (
-                      <tr key={entry.id}>
-                        <td>#{entry.item_id}</td>
-                        <td>{entry.planned_quantity}</td>
-                        <td>{entry.returned_quantity}</td>
-                        <td>{entry.damaged_quantity}</td>
-                        <td>
-                          <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onRemoveEventItem(entry.id)}>
-                            Odebrat
-                          </button>
-                        </td>
+                    {filteredEventItems.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="text-center py-5 text-muted">Na akci teď není žádná dohledatelná položka.</td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredEventItems.map(({ entry, item }) => {
+                        const currentLocation = item ? getItemCurrentLocation(item) : { label: "—", tone: "neutral" };
+                        const flagBadge = item ? getItemFlagBadge(item) : null;
+                        const categoryMeta = item?.category ? categoryMetaByPath[item.category] : null;
+                        const remaining = Math.max(entry.planned_quantity - entry.returned_quantity, 0);
+                        return (
+                          <tr key={entry.id}>
+                            <td>
+                              <button type="button" className="btn btn-link p-0 text-decoration-none fw-semibold" onClick={() => item && onOpenItem(item)}>
+                                {item?.name || `#${entry.item_id}`}
+                              </button>
+                            </td>
+                            <td>
+                              {item?.category ? (
+                                <span className="inventory-inline-badge" style={buildColorStyle(categoryMeta?.color || "#5b8def", 0.16)}>
+                                  {item.category}
+                                </span>
+                              ) : "—"}
+                            </td>
+                            <td className="text-muted">{item?.qr_identifier || "—"}</td>
+                            <td>{item ? `${item.quantity} ${item.quantity_unit}` : "—"}</td>
+                            <td><span className={`inventory-location-pill is-${currentLocation.tone}`}>{currentLocation.label}</span></td>
+                            <td>{flagBadge ? <span className="inventory-inline-badge" style={flagBadge.style}>{flagBadge.label}</span> : "—"}</td>
+                            <td className="text-center">{remaining}</td>
+                            <td className="text-end">
+                              {remaining > 0 ? (
+                                <button type="button" className="btn btn-sm btn-outline-success" onClick={() => onOpenReturnItem(entry, item)}>
+                                  Vrátit
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
             </>
           )}
         </Card>
-      </div>
+      </section>
     </div>
   );
 }
@@ -123,12 +204,12 @@ InventoryEventsScreen.propTypes = {
   events: PropTypes.array.isRequired,
   selectedEvent: PropTypes.object,
   eventDetail: PropTypes.object,
+  items: PropTypes.array.isRequired,
+  categoryMetaByPath: PropTypes.object.isRequired,
   onSelectEvent: PropTypes.func.isRequired,
   onOpenCreate: PropTypes.func.isRequired,
   onOpenEdit: PropTypes.func.isRequired,
-  selectedItem: PropTypes.object,
-  assignQuantity: PropTypes.number.isRequired,
-  onAssignQuantityChange: PropTypes.func.isRequired,
-  onAssignSelectedItem: PropTypes.func.isRequired,
-  onRemoveEventItem: PropTypes.func.isRequired,
+  onDeleteEvent: PropTypes.func.isRequired,
+  onOpenReturnItem: PropTypes.func.isRequired,
+  onOpenItem: PropTypes.func.isRequired,
 };

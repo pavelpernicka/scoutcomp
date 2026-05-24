@@ -12,10 +12,10 @@ export default function InventoryCategoriesScreen({ categories, selectedPath, on
     <div className="row g-4">
       <div className="col-12 col-xl-8">
         <Card className="border-0 shadow-lg" title="Strom kategorií" icon={<i className="fas fa-diagram-project"></i>}>
-          <div className="d-flex justify-content-between align-items-center mb-3">
+          <div className="inventory-section-create mb-3">
             <p className="text-muted mb-0">Kategorie se používají ve filtrech i při hromadných změnách.</p>
-            <button type="button" className="btn btn-primary" onClick={onCreateRoot}>
-              <i className="fas fa-plus me-2"></i>Kořenová kategorie
+            <button type="button" className="btn btn-primary w-100" onClick={onCreateRoot}>
+              <i className="fas fa-plus me-2"></i>Přidat kořenovou kategorii
             </button>
           </div>
           <InventoryLocationTree

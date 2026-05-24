@@ -1,59 +1,105 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { useMemo, useState } from "react";
 
 import Card from "../../../components/Card";
 
-export default function InventoryLoansScreen({ loanGroups, onOpenItem, onReturnLoan }) {
-  return (
-    <div className="row g-4">
-      <div className="col-12">
-        <Card className="border-0 shadow-lg" title="Aktivní výpůjčky" icon={<i className="fas fa-handshake-angle"></i>}>
-          <div className="inventory-loan-groups">
-            {loanGroups.length === 0 ? (
-              <div className="text-muted">Teď není evidovaná žádná otevřená výpůjčka.</div>
-            ) : (
-              loanGroups.map((group) => (
-                <section key={group.borrowerName} className="inventory-loan-group-card">
-                  <div className="inventory-loan-group-head">
-                    <div>
-                      <h3>{group.borrowerName}</h3>
-                      <div className="small text-muted">Aktivní výpůjčky: {group.openLoanCount}</div>
-                    </div>
-                    <div className="inventory-loan-stat-strip">
-                      <span className="inventory-inline-badge">{group.openQuantity} jednotek celkem</span>
-                      {group.overdueCount > 0 ? <span className="inventory-inline-badge is-warning">{group.overdueCount} po termínu</span> : null}
-                    </div>
-                  </div>
+export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenReturnLoan }) {
+  const [search, setSearch] = useState("");
+  const [scanValue, setScanValue] = useState("");
 
-                  <div className="inventory-loan-row-list">
-                    {group.loans.map((loan) => (
-                      <div key={loan.id} className="inventory-loan-row">
-                        <button type="button" className="inventory-loan-item-link" onClick={() => onOpenItem(loan.itemId)}>
-                          <strong>{loan.itemName}</strong>
-                          <span>{loan.quantity} {loan.quantityUnit}</span>
-                        </button>
-                        <div className="small text-muted">
-                          půjčeno {new Date(loan.borrowed_at).toLocaleString("cs-CZ")}
-                          {loan.due_at ? ` • vrátit ${new Date(loan.due_at).toLocaleString("cs-CZ")}` : ""}
-                        </div>
-                        <button type="button" className="btn btn-sm btn-success" onClick={() => onReturnLoan(loan.id)}>
-                          <i className="fas fa-check me-2"></i>Vráceno
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </section>
+  const filteredEntries = useMemo(() => {
+    const normalized = search.trim().toLowerCase();
+    if (!normalized) return loanEntries;
+    return loanEntries.filter((entry) => (
+      [entry.itemName, entry.borrower_name, entry.qrIdentifier]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(normalized)
+    ));
+  }, [loanEntries, search]);
+
+  const handleScan = () => {
+    const normalized = scanValue.trim().toLowerCase();
+    if (!normalized) return;
+    const match = loanEntries.find((entry) => String(entry.qrIdentifier || "").trim().toLowerCase() === normalized);
+    if (match) {
+      onOpenReturnLoan(match, match.item);
+      setScanValue("");
+    }
+  };
+
+  return (
+    <Card className="border-0 shadow-lg" title="Zpětná inventura výpůjček" icon={<i className="fas fa-handshake-angle"></i>}>
+      <div className="inventory-searchbar-wrap mb-3">
+        <i className="fas fa-magnifying-glass"></i>
+        <input
+          className="inventory-searchbar"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Hledej podle názvu věci nebo QR kódu"
+        />
+      </div>
+      <div className="d-flex gap-2 mb-4">
+        <input
+          className="form-control"
+          value={scanValue}
+          onChange={(event) => setScanValue(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") handleScan();
+          }}
+          placeholder="Naskenuj QR kód vypůjčené věci"
+        />
+        <button type="button" className="btn btn-outline-primary" onClick={handleScan}>
+          <i className="fas fa-qrcode me-2"></i>Skenovat
+        </button>
+      </div>
+
+      <div className="table-responsive">
+        <table className="table inventory-modern-table align-middle">
+          <thead>
+            <tr>
+              <th>Věc</th>
+              <th>Komu</th>
+              <th>QR</th>
+              <th>Množství</th>
+              <th className="text-end">Akce</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredEntries.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="text-center py-5 text-muted">Teď není evidovaná žádná otevřená výpůjčka.</td>
+              </tr>
+            ) : (
+              filteredEntries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>
+                    <button type="button" className="btn btn-link p-0 text-decoration-none fw-semibold" onClick={() => onOpenItem(entry.itemId)}>
+                      {entry.itemName}
+                    </button>
+                  </td>
+                  <td>{entry.borrower_name}</td>
+                  <td className="text-muted">{entry.qrIdentifier || "—"}</td>
+                  <td>{entry.quantity} {entry.quantityUnit}</td>
+                  <td className="text-end">
+                    <button type="button" className="btn btn-sm btn-outline-success" onClick={() => onOpenReturnLoan(entry, entry.item)}>
+                      Vrátit
+                    </button>
+                  </td>
+                </tr>
               ))
             )}
-          </div>
-        </Card>
+          </tbody>
+        </table>
       </div>
-    </div>
+    </Card>
   );
 }
 
 InventoryLoansScreen.propTypes = {
-  loanGroups: PropTypes.array.isRequired,
+  loanEntries: PropTypes.array.isRequired,
   onOpenItem: PropTypes.func.isRequired,
-  onReturnLoan: PropTypes.func.isRequired,
+  onOpenReturnLoan: PropTypes.func.isRequired,
 };

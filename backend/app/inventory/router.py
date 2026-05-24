@@ -27,6 +27,7 @@ from ..schemas import (
     InventoryEventCreate,
     InventoryEventDetail,
     InventoryEventItemAssign,
+    InventoryEventItemReturn,
     InventoryCategoryCreate,
     InventoryCategoryPublic,
     InventoryCategoryUpdate,
@@ -88,6 +89,27 @@ from .service import (
 )
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def sync_system_quantity_flag(db: Session, item: InventoryItem) -> None:
+    sold_out_flag = next(
+        (
+            flag for flag in db.query(InventoryFlag)
+            .filter(InventoryFlag.team_id == item.team_id, InventoryFlag.is_system.is_(True))
+            .all()
+            if flag.name and flag.name.strip().lower() == "došlo"
+        ),
+        None,
+    )
+    if item.quantity <= 0:
+        if sold_out_flag:
+            item.flag_id = sold_out_flag.id
+        item.status = InventoryItemStatus.MISSING
+        return
+    if sold_out_flag and item.flag_id == sold_out_flag.id:
+        item.flag_id = None
+    if item.status == InventoryItemStatus.MISSING:
+        item.status = InventoryItemStatus.AVAILABLE
 
 
 @router.get("/overview", response_model=InventoryOverviewResponse)
@@ -222,6 +244,7 @@ def create_item(
         notes=payload.notes,
         qr_identifier=generate_qr_identifier(db),
     )
+    sync_system_quantity_flag(db, item)
     db.add(item)
     db.flush()
     for index, photo in enumerate(payload.photos):
@@ -274,6 +297,8 @@ def update_item(
         if value is not None and value != getattr(item, field):
             changes[field] = {"from": getattr(item, field), "to": value}
             setattr(item, field, value)
+
+    sync_system_quantity_flag(db, item)
 
     touch_updated_location(item)
     if changes:
@@ -434,6 +459,29 @@ def update_event(
     return serialize_event(get_event_or_404(db, current_user, event.id))
 
 
+@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_event(
+    event_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> None:
+    event = get_event_or_404(db, current_user, event_id)
+
+    # Check if there are any items that haven't been fully returned
+    unreturned_items = [
+        item for item in event.items
+        if (item.planned_quantity or 0) > (item.returned_quantity or 0)
+    ]
+
+    if unreturned_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Event still contains unreturned items. Return or remove them first.",
+        )
+    db.delete(event)
+    db.commit()
+
+
 @router.get("/events/{event_id}", response_model=InventoryEventDetail)
 def get_event_detail(
     event_id: int,
@@ -503,6 +551,56 @@ def remove_item_from_event(
     if item.current_location == f"Akce: {event.name}":
         item.current_location = item.default_location
     db.delete(assignment)
+    db.commit()
+    return serialize_event_detail(get_event_or_404(db, current_user, event.id))
+
+
+@router.post("/events/{event_id}/items/{event_item_id}/return", response_model=InventoryEventDetail)
+def return_event_item(
+    event_id: int,
+    event_item_id: int,
+    payload: InventoryEventItemReturn,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventoryEventDetail:
+    event = get_event_or_404(db, current_user, event_id)
+    assignment = next((value for value in event.items if value.id == event_item_id), None)
+    if not assignment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event assignment not found")
+
+    remaining_quantity = max(assignment.planned_quantity - assignment.returned_quantity, 0)
+    if payload.quantity > remaining_quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Returned quantity exceeds remaining quantity")
+
+    item = assignment.item
+    condition = normalize_scan_condition(payload.condition) or "ok"
+    assignment.returned_quantity += payload.quantity
+    if condition == "damaged":
+        assignment.damaged_quantity += payload.quantity
+        item.status = InventoryItemStatus.DAMAGED
+
+    if payload.current_location:
+        item.current_location = payload.current_location
+    elif assignment.returned_quantity >= assignment.planned_quantity and item.current_location == f"Akce: {event.name}":
+        item.current_location = item.default_location
+
+    record_history(
+        db,
+        item=item,
+        actor=current_user,
+        action=InventoryHistoryAction.EVENT_RETURNED,
+        payload={
+            "event_id": event.id,
+            "event_name": event.name,
+            "returned_quantity": payload.quantity,
+            "condition": condition,
+            "current_location": item.current_location,
+            "note": payload.note,
+        },
+        event=event,
+    )
+    db.add(assignment)
+    db.add(item)
     db.commit()
     return serialize_event_detail(get_event_or_404(db, current_user, event.id))
 
@@ -670,6 +768,7 @@ def create_location(
         team_id=payload.team_id,
         parent_id=payload.parent_id,
         name=payload.name,
+        description=payload.description,
         path=build_location_path(payload.name, parent),
         sort_order=payload.sort_order,
     )
@@ -704,6 +803,8 @@ def update_location(
         location.parent_id = data["parent_id"]
     if "name" in data:
         location.name = data["name"]
+    if "description" in data:
+        location.description = data["description"]
     if "sort_order" in data:
         location.sort_order = data["sort_order"]
     location.path = build_location_path(location.name, parent)
@@ -843,7 +944,7 @@ def create_flag(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryFlagPublic:
     ensure_team_exists_and_allowed(db, current_user, payload.team_id)
-    flag = InventoryFlag(**payload.model_dump())
+    flag = InventoryFlag(**payload.model_dump(), is_system=False)
     db.add(flag)
     db.commit()
     db.refresh(flag)
@@ -858,6 +959,8 @@ def update_flag(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryFlagPublic:
     flag = get_flag_or_404(db, current_user, flag_id)
+    if flag.is_system:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System flag cannot be edited")
     data = payload.model_dump(exclude_unset=True)
     if "team_id" in data:
         ensure_team_exists_and_allowed(db, current_user, data["team_id"])
@@ -875,6 +978,268 @@ def delete_flag(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> None:
     flag = get_flag_or_404(db, current_user, flag_id)
+    if flag.is_system:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="System flag cannot be deleted")
     db.query(InventoryItem).filter(InventoryItem.flag_id == flag.id).update({"flag_id": None})
     db.delete(flag)
     db.commit()
+
+
+# Label Template endpoints
+@router.get("/label-templates", response_model=list[InventoryLabelTemplatePublic])
+def list_label_templates(
+    team_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> list[InventoryLabelTemplatePublic]:
+    return serialize_templates(get_scoped_templates(db, current_user, team_id))
+
+
+@router.post("/label-templates", response_model=InventoryLabelTemplatePublic, status_code=status.HTTP_201_CREATED)
+def create_label_template(
+    payload: InventoryLabelTemplateCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventoryLabelTemplatePublic:
+    ensure_team_exists_and_allowed(db, current_user, payload.team_id)
+    template = InventoryLabelTemplate(**payload.model_dump())
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    return serialize_template(template)
+
+
+@router.patch("/label-templates/{template_id}", response_model=InventoryLabelTemplatePublic)
+def update_label_template(
+    template_id: int,
+    payload: InventoryLabelTemplateUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventoryLabelTemplatePublic:
+    template = get_template_or_404(db, current_user, template_id)
+    data = payload.model_dump(exclude_unset=True)
+    if "team_id" in data:
+        ensure_team_exists_and_allowed(db, current_user, data["team_id"])
+    for key, value in data.items():
+        setattr(template, key, value)
+    db.add(template)
+    db.commit()
+    return serialize_template(template)
+
+
+@router.delete("/label-templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_label_template(
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> None:
+    template = get_template_or_404(db, current_user, template_id)
+    db.delete(template)
+    db.commit()
+
+
+@router.post("/labels/preview")
+def preview_labels(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+):
+    try:
+        template_id = payload.get("template_id")
+        latex_template = payload.get("latex_template", "")
+
+        # Use template from DB or provided LaTeX
+        if template_id:
+            template = get_template_or_404(db, current_user, template_id)
+            latex_content = template.latex_template or latex_template
+        else:
+            latex_content = latex_template
+
+        if not latex_content:
+            raise HTTPException(status_code=400, detail="No LaTeX template provided")
+    except Exception as e:
+        print(f"Preview error: {e}")
+        print(f"Payload: {payload}")
+        raise HTTPException(status_code=400, detail=f"Error processing request: {str(e)}")
+
+    # Sample data for preview
+    sample_data = {
+        'name': 'Turistický batoh Deuter Futura Pro 36',
+        'category': 'Turistika » Batohy',
+        'current_location': 'Sklad A » Regál 3',
+        'default_location': 'Sklad A » Regál 3',
+        'status': 'Dostupné',
+        'qr_identifier': 'SCT-2024-001'
+    }
+
+    # LaTeX escape function
+    def latex_escape(text):
+        if not text:
+            return ''
+        replacements = {
+            '&': '\\&', '%': '\\%', '$': '\\$', '#': '\\#',
+            '^': '\\textasciicircum{}', '_': '\\_', '{': '\\{', '}': '\\}',
+            '~': '\\textasciitilde{}', '\\': '\\textbackslash{}'
+        }
+        for char, escape in replacements.items():
+            text = text.replace(char, escape)
+        return text
+
+    # Replace placeholders - fix double braces issue
+    preview_latex = latex_content
+    for field, value in sample_data.items():
+        escaped_value = latex_escape(value)
+        # Handle both {{field}} and {{{{field}}}} patterns
+        preview_latex = preview_latex.replace('{{' + field + '}}', escaped_value)
+        preview_latex = preview_latex.replace('{{{{' + field + '}}}}', escaped_value)
+
+    return {"latex_code": preview_latex, "sample_data": sample_data}
+
+
+@router.post("/labels/generate")
+def generate_labels(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+):
+    template_id = payload.get("template_id")
+    item_ids = payload.get("item_ids", [])
+
+    template = get_template_or_404(db, current_user, template_id)
+    items = db.query(InventoryItem).filter(InventoryItem.id.in_(item_ids)).all()
+
+    import os
+    import tempfile
+    import subprocess
+    from fastapi import Response
+
+    # Get field value for item
+    def get_field_value(item, field_name):
+        if field_name == 'name':
+            return item.name or ''
+        elif field_name == 'category':
+            return item.category or ''
+        elif field_name == 'current_location':
+            return item.current_location or ''
+        elif field_name == 'default_location':
+            return item.default_location or ''
+        elif field_name == 'status':
+            if item.current_location != item.default_location:
+                return 'Navráceno jinam'
+            return 'Dostupné'
+        elif field_name == 'qr_identifier':
+            return item.qr_identifier or ''
+        else:
+            return ''
+
+    # LaTeX escape function
+    def latex_escape(text):
+        if not text:
+            return ''
+        # Escape special LaTeX characters
+        replacements = {
+            '&': '\\&',
+            '%': '\\%',
+            '$': '\\$',
+            '#': '\\#',
+            '^': '\\textasciicircum{}',
+            '_': '\\_',
+            '{': '\\{',
+            '}': '\\}',
+            '~': '\\textasciitilde{}',
+            '\\': '\\textbackslash{}'
+        }
+        for char, escape in replacements.items():
+            text = text.replace(char, escape)
+        return text
+
+    # Default LaTeX template if none in database
+    width_mm = template.width_mm
+    height_mm = template.height_mm
+    qr_size_mm = template.qr_size_mm or 10
+
+    default_latex_template = f"""\\documentclass[border=2pt]{{standalone}}
+\\usepackage[utf8]{{inputenc}}
+\\usepackage[T1]{{fontenc}}
+\\usepackage{{qrcode}}
+\\usepackage{{geometry}}
+\\geometry{{paperwidth={width_mm}mm,paperheight={height_mm}mm,margin=0pt}}
+
+\\begin{{document}}
+\\pagestyle{{empty}}
+
+\\begin{{minipage}}[t][{height_mm}mm][t]{{{width_mm}mm}}
+\\vspace*{{3mm}}
+\\hspace*{{3mm}}\\qrcode[height={qr_size_mm}mm]{{{{{{qr_identifier}}}}}}
+
+\\vspace{{-{height_mm - 10}mm}}
+\\hspace*{{{qr_size_mm + 6}mm}}
+\\begin{{minipage}}{{{width_mm - qr_size_mm - 9}mm}}
+\\textbf{{{{{{name}}}}}} \\\\
+\\small {{{{{{category}}}}}} \\\\
+\\tiny {{{{{{default_location}}}}}} \\\\
+\\end{{minipage}}
+\\end{{minipage}}
+
+\\end{{document}}"""
+
+    # Use template's LaTeX code or default
+    latex_template = getattr(template, 'latex_template', None) or default_latex_template
+
+    # Create temporary directory
+    with tempfile.TemporaryDirectory() as temp_dir:
+        all_pdfs = []
+
+        for i, item in enumerate(items):
+            # Replace placeholders with actual values
+            latex_content = latex_template
+
+            # Replace all field placeholders - fix double braces issue
+            field_names = ['name', 'category', 'current_location', 'default_location', 'status', 'qr_identifier']
+            for field_name in field_names:
+                field_value = get_field_value(item, field_name)
+                escaped_value = latex_escape(field_value)
+                # Handle both {{field}} and {{{{field}}}} patterns
+                latex_content = latex_content.replace('{{' + field_name + '}}', escaped_value)
+                latex_content = latex_content.replace('{{{{' + field_name + '}}}}', escaped_value)
+
+            # Write LaTeX file
+            tex_file = os.path.join(temp_dir, f"label_{i}.tex")
+            with open(tex_file, 'w', encoding='utf-8') as f:
+                f.write(latex_content)
+
+            # Compile LaTeX to PDF
+            try:
+                result = subprocess.run([
+                    'pdflatex', '-interaction=nonstopmode', '-output-directory', temp_dir, tex_file
+                ], capture_output=True, text=True, timeout=30)
+
+                pdf_file = os.path.join(temp_dir, f"label_{i}.pdf")
+                if os.path.exists(pdf_file):
+                    with open(pdf_file, 'rb') as f:
+                        all_pdfs.append(f.read())
+                else:
+                    # Fallback to simple text if LaTeX compilation fails
+                    raise Exception("LaTeX compilation failed")
+
+            except Exception as e:
+                # Return error or fallback
+                return Response(
+                    content=f"Chyba při generování štítků: {str(e)}".encode(),
+                    media_type="text/plain",
+                    status_code=500
+                )
+
+        if all_pdfs:
+            # For now, return first PDF (could merge multiple PDFs later)
+            return Response(
+                content=all_pdfs[0],
+                media_type="application/pdf",
+                headers={"Content-Disposition": "attachment; filename=labels.pdf"}
+            )
+        else:
+            return Response(
+                content="Nepodařilo se vygenerovat žádné štítky".encode(),
+                media_type="text/plain",
+                status_code=500
+            )

@@ -37,6 +37,10 @@ export default function InventoryLocationDialog({
           <input className="form-control" type="number" min="0" value={form.sort_order} onChange={(event) => onChange("sort_order", Number(event.target.value))} />
         </div>
         <div className="col-12">
+          <label className="form-label">Popis</label>
+          <textarea className="form-control" rows={3} value={form.description || ""} onChange={(event) => onChange("description", event.target.value)} />
+        </div>
+        <div className="col-12">
           <label className="form-label">Nadřazená lokace</label>
           <select className="form-select" value={form.parent_id ?? ""} onChange={(event) => onChange("parent_id", event.target.value ? Number(event.target.value) : null)}>
             <option value="">Bez nadřazené lokace</option>

@@ -645,8 +645,16 @@ class InventoryEventItemAssign(BaseModel):
     note: Optional[str] = None
 
 
+class InventoryEventItemReturn(BaseModel):
+    quantity: int = Field(default=1, ge=1)
+    condition: Optional[str] = None
+    current_location: Optional[str] = Field(default=None, max_length=200)
+    note: Optional[str] = None
+
+
 class InventoryEventItemPublic(BaseModel):
     id: int
+    event_id: int
     item_id: int
     planned_quantity: int
     returned_quantity: int
@@ -656,6 +664,19 @@ class InventoryEventItemPublic(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryItemEventAssignmentPublic(BaseModel):
+    id: int
+    event_id: int
+    event_name: Optional[str] = None
+    event_status: Optional[InventoryEventStatus] = None
+    planned_quantity: int
+    returned_quantity: int
+    damaged_quantity: int
+    note: Optional[str]
+    created_at: datetime
+    updated_at: datetime
 
 
 class InventoryEventPublic(BaseModel):
@@ -701,7 +722,8 @@ class InventoryLabelTemplateBase(BaseModel):
     qr_size_mm: float = Field(default=18, gt=0)
     title_font_size: float = Field(default=14, gt=0)
     meta_font_size: float = Field(default=9, gt=0)
-    fields: List[str] = Field(default_factory=lambda: ["name", "category", "current_location", "qr_identifier"])
+    fields: str = Field(default='[{"id":"name","x":15,"y":8,"fontSize":12,"align":"left","enabled":true},{"id":"category","x":15,"y":18,"fontSize":8,"align":"left","enabled":true},{"id":"qr_identifier","x":15,"y":25,"fontSize":6,"align":"left","enabled":true}]')
+    latex_template: Optional[str] = None
 
 
 class InventoryLabelTemplateCreate(InventoryLabelTemplateBase):
@@ -718,7 +740,8 @@ class InventoryLabelTemplateUpdate(BaseModel):
     qr_size_mm: Optional[float] = Field(default=None, gt=0)
     title_font_size: Optional[float] = Field(default=None, gt=0)
     meta_font_size: Optional[float] = Field(default=None, gt=0)
-    fields: Optional[List[str]] = None
+    fields: Optional[str] = None
+    latex_template: Optional[str] = None
 
 
 class InventoryLabelTemplatePublic(InventoryLabelTemplateBase):
@@ -731,6 +754,7 @@ class InventoryLabelTemplatePublic(InventoryLabelTemplateBase):
 
 class InventoryLocationBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
     team_id: int
     parent_id: Optional[int] = None
     sort_order: int = Field(default=0, ge=0)
@@ -742,6 +766,7 @@ class InventoryLocationCreate(InventoryLocationBase):
 
 class InventoryLocationUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
     team_id: Optional[int] = None
     parent_id: Optional[int] = None
     sort_order: Optional[int] = Field(default=None, ge=0)
@@ -752,6 +777,7 @@ class InventoryLocationPublic(BaseModel):
     team_id: int
     parent_id: Optional[int]
     name: str
+    description: Optional[str]
     path: str
     sort_order: int
     created_at: datetime
@@ -825,6 +851,7 @@ class InventoryFlagPublic(BaseModel):
     name: str
     description: Optional[str]
     color: str
+    is_system: bool = False
     sort_order: int
     created_at: datetime
     updated_at: datetime
@@ -854,6 +881,7 @@ class InventoryItemPublic(BaseModel):
     open_loan_quantity: int = 0
     active_event_quantity: int = 0
     current_event_name: Optional[str] = None
+    event_assignments: List[InventoryItemEventAssignmentPublic] = Field(default_factory=list)
     photos: List[InventoryPhotoPublic] = Field(default_factory=list)
     loans: List[InventoryLoanPublic] = Field(default_factory=list)
     history_entries: List[InventoryHistoryPublic] = Field(default_factory=list)

@@ -17,6 +17,10 @@ export const inventoryApi = {
     const { data } = await api.patch(`/inventory/items/${id}`, payload);
     return data;
   },
+  getItem: async (id) => {
+    const { data } = await api.get(`/inventory/items/${id}`);
+    return data;
+  },
   bulkUpdateItems: async (payload) => {
     const { data } = await api.post("/inventory/items/bulk", payload);
     return data;
@@ -45,6 +49,9 @@ export const inventoryApi = {
     const { data } = await api.patch(`/inventory/events/${id}`, payload);
     return data;
   },
+  deleteEvent: async (id) => {
+    await api.delete(`/inventory/events/${id}`);
+  },
   getEventDetail: async (id) => {
     const { data } = await api.get(`/inventory/events/${id}`);
     return data;
@@ -55,6 +62,10 @@ export const inventoryApi = {
   },
   removeItemFromEvent: async (eventId, eventItemId) => {
     const { data } = await api.delete(`/inventory/events/${eventId}/items/${eventItemId}`);
+    return data;
+  },
+  returnEventItem: async (eventId, eventItemId, payload) => {
+    const { data } = await api.post(`/inventory/events/${eventId}/items/${eventItemId}/return`, payload);
     return data;
   },
   scanEventReturn: async (eventId, payload) => {
@@ -73,7 +84,20 @@ export const inventoryApi = {
     const { data } = await api.patch(`/inventory/label-templates/${id}`, payload);
     return data;
   },
+  deleteTemplate: async (id) => {
+    await api.delete(`/inventory/label-templates/${id}`);
+  },
+  generateLabels: async (payload) => {
+    const response = await api.post("/inventory/labels/generate", payload, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
   previewLabels: async (payload) => {
+    const { data } = await api.post("/inventory/labels/preview", payload);
+    return data;
+  },
+  previewLatexTemplate: async (payload) => {
     const { data } = await api.post("/inventory/labels/preview", payload);
     return data;
   },

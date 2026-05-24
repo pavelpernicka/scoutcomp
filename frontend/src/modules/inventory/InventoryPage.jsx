@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { inventoryApi } from "./api";
 import {
-  buildLoanGroups,
+  buildOpenLoanEntries,
   buildCategoryOptions,
   buildLocationOptions,
   buildPathMetaMap,
@@ -17,8 +17,11 @@ import {
 import InventoryBulkDialog from "./components/InventoryBulkDialog";
 import InventoryCategoryDialog from "./components/InventoryCategoryDialog";
 import InventoryEventDialog from "./components/InventoryEventDialog";
+import InventoryEventReturnDialog from "./components/InventoryEventReturnDialog";
 import InventoryFlagDialog from "./components/InventoryFlagDialog";
 import InventoryItemDialog from "./components/InventoryItemDialog";
+import InventoryLabelGenerateDialog from "./components/InventoryLabelGenerateDialog";
+import InventoryLoanReturnDialog from "./components/InventoryLoanReturnDialog";
 import InventoryLocationDialog from "./components/InventoryLocationDialog";
 import InventorySidebar from "./components/InventorySidebar";
 import InventoryTemplateDialog from "./components/InventoryTemplateDialog";
@@ -48,7 +51,7 @@ const emptyItemForm = {
   team_id: "",
 };
 
-const emptyEventForm = { name: "", team_id: "", start_date: "", end_date: "", note: "", status: "planned" };
+const emptyEventForm = { name: "", team_id: "", start_date: "", end_date: "", note: "", status: "active" };
 const emptyPhotoForm = { image_url: "", caption: "" };
 const emptyLoanForm = { borrower_name: "", quantity: 1, due_at: "", note: "" };
 const emptyTemplateForm = {
@@ -63,7 +66,7 @@ const emptyTemplateForm = {
   meta_font_size: 9,
   fields: ["name", "category", "current_location", "qr_identifier"],
 };
-const emptyLocationForm = { name: "", parent_id: null, sort_order: 0, team_id: "" };
+const emptyLocationForm = { name: "", description: "", parent_id: null, sort_order: 0, team_id: "" };
 const emptyCategoryForm = { name: "", description: "", parent_id: null, color: "#5b8def", sort_order: 0, team_id: "" };
 const emptyFlagForm = { name: "", description: "", color: "neutral", sort_order: 0, team_id: "" };
 const emptyBulkForm = {
@@ -73,6 +76,15 @@ const emptyBulkForm = {
   set_flag_id: null,
   assign_event_id: null,
   assign_event_quantity: 1,
+};
+const emptyEventReturnForm = {
+  quantity: 1,
+  condition: "ok",
+  current_location: "",
+  note: "",
+};
+const emptyLoanReturnForm = {
+  note: "",
 };
 
 function toIsoOrNull(value) {
@@ -92,20 +104,25 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
-  const [assignQuantity, setAssignQuantity] = useState(1);
   const [scanValue, setScanValue] = useState("");
   const [eventScanValue, setEventScanValue] = useState("");
   const [scanFeedback, setScanFeedback] = useState("");
   const [labelPreview, setLabelPreview] = useState(null);
+  const [selectedLabelTemplateId, setSelectedLabelTemplateId] = useState(null);
 
   const [itemDialogVisible, setItemDialogVisible] = useState(false);
   const [itemDialogMode, setItemDialogMode] = useState("create");
   const [eventDialogVisible, setEventDialogVisible] = useState(false);
+  const [eventDialogMode, setEventDialogMode] = useState("create");
   const [templateDialogVisible, setTemplateDialogVisible] = useState(false);
+  const [labelDialogVisible, setLabelDialogVisible] = useState(false);
   const [locationDialogVisible, setLocationDialogVisible] = useState(false);
   const [categoryDialogVisible, setCategoryDialogVisible] = useState(false);
   const [flagDialogVisible, setFlagDialogVisible] = useState(false);
   const [bulkDialogVisible, setBulkDialogVisible] = useState(false);
+  const [eventReturnDialogVisible, setEventReturnDialogVisible] = useState(false);
+  const [loanReturnDialogVisible, setLoanReturnDialogVisible] = useState(false);
+  const [sidebarDrawerVisible, setSidebarDrawerVisible] = useState(false);
   const [bulkMode, setBulkMode] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -118,8 +135,14 @@ export default function InventoryPage() {
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
   const [flagForm, setFlagForm] = useState(emptyFlagForm);
   const [bulkForm, setBulkForm] = useState(emptyBulkForm);
+  const [eventReturnForm, setEventReturnForm] = useState(emptyEventReturnForm);
   const [photoForm, setPhotoForm] = useState(emptyPhotoForm);
   const [loanForm, setLoanForm] = useState(emptyLoanForm);
+  const [loanReturnForm, setLoanReturnForm] = useState(emptyLoanReturnForm);
+  const [returningEventEntry, setReturningEventEntry] = useState(null);
+  const [returningEventItem, setReturningEventItem] = useState(null);
+  const [returningLoan, setReturningLoan] = useState(null);
+  const [returningLoanItem, setReturningLoanItem] = useState(null);
 
   const { data: teams = [] } = useQuery({
     queryKey: ["inventory", "teams"],
@@ -144,6 +167,7 @@ export default function InventoryPage() {
   const locations = overview?.locations ?? [];
   const categoriesTree = overview?.categories ?? [];
   const flags = overview?.flags ?? [];
+  const editableFlags = useMemo(() => flags.filter((flag) => !flag.is_system), [flags]);
   const flatLocations = useMemo(() => flattenLocationTree(locations), [locations]);
   const flatCategories = useMemo(() => flattenLocationTree(categoriesTree), [categoriesTree]);
   const categoryMetaByPath = useMemo(() => buildPathMetaMap(categoriesTree), [categoriesTree]);
@@ -169,7 +193,7 @@ export default function InventoryPage() {
     return [...options, ...extra];
   }, [categoriesTree, items]);
   const locationPaths = useMemo(() => collectLocationPaths(locations), [locations]);
-  const loanGroups = useMemo(() => buildLoanGroups(items), [items]);
+  const openLoanEntries = useMemo(() => buildOpenLoanEntries(items), [items]);
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null;
 
@@ -209,17 +233,13 @@ export default function InventoryPage() {
     onSuccess: (item) => {
       invalidateInventory();
       setSelectedItemId(item.id);
-      setItemDialogVisible(false);
       setSelectedItemIds((current) => Array.from(new Set([...current, item.id])));
     },
   });
 
   const updateItemMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.updateItem(id, payload),
-    onSuccess: () => {
-      invalidateInventory();
-      setItemDialogVisible(false);
-    },
+    onSuccess: () => invalidateInventory(),
   });
 
   const saveEventMutation = useMutation({
@@ -248,15 +268,36 @@ export default function InventoryPage() {
   });
 
   const returnLoanMutation = useMutation({
-    mutationFn: inventoryApi.returnLoan,
+    mutationFn: ({ loanId, payload = {} }) => inventoryApi.returnLoan(loanId, payload),
     onSuccess: () => invalidateInventory(),
   });
 
-  const createTemplateMutation = useMutation({
-    mutationFn: inventoryApi.createTemplate,
+  const templateMutation = useMutation({
+    mutationFn: (data) => data.id ? inventoryApi.updateTemplate(data.id, data) : inventoryApi.createTemplate(data),
     onSuccess: () => {
       invalidateInventory();
       setTemplateDialogVisible(false);
+      setTemplateForm(emptyTemplateForm);
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: inventoryApi.deleteTemplate,
+    onSuccess: () => invalidateInventory(),
+  });
+
+  const generateLabelsMutation = useMutation({
+    mutationFn: inventoryApi.generateLabels,
+    onSuccess: (pdfBlob) => {
+      // Create download link for PDF
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'labels.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     },
   });
 
@@ -334,9 +375,25 @@ export default function InventoryPage() {
     onSuccess: () => invalidateInventory(),
   });
 
-  const removeEventItemMutation = useMutation({
-    mutationFn: ({ eventId, eventItemId }) => inventoryApi.removeItemFromEvent(eventId, eventItemId),
-    onSuccess: () => invalidateInventory(),
+  const deleteEventMutation = useMutation({
+    mutationFn: inventoryApi.deleteEvent,
+    onSuccess: () => {
+      const fallback = events.find((entry) => entry.id !== selectedEventId) || null;
+      setSelectedEventId(fallback?.id ?? null);
+      invalidateInventory();
+    },
+  });
+
+  const returnEventItemMutation = useMutation({
+    mutationFn: ({ eventId, eventItemId, payload }) => inventoryApi.returnEventItem(eventId, eventItemId, payload),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(["inventory", "event", selectedEventId], detail);
+      invalidateInventory();
+      setEventReturnDialogVisible(false);
+      setReturningEventEntry(null);
+      setReturningEventItem(null);
+      setEventReturnForm(emptyEventReturnForm);
+    },
   });
 
   const bulkUpdateMutation = useMutation({
@@ -363,24 +420,7 @@ export default function InventoryPage() {
     onSuccess: (data) => setLabelPreview(data),
   });
 
-  const openCreateItem = () => {
-    setItemDialogMode("create");
-    setItemForm({
-      ...emptyItemForm,
-      team_id: teams[0]?.id || "",
-      category: categoryFilter || "",
-      flag_id: null,
-      default_location: locationFilter || "",
-      current_location: locationFilter || "",
-      current_location_mode: "location",
-      current_event_id: null,
-      current_event_quantity: 1,
-    });
-    setLoanForm(emptyLoanForm);
-    setItemDialogVisible(true);
-  };
-
-  const openEditItem = (item) => {
+  const hydrateItemEditor = (item) => {
     setSelectedItemId(item.id);
     setItemDialogMode("edit");
     setItemForm({
@@ -399,7 +439,6 @@ export default function InventoryPage() {
       notes: item.notes || "",
       team_id: item.team_id || teams[0]?.id || "",
     });
-    setSelectedItemIds((current) => Array.from(new Set([...current, item.id])));
     setPhotoForm(emptyPhotoForm);
     const openLoan = (item.loans || []).find((loan) => !loan.returned_at);
     setLoanForm(openLoan ? {
@@ -408,23 +447,58 @@ export default function InventoryPage() {
       due_at: openLoan.due_at ? openLoan.due_at.slice(0, 16) : "",
       note: openLoan.note || "",
     } : emptyLoanForm);
+  };
+
+  const openCreateItem = () => {
+    setItemDialogMode("create");
+    setItemForm({
+      ...emptyItemForm,
+      team_id: teams[0]?.id || "",
+      category: categoryFilter || "",
+      flag_id: null,
+      default_location: locationFilter || "",
+      current_location: locationFilter || "",
+      current_location_mode: "location",
+      current_event_id: null,
+      current_event_quantity: 1,
+    });
+    setLoanForm(emptyLoanForm);
     setItemDialogVisible(true);
   };
 
+  const openEditItem = (item) => {
+    hydrateItemEditor(item);
+    setItemDialogVisible(true);
+  };
+
+  const openLabelDialog = () => {
+    if (selectedItem && templates.length > 0) {
+      // Open dialog to select template
+      setSelectedLabelTemplateId(templates[0]?.id ?? null);
+      setLabelPreview(null);
+      setLabelDialogVisible(true);
+    } else {
+      // No templates available
+      alert("Nejsou k dispozici žádné šablony štítků.");
+    }
+  };
+
   const openCreateEvent = () => {
+    setEventDialogMode("create");
     setEventForm({ ...emptyEventForm, team_id: teams[0]?.id || "" });
     setEventDialogVisible(true);
   };
 
   const openEditEvent = () => {
     if (!selectedEvent) return;
+    setEventDialogMode("edit");
     setEventForm({
       name: selectedEvent.name || "",
       team_id: selectedEvent.team_id || teams[0]?.id || "",
       start_date: selectedEvent.start_date ? selectedEvent.start_date.slice(0, 16) : "",
       end_date: selectedEvent.end_date ? selectedEvent.end_date.slice(0, 16) : "",
       note: selectedEvent.note || "",
-      status: selectedEvent.status || "planned",
+      status: selectedEvent.status || "active",
     });
     setEventDialogVisible(true);
   };
@@ -462,6 +536,7 @@ export default function InventoryPage() {
     setEditingLocation(location);
     setLocationForm({
       name: location.name,
+      description: location.description || "",
       parent_id: location.parent_id,
       sort_order: location.sort_order,
       team_id: location.team_id,
@@ -523,19 +598,21 @@ export default function InventoryPage() {
     if (flagFilter === String(flag.id)) setFlagFilter("");
   };
 
-  const handleSaveItem = async () => {
+  const handleSaveItem = async ({ closeAfterSave = true, section = "all" } = {}) => {
+    const shouldProcessLocationFlows = section === "all" || section === "location";
     const payload = {
       ...itemForm,
       team_id: Number(itemForm.team_id),
       flag_id: itemForm.flag_id || null,
       current_location: itemForm.current_location_mode === "location" ? itemForm.current_location : itemForm.default_location,
+      photos: !selectedItem && photoForm.image_url ? [{ image_url: photoForm.image_url }] : [],
     };
     try {
       const savedItem = itemDialogMode === "create"
         ? await createItemMutation.mutateAsync(payload)
         : await updateItemMutation.mutateAsync({ id: selectedItemId, payload });
 
-      if (itemForm.current_location_mode === "event" && itemForm.current_event_id) {
+      if (shouldProcessLocationFlows && itemForm.current_location_mode === "event" && itemForm.current_event_id) {
         await assignEventItemMutation.mutateAsync({
           eventId: itemForm.current_event_id,
           payload: {
@@ -543,12 +620,18 @@ export default function InventoryPage() {
             planned_quantity: Number(itemForm.current_event_quantity || 1),
           },
         });
+
+        // Refresh the item data to show the new assignment
+        if (!closeAfterSave) {
+          const freshItem = await inventoryApi.getItem(savedItem.id);
+          openEditItem(freshItem);
+        }
       }
 
       if (
-        itemForm.current_location_mode === "loan"
+        shouldProcessLocationFlows
+        && itemForm.current_location_mode === "loan"
         && loanForm.borrower_name.trim()
-        && (!selectedItem || selectedItem.open_loan_quantity === 0)
       ) {
         await createLoanMutation.mutateAsync({
           itemId: savedItem.id,
@@ -558,6 +641,25 @@ export default function InventoryPage() {
           },
         });
       }
+
+      invalidateInventory();
+      const freshItem = await inventoryApi.getItem(savedItem.id);
+      hydrateItemEditor(freshItem);
+      if (!closeAfterSave && section === "location" && itemForm.current_location_mode === "event") {
+        setItemForm((current) => ({
+          ...current,
+          current_event_id: null,
+          current_event_quantity: Math.max(1, freshItem.available_quantity || 1),
+        }));
+      }
+      if (!closeAfterSave && section === "location" && itemForm.current_location_mode === "loan") {
+        setLoanForm(emptyLoanForm);
+      }
+      if (closeAfterSave) {
+        setItemDialogVisible(false);
+      } else {
+        setItemDialogVisible(true);
+      }
     } catch {
       return;
     }
@@ -565,7 +667,7 @@ export default function InventoryPage() {
 
   const handleSaveEvent = () => {
     saveEventMutation.mutate({
-      id: selectedEventId,
+      id: eventDialogMode === "edit" ? selectedEventId : null,
       payload: {
         ...eventForm,
         team_id: Number(eventForm.team_id),
@@ -582,6 +684,7 @@ export default function InventoryPage() {
   const handleSaveLocation = () => {
     const payload = {
       name: locationForm.name,
+      description: locationForm.description,
       parent_id: locationForm.parent_id,
       sort_order: Number(locationForm.sort_order || 0),
       team_id: Number(locationForm.team_id),
@@ -664,6 +767,95 @@ export default function InventoryPage() {
     scanReturnMutation.mutate({ eventId: selectedEventId, payload: { qr_identifier: eventScanValue.trim() } });
   };
 
+  const openEventReturnDialog = (entry, item) => {
+    const remainingQuantity = Math.max((entry?.planned_quantity || 0) - (entry?.returned_quantity || 0), 0);
+    setReturningEventEntry(entry);
+    setReturningEventItem(item);
+    setEventReturnForm({
+      quantity: Math.max(remainingQuantity, 1),
+      condition: "ok",
+      current_location: item?.default_location || "",
+      note: "",
+    });
+    setEventReturnDialogVisible(true);
+  };
+
+  const openLoanReturnDialog = (loan, item) => {
+    setReturningLoan(loan);
+    setReturningLoanItem(item);
+    setLoanReturnForm(emptyLoanReturnForm);
+    setLoanReturnDialogVisible(true);
+  };
+
+  const handleDeleteEvent = () => {
+    if (!selectedEvent) return;
+
+    // Check if there are any items that haven't been fully returned
+    const unreturned = (eventDetail?.items || []).filter((entry) => {
+      const plannedQuantity = entry.planned_quantity || 0;
+      const returnedQuantity = entry.returned_quantity || 0;
+      return plannedQuantity > returnedQuantity;
+    });
+
+    if (unreturned.length > 0) {
+      window.alert("Tuto akci teď nelze smazat. Nejdřív vrať nebo odeber všechny věci z akce.");
+      return;
+    }
+
+    if (!window.confirm(`Smazat akci "${selectedEvent.name}"?`)) return;
+    deleteEventMutation.mutate(selectedEvent.id);
+  };
+
+  const handleSubmitEventReturn = async (editAfterSave = false) => {
+    if (!selectedEventId || !returningEventEntry) return;
+    try {
+      await returnEventItemMutation.mutateAsync({
+        eventId: selectedEventId,
+        eventItemId: returningEventEntry.id,
+        payload: {
+          quantity: Number(eventReturnForm.quantity || 1),
+          condition: eventReturnForm.condition,
+          current_location: eventReturnForm.current_location || null,
+          note: eventReturnForm.note || null,
+        },
+      });
+      if (editAfterSave && returningEventItem) {
+        const freshItem = await inventoryApi.getItem(returningEventItem.id);
+        openEditItem(freshItem);
+      }
+    } catch {
+      return;
+    }
+  };
+
+  const handleSubmitLoanReturn = async (editAfterSave = false) => {
+    if (!returningLoan) return;
+    try {
+      // If this is a combined loan entry, return all individual loans
+      const loansToReturn = returningLoan.loans || [returningLoan];
+
+      for (const loan of loansToReturn) {
+        await returnLoanMutation.mutateAsync({
+          loanId: loan.id,
+          payload: {
+            note: loanReturnForm.note || null,
+          },
+        });
+      }
+
+      setLoanReturnDialogVisible(false);
+      setReturningLoan(null);
+      setReturningLoanItem(null);
+      setLoanReturnForm(emptyLoanReturnForm);
+      if (editAfterSave && returningLoanItem) {
+        const freshItem = await inventoryApi.getItem(returningLoanItem.id);
+        openEditItem(freshItem);
+      }
+    } catch {
+      return;
+    }
+  };
+
   if (isLoading) return <div className="loader">Načítám sklad…</div>;
   if (error) return <div className="alert alert-danger">Nepodařilo se načíst skladový modul.</div>;
 
@@ -677,6 +869,16 @@ export default function InventoryPage() {
   return (
     <>
       <div className="inventory-shell">
+        <div className="inventory-mobile-topbar inventory-mobile-only">
+          <button type="button" className="btn btn-outline-primary" onClick={() => setSidebarDrawerVisible(true)}>
+            <i className="fas fa-bars me-2"></i>Menu
+          </button>
+          <div className="inventory-mobile-topbar-title">Oddílový inventář</div>
+          <button type="button" className="btn btn-primary" onClick={openCreateItem}>
+            <i className="fas fa-plus"></i>
+          </button>
+        </div>
+
         <InventorySidebar
           screens={INVENTORY_SCREENS}
           activeScreen={activeScreen}
@@ -723,12 +925,12 @@ export default function InventoryPage() {
           )}
           {activeScreen === "loans" && (
             <InventoryLoansScreen
-              loanGroups={loanGroups}
+              loanEntries={openLoanEntries}
               onOpenItem={(itemId) => {
                 const item = items.find((entry) => entry.id === itemId);
                 if (item) openEditItem(item);
               }}
-              onReturnLoan={(loanId) => returnLoanMutation.mutate(loanId)}
+              onOpenReturnLoan={openLoanReturnDialog}
             />
           )}
           {activeScreen === "events" && (
@@ -736,17 +938,14 @@ export default function InventoryPage() {
               events={events}
               selectedEvent={selectedEvent}
               eventDetail={eventDetail}
+              items={items}
+              categoryMetaByPath={categoryMetaByPath}
               onSelectEvent={setSelectedEventId}
               onOpenCreate={openCreateEvent}
               onOpenEdit={openEditEvent}
-              selectedItem={selectedItem}
-              assignQuantity={assignQuantity}
-              onAssignQuantityChange={setAssignQuantity}
-              onAssignSelectedItem={() => selectedItem && selectedEventId && assignEventItemMutation.mutate({
-                eventId: selectedEventId,
-                payload: { item_id: selectedItem.id, planned_quantity: assignQuantity },
-              })}
-              onRemoveEventItem={(eventItemId) => removeEventItemMutation.mutate({ eventId: selectedEventId, eventItemId })}
+              onDeleteEvent={handleDeleteEvent}
+              onOpenReturnItem={openEventReturnDialog}
+              onOpenItem={openEditItem}
             />
           )}
           {activeScreen === "scanner" && (
@@ -765,11 +964,12 @@ export default function InventoryPage() {
             <InventoryLabelsScreen
               templates={templates}
               selectedItemIds={selectedItemIds}
-              labelPreview={labelPreview}
-              onOpenTemplate={() => setTemplateDialogVisible(true)}
-              onPreview={() => {
-                if (templates[0]) previewLabelsMutation.mutate({ item_ids: selectedItemIds, template_id: templates[0].id });
-              }}
+              items={items}
+              teams={teams}
+              onCreateTemplate={(templateData) => templateMutation.mutate(templateData)}
+              onUpdateTemplate={(id, templateData) => templateMutation.mutate({ ...templateData, id })}
+              onDeleteTemplate={(id) => deleteTemplateMutation.mutate(id)}
+              onGenerateLabels={(templateId, itemIds) => generateLabelsMutation.mutate({ template_id: templateId, item_ids: itemIds })}
             />
           )}
           {activeScreen === "locations" && (
@@ -805,6 +1005,21 @@ export default function InventoryPage() {
         </div>
       </div>
 
+      {sidebarDrawerVisible ? (
+        <>
+          <button type="button" className="inventory-drawer-backdrop inventory-mobile-only" onClick={() => setSidebarDrawerVisible(false)} aria-label="Zavřít menu" />
+          <InventorySidebar
+            screens={INVENTORY_SCREENS}
+            activeScreen={activeScreen}
+            onSelectScreen={setActiveScreen}
+            onCreateItem={openCreateItem}
+            stats={{ items: items.length, locations: locationPaths.length, events: events.length, categories: flatCategories.length }}
+            isDrawer
+            onClose={() => setSidebarDrawerVisible(false)}
+          />
+        </>
+      ) : null}
+
       <InventoryItemDialog
         isVisible={itemDialogVisible}
         mode={itemDialogMode}
@@ -819,10 +1034,38 @@ export default function InventoryPage() {
         onChange={(field, value) => setItemForm((current) => ({ ...current, [field]: value }))}
         onPhotoChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
         onLoanChange={(field, value) => setLoanForm((current) => ({ ...current, [field]: value }))}
-        onAddPhoto={() => selectedItem && addPhotoMutation.mutate({ id: selectedItem.id, payload: photoForm })}
-        onReturnLoan={(loanId) => returnLoanMutation.mutate(loanId)}
+        onUploadPhoto={(imageUrl) => {
+          if (selectedItem) {
+            addPhotoMutation.mutate({ id: selectedItem.id, payload: { image_url: imageUrl, caption: null } });
+          }
+        }}
+        onReturnLoan={(loanId) => returnLoanMutation.mutate({ loanId })}
         onClose={() => setItemDialogVisible(false)}
-        onSubmit={handleSaveItem}
+        onSubmit={() => handleSaveItem({ closeAfterSave: true })}
+        onSaveSection={(section) => handleSaveItem({ closeAfterSave: false, section })}
+        onOpenReturnEvent={(assignment) => {
+          if (!selectedItem) return;
+          openEventReturnDialog(assignment, selectedItem);
+        }}
+        onOpenLabelDialog={openLabelDialog}
+      />
+
+      <InventoryLabelGenerateDialog
+        isVisible={labelDialogVisible}
+        item={selectedItem}
+        templates={templates}
+        selectedTemplateId={selectedLabelTemplateId}
+        labelPreview={labelPreview}
+        onChangeTemplate={setSelectedLabelTemplateId}
+        onClose={() => {
+          setLabelDialogVisible(false);
+          setLabelPreview(null);
+        }}
+        onPreview={() => {
+          if (selectedItem && selectedLabelTemplateId) {
+            previewLabelsMutation.mutate({ item_ids: [selectedItem.id], template_id: selectedLabelTemplateId });
+          }
+        }}
       />
 
       <InventoryEventDialog
@@ -832,6 +1075,24 @@ export default function InventoryPage() {
         onClose={() => setEventDialogVisible(false)}
         onSubmit={handleSaveEvent}
       />
+
+      <InventoryEventReturnDialog
+        isVisible={eventReturnDialogVisible}
+        entry={returningEventEntry}
+        item={returningEventItem}
+        form={eventReturnForm}
+        locationOptions={locationTreeOptions}
+        onChange={(field, value) => setEventReturnForm((current) => ({ ...current, [field]: value }))}
+        onClose={() => {
+          setEventReturnDialogVisible(false);
+          setReturningEventEntry(null);
+          setReturningEventItem(null);
+          setEventReturnForm(emptyEventReturnForm);
+        }}
+        onSubmit={() => handleSubmitEventReturn(false)}
+        onSubmitAndEdit={() => handleSubmitEventReturn(true)}
+      />
+
 
       <InventoryTemplateDialog
         isVisible={templateDialogVisible}
@@ -881,7 +1142,7 @@ export default function InventoryPage() {
         eventOptions={events}
         locationOptions={locationOptions}
         categoryOptions={categoryOptions}
-        flags={flags}
+        flags={editableFlags}
         selectedCount={selectedItemIds.length}
         onChange={(field, value) => setBulkForm((current) => ({ ...current, [field]: value }))}
         onClose={() => { setBulkDialogVisible(false); setBulkMode(null); }}

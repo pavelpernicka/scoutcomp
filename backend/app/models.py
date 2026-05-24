@@ -571,6 +571,7 @@ class InventoryLabelTemplate(Base):
     title_font_size = Column(Float, nullable=False, default=14)
     meta_font_size = Column(Float, nullable=False, default=9)
     fields = Column(JSON, nullable=False, default=list)
+    latex_template = Column(Text, nullable=True)  # LaTeX template with {{field}} placeholders
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -584,6 +585,7 @@ class InventoryLocation(Base):
     team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey("inventory_locations.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
     path = Column(String(500), nullable=False, index=True)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=func.now(), nullable=False)
@@ -631,6 +633,7 @@ class InventoryFlag(Base):
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
     color = Column(String(32), nullable=False, default="neutral")
+    is_system = Column(Boolean, nullable=False, default=False)
     sort_order = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)

@@ -33,6 +33,7 @@ from ..schemas import (
     InventoryEventPublic,
     InventoryEventScanPublic,
     InventoryEventItemPublic,
+    InventoryItemEventAssignmentPublic,
     InventoryFlagPublic,
     InventoryHistoryPublic,
     InventoryItemPublic,
@@ -311,6 +312,22 @@ def serialize_item(item: InventoryItem) -> InventoryItemPublic:
         open_loan_quantity=get_open_loan_quantity(item),
         active_event_quantity=get_active_event_quantity(item),
         current_event_name=active_assignment.event.name if active_assignment and active_assignment.event else None,
+        event_assignments=[
+            InventoryItemEventAssignmentPublic(
+                id=assignment.id,
+                event_id=assignment.event_id,
+                event_name=assignment.event.name if assignment.event else None,
+                event_status=assignment.event.status if assignment.event else None,
+                planned_quantity=assignment.planned_quantity,
+                returned_quantity=assignment.returned_quantity,
+                damaged_quantity=assignment.damaged_quantity,
+                note=assignment.note,
+                created_at=assignment.created_at,
+                updated_at=assignment.updated_at,
+            )
+            for assignment in item.event_assignments
+            if assignment.event and assignment.returned_quantity < assignment.planned_quantity
+        ],
         photos=[InventoryPhotoPublic.model_validate(photo) for photo in item.photos],
         loans=[InventoryLoanPublic.model_validate(loan) for loan in item.loans],
         history_entries=[InventoryHistoryPublic.model_validate(entry) for entry in item.history_entries],
@@ -322,7 +339,53 @@ def serialize_event(event: InventoryEvent) -> InventoryEventPublic:
 
 
 def serialize_template(template: InventoryLabelTemplate) -> InventoryLabelTemplatePublic:
-    return InventoryLabelTemplatePublic.model_validate(template)
+    import json
+
+    # Convert old format fields to new format if needed
+    fields = template.fields
+    if isinstance(fields, list):
+        # Convert old list format to new JSON format
+        default_positions = {
+            "name": {"x": 15, "y": 8, "fontSize": 12, "align": "left"},
+            "category": {"x": 15, "y": 18, "fontSize": 8, "align": "left"},
+            "current_location": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
+            "default_location": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
+            "status": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
+            "qr_identifier": {"x": 15, "y": 25, "fontSize": 6, "align": "left"}
+        }
+
+        converted_fields = []
+        for i, field_name in enumerate(fields):
+            pos = default_positions.get(field_name, {"x": 15, "y": 8 + i * 7, "fontSize": 8, "align": "left"})
+            converted_fields.append({
+                "id": field_name,
+                "enabled": True,
+                **pos
+            })
+
+        fields = json.dumps(converted_fields)
+    elif not isinstance(fields, str):
+        # Fallback for any other format
+        fields = '[{"id":"name","x":15,"y":8,"fontSize":12,"align":"left","enabled":true}]'
+
+    # Create dict with converted fields
+    template_data = {
+        "id": template.id,
+        "team_id": template.team_id,
+        "name": template.name,
+        "width_mm": template.width_mm,
+        "height_mm": template.height_mm,
+        "qr_x_mm": template.qr_x_mm,
+        "qr_y_mm": template.qr_y_mm,
+        "qr_size_mm": template.qr_size_mm,
+        "title_font_size": template.title_font_size,
+        "meta_font_size": template.meta_font_size,
+        "fields": fields,
+        "created_at": template.created_at,
+        "updated_at": template.updated_at
+    }
+
+    return InventoryLabelTemplatePublic.model_validate(template_data)
 
 
 def build_location_path(name: str, parent: Optional[InventoryLocation]) -> str:
@@ -337,6 +400,7 @@ def serialize_location_tree(locations: Iterable[InventoryLocation]) -> list[Inve
             team_id=location.team_id,
             parent_id=location.parent_id,
             name=location.name,
+            description=location.description,
             path=location.path,
             sort_order=location.sort_order,
             created_at=location.created_at,

@@ -117,7 +117,6 @@ export default function Layout({ children }) {
                       {(isAdmin || isGroupAdmin) && (
                         <li>
                           <NavLink to="/inventory" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            <i className="fas fa-warehouse me-2 text-primary"></i>
                             {t("navigation.inventory")}
                           </NavLink>
                         </li>

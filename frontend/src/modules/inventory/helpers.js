@@ -43,6 +43,7 @@ export const LABEL_FIELD_OPTIONS = [
   { value: "default_location", label: "Výchozí lokace" },
   { value: "status", label: "Stav" },
   { value: "qr_identifier", label: "QR identifikátor" },
+  { value: "custom_text", label: "Textové pole" },
 ];
 
 export const INVENTORY_SCREENS = [
@@ -51,7 +52,7 @@ export const INVENTORY_SCREENS = [
   { id: "events", label: "Akce", icon: "fas fa-campground" },
   { id: "scanner", label: "Skener", icon: "fas fa-qrcode" },
   { id: "labels", label: "Štítky", icon: "fas fa-tags" },
-  { id: "locations", label: "Defaultní lokace", icon: "fas fa-sitemap" },
+  { id: "locations", label: "Lokace", icon: "fas fa-sitemap" },
   { id: "categories", label: "Kategorie", icon: "fas fa-diagram-project" },
   { id: "flags", label: "Příznaky", icon: "fas fa-palette" },
 ];
@@ -310,4 +311,54 @@ export function buildLoanGroups(items) {
     });
   });
   return [...groups.values()].sort((left, right) => left.borrowerName.localeCompare(right.borrowerName, "cs", { sensitivity: "base" }));
+}
+
+export function buildOpenLoanEntries(items) {
+  const combinedLoans = new Map();
+
+  items.forEach((item) => {
+    (item.loans || [])
+      .filter((loan) => !loan.returned_at)
+      .forEach((loan) => {
+        const key = `${item.id}-${loan.borrower_name.trim()}`;
+
+        if (combinedLoans.has(key)) {
+          // Combine with existing loan entry
+          const existing = combinedLoans.get(key);
+          existing.quantity += loan.quantity;
+          existing.loans.push(loan);
+          // Keep the earliest borrowed_at date
+          if (loan.borrowed_at < existing.borrowed_at) {
+            existing.borrowed_at = loan.borrowed_at;
+          }
+          // Keep the earliest due_at date if any
+          if (loan.due_at && (!existing.due_at || loan.due_at < existing.due_at)) {
+            existing.due_at = loan.due_at;
+          }
+          // Combine notes
+          if (loan.note && !existing.note.includes(loan.note)) {
+            existing.note = existing.note ? `${existing.note}; ${loan.note}` : loan.note;
+          }
+        } else {
+          // Create new combined entry
+          combinedLoans.set(key, {
+            id: loan.id, // Use first loan's ID as primary
+            borrower_name: loan.borrower_name,
+            quantity: loan.quantity,
+            borrowed_at: loan.borrowed_at,
+            due_at: loan.due_at,
+            note: loan.note || "",
+            item,
+            itemId: item.id,
+            itemName: item.name,
+            quantityUnit: item.quantity_unit,
+            qrIdentifier: item.qr_identifier,
+            loans: [loan], // Keep track of individual loans for return functionality
+          });
+        }
+      });
+  });
+
+  return [...combinedLoans.values()]
+    .sort((left, right) => left.itemName.localeCompare(right.itemName, "cs", { sensitivity: "base" }));
 }

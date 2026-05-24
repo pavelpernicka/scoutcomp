@@ -19,7 +19,7 @@ export default function InventoryFlagDialog({
       title={editing ? "Upravit příznak" : "Nový příznak"}
       subtitle="Příznaky jsou jednoduché štítky s barvou pro rychlou orientaci."
       icon={<i className="fas fa-palette"></i>}
-      size="md"
+      size="sm"
       footer={(
         <>
           <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Zavřít</button>
