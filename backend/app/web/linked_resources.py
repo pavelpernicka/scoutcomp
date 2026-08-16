@@ -63,6 +63,22 @@ def resource_snapshot(db: Session, kind: Any, resource_id: Any, *, published: bo
     defaults = item.published_default_props if published else item.default_props
     variants = item.published_variants if published else item.variants
     published_version = int(item.published_version or 0)
+    if (
+        published
+        and (published_version < 1 or not project_data)
+        and item.origin_resource_id
+        and int(item.draft_version or 1) == 1
+    ):
+        # Compatibility for pristine forks created before clone endpoints
+        # preserved the origin's published baseline.
+        origin = db.query(type(item)).filter_by(id=item.origin_resource_id).one_or_none()
+        if origin is not None and origin.published_project_data and int(origin.published_version or 0) > 0:
+            project_data = origin.published_project_data
+            css = origin.published_css
+            schema = origin.published_prop_schema
+            defaults = origin.published_default_props
+            variants = origin.published_variants
+            published_version = int(origin.published_version or 1)
     if published and (published_version < 1 or not project_data):
         raise ResourcePropsError(f"Linked {kind} has not been published")
     schema = normalise_prop_schema(schema or [])

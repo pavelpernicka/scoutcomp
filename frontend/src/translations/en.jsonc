@@ -106,7 +106,8 @@
         "emptyState": "Empty state",
         "templatePart": "Global part",
         "globalPart": "Global part",
-        "linkedResource": "Linked resource"
+        "linkedResource": "Linked resource",
+        "contentSlot": "Page content"
       },
       "inspector": {
         "layout": "Layout",
@@ -126,6 +127,8 @@
         "expand": "Expand element",
         "collapse": "Collapse element",
         "customName": "Custom layer name",
+        "editableArea": "Editable area",
+        "delete": "Delete element (Delete)",
         "states": {
           "global": "Shared global part",
           "linked": "Linked resource",
@@ -191,6 +194,11 @@
       "bindingField": "Field",
       "bindingTarget": "Target",
       "addBinding": "Add binding",
+      "repeatHelp": "Choose a collection and configure its filters, sorting and limit. Content inside the element renders once for every record.",
+      "repeatSelectSource": "Choose a data source…",
+      "repeatEmptySource": "This repeat has no source yet. It can be saved safely and renders its empty state on the site.",
+      "repeatFields": "Record fields",
+      "repeatFieldsHelp": "Select an element inside the Repeat and use its Data tab to bind text, a link or an image to one of these fields.",
       "codeHelp": "Directly edit the selected element's HTML and CSS. Changes apply to the editor.",
       "html": "HTML",
       "css": "CSS",
@@ -221,7 +229,8 @@
         "emptyState": "Empty state",
         "templatePart": "Template part",
         "globalPart": "Global site part",
-        "linkedResource": "Linked component or section"
+        "linkedResource": "Linked component or section",
+        "contentSlot": "Drag a section or element here"
       },
       "data": {
         "field": "Field",
@@ -235,6 +244,14 @@
         "scopeSource": "Public data source",
         "targetText": "Text",
         "targetRichText": "Rich text",
+        "targetHref": "Link URL (href)",
+        "targetSrc": "Image URL (src)",
+        "targetAlt": "Image alternative text",
+        "targetDatetime": "Date and time (datetime)",
+        "targetTitle": "Element title",
+        "targetStyleColor": "Text color",
+        "targetStyleBackgroundColor": "Background color",
+        "targetStyleOpacity": "Opacity",
         "source": "Source",
         "limit": "Limit",
         "sort": "Sort",

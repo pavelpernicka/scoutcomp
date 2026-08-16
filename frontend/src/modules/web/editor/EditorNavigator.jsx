@@ -3,12 +3,13 @@ import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
 import { getComponentDisplayName, getComponentState, getComponentTechnicalName } from "./componentDisplayName";
+import { canDeleteComponent, isContentSlot } from "./componentOwnership";
 
 const childModels = (component) => component?.components?.()?.models || [];
 const componentKey = (component) => component?.cid || component?.getId?.();
 const isAtomic = (component) => ["sc-template-part", "sc-global-part", "sc-resource-instance"].includes(component?.get?.("type"));
 
-function NavigatorNode({ component, depth, selected, openIds, editingId, onSelect, onToggle, onEdit, onCommitName }) {
+function NavigatorNode({ component, depth, selected, openIds, editingId, root, disabled, onSelect, onToggle, onEdit, onCommitName, onDelete }) {
   const { t } = useTranslation();
   const id = componentKey(component);
   const children = isAtomic(component) ? [] : childModels(component);
@@ -17,10 +18,12 @@ function NavigatorNode({ component, depth, selected, openIds, editingId, onSelec
   const state = getComponentState(component);
   const label = getComponentDisplayName(component, t);
   const technical = getComponentTechnicalName(component);
+  const contentSlot = isContentSlot(component);
+  const removable = !disabled && canDeleteComponent(component, root);
   const stateIcons = { global: "fa-earth-europe", linked: "fa-link", detached: "fa-link-slash", dynamic: "fa-database" };
 
   return <li role="treeitem" aria-selected={active} aria-expanded={children.length ? open : undefined}>
-    <div className={`web-editor-navigator-row state-${state}${active ? " active" : ""}`} style={{ paddingLeft: `${depth * 12 + 6}px` }}>
+    <div className={`web-editor-navigator-row state-${state}${contentSlot ? " is-content-slot" : ""}${active ? " active" : ""}`} style={{ paddingLeft: `${depth * 12 + 6}px` }}>
       <button type="button" className="web-editor-navigator-toggle" disabled={!children.length} aria-label={open ? t("web.editor.navigator.collapse") : t("web.editor.navigator.expand")} onClick={() => onToggle(id)}>
         {children.length ? <i className={`fas fa-chevron-${open ? "down" : "right"}`} /> : <span />}
       </button>
@@ -36,11 +39,16 @@ function NavigatorNode({ component, depth, selected, openIds, editingId, onSelec
         }}
       /> : <button type="button" className="web-editor-navigator-select" onClick={() => onSelect(component)} onDoubleClick={() => onEdit(id)}>
         <span className="web-editor-navigator-label">{label}</span>
-        <small>{technical}</small>
+        <small>{contentSlot ? `${technical} · ${t("web.editor.navigator.editableArea")}` : technical}</small>
       </button>}
-      {stateIcons[state] && <i className={`fas ${stateIcons[state]} web-editor-navigator-state`} title={t(`web.editor.navigator.states.${state}`)} />}
+      {contentSlot
+        ? <i className="fas fa-inbox web-editor-navigator-state" title={t("web.editor.navigator.editableArea")} />
+        : stateIcons[state]
+          ? <i className={`fas ${stateIcons[state]} web-editor-navigator-state`} title={t(`web.editor.navigator.states.${state}`)} />
+          : <span />}
+      {removable ? <button type="button" className="web-editor-navigator-delete" title={t("web.editor.navigator.delete")} aria-label={t("web.editor.navigator.delete")} onClick={(event) => { event.stopPropagation(); onDelete(component); }}><i className="fas fa-trash" /></button> : <span />}
     </div>
-    {children.length > 0 && open && <ul role="group">{children.map((child) => <NavigatorNode key={componentKey(child)} component={child} depth={depth + 1} selected={selected} openIds={openIds} editingId={editingId} onSelect={onSelect} onToggle={onToggle} onEdit={onEdit} onCommitName={onCommitName} />)}</ul>}
+    {children.length > 0 && open && <ul role="group">{children.map((child) => <NavigatorNode key={componentKey(child)} component={child} depth={depth + 1} selected={selected} openIds={openIds} editingId={editingId} root={root} disabled={disabled} onSelect={onSelect} onToggle={onToggle} onEdit={onEdit} onCommitName={onCommitName} onDelete={onDelete} />)}</ul>}
   </li>;
 }
 
@@ -50,13 +58,16 @@ NavigatorNode.propTypes = {
   selected: PropTypes.object,
   openIds: PropTypes.instanceOf(Set).isRequired,
   editingId: PropTypes.string,
+  root: PropTypes.object.isRequired,
+  disabled: PropTypes.bool.isRequired,
   onSelect: PropTypes.func.isRequired,
   onToggle: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onCommitName: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
 };
 
-export default function EditorNavigator({ editor, selected, onSelect }) {
+export default function EditorNavigator({ editor, selected, onSelect, disabled = false }) {
   const { t } = useTranslation();
   const [, setRevision] = useState(0);
   const [openIds, setOpenIds] = useState(() => new Set());
@@ -102,9 +113,26 @@ export default function EditorNavigator({ editor, selected, onSelect }) {
     else component.unset?.("custom-name");
     setEditingId(null);
   };
+  const deleteComponent = (component) => {
+    if (disabled) return false;
+    if (!canDeleteComponent(component, root)) return false;
+    const parent = component.parent?.();
+    const siblings = parent?.components?.()?.models || [];
+    const index = siblings.indexOf(component);
+    const fallback = siblings[index + 1] || siblings[index - 1] || parent;
+    editor.runCommand?.("core:component-delete", { component });
+    if (fallback && fallback !== root) editor.select?.(fallback);
+    return true;
+  };
+  const onKeyDown = (event) => {
+    if (!selected || !["Delete", "Backspace"].includes(event.key)) return;
+    const target = event.target;
+    if (target?.matches?.("input, textarea, select") || target?.isContentEditable) return;
+    if (deleteComponent(selected)) event.preventDefault();
+  };
 
   if (!editor || !root) return <p className="web-editor-panel-empty">{t("web.editor.navigator.loading")}</p>;
-  return <div className="web-editor-navigator"><p className="web-editor-navigator-help">{t("web.editor.navigator.help")}</p><ul role="tree" aria-label={t("web.editor.navigator.label")}>{roots.map((component) => <NavigatorNode key={componentKey(component)} component={component} depth={0} selected={selected} openIds={openIds} editingId={editingId} onSelect={onSelect} onToggle={toggle} onEdit={setEditingId} onCommitName={commitName} />)}</ul></div>;
+  return <div className="web-editor-navigator" tabIndex={0} onKeyDown={onKeyDown}><p className="web-editor-navigator-help">{t("web.editor.navigator.help")}</p><ul role="tree" aria-label={t("web.editor.navigator.label")}>{roots.map((component) => <NavigatorNode key={componentKey(component)} component={component} depth={0} selected={selected} openIds={openIds} editingId={editingId} root={root} disabled={disabled} onSelect={onSelect} onToggle={toggle} onEdit={setEditingId} onCommitName={commitName} onDelete={deleteComponent} />)}</ul></div>;
 }
 
-EditorNavigator.propTypes = { editor: PropTypes.object, selected: PropTypes.object, onSelect: PropTypes.func.isRequired };
+EditorNavigator.propTypes = { editor: PropTypes.object, selected: PropTypes.object, onSelect: PropTypes.func.isRequired, disabled: PropTypes.bool };

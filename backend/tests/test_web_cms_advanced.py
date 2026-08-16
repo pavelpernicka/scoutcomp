@@ -91,6 +91,48 @@ def test_repeat_can_traverse_a_bounded_context_collection(db_session):
     assert "Child" in body
 
 
+def test_repeat_with_empty_source_is_safe_wip_state(db_session):
+    """An empty repeat source saves/publishes and renders the empty branch."""
+    compiled = compile_project(project({
+        "type": "sc-repeat",
+        "source": "",
+        "params": {"limit": 2},
+        "components": [text("Row")],
+        "empty": [text("Není zdroj")],
+    }))
+    assert compiled.tree["type"] == "wrapper"
+    repeat = compiled.tree["components"][0]
+    assert repeat["source"] == ""
+    # No resolver is consulted; the empty branch renders instead.
+    def fail_resolver(*args):
+        raise AssertionError("resolver must not run for an empty source")
+
+    rendered = render_project(db_session, compiled.tree, resolver=fail_resolver)
+    assert "Není zdroj" in rendered
+    assert "Row" not in rendered
+
+
+def test_repeat_without_source_attribute_is_safe_wip_state(db_session):
+    """GrapesJS may omit default-valued properties; a missing source is also a safe WIP state."""
+    compiled = compile_project(project({
+        "type": "sc-repeat",
+        "components": [text("Row")],
+        "empty": [text("Zatím bez dat")],
+    }))
+    repeat = compiled.tree["components"][0]
+    assert repeat["source"] == ""
+    assert "Zatím bez dat" in render_project(db_session, compiled.tree)
+
+
+def test_repeat_still_rejects_invalid_nonempty_source(db_session):
+    with pytest.raises(CompileError):
+        compile_project(project({"type": "sc-repeat", "source": "not a valid source!", "components": []}))
+    with pytest.raises(CompileError):
+        compile_project(project({"type": "sc-repeat", "source": {"bad": "shape"}, "components": []}))
+    with pytest.raises(CompileError):
+        compile_project(project({"type": "sc-repeat", "source": 0, "components": []}))
+
+
 def test_renderer_rejects_xss_unsafe_urls_and_css_breakout(db_session):
     with pytest.raises(CompileError):
         compile_project(project({"type": "default", "tagName": "script", "content": "alert(1)"}))
@@ -413,6 +455,50 @@ def test_grapes_default_component_survives_draft_preview_and_publish_routes(db_s
     assert published["published_revision_id"] is not None
 
 
+def test_empty_repeat_survives_draft_save_and_publish_routes(db_session):
+    from app.web.routes_pages import DraftPayload, PublishPayload, publish_page_draft, save_page_draft
+
+    user = User(
+        username="repeat-editor",
+        real_name="Repeat editor",
+        password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    page = WebPage(
+        slug="empty-repeat-page",
+        path_segment="empty-repeat-page",
+        path="/empty-repeat-page",
+        title="Empty repeat page",
+        data=project(),
+        draft_version=1,
+    )
+    db_session.add_all([user, page])
+    db_session.commit()
+
+    payload_project = project({
+        "type": "sc-repeat",
+        "source": "",
+        "params": {},
+        "components": [text("Row")],
+        "empty": [text("Zatím bez zdroje")],
+    })
+    saved = save_page_draft(
+        page.id,
+        DraftPayload(project_data=payload_project, expected_version=1),
+        db_session,
+        user,
+    )
+    assert saved["draft_version"] == 2
+
+    published = publish_page_draft(
+        page.id,
+        PublishPayload(expected_version=2),
+        db_session,
+        user,
+    )
+    assert published["published_revision_id"] is not None
+
+
 def test_linked_component_variants_merge_order(db_session):
     """default_props -> variant.props -> instance.props wins."""
     component = WebReusableComponent(
@@ -641,6 +727,95 @@ def test_template_slot_composes_page_tree(db_session):
     page_tree = compile_project(project(text("Page body"))).tree
     rendered = render_project(db_session, template.tree, slot_tree=page_tree)
     assert rendered == "<main><header>Header</header><main><p>Page body</p></main><footer>Footer</footer></main>"
+
+
+def test_slot_name_defaults_when_grapes_omits_default_model_property():
+    with_attribute = compile_project(project({
+        "type": "sc-slot",
+        "attributes": {"data-sc-type": "slot", "data-sc-slot": "content"},
+        "components": [],
+    }))
+    legacy_default = compile_project(project({"type": "sc-slot", "components": []}))
+
+    assert with_attribute.tree["components"][0]["name"] == "content"
+    assert legacy_default.tree["components"][0]["name"] == "content"
+
+    with pytest.raises(CompileError, match="Slot name is invalid"):
+        compile_project(project({
+            "type": "sc-slot",
+            "attributes": {"data-sc-slot": "Invalid slot"},
+            "components": [],
+        }))
+    with pytest.raises(CompileError, match="Slot name is invalid"):
+        compile_project(project({
+            "type": "sc-slot",
+            "name": "",
+            "attributes": {"data-sc-slot": "content"},
+            "components": [],
+        }))
+
+
+def test_linked_layout_merge_save_publish_with_legacy_default_slot(db_session):
+    """Legacy sc-slot data (no ``name`` and no ``data-sc-slot`` attribute) must
+    behave as the default content slot through the whole linked-layout chain."""
+    from app.web.routes_pages import _merged_editor_project
+
+    layout_project = project(
+        {"type": "text", "tagName": "header", "content": "Header"},
+        {"type": "sc-slot", "components": []},
+    )
+    layout = WebTemplate(
+        key="legacy-slot-layout",
+        qualified_key="site:template:legacy-slot-layout",
+        name="Legacy slot layout",
+        html="",
+        usage_mode="linked_layout",
+        project_data=layout_project,
+        published_project_data=deepcopy(layout_project),
+        published_version=1,
+    )
+    page = WebPage(
+        slug="legacy-slot-page",
+        path_segment="legacy-slot-page",
+        path="/legacy-slot-page",
+        title="Legacy slot page",
+        data=project(text("Body")),
+        draft_version=1,
+    )
+    db_session.add_all([layout, page])
+    db_session.flush()
+    page.template_id = layout.id
+    db_session.commit()
+
+    merged = _merged_editor_project(page, db_session)
+    root = merged["pages"][0]["frames"][0]["component"]
+    slot = root["components"][1]
+    assert slot["type"] == "sc-slot"
+    assert slot["components"][0]["content"] == "Body"
+    # Template shell stays locked even though the slot carried no name.
+    assert root["components"][0]["editable"] is False
+    assert slot.get("editable") is not False
+
+    save_draft(
+        db_session,
+        page,
+        expected_version=1,
+        project=merged,
+        user_id=1,
+        metadata={"title": page.title, "slug": page.slug, "template_id": layout.id},
+    )
+    # Only the slot children survive into the page-owned project.
+    assert page.data["pages"][0]["frames"][0]["component"]["components"][0]["content"] == "Body"
+
+    revision = publish_page(db_session, page, expected_version=2, user_id=1)
+    # The revision stores the page-owned tree; template composition happens
+    # at render time. Render through the page pipeline so the legacy slot of
+    # the template is composed with the published page content.
+    from app.web.pages import compile_draft
+    from app.web.routes_pages import _render_compiled_page
+    document = _render_compiled_page(db_session, page, compile_draft(page), published=True)
+    assert "Header" in document
+    assert "Body" in document
 
 
 def test_legacy_html_sanitizer_preserves_placeholder_and_removes_xss():
@@ -917,12 +1092,53 @@ def test_template_clone_creates_editable_site_owned_variant(db_session):
     assert clone["id"] != origin.id
     assert clone["forked_from_id"] == origin.id
     assert clone["usage_mode"] == "copy_on_create"
-    assert clone["published_version"] == 0
+    assert clone["published_version"] == 1
+    assert clone["published_project_data"] == origin.published_project_data
     assert clone["is_system"] is False
     cloned_model = db_session.get(WebTemplate, clone["id"])
     assert cloned_model.theme_version_id is None
     assert cloned_model.project_data == origin.project_data
     assert cloned_model.project_data is not origin.project_data
+
+
+def test_page_publish_adopts_published_baseline_for_pristine_legacy_template_fork(db_session):
+    origin_project = project(
+        {"type": "sc-slot", "name": "content", "components": []},
+    )
+    origin = WebTemplate(
+        key="published-origin", qualified_key="theme:templates:published-origin",
+        name="Published origin", html="", usage_mode="linked_layout",
+        project_data=origin_project,
+        published_project_data=deepcopy(origin_project),
+        published_version=1,
+    )
+    legacy_fork = WebTemplate(
+        key="legacy-fork", qualified_key="site:template:legacy-fork",
+        name="Legacy fork", html="", usage_mode="linked_layout",
+        project_data=deepcopy(origin_project),
+        published_project_data=None,
+        published_version=0,
+        draft_version=1,
+    )
+    db_session.add(origin)
+    db_session.flush()
+    legacy_fork.forked_from_id = origin.id
+    db_session.add(legacy_fork)
+    db_session.flush()
+    page = WebPage(
+        slug="legacy-fork-page", path_segment="legacy-fork-page",
+        path="/legacy-fork-page", title="Legacy fork page",
+        data=project(text("Publish me")), template_id=legacy_fork.id,
+        template=legacy_fork.key, draft_version=1,
+    )
+    db_session.add(page)
+    db_session.commit()
+
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+
+    assert revision.id == page.published_revision_id
+    assert legacy_fork.published_version == 1
+    assert legacy_fork.published_project_data == origin.published_project_data
 
 
 def test_installed_theme_template_cannot_be_deleted_directly(db_session):
@@ -1086,7 +1302,11 @@ def test_linked_layout_save_reload_publish_preserves_page_css(db_session):
     page_style = {"selectors": [{"name": "page-card"}], "style": {"color": "red"}}
     layout_project = project(
         {"type": "text", "tagName": "header", "content": "Header"},
-        {"type": "sc-slot", "name": "content", "components": []},
+        {
+            "type": "sc-slot",
+            "attributes": {"data-sc-type": "slot", "data-sc-slot": "content"},
+            "components": [],
+        },
         styles=[template_style],
     )
     layout = WebTemplate(

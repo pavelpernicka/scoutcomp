@@ -1,4 +1,5 @@
 export const SC_COMPONENT_TYPES = Object.freeze({
+  slot: "sc-slot",
   bind: "sc-bind",
   repeat: "sc-repeat",
   condition: "sc-condition",

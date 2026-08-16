@@ -15,7 +15,10 @@ from unidecode import unidecode
 
 from ..models import WebPage, WebPageRevision, WebTemplate
 from .linked_resources import validate_linked_resource_instances
-from .renderer import CompiledProject, CompileError, compile_project, render_document
+from .renderer import (
+    CompiledProject, CompileError, compile_project, component_slot_name,
+    render_document,
+)
 from .resource_props import ResourcePropsError
 
 
@@ -183,7 +186,7 @@ def _find_content_slot(node: dict[str, Any], depth: int = 0) -> dict[str, Any] |
     """Locate the first ``sc-slot`` named "content" in a project tree."""
     if not isinstance(node, dict) or depth > 40:
         return None
-    if node.get("type") == "sc-slot" and node.get("name") == "content":
+    if node.get("type") == "sc-slot" and component_slot_name(node) == "content":
         return node
     for child in node.get("components", []):
         found = _find_content_slot(child, depth + 1)
@@ -195,7 +198,7 @@ def _find_content_slot(node: dict[str, Any], depth: int = 0) -> dict[str, Any] |
 def _content_slots(node: dict[str, Any], depth: int = 0) -> list[dict[str, Any]]:
     if not isinstance(node, dict) or depth > 40:
         return []
-    found = [node] if node.get("type") == "sc-slot" and node.get("name") == "content" else []
+    found = [node] if node.get("type") == "sc-slot" and component_slot_name(node) == "content" else []
     for child in node.get("components", []):
         found.extend(_content_slots(child, depth + 1))
     return found
@@ -391,6 +394,29 @@ def compile_draft(page: WebPage, override: dict[str, Any] | None = None) -> Comp
     return compile_project(deepcopy(override) if override is not None else project_data(page))
 
 
+def _adopt_pristine_template_fork_baseline(db: Session, template: WebTemplate) -> None:
+    """Backfill the published baseline for clones created by older code.
+
+    A pristine site-owned fork is semantically identical to its published
+    origin until edited. Older clone routes stored only the draft, which made
+    every page using such a fork unpublishable. Adoption happens only as part
+    of an explicit page publish and never promotes edited draft content.
+    """
+    if (
+        template.published_project_data
+        or int(template.published_version or 0) > 0
+        or not template.forked_from_id
+        or int(template.draft_version or 1) != 1
+    ):
+        return
+    origin = db.query(WebTemplate).filter_by(id=template.forked_from_id).one_or_none()
+    if origin is None or not origin.published_project_data or int(origin.published_version or 0) < 1:
+        return
+    template.published_project_data = deepcopy(origin.published_project_data)
+    template.published_css = origin.published_css or ""
+    template.published_version = int(origin.published_version or 1)
+
+
 def publish_page(db: Session, page: WebPage, *, expected_version: int, user_id: int) -> WebPageRevision:
     if expected_version != (page.draft_version or 1):
         raise HTTPException(409, "Draft was changed by another editor")
@@ -407,6 +433,7 @@ def publish_page(db: Session, page: WebPage, *, expected_version: int, user_id: 
         elif page.template:
             template = db.query(WebTemplate).filter_by(key=page.template).one_or_none()
         if template is not None:
+            _adopt_pristine_template_fork_baseline(db, template)
             if not template.published_project_data:
                 raise CompileError("Selected template has not been published")
             compile_project(template.published_project_data)

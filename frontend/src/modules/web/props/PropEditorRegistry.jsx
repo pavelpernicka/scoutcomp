@@ -306,7 +306,7 @@ export function ResourcePropsEditor({ schema, value, onChange, disabled = false 
   const { t } = useTranslation();
   const values = value && typeof value === "object" ? value : {};
   if (!schema?.length) return <div className="web-editor-inspector-empty"><p>{t("web.props.empty")}</p></div>;
-  return <div className="web-resource-props-editor">
+  return <fieldset className="web-resource-props-editor" disabled={disabled}>
     {schema.map((definition) => {
       const Editor = PropEditorRegistry.get(definition.type) || TextEditor;
       const isContainer = definition.type === "group" || definition.type === "repeater";
@@ -322,7 +322,7 @@ export function ResourcePropsEditor({ schema, value, onChange, disabled = false 
         {definition.help && <small>{definition.help}</small>}
       </label>;
     })}
-  </div>;
+  </fieldset>;
 }
 
 ResourcePropsEditor.propTypes = {

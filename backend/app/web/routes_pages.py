@@ -3,6 +3,7 @@ from .routes_common import *  # noqa: F403
 from copy import deepcopy
 
 from .resource_props import ResourcePropsError
+from .renderer import component_slot_name
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -258,7 +259,7 @@ def _deep_merge(base: dict, override: dict) -> dict:
 def _tree_contains_sc_slot(node: dict, depth: int = 0) -> bool:
     if not isinstance(node, dict) or depth > 40:
         return False
-    if node.get("type") == "sc-slot" and node.get("name") == "content":
+    if node.get("type") == "sc-slot" and component_slot_name(node) == "content":
         return True
     for child in node.get("components", []):
         if _tree_contains_sc_slot(child, depth + 1):
@@ -358,7 +359,7 @@ def _merged_editor_project(page: WebPage, db: Session) -> dict | None:
         attributes = dict(node.get("attributes") or {})
         attributes["data-sc-template-owner"] = str(template.id)
         node["attributes"] = attributes
-        is_content_slot = node.get("type") == "sc-slot" and node.get("name") == "content"
+        is_content_slot = node.get("type") == "sc-slot" and component_slot_name(node) == "content"
         node["removable"] = False
         node["copyable"] = False
         if not is_content_slot:
@@ -375,7 +376,7 @@ def _merged_editor_project(page: WebPage, db: Session) -> dict | None:
     def _inject_into_slot(node, depth=0):
         if not isinstance(node, dict) or depth > 40:
             return False
-        if node.get("type") == "sc-slot" and node.get("name") == "content":
+        if node.get("type") == "sc-slot" and component_slot_name(node) == "content":
             node["components"] = deepcopy(page_content)
             return True
         for child in node.get("components", []):

@@ -1,3 +1,5 @@
+import { insertEditorComponents } from "./editorInsertion";
+
 export const getResourceComponent = (resource = {}) => {
   const project = resource.project_data || resource.data || {};
   const page = project.pages?.[0] || {};
@@ -26,7 +28,7 @@ export const getResourceStyles = (resource = {}) => {
 };
 
 export const insertResource = (editor, resource) => {
-  const added = editor.addComponents(cloneResourceComponents(resource));
+  const added = insertEditorComponents(editor, cloneResourceComponents(resource));
   const styles = getResourceStyles(resource);
   if (styles.length) {
     styles.forEach((rule) => {
@@ -57,7 +59,7 @@ export const linkedResourceInstance = (resource, kind) => ({
 });
 
 export const insertLinkedResource = (editor, resource, kind) => (
-  editor.addComponents(linkedResourceInstance(resource, kind))
+  insertEditorComponents(editor, linkedResourceInstance(resource, kind))
 );
 
 

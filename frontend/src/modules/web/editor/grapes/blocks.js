@@ -2,6 +2,43 @@ import { BLOCK_CATEGORIES, SC_COMPONENT_TYPES } from "./constants";
 
 const safeId = (value) => String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "-");
 
+const BLOCK_ICONS = {
+  "sc-container": "fa-window-maximize",
+  "sc-box": "fa-square",
+  "sc-section": "fa-layer-group",
+  "sc-columns": "fa-columns",
+  "sc-flex": "fa-arrows-left-right-to-line",
+  "sc-grid": "fa-table-cells-large",
+  "sc-text": "fa-paragraph",
+  "sc-rich-text": "fa-align-left",
+  "sc-heading": "fa-heading",
+  "sc-link": "fa-link",
+  "sc-image": "fa-image",
+  "sc-figure": "fa-images",
+  "sc-button": "fa-hand-pointer",
+  "sc-divider": "fa-minus",
+  "sc-spacer": "fa-arrows-up-down",
+  "sc-unordered-list": "fa-list-ul",
+  "sc-ordered-list": "fa-list-ol",
+  "sc-list-item": "fa-list",
+  "sc-table": "fa-table",
+  "sc-semantic-article": "fa-newspaper",
+  "sc-semantic-header": "fa-window-maximize",
+  "sc-semantic-footer": "fa-window-minimize",
+  "sc-semantic-main": "fa-square-poll-horizontal",
+  "sc-semantic-nav": "fa-bars",
+  "sc-semantic-aside": "fa-table-columns",
+  "sc-bind": "fa-code",
+  "sc-repeat": "fa-repeat",
+  "sc-condition": "fa-code-branch",
+  "sc-empty": "fa-box-open",
+};
+
+const withBlockIcons = (blocks) => blocks.map((block) => ({
+  ...block,
+  media: block.media || `<i class="fas ${BLOCK_ICONS[block.id] || "fa-cube"}" aria-hidden="true"></i>`,
+}));
+
 const text = (content) => ({ type: "text", tagName: "p", content });
 const bind = (field) => ({
   type: SC_COMPONENT_TYPES.bind,
@@ -13,7 +50,7 @@ const bind = (field) => ({
 export function createPrimitiveBlocks(translate = (key) => key) {
   const category = translate(BLOCK_CATEGORIES.primitives);
   const structure = translate(BLOCK_CATEGORIES.structure);
-  return [
+  return withBlockIcons([
     {
       id: "sc-container",
       label: translate("web.editor.block.container"),
@@ -204,7 +241,7 @@ export function createPrimitiveBlocks(translate = (key) => key) {
       category: translate(BLOCK_CATEGORIES.data),
       content: { type: SC_COMPONENT_TYPES.empty },
     },
-  ];
+  ]);
 }
 
 const getFields = (source) => {
@@ -251,6 +288,7 @@ export function createDataSourceBlocks(dataSources = [], translate = (key) => ke
         id: `sc-data-${safeId(source.id)}`,
         label: source.label || source.name || source.translation_key || source.id,
         category: translate(BLOCK_CATEGORIES.data),
+        media: '<i class="fas fa-database" aria-hidden="true"></i>',
         content,
       };
     });

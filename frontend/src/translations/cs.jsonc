@@ -106,7 +106,8 @@
         "emptyState": "Prázdný stav",
         "templatePart": "Globální část",
         "globalPart": "Globální část",
-        "linkedResource": "Propojený zdroj"
+        "linkedResource": "Propojený zdroj",
+        "contentSlot": "Obsah stránky"
       },
       "inspector": {
         "layout": "Rozvržení",
@@ -126,6 +127,8 @@
         "expand": "Rozbalit prvek",
         "collapse": "Sbalit prvek",
         "customName": "Vlastní název vrstvy",
+        "editableArea": "Editovatelná oblast",
+        "delete": "Smazat prvek (Delete)",
         "states": {
           "global": "Sdílená globální část",
           "linked": "Propojený zdroj",
@@ -191,6 +194,11 @@
       "bindingField": "Pole",
       "bindingTarget": "Cíl",
       "addBinding": "Přidat vazbu",
+      "repeatHelp": "Vyberte kolekci a nastavte její filtry, řazení a limit. Obsah uvnitř prvku se vykreslí pro každý záznam.",
+      "repeatSelectSource": "Vyberte zdroj dat…",
+      "repeatEmptySource": "Opakování zatím nemá zdroj. Lze je bezpečně uložit; na webu zobrazí prázdný stav.",
+      "repeatFields": "Pole položky",
+      "repeatFieldsHelp": "Vyberte prvek uvnitř Opakování a na kartě Data propojte jeho text, odkaz nebo obrázek s některým z těchto polí.",
       "codeHelp": "Přímo upravte HTML a CSS vybraného prvku. Změny se aplikují do editoru.",
       "html": "HTML",
       "css": "CSS",
@@ -222,7 +230,8 @@
         "emptyState": "Prázdný stav",
         "templatePart": "Část šablony",
         "globalPart": "Globální část webu",
-        "linkedResource": "Propojená komponenta nebo sekce"
+        "linkedResource": "Propojená komponenta nebo sekce",
+        "contentSlot": "Přetáhněte sem sekci nebo prvek"
       },
       "data": {
         "field": "Pole",
@@ -236,6 +245,14 @@
         "scopeSource": "Veřejný zdroj dat",
         "targetText": "Text",
         "targetRichText": "Formátovaný text",
+        "targetHref": "URL odkazu (href)",
+        "targetSrc": "URL obrázku (src)",
+        "targetAlt": "Alternativní text obrázku",
+        "targetDatetime": "Datum a čas (datetime)",
+        "targetTitle": "Titulek prvku (title)",
+        "targetStyleColor": "Barva textu",
+        "targetStyleBackgroundColor": "Barva pozadí",
+        "targetStyleOpacity": "Průhlednost",
         "source": "Zdroj",
         "limit": "Limit",
         "sort": "Řazení",

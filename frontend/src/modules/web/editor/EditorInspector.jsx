@@ -4,20 +4,12 @@ import { useTranslation } from "react-i18next";
 import { createBindingTargetOptions, getComponentBindings, removeComponentBinding, setComponentBinding } from "./grapes";
 import { getComponentDisplayName, getComponentState, getComponentTechnicalName } from "./componentDisplayName";
 import { ResourcePropsEditor } from "../props/PropEditorRegistry";
+import { getTemplateOwnerId } from "./componentOwnership";
 
 
 const tabs = ["content", "style", "data", "code", "advanced"];
 
-export const getTemplateOwnerId = (selected) => {
-  let node = selected;
-  while (node) {
-    if (node !== selected && node.get?.("type") === "sc-slot" && node.get?.("name") === "content") return null;
-    const owner = node.getAttributes?.()?.["data-sc-template-owner"];
-    if (owner) return Number(owner) || owner;
-    node = node.parent?.();
-  }
-  return null;
-};
+export { getTemplateOwnerId } from "./componentOwnership";
 
 export default function EditorInspector({ selected, dataSources, resources, onDuplicate, onDelete, onClone, onDetach, onEditDefinition, onEditTemplate, onContentChange }) {
   const { t } = useTranslation();
@@ -33,7 +25,9 @@ export default function EditorInspector({ selected, dataSources, resources, onDu
       {selected && templateOwnerId ? <TemplateOwnedInfo templateId={templateOwnerId} onEdit={onEditTemplate} /> : <>
         <div className={selected && tab === "content" ? "" : "d-none"}>{linked ? <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} /> : <div className="web-editor-trait-manager" />}</div>
         <div className={selected && tab === "style" ? "" : "d-none"}>{linked ? <LinkedStyleInfo selected={selected} resources={resources} /> : <div className="web-editor-style-manager" />}</div>
-        {selected && tab === "data" && <DataBindings selected={selected} dataSources={dataSources} />}
+        {selected && tab === "data" && (type === "sc-repeat"
+          ? <RepeatConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
+          : <DataBindings selected={selected} dataSources={dataSources} />)}
         <div className={selected && tab === "code" ? "" : "d-none"}>{selected && <CodePanel key={selected.cid} selected={selected} onApplied={onContentChange} />}</div>
         {selected && tab === "advanced" && <AdvancedInspector selected={selected} />}
       </>}
@@ -68,7 +62,7 @@ const normalizeVariantId = (variant) => {
   return variant.id || variant.label || "";
 };
 
-function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDefinition, onContentChange }) {
+export function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDefinition, onContentChange, disabled = false, showActions = true }) {
   const { t } = useTranslation();
   const kind = selected.get("resourceKind") === "section" ? "sections" : "components";
   const resourceId = String(selected.get("resourceId") || "");
@@ -92,7 +86,7 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDef
   const schema = definition.prop_schema || definition.published_prop_schema || [];
   return <div className="web-editor-linked-props">
     <div className="web-editor-resource-state state-linked"><i className="fas fa-link" /><span><strong>{definition.name}</strong><small>{t(kind === "sections" ? "web.props.linkedSection" : "web.props.linkedComponent")}</small></span></div>
-    <div className="web-editor-linked-actions">
+    {showActions && <div className="web-editor-linked-actions">
       <button type="button" className="btn btn-sm btn-outline-secondary" disabled={cloning} onClick={() => { setCloning(true); Promise.resolve(onClone?.(selected, kind, definition)).catch(() => {}).finally(() => setCloning(false)); }}>
         <i className="fas fa-clone me-1" />{t("web.props.cloneVariant")}
       </button>
@@ -107,10 +101,11 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDef
         <i className={`fas fa-${detaching ? "spinner fa-spin" : "link-slash"} me-1`} />{detaching ? t("web.props.detaching") : t("web.props.detach")}
       </button>
       {detachError && <p className="web-editor-field-error" role="alert">{detachError}</p>}
-    </div>
+    </div>}
     {variants.length > 0 && <div className="web-editor-prop-section">
       <label className="web-prop-field web-prop-select"><span>{t("web.props.variant")}</span>
-        <select value={variant} onChange={(e) => {
+        <select value={variant} disabled={disabled} onChange={(e) => {
+          if (disabled) return;
           const id = e.target.value;
           setVariant(id);
           selected.set("variant", id || null);
@@ -124,11 +119,11 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDef
         </select>
       </label>
     </div>}
-    <ResourcePropsEditor schema={schema} value={values} onChange={(next) => { setValues(next); selected.set("props", next); onContentChange?.(); }} />
+    <ResourcePropsEditor schema={schema} value={values} disabled={disabled} onChange={(next) => { if (disabled) return; setValues(next); selected.set("props", next); onContentChange?.(); }} />
   </div>;
 }
 
-LinkedResourceProps.propTypes = { selected: PropTypes.object.isRequired, resources: PropTypes.object.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onContentChange: PropTypes.func };
+LinkedResourceProps.propTypes = { selected: PropTypes.object.isRequired, resources: PropTypes.object.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onContentChange: PropTypes.func, disabled: PropTypes.bool, showActions: PropTypes.bool };
 
 /* ── Linked resource style panel (CSS ownership info) ────────────── */
 
@@ -160,7 +155,77 @@ LinkedStyleInfo.propTypes = { selected: PropTypes.object.isRequired, resources: 
 
 const sourceFields = (source) => Array.isArray(source?.fields) ? source.fields : Object.entries(source?.fields || {}).map(([id, definition]) => ({ id, ...(typeof definition === "object" ? definition : {}) }));
 
-function DataBindings({ selected, dataSources }) {
+const sourceParameters = (source) => Object.entries(source?.parameters || {}).map(([id, definition]) => ({
+  id,
+  ...(definition && typeof definition === "object" ? definition : {}),
+}));
+
+const parameterValue = (params, definition) => (
+  Object.prototype.hasOwnProperty.call(params, definition.id) ? params[definition.id] : definition.default ?? ""
+);
+
+const coerceParameter = (definition, value) => {
+  if (value === "") return undefined;
+  if (definition.type === "integer") return Number.parseInt(value, 10);
+  if (definition.type === "number") return Number(value);
+  if (definition.type === "boolean") return value === true || value === "true";
+  return value;
+};
+
+export function RepeatConfigurator({ selected, dataSources, onContentChange }) {
+  const { t } = useTranslation();
+  const [, setRevision] = useState(0);
+  const collections = dataSources.filter((source) => source?.collection !== false);
+  const sourceId = selected.get?.("source") || "";
+  const source = collections.find((item) => item.id === sourceId);
+  const params = selected.get?.("params") || {};
+  const updateSource = (nextSource) => {
+    selected.set?.("source", nextSource);
+    selected.set?.("params", {});
+    setRevision((value) => value + 1);
+    onContentChange?.();
+  };
+  const updateParameter = (definition, rawValue) => {
+    const value = coerceParameter(definition, rawValue);
+    const next = { ...params };
+    if (value === undefined || (typeof value === "number" && Number.isNaN(value))) delete next[definition.id];
+    else next[definition.id] = value;
+    selected.set?.("params", next);
+    setRevision((revision) => revision + 1);
+    onContentChange?.();
+  };
+  return <div className="web-editor-binding-panel web-editor-repeat-configurator">
+    <p>{t("web.editor.repeatHelp")}</p>
+    <label><span>{t("web.editor.data.source")}</span><select value={sourceId} onChange={(event) => updateSource(event.target.value)}>
+      <option value="">{t("web.editor.repeatSelectSource")}</option>
+      {collections.map((item) => <option key={item.id} value={item.id}>{item.label || item.name || item.id}</option>)}
+    </select></label>
+    {!source && <div className="web-editor-linked-help"><i className="fas fa-database" /><p>{t("web.editor.repeatEmptySource")}</p></div>}
+    {source && <>
+      {sourceParameters(source).map((definition) => {
+        const value = parameterValue(params, definition);
+        const label = definition.label || definition.id;
+        if (definition.choices?.length) return <label key={definition.id}><span>{label}</span><select value={String(value ?? "")} onChange={(event) => updateParameter(definition, event.target.value)}>
+          {!definition.required && definition.default == null && <option value="">—</option>}
+          {definition.choices.map((choice) => <option key={String(choice)} value={String(choice)}>{String(choice)}</option>)}
+        </select>{definition.description && <small>{definition.description}</small>}</label>;
+        if (definition.type === "boolean") return <label key={definition.id} className="web-editor-repeat-checkbox"><input type="checkbox" checked={Boolean(value)} onChange={(event) => updateParameter(definition, event.target.checked)} /><span>{label}</span></label>;
+        return <label key={definition.id}><span>{label}</span><input
+          type={definition.type === "integer" || definition.type === "number" ? "number" : definition.type === "datetime" ? "datetime-local" : "text"}
+          value={value ?? ""}
+          min={definition.minimum ?? undefined}
+          max={definition.maximum ?? undefined}
+          onChange={(event) => updateParameter(definition, event.target.value)}
+        />{definition.description && <small>{definition.description}</small>}</label>;
+      })}
+      <div className="web-editor-repeat-fields"><strong>{t("web.editor.repeatFields")}</strong><div>{sourceFields(source).map((field) => <code key={field.id || field.name}>{field.label || field.name || field.id}</code>)}</div><small>{t("web.editor.repeatFieldsHelp")}</small></div>
+    </>}
+  </div>;
+}
+
+RepeatConfigurator.propTypes = { selected: PropTypes.object.isRequired, dataSources: PropTypes.array.isRequired, onContentChange: PropTypes.func };
+
+export function DataBindings({ selected, dataSources }) {
   const { t } = useTranslation();
   const [sourceId, setSourceId] = useState("");
   const [field, setField] = useState("");

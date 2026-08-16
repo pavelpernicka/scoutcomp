@@ -74,10 +74,27 @@ SAFE_COLOR = re.compile(
 )
 SAFE_LENGTH = re.compile(r"^(?:0|-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vw|vh|ch|vmin|vmax))$", re.I)
 SAFE_FONT = re.compile(r"^[A-Za-z0-9 '\",._-]{1,160}$")
+SLOT_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,49}$")
 
 
 class CompileError(ValueError):
     """The project cannot be published under the public rendering policy."""
+
+
+def component_slot_name(node: dict[str, Any]) -> Any:
+    """Return a slot name while honoring GrapesJS default-value omission.
+
+    GrapesJS does not serialize model properties equal to their registered
+    defaults. ``sc-slot`` therefore legitimately arrives without ``name``;
+    the editor keeps its semantic name in ``data-sc-slot`` and older projects
+    may omit both fields for the default content slot.
+    """
+    if "name" in node:
+        return node.get("name")
+    attributes = node.get("attributes")
+    if isinstance(attributes, dict) and "data-sc-slot" in attributes:
+        return attributes.get("data-sc-slot")
+    return "content"
 
 
 def _safe_bound_style(property_name: str, value: Any) -> str:
@@ -197,8 +214,13 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         raise CompileError("Component children must be a list")
 
     if component_type == "sc-repeat":
-        source = node.get("source") or node.get("dataSource")
-        if not isinstance(source, str) or not re.fullmatch(
+        source = node.get("source") if "source" in node else node.get("dataSource")
+        if source in (None, ""):
+            # A repeat without a data source is a safe work-in-progress state:
+            # the draft saves and publishes, and rendering fails closed to the
+            # authored empty branch. Only a non-empty source is validated.
+            source = ""
+        elif not isinstance(source, str) or not re.fullmatch(
             r"(?:[a-z][a-z0-9_-]*\.[a-z][a-z0-9_.-]*|context\.[a-z][a-z0-9_.-]*)",
             source,
         ):
@@ -254,8 +276,8 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
             result["variant"] = variant
         children = []
     elif component_type == "sc-slot":
-        name = node.get("name")
-        if not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_-]{0,49}", name):
+        name = component_slot_name(node)
+        if not isinstance(name, str) or not SLOT_NAME.fullmatch(name):
             raise CompileError("Slot name is invalid")
         result["name"] = name
     elif component_type == "sc-empty":
@@ -508,6 +530,9 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
     component_type = node.get("type")
     if component_type == "sc-repeat":
         source = node["source"]
+        if not source:
+            # No source configured yet: fail closed to the authored empty branch.
+            return _render_nodes(node.get("empty", []), state, context, depth + 1)
         records = (
             _lookup(context, source.removeprefix("context."))
             if source.startswith("context.") else

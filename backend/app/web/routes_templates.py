@@ -457,6 +457,7 @@ def clone_template(template_id: int, payload: TemplateClonePayload, db: Session 
         suffix += 1
 
     project = deepcopy(origin.project_data or origin.published_project_data or _empty_project())
+    published_project = deepcopy(origin.published_project_data) if origin.published_project_data else None
     clone = WebTemplate(
         key=key,
         qualified_key=qualified_key,
@@ -468,9 +469,9 @@ def clone_template(template_id: int, payload: TemplateClonePayload, db: Session 
         usage_mode=origin.usage_mode or "linked_layout",
         project_data=project,
         draft_version=1,
-        published_project_data=None,
-        published_css="",
-        published_version=0,
+        published_project_data=published_project,
+        published_css=(origin.published_css or "") if published_project else "",
+        published_version=int(origin.published_version or 1) if published_project else 0,
         theme_version_id=None,
         preview_media_id=origin.preview_media_id,
         forked_from_id=origin.id,

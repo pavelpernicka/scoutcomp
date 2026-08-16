@@ -30,6 +30,38 @@ class FakeSelected {
 }
 
 describe("EditorInspector linked props", () => {
+  it("configures a repeat from the declared data-source schema", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "sc-repeat", source: "", params: {} });
+    render(<EditorInspector
+      selected={selected}
+      dataSources={[{
+        id: "core.events",
+        label: "Events",
+        collection: true,
+        fields: { title: { label: "Title" }, url: { label: "URL" } },
+        parameters: {
+          kind: { type: "string", label: "Kind", choices: ["meeting", "trip"] },
+          limit: { type: "integer", label: "Limit", default: 10, minimum: 1, maximum: 50 },
+        },
+      }]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+      onContentChange={onContentChange}
+    />);
+
+    fireEvent.click(screen.getAllByRole("tab")[2]);
+    fireEvent.change(screen.getByLabelText(/Zdroj|Source/), { target: { value: "core.events" } });
+    fireEvent.change(screen.getByLabelText("Kind"), { target: { value: "trip" } });
+    fireEvent.change(screen.getByLabelText("Limit"), { target: { value: "12" } });
+
+    expect(selected.values.source).toBe("core.events");
+    expect(selected.values.params).toEqual({ kind: "trip", limit: 12 });
+    expect(screen.getByText("Title")).toBeInTheDocument();
+    expect(onContentChange).toHaveBeenCalled();
+  });
+
   it("reflects GrapesJS undo and external prop changes", () => {
     const selected = new FakeSelected({
       type: "sc-resource-instance",

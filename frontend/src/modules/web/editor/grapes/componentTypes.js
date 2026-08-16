@@ -13,6 +13,11 @@ const selectOptions = (values) => values.map(([id, label]) => ({ id, label }));
 const matchesType = (name) => (element) =>
   element?.getAttribute?.("data-sc-type") === name;
 
+const safePreviewUrl = (value) => {
+  const url = String(value || "").trim();
+  return /^(?:https?:|data:image\/|blob:|\/)/i.test(url) ? url : "";
+};
+
 /**
  * Register ScoutComp's declarative nodes including their editor views.
  * Custom components get a dashed border + inline badge so authors see
@@ -24,6 +29,38 @@ const matchesType = (name) => (element) =>
  */
 export function registerScoutCompTypes(editor, translate = (key) => key) {
   const components = editor.Components;
+
+  // ── sc-slot ──────────────────────────────────────────────────────────
+  components.addType(SC_COMPONENT_TYPES.slot, {
+    isComponent: matchesType("slot"),
+    model: {
+      defaults: {
+        tagName: "div",
+        name: "content",
+        attributes: { "data-sc-type": "slot", "data-sc-slot": "content" },
+        droppable: ':not([data-sc-type="slot"])',
+        draggable: false,
+        removable: false,
+        copyable: false,
+        stylable: false,
+        editable: false,
+        selectable: true,
+        layerable: true,
+        toolbar: [],
+        traits: [],
+      },
+      init() {
+        this.syncSlotAttributes();
+        this.listenTo(this, "change:name", this.syncSlotAttributes);
+      },
+      syncSlotAttributes() {
+        this.addAttributes({
+          "data-sc-type": "slot",
+          "data-sc-slot": this.get("name") || "content",
+        }, { silent: true });
+      },
+    },
+  });
 
   // ── sc-bind ──────────────────────────────────────────────────────────
   components.addType(SC_COMPONENT_TYPES.bind, {
@@ -352,9 +389,11 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         content: `◇ ${translate("web.editor.placeholder.linkedResource")}`,
         style: {
           display: "block",
+          position: "relative",
+          overflow: "hidden",
           padding: "12px",
           border: "2px solid #78a6d8",
-          minHeight: "44px",
+          minHeight: "96px",
           color: "#78a6d8",
           fontSize: "12px",
           fontFamily: "system-ui, sans-serif",
@@ -405,6 +444,73 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         const present = candidates.find((key) => typeof props[key] === "string");
         if (present) return present;
         return Object.keys(props).find((key) => typeof props[key] === "string") || "";
+      },
+    },
+    view: {
+      init() {
+        this.listenTo(
+          this.model,
+          "change:previewUrl change:resourceName change:resourceId change:resourceKind change:props",
+          this.renderLinkedPreview,
+        );
+      },
+      onRender() {
+        this.renderLinkedPreview();
+      },
+      renderLinkedPreview() {
+        const documentRef = this.el?.ownerDocument;
+        if (!documentRef) return;
+        let preview = this.el.querySelector?.(":scope > .sc-editor-linked-preview");
+        if (!preview) {
+          preview = documentRef.createElement("div");
+          preview.className = "sc-editor-linked-preview";
+          Object.assign(preview.style, {
+            position: "absolute",
+            inset: "3px",
+            zIndex: "2",
+            display: "grid",
+            gridTemplateRows: "minmax(0, 1fr) auto",
+            overflow: "hidden",
+            borderRadius: "2px",
+            background: "#f4f6f8",
+            color: "#253040",
+            fontFamily: "system-ui, sans-serif",
+            pointerEvents: "none",
+          });
+          this.el.appendChild(preview);
+        }
+        preview.replaceChildren();
+        const url = safePreviewUrl(this.model.get("previewUrl"));
+        const name = String(this.model.get("resourceName") || this.model.get("resourceId") || "?");
+        const values = Object.values(this.model.get("props") || {})
+          .filter((value) => typeof value === "string" && value.trim())
+          .slice(0, 2);
+        if (url) {
+          const image = documentRef.createElement("img");
+          image.src = url;
+          image.alt = "";
+          Object.assign(image.style, { width: "100%", height: "100%", minHeight: "56px", objectFit: "cover" });
+          preview.appendChild(image);
+        } else {
+          const placeholder = documentRef.createElement("div");
+          placeholder.textContent = values[0] || name;
+          Object.assign(placeholder.style, { display: "grid", minHeight: "56px", padding: "10px", placeItems: "center", fontWeight: "600" });
+          preview.appendChild(placeholder);
+        }
+        const caption = documentRef.createElement("div");
+        caption.textContent = [name, ...values].filter(Boolean).join(" · ");
+        Object.assign(caption.style, {
+          overflow: "hidden",
+          padding: "5px 7px",
+          background: "rgba(24, 34, 48, .9)",
+          color: "#fff",
+          fontSize: "11px",
+          fontWeight: "600",
+          textAlign: "left",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        });
+        preview.appendChild(caption);
       },
     },
   });

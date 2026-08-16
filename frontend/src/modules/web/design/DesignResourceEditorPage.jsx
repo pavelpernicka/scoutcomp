@@ -8,6 +8,9 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../providers/AuthProvider";
 import { cmsApi } from "../api/cms";
 import { filterCatalogResources, linkedResourceInstance } from "../editor/resourceBlocks";
+import { DataBindings, LinkedResourceProps, RepeatConfigurator } from "../editor/EditorInspector";
+import EditorNavigator from "../editor/EditorNavigator";
+import EditorBreadcrumbs from "../editor/EditorBreadcrumbs";
 import useGrapesEditor from "../editor/useGrapesEditor";
 import MediaPreview from "../media/MediaPreview";
 import { getTemplateUsageMode, TEMPLATE_USAGE_MODES, templatePersistenceFields } from "../templateContracts";
@@ -39,6 +42,7 @@ export default function DesignResourceEditorPage({ kind }) {
   const [device, setDeviceState] = useState("Desktop");
   const [leftPanel, setLeftPanel] = useState("insert");
   const [rightPanel, setRightPanel] = useState("style");
+  const [selectionRevision, setSelectionRevision] = useState(0);
   const savedDirtyCountRef = useRef(undefined);
   const editGenerationRef = useRef(0);
   const savedGenerationRef = useRef(0);
@@ -151,12 +155,21 @@ export default function DesignResourceEditorPage({ kind }) {
     canvasStyles: canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [],
     translate: t,
     onDirtyChange: (dirty) => { if (dirty && !readOnly) setStatus("unsaved"); },
+    onSelectionChange: () => setSelectionRevision((value) => value + 1),
     onReady: (instance) => {
       if (resource?.css) instance.addStyle(resource.css);
       instance.clearDirtyCount();
     },
     onError: () => setError(t("web.errors.editorLoad")),
   });
+  const selectedComponent = selectionRevision >= 0 ? editor.editorRef.current?.getSelected?.() : null;
+  const selectedLinkedResource = selectedComponent?.get?.("type") === "sc-resource-instance";
+  const selectComponent = (component) => editor.editorRef.current?.select?.(component);
+  const markComponentChanged = () => {
+    if (readOnly) return;
+    editGenerationRef.current += 1;
+    setStatus("unsaved");
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -296,7 +309,11 @@ export default function DesignResourceEditorPage({ kind }) {
         </div>}
         <div className="web-editor-block-manager" />
       </div>
-      <div className={`web-editor-layer-manager ${leftPanel === "layers" ? "" : "d-none"}`} />
+      <div className={leftPanel === "layers" ? "" : "d-none"}>
+        <div className="web-editor-panel-heading"><h2>{t("web.editor.navigator.title")}</h2></div>
+        <EditorNavigator editor={editor.editorRef.current} selected={selectedComponent} onSelect={selectComponent} disabled={readOnly} />
+        <div className="web-editor-native-layer-manager" aria-hidden="true" />
+      </div>
       <div className="web-resource-fields">
         <label><span>{t("web.resourceEditor.key")}</span><input value={form.qualified_key} disabled title={t("web.resourceEditor.keyImmutable")} /></label>
         <label><span>{t("web.resourceEditor.description")}</span><textarea rows="3" value={form.description} disabled={readOnly} onChange={(event) => changeForm("description", event.target.value)} /></label>
@@ -304,12 +321,26 @@ export default function DesignResourceEditorPage({ kind }) {
       </div>
     </aside>
 
-    <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}</main>
+    <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
 
     <aside className="web-editor-inspector web-resource-editor-right">
-      <div className="web-editor-inspector-tabs"><button type="button" className={rightPanel === "style" ? "active" : ""} onClick={() => setRightPanel("style")}>{t("web.editor.inspectorTabs.style")}</button><button type="button" className={rightPanel === "content" ? "active" : ""} onClick={() => setRightPanel("content")}>{t("web.editor.inspectorTabs.content")}</button>{kind !== "templates" && <button type="button" className={rightPanel === "props" ? "active" : ""} onClick={() => setRightPanel("props")}>{t("web.props.tab")}</button>}</div>
+      <div className="web-editor-inspector-tabs"><button type="button" className={rightPanel === "style" ? "active" : ""} onClick={() => setRightPanel("style")}>{t("web.editor.inspectorTabs.style")}</button><button type="button" className={rightPanel === "content" ? "active" : ""} onClick={() => setRightPanel("content")}>{t("web.editor.inspectorTabs.content")}</button><button type="button" className={rightPanel === "data" ? "active" : ""} onClick={() => setRightPanel("data")}>{t("web.editor.inspectorTabs.data")}</button>{kind !== "templates" && <button type="button" className={rightPanel === "props" ? "active" : ""} onClick={() => setRightPanel("props")}>{t("web.props.tab")}</button>}</div>
       <div className={`web-editor-style-manager ${rightPanel === "style" ? "" : "d-none"}`} />
-      <div className={`web-editor-trait-manager ${rightPanel === "content" ? "" : "d-none"}`} />
+      <div className={rightPanel === "content" ? "" : "d-none"}>
+        {selectedLinkedResource
+          ? <div className="web-editor-inspector-body"><LinkedResourceProps
+              key={selectedComponent.cid}
+              selected={selectedComponent}
+              resources={{ components: catalogComponents, sections: catalogSections }}
+              disabled={readOnly}
+              showActions={false}
+              onContentChange={markComponentChanged}
+            /></div>
+          : <div className="web-editor-trait-manager" />}
+      </div>
+      {rightPanel === "data" && selectedComponent && (selectedComponent.get?.("type") === "sc-repeat"
+        ? <div className="web-editor-inspector-body"><RepeatConfigurator selected={selectedComponent} dataSources={itemsFrom(sourcesQuery.data)} onContentChange={markComponentChanged} /></div>
+        : <div className="web-editor-inspector-body"><DataBindings selected={selectedComponent} dataSources={itemsFrom(sourcesQuery.data)} /></div>)}
       {kind !== "templates" && rightPanel === "props" && <ResourcePropSchemaEditor
         schema={form.prop_schema}
         defaults={form.default_props}

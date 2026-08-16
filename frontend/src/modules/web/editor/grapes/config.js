@@ -3,6 +3,62 @@ import { registerBuilderBlocks } from "./blocks";
 import { registerScoutCompTypes } from "./componentTypes";
 import { grapesI18nConfig } from "./i18n";
 
+const cssContent = (value) => JSON.stringify(String(value || ""));
+
+export const editorCanvasCss = (translate = (key) => key) => `
+[data-sc-type="slot"][data-sc-slot="content"] {
+  box-sizing: border-box !important;
+  position: relative !important;
+  min-height: 112px !important;
+  outline: 2px dashed #d7a157 !important;
+  outline-offset: -2px !important;
+  background-color: rgba(215, 161, 87, .08) !important;
+}
+[data-sc-type="slot"][data-sc-slot="content"]::before {
+  content: ${cssContent(translate("web.editor.component.contentSlot"))};
+  position: absolute;
+  z-index: 2;
+  top: 6px;
+  left: 8px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: #8a5a19;
+  color: #fff8e8;
+  font: 700 11px/1.4 system-ui, sans-serif;
+  pointer-events: none;
+}
+[data-sc-type="slot"][data-sc-slot="content"]:empty::after {
+  content: ${cssContent(translate("web.editor.placeholder.contentSlot"))};
+  position: absolute;
+  inset: 32px 12px 10px;
+  display: grid;
+  place-items: center;
+  color: #8a5a19;
+  font: 600 13px/1.4 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+:where(div, section, article, header, footer, main, nav, aside):empty:not([data-sc-type]):not([aria-hidden="true"]) {
+  box-sizing: border-box !important;
+  position: relative !important;
+  min-height: 72px !important;
+  outline: 1px dashed rgba(104, 109, 204, .72) !important;
+  outline-offset: -1px !important;
+  background-color: rgba(104, 109, 204, .05) !important;
+}
+:where(div, section, article, header, footer, main, nav, aside):empty:not([data-sc-type]):not([aria-hidden="true"])::after {
+  content: ${cssContent(translate("web.editor.placeholder.contentSlot"))};
+  position: absolute;
+  inset: 8px;
+  display: grid;
+  place-items: center;
+  color: #5b61b5;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  text-align: center;
+  pointer-events: none;
+}
+`;
+
 /** Create the stable GrapesJS 0.21.9 configuration used by the React hook. */
 export function createEditorConfig({
   container,
@@ -27,11 +83,12 @@ export function createEditorConfig({
   // Build inline canvas CSS from the same source the public renderer uses.
   // GrapesJS places `baseCss` into a <style> element inside the iframe body,
   // making tokens, theme styles, and site-wide CSS active for every component.
-  const baseCss = canvasStyles
+  const sourceCss = canvasStyles
     .filter((item) => item && !item.href)  // href items are external <link>s
     .map((item) => item.css || "")
     .filter(Boolean)
     .join("\n");
+  const baseCss = [sourceCss, editorCanvasCss(translate)].filter(Boolean).join("\n");
 
   return {
     container,

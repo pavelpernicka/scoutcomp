@@ -35,6 +35,7 @@ const TYPE_KEYS = {
   "sc-template-part": "templatePart",
   "sc-global-part": "globalPart",
   "sc-resource-instance": "linkedResource",
+  "sc-slot": "contentSlot",
 };
 
 const textValue = (value) => String(value || "")
@@ -100,6 +101,9 @@ export function getComponentDisplayName(component, t) {
   if (resourceName) return resourceName;
 
   const type = String(getValue(component, "type") || "default").toLowerCase();
+  if (type === "sc-slot" && getValue(component, "name") === "content") {
+    return translate(t, "web.editor.component.contentSlot", "Page content");
+  }
   const explicitName = textValue(getValue(component, "name"));
   if (explicitName && !GENERIC_NAMES.has(explicitName.toLowerCase())) return explicitName;
 
@@ -155,6 +159,7 @@ export function getComponentDisplayName(component, t) {
 export function getComponentTechnicalName(component) {
   if (!component) return "";
   const type = String(getValue(component, "type") || "default").toLowerCase();
+  if (type === "sc-slot") return `slot:${textValue(getValue(component, "name")) || "content"}`;
   const tag = type === "wrapper" ? "body" : String(getValue(component, "tagName") || "div").toLowerCase();
   const attributes = component.getAttributes?.() || {};
   const id = textValue(attributes.id);

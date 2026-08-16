@@ -16,6 +16,7 @@ const t = (key) => ({
   "web.editor.navigator.tags.link": "Odkaz",
   "web.editor.navigator.tags.image": "Obrázek",
   "web.editor.navigator.tags.header": "Záhlaví",
+  "web.editor.component.contentSlot": "Obsah stránky",
 }[key] || key);
 
 describe("component display names", () => {
@@ -37,5 +38,11 @@ describe("component display names", () => {
     const hero = component({ type: "default", tagName: "section", classes: ["hero", "hero--large"] }, { id: "homepage-hero" });
     expect(getComponentDisplayName(hero, t)).toBe("Hero");
     expect(getComponentTechnicalName(hero)).toBe("section#homepage-hero.hero.hero--large");
+  });
+
+  it("names the template content slot explicitly", () => {
+    const slot = component({ type: "sc-slot", name: "content" });
+    expect(getComponentDisplayName(slot, t)).toBe("Obsah stránky");
+    expect(getComponentTechnicalName(slot)).toBe("slot:content");
   });
 });

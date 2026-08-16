@@ -9,6 +9,7 @@ import {
   loadEditorProject,
   registerBuilderBlocks,
 } from "./grapes";
+import { insertEditorComponents } from "./editorInsertion";
 
 const selectedSummary = (component) => {
   if (!component) return null;
@@ -34,6 +35,34 @@ export const subscribeToEditorChanges = (editor, onChange) => {
   };
 };
 
+export const clampCanvasToolbar = (editor, inset = 8) => {
+  const toolbar = editor?.Canvas?.getToolbarEl?.();
+  const boundary = editor?.Canvas?.getElement?.() || toolbar?.offsetParent;
+  if (!toolbar || !boundary || toolbar.style.display === "none") return false;
+
+  const toolbarRect = toolbar.getBoundingClientRect?.();
+  const boundaryRect = boundary.getBoundingClientRect?.();
+  if (!toolbarRect || !boundaryRect || !toolbarRect.width || !toolbarRect.height) return false;
+
+  const currentLeft = Number.parseFloat(toolbar.style.left) || toolbar.offsetLeft || 0;
+  const currentTop = Number.parseFloat(toolbar.style.top) || toolbar.offsetTop || 0;
+  const availableWidth = Math.max(0, boundaryRect.width - inset * 2);
+  toolbar.style.maxWidth = `${availableWidth}px`;
+
+  let shiftX = 0;
+  if (toolbarRect.width >= availableWidth) shiftX = boundaryRect.left + inset - toolbarRect.left;
+  else if (toolbarRect.left < boundaryRect.left + inset) shiftX = boundaryRect.left + inset - toolbarRect.left;
+  else if (toolbarRect.right > boundaryRect.right - inset) shiftX = boundaryRect.right - inset - toolbarRect.right;
+
+  let shiftY = 0;
+  if (toolbarRect.top < boundaryRect.top + inset) shiftY = boundaryRect.top + inset - toolbarRect.top;
+  else if (toolbarRect.bottom > boundaryRect.bottom - inset) shiftY = boundaryRect.bottom - inset - toolbarRect.bottom;
+
+  toolbar.style.left = `${Math.round(currentLeft + shiftX)}px`;
+  toolbar.style.top = `${Math.round(currentTop + shiftY)}px`;
+  return Boolean(shiftX || shiftY);
+};
+
 /**
  * Owns one GrapesJS 0.21.9 instance for a mounted editor shell.
  *
@@ -54,6 +83,7 @@ export function useGrapesEditor({
   styleSectors,
   canvasStyles = [],
   editorConfig,
+  preferContentSlotInsertion = false,
   onDirtyChange,
   onSelectionChange,
   onHistoryChange,
@@ -153,12 +183,30 @@ export function useGrapesEditor({
         report(callbacksRef.current.onSelectionChange, null);
       };
       const onHistory = () => updateHistoryState(editor);
+      let toolbarFrame = 0;
+      const scheduleToolbarClamp = () => {
+        if (toolbarFrame) window.cancelAnimationFrame(toolbarFrame);
+        toolbarFrame = window.requestAnimationFrame(() => {
+          toolbarFrame = 0;
+          clampCanvasToolbar(editor);
+        });
+      };
       const unsubscribeChanges = subscribeToEditorChanges(editor, onUpdate);
 
       editor.on("component:selected", onSelection);
       editor.on("component:deselected", onDeselection);
       editor.on("undo", onHistory);
       editor.on("redo", onHistory);
+      const toolbarEvents = [
+        "component:selected",
+        "component:update",
+        "canvas:tools:update",
+        "canvas:refresh",
+        "canvas:scroll",
+        "canvas:frame:load",
+      ];
+      toolbarEvents.forEach((event) => editor.on(event, scheduleToolbarClamp));
+      window.addEventListener("resize", scheduleToolbarClamp);
 
       const initial = inputRef.current;
       if (initial.projectData !== undefined || initial.legacyHtml || initial.legacyCss) {
@@ -177,6 +225,9 @@ export function useGrapesEditor({
         editor.off("component:deselected", onDeselection);
         editor.off("undo", onHistory);
         editor.off("redo", onHistory);
+        toolbarEvents.forEach((event) => editor.off(event, scheduleToolbarClamp));
+        window.removeEventListener("resize", scheduleToolbarClamp);
+        if (toolbarFrame) window.cancelAnimationFrame(toolbarFrame);
         editor.destroy();
         if (editorRef.current === editor) editorRef.current = null;
       };
@@ -309,8 +360,11 @@ export function useGrapesEditor({
     const editor = editorRef.current;
     const block = editor?.BlockManager.get(blockId);
     if (!editor || !block) return [];
+    if (preferContentSlotInsertion) {
+      return insertEditorComponents(editor, block.get("content"));
+    }
     return editor.addComponents(block.get("content"));
-  }, []);
+  }, [preferContentSlotInsertion]);
 
   return {
     editorRef,

@@ -15,6 +15,7 @@ import EditorTopbar from "./EditorTopbar";
 import PreviewDialog from "./PreviewDialog";
 import RevisionsDialog from "./RevisionsDialog";
 import { detachLinkedResource, filterCatalogResources, insertLinkedResource } from "./resourceBlocks";
+import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
 import MediaPickerModal from "../media/MediaPickerModal";
@@ -23,6 +24,8 @@ import "../styles/editor.css";
 
 const safeId = (value) => String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "-");
 const EMPTY = [];
+const isCompactViewport = () => typeof window !== "undefined"
+  && Boolean(window.matchMedia?.("(max-width: 900px)")?.matches);
 
 export default function WebEditorPage() {
   const { id } = useParams();
@@ -38,8 +41,8 @@ export default function WebEditorPage() {
   const autosaveRef = useRef(null);
   const savedDirtyCountRef = useRef(undefined);
   const [mode, setMode] = useState("insert");
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
+  const [leftOpen, setLeftOpen] = useState(() => !isCompactViewport());
+  const [inspectorOpen, setInspectorOpen] = useState(() => !isCompactViewport());
   const [device, setDeviceState] = useState("Desktop");
   const [selected, setSelected] = useState(null);
   const [pageForm, setPageForm] = useState({ title: "", path_segment: "", meta_description: "", template_id: null });
@@ -96,6 +99,7 @@ export default function WebEditorPage() {
     language: i18n.language,
     loadKey: page ? `${page.id}:${page.draft_version}:${page.template_id || "none"}` : undefined,
     canvasStyles: templateCSSQuery.data ? [...canvasStyles, { href: "", css: templateCSSQuery.data }] : canvasStyles,
+    preferContentSlotInsertion: true,
     onDirtyChange: handleDirty,
     onSelectionChange: setSelected,
     onError: () => setPreviewError(t("web.errors.editorLoad")),
@@ -188,7 +192,7 @@ export default function WebEditorPage() {
         const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
         src = URL.createObjectURL(data);
       } catch { /* fall back to raw URL (broken icon if auth-required) */ }
-      instance.addComponents({
+      insertEditorComponents(instance, {
         type: "image",
         attributes: {
           src,
@@ -197,7 +201,7 @@ export default function WebEditorPage() {
         },
       });
     } else {
-      instance.addComponents({
+      insertEditorComponents(instance, {
         type: "link",
         content: mediaItem.filename,
         attributes: { href: mediaItem.url, target: "_blank", "data-sc-media-id": String(mediaItem.id) },
@@ -308,13 +312,19 @@ export default function WebEditorPage() {
   if (pageQuery.isError || !page) return <div className="web-editor-load-error"><h1>{t("web.errors.pageLoad")}</h1><button className="btn btn-primary" onClick={() => navigate("/admin/web/pages")}>{t("web.editor.back")}</button></div>;
 
   const changeMode = (nextMode) => {
+    if (isCompactViewport()) setInspectorOpen(false);
     if (mode === nextMode) setLeftOpen((current) => !current);
     else { setMode(nextMode); setLeftOpen(true); }
   };
+  const toggleInspector = () => {
+    const next = !inspectorOpen;
+    if (next && isCompactViewport()) setLeftOpen(false);
+    setInspectorOpen(next);
+  };
 
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
-    <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={() => setInspectorOpen((current) => !current)} onMedia={() => setMediaPickerOpen(true)} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
-    <EditorRail mode={mode} open={leftOpen} onMode={changeMode} />
+    <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
+    <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => setMediaPickerOpen(true)} />
     <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
     <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} />

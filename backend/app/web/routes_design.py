@@ -480,7 +480,7 @@ def clone_design_resource(kind: str, resource_id: int, payload: DesignResourceCl
         published_prop_schema=origin.published_prop_schema or [],
         published_default_props=origin.published_default_props or {},
         published_variants=origin.published_variants or [],
-        published_version=0,
+        published_version=int(origin.published_version or 1) if origin.published_project_data else 0,
         theme_version_id=None,
         preview_media_id=origin.preview_media_id,
         origin_resource_id=origin.id,
