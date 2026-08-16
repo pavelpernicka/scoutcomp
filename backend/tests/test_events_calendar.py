@@ -131,18 +131,18 @@ def test_event_public_visibility_is_explicit_and_available_to_cms(client, db_ses
         headers=headers,
     )
     assert private_response.status_code == 201
-    assert private_response.json()["is_public"] is False
+    assert private_response.json()["is_public"] is True
 
     public_response = client.post(
         "/activity/events",
-        json=_event_payload(title="Veřejná akce", is_public=True),
+        json=_event_payload(title="Skrytá akce", is_public=False),
         headers=headers,
     )
     assert public_response.status_code == 201
-    assert public_response.json()["is_public"] is True
+    assert public_response.json()["is_public"] is False
 
     public_events = resolve_data_source(db_session, "core.events")
-    assert [event["title"] for event in public_events] == ["Veřejná akce"]
+    assert [event["title"] for event in public_events] == ["Interní akce"]
 
 
 def test_member_sees_only_own_and_unit_wide_events(client, db_session):
@@ -419,3 +419,19 @@ def test_planned_deadline_blocks_member_signup(client, db_session):
         headers=member_headers,
     )
     assert response.status_code == 400
+
+
+def test_unknown_planned_attendance_is_the_default_and_is_not_stored(client, db_session):
+    team = Team(name="Alpha", join_code="JOINALPHA")
+    admin = _user("admin", RoleEnum.ADMIN)
+    member = _user("member", RoleEnum.MEMBER, team)
+    db_session.add_all([team, admin, member])
+    db_session.commit()
+    event = client.post("/activity/events", json=_event_payload(team_id=team.id), headers=_headers(_login(client, "admin"))).json()
+    headers = _headers(_login(client, "member"))
+    client.post(f"/activity/events/{event['id']}/planned", json={"status": "attending"}, headers=headers)
+    response = client.post(f"/activity/events/{event['id']}/planned", json={"status": "unknown"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["status"] == "unknown"
+    entries = client.get("/activity/events", headers=headers).json()[0]["attendance"]
+    assert not any(entry["mode"] == "planned" for entry in entries)

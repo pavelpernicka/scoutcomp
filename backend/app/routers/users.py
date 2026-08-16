@@ -1,6 +1,7 @@
 from typing import List, Optional
 import secrets
 import string
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
@@ -15,15 +16,20 @@ from ..dependencies import (
 from ..models import RoleEnum, Team, User
 from ..schemas import BulkRegistrationResult, BulkUserRegistration, MeResponse, PasswordChangeRequest, UserCreate, UserPublic, UserUpdate, UserWithPassword
 from ..core.security import get_password_hash, verify_password
+from ..usernames import is_canonical_username, normalize_legacy_username
 from ..permissions import allows_team, managed_team_ids, permission_keys, permission_scopes
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 def _user_to_public(user: User, db: Session | None = None) -> UserPublic:
+    # A migration persists this conversion at startup. Keep this boundary
+    # defensive as well, so a legacy record cannot turn the users list into a
+    # 500 error before the migration is applied.
+    username = user.username if is_canonical_username(user.username) else normalize_legacy_username(user.username, user.id)
     return UserPublic(
         id=user.id,
-        username=user.username,
+        username=username,
         real_name=user.real_name,
         email=user.email,
         preferred_language=user.preferred_language,
@@ -217,8 +223,14 @@ def update_user(
         if "any" not in permission_scopes(db, current_user, "core.users.edit"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team assignment cannot be removed")
         user.team_id = None
-    if payload.role is not None or payload.managed_team_ids is not None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Roles and managed teams are administered through permission groups")
+    if payload.role is not None:
+        if "core.access.manage" not in permission_keys(db, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing core.access.manage")
+        if current_user.id == user.id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot change your own role")
+        user.role = payload.role
+    if payload.managed_team_ids is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Managed teams are administered through permission groups")
     if payload.is_active is not None:
         user.is_active = payload.is_active
 
@@ -298,13 +310,9 @@ def bulk_register_users(
     _: User = Depends(require_action("core.users.create")),
 ) -> BulkRegistrationResult:
     def generate_username(real_name: str) -> str:
-        return (
-            transliterate_text(real_name)
-            .lower()
-            .replace(" ", "_")
-            .replace("-", "_")
-            [:50]
-        )
+        value = transliterate_text(real_name).lower().replace(" ", "_")
+        value = re.sub(r"[^a-z0-9._-]", "", value).strip("._-")
+        return value[:50]
 
     created_users = []
     errors = []

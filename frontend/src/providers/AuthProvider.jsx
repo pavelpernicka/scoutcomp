@@ -3,11 +3,17 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import PropTypes from "prop-types";
 
-import api, { TOKEN_STORAGE_KEY, clearAuthTokens, setAuthTokens } from "../services/api";
+import api, {
+  clearAuthTokens,
+  loadAuthTokens,
+  persistAuthTokens,
+  setAuthTokens,
+} from "../services/api";
 
 export class PasswordChangeRequiredError extends Error {
   constructor(message) {
@@ -18,58 +24,63 @@ export class PasswordChangeRequiredError extends Error {
 
 const AuthContext = createContext(undefined);
 
-const parseStoredTokens = () => {
-  try {
-    const raw = window.localStorage.getItem(TOKEN_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (error) {
-    console.warn("Failed to parse stored tokens", error);
-    return null;
-  }
-};
-
 export function AuthProvider({ children }) {
-  const [tokens, setTokens] = useState(() => parseStoredTokens());
+  const [tokens, setTokens] = useState(() => loadAuthTokens());
   const [profile, setProfile] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const profileRequestRef = useRef(null);
 
   const persistTokens = (nextTokens) => {
     setTokens(nextTokens);
-    if (nextTokens) {
-      window.localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(nextTokens));
-    } else {
-      window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    }
+    persistAuthTokens(nextTokens);
   };
 
-  const fetchProfile = async () => {
-    try {
-      const { data } = await api.get("/users/me");
-      setProfile(data);
-    } catch (error) {
-      console.error("Unable to load profile", error);
-      persistTokens(null);
-      setProfile(null);
-      clearAuthTokens();
-    } finally {
-      setIsLoaded(true);
-    }
+  const fetchProfile = async (accessToken = tokens?.accessToken) => {
+    const pending = profileRequestRef.current;
+    if (pending?.accessToken === accessToken) return pending.promise;
+
+    let request;
+    request = (async () => {
+      try {
+        const { data } = await api.get("/users/me");
+        if (profileRequestRef.current?.promise === request) setProfile(data);
+      } catch (error) {
+        if (profileRequestRef.current?.promise !== request) return;
+        // An expired session is a normal state; clear it without a noisy console error.
+        if (error.response?.status !== 401) console.error("Unable to load profile", error);
+        persistTokens(null);
+        setProfile(null);
+        clearAuthTokens();
+      } finally {
+        if (profileRequestRef.current?.promise === request) {
+          profileRequestRef.current = null;
+          setIsLoaded(true);
+        }
+      }
+    })();
+    profileRequestRef.current = { accessToken, promise: request };
+    return request;
   };
 
   useEffect(() => {
     if (tokens?.accessToken) {
       setAuthTokens(tokens);
       setIsLoaded(false);
-      fetchProfile();
+      fetchProfile(tokens.accessToken);
     } else {
+      profileRequestRef.current = null;
       clearAuthTokens();
       setProfile(null);
       setIsLoaded(true);
     }
   }, [tokens?.accessToken]);
 
-  const login = async ({ username, password }) => {
-    const { data } = await api.post("/auth/login", { username, password });
+  const login = async ({ username, password, rememberMe = false }) => {
+    const { data } = await api.post("/auth/login", {
+      username,
+      password,
+      remember_me: rememberMe,
+    });
 
     // Check if password change is required
     if (data.requires_password_change) {
@@ -80,22 +91,25 @@ export function AuthProvider({ children }) {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresIn: data.expires_in,
+      rememberMe,
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);
     await fetchProfile();
   };
 
-  const changePassword = async ({ username, oldPassword, newPassword }) => {
+  const changePassword = async ({ username, oldPassword, newPassword, rememberMe = false }) => {
     const { data } = await api.post("/auth/force-change-password", {
       username,
       old_password: oldPassword,
       new_password: newPassword,
+      remember_me: rememberMe,
     });
     const nextTokens = {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresIn: data.expires_in,
+      rememberMe,
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);
@@ -123,6 +137,7 @@ export function AuthProvider({ children }) {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresIn: data.expires_in,
+      rememberMe: true,
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);

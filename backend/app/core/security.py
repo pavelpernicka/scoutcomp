@@ -34,9 +34,14 @@ def create_access_token(user_id: int, role: RoleEnum) -> Tuple[str, int]:
     return token, int(expires_delta.total_seconds())
 
 
-def create_refresh_token() -> Tuple[str, datetime]:
+def create_refresh_token(remember_me: bool = False) -> Tuple[str, datetime]:
     token = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=settings.app.token.refresh_expire_minutes)
+    expiry_minutes = (
+        settings.app.token.remember_me_refresh_expire_minutes
+        if remember_me
+        else settings.app.token.refresh_expire_minutes
+    )
+    expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=expiry_minutes)
     return token, expires_at
 
 

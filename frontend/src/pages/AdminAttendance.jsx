@@ -31,7 +31,34 @@ const PLANNED_STATUS_META = {
   unknown: { badge: "bg-secondary", icon: "fa-question", label: "calendar.unknown" },
 };
 
-const CYCLE_ORDER = ["present", "absent", "excused"];
+const CYCLE_ORDER = ["present", "excused", "absent"];
+
+const schoolYearStart = () => {
+  const now = new Date();
+  const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-09-01`;
+};
+
+const updateMatrixCell = (data, groupKey, memberId, eventId, status) => {
+  if (!data) return data;
+  const key = String(eventId);
+  return {
+    ...data,
+    groups: data.groups.map((group) => {
+      if ((group.team_id ?? "none") !== groupKey) return group;
+      return {
+        ...group,
+        members: group.members.map((member) => {
+          if (member.id !== memberId) return member;
+          const attendance = { ...(member.attendance || {}) };
+          if (status) attendance[key] = status;
+          else delete attendance[key];
+          return { ...member, attendance };
+        }),
+      };
+    }),
+  };
+};
 
 const getErrorMessage = (error) => {
   const detail = error?.response?.data?.detail;
@@ -50,7 +77,7 @@ export default function AdminAttendance() {
   const [activeTab, setActiveTab] = useState("matrix");
 
   const [filters, setFilters] = useState({
-    dateFrom: "",
+    dateFrom: schoolYearStart(),
     dateTo: "",
     kind: "",
   });
@@ -58,6 +85,8 @@ export default function AdminAttendance() {
 
   const [matrixData, setMatrixData] = useState(null);
   const [collapsed, setCollapsed] = useState({});
+  const [editingEnabled, setEditingEnabled] = useState(false);
+  const [savingCells, setSavingCells] = useState(() => new Set());
 
   const [memberQuery, setMemberQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -179,32 +208,17 @@ export default function AdminAttendance() {
   };
 
   const cycleCell = (groupKey, member, event) => {
+    if (!editingEnabled) return;
     const key = String(event.id);
-    const current = member.attendance?.[key] || null;
-    const idx = CYCLE_ORDER.indexOf(current);
-    const next = CYCLE_ORDER[(idx + 1) % CYCLE_ORDER.length];
-    const isSet = idx >= 0;
+    const cellKey = `${groupKey}:${member.id}:${key}`;
+    if (savingCells.has(cellKey)) return;
 
-    const prevData = matrixData;
-    setMatrixData(data => {
-      if (!data) return data;
-      return {
-        ...data,
-        groups: data.groups.map(g => {
-          if (g.team_id !== groupKey) return g;
-          return {
-            ...g,
-            members: g.members.map(m => {
-              if (m.id !== member.id) return m;
-              const attendance = { ...(m.attendance || {}) };
-              if (isSet) delete attendance[key];
-              else attendance[key] = next;
-              return { ...m, attendance };
-            }),
-          };
-        }),
-      };
-    });
+    const current = member.attendance?.[key] || null;
+    const currentIndex = CYCLE_ORDER.indexOf(current);
+    const next = CYCLE_ORDER[(currentIndex + 1) % CYCLE_ORDER.length];
+
+    setMatrixData((data) => updateMatrixCell(data, groupKey, member.id, event.id, next));
+    setSavingCells((cells) => new Set(cells).add(cellKey));
 
     api
       .post(`/activity/events/${event.id}/attendance`, {
@@ -212,14 +226,19 @@ export default function AdminAttendance() {
         mode: "real",
         status: next,
       })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["admin-attendance"] });
-      })
+      .then(() => queryClient.invalidateQueries({ queryKey: ["admin-attendance-matrix"] }))
       .catch((error) => {
-        setMatrixData(prevData);
+        setMatrixData((data) => updateMatrixCell(data, groupKey, member.id, event.id, current));
         if (error.response?.status !== 403) {
           setFeedback({ type: "danger", message: getErrorMessage(error) });
         }
+      })
+      .finally(() => {
+        setSavingCells((cells) => {
+          const nextCells = new Set(cells);
+          nextCells.delete(cellKey);
+          return nextCells;
+        });
       });
   };
 
@@ -274,6 +293,8 @@ export default function AdminAttendance() {
   const renderMatrixCell = (groupKey, member, event) => {
     const status = member.attendance?.[String(event.id)] || null;
     const meta = status ? REAL_STATUS_META[status] : null;
+    const cellKey = `${groupKey}:${member.id}:${event.id}`;
+    const isSaving = savingCells.has(cellKey);
     return (
       <td className="text-center px-1" key={event.id}>
         <button
@@ -281,8 +302,9 @@ export default function AdminAttendance() {
           className={`btn btn-sm btn-outline-secondary border-0 ${meta ? meta.color : "text-muted"} p-1`}
           title={t("admin.attendance.clickToChange")}
           onClick={() => cycleCell(groupKey, member, event)}
+          disabled={!editingEnabled || isSaving}
         >
-          <i className={`fas ${meta ? meta.icon : "fa-minus"}`}></i>
+          <i className={`fas ${isSaving ? "fa-spinner fa-spin" : meta ? meta.icon : "fa-minus"}`}></i>
         </button>
       </td>
     );
@@ -369,8 +391,8 @@ export default function AdminAttendance() {
                   />
                 </div>
                 <div className="col-md-3 col-sm-6 d-flex gap-2">
-                  {filters.dateFrom || filters.dateTo || filters.kind ? (
-                    <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ dateFrom: "", dateTo: "", kind: "" })}>
+                  {filters.dateFrom !== schoolYearStart() || filters.dateTo || filters.kind ? (
+                    <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ dateFrom: schoolYearStart(), dateTo: "", kind: "" })}>
                       <i className="fas fa-times me-1"></i>{t("admin.attendance.clearFilters")}
                     </Button>
                   ) : null}
@@ -388,16 +410,20 @@ export default function AdminAttendance() {
               </span>
             ))}
             <span><i className="fas fa-minus text-muted me-1"></i>{t("admin.attendance.notRecorded")}</span>
-            <span className="ms-auto">{t("admin.attendance.clickToChange")}</span>
+            <span className="ms-auto">{editingEnabled ? t("admin.attendance.editEnabled") : t("admin.attendance.editDisabled")}</span>
           </div>
 
           {/* Matrix */}
           <div className="card shadow-sm border-0 mb-4">
             <div className="card-header bg-white border-0 py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
               <h5 className="mb-0">{t("admin.attendance.matrixTitle")}</h5>
-              <span className="text-muted small">
-                {events.length} {t("calendar.events").toLowerCase()}
-              </span>
+              <div className="d-flex align-items-center gap-2">
+                <span className="text-muted small">{events.length} {t("calendar.events").toLowerCase()}</span>
+                <Button variant={editingEnabled ? "primary" : "outline-secondary"} size="sm" onClick={() => setEditingEnabled((value) => !value)}>
+                  <i className={`fas fa-${editingEnabled ? "lock-open" : "pen"} me-1`} />
+                  {editingEnabled ? t("admin.attendance.finishEditing") : t("admin.attendance.enableEditing")}
+                </Button>
+              </div>
             </div>
             <div className="card-body p-0">
               {matrixQuery.isLoading ? (
@@ -410,7 +436,7 @@ export default function AdminAttendance() {
                   <p className="mb-0">{t("calendar.noEventsInMonth")}</p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ maxHeight: "70vh" }}>
+                <div className="table-responsive" style={{ overflowX: "auto", overscrollBehaviorInline: "contain" }}>
                   <table className="table table-sm table-bordered align-middle mb-0" style={{ minWidth: `${events.length * 90 + 220}px` }}>
                     <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 2 }}>
                       <tr>

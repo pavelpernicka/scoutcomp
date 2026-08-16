@@ -3,6 +3,7 @@ import api from "../../../services/api";
 const unwrap = (response) => response.data;
 
 export const cmsApi = {
+  downloadSiteExport: () => api.get("/web/export", { responseType: "blob" }).then((response) => response.data),
   listPages: () => api.get("/web/pages").then(unwrap),
   getPage: (id) => api.get(`/web/pages/${id}`).then(unwrap),
   getPageEditorData: (id) => api.get(`/web/pages/${id}/editor-data`).then(unwrap),

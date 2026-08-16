@@ -7,7 +7,6 @@ import "../styles/admin.css";
 
 const entries = [
   ["pages", "/admin/web/pages", "fa-file-lines", ["web.pages.manage", "web.manage"]],
-  ["posts", "/admin/web/posts", "fa-newspaper", ["web.posts.manage", "web.manage"]],
   ["menus", "/admin/web/menus", "fa-bars", ["web.menus.manage", "web.manage"]],
   ["media", "/admin/web/media", "fa-images", ["web.media.manage", "web.manage"]],
   ["design", "/admin/web/design", "fa-swatchbook", ["web.design.manage", "web.templates.manage", "web.manage"]],

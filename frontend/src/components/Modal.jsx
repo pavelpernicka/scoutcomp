@@ -1,3 +1,4 @@
+import { useEffect, useId, useRef } from 'react';
 import PropTypes from 'prop-types';
 
 const Modal = ({
@@ -14,15 +15,62 @@ const Modal = ({
   className = '',
   ...props
 }) => {
+  const dialogRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  useEffect(() => {
+    if (!isVisible) return undefined;
+
+    const previousFocus = document.activeElement;
+    const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusInitialControl = () => {
+      const focusable = dialogRef.current?.querySelectorAll(focusableSelector);
+      (focusable?.[0] || dialogRef.current)?.focus();
+    };
+    const timer = window.setTimeout(focusInitialControl, 0);
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...(dialogRef.current?.querySelectorAll(focusableSelector) || [])];
+      if (!focusable.length) {
+        event.preventDefault();
+        dialogRef.current?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [isVisible]);
+
   if (!isVisible) return null;
 
   const modalSizeClass = size ? `modal-${size}` : '';
 
   return (
     <>
-      <div className="modal fade show d-block" role="dialog" tabIndex="-1" {...props}>
+      <div className="modal fade show d-block" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex="-1" {...props}>
         <div className={`modal-dialog ${modalSizeClass}`} role="document">
-          <div className={`modal-content border-0 shadow-lg ${className}`}>
+          <div ref={dialogRef} className={`modal-content border-0 shadow-lg ${className}`} tabIndex="-1">
             <div
               className="modal-header text-white"
               style={headerStyle || { background: headerGradient }}
@@ -30,7 +78,7 @@ const Modal = ({
               <div className="d-flex align-items-center gap-2">
                 {icon && <span className="fs-3">{icon}</span>}
                 <div>
-                  <h5 className="modal-title mb-0">{title}</h5>
+                  <h5 id={titleId} className="modal-title mb-0">{title}</h5>
                   {subtitle && <small className="opacity-90">{subtitle}</small>}
                 </div>
               </div>

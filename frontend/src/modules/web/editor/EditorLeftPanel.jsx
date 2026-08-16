@@ -33,6 +33,15 @@ export default function EditorLeftPanel({
     sections: filter(sections),
     data: filter(dataSources),
   }), [components, sections, dataSources, search]);
+  const startDrag = (event, item) => {
+    const blockId = catalog === "data"
+      ? `sc-data-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`
+      : `sc-resource-${catalog === "components" ? "component" : "section"}-${item.id}`;
+    const block = editor?.BlockManager?.get?.(blockId);
+    if (!block) return;
+    event.dataTransfer.effectAllowed = "copy";
+    editor.BlockManager.startDrag?.(block, event.nativeEvent);
+  };
 
   useEffect(() => {
     document.querySelectorAll(".web-editor-block-manager .gjs-block").forEach((block) => {
@@ -68,7 +77,7 @@ export default function EditorLeftPanel({
       <div className={catalog === "components" ? "web-editor-block-manager" : "web-editor-block-manager d-none"} />
       <div className="web-editor-catalog-list">{catalogItems[catalog]?.map((item) => {
         const preview = item.preview_url || (item.preview_media_id ? `/api/web/media/${item.preview_media_id}/file` : null);
-        return <button key={item.id} type="button" onClick={() => onInsert(catalog, item)}>
+        return <button key={item.id} type="button" draggable={Boolean(editor)} onDragStart={(event) => startDrag(event, item)} title={catalog === "data" ? (item.description || item.label || item.name || item.id) : undefined} onClick={() => onInsert(catalog, item)}>
           <span className="web-editor-catalog-icon">{preview ? <MediaPreview src={preview} alt="" /> : <i className={`fas ${catalog === "data" ? "fa-database" : "fa-layer-group"}`} />}</span>
           <span><strong>{item.name || item.label || item.id}</strong><small>{item.description || item.id}</small></span>
         </button>;

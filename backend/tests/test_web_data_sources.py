@@ -41,7 +41,7 @@ def _now():
 def test_catalog_only_contains_sources_from_available_modules(db_session):
     _seed(db_session)
     assert {item["id"] for item in list_data_sources(db_session)} == {
-        "core.events", "web.media", "web.menu", "web.posts",
+        "core.events", "core.media", "web.menu", "core.posts",
     }
 
     core = db_session.query(RegisteredModule).filter_by(code="core").one()
@@ -111,10 +111,24 @@ def test_posts_source_reads_published_snapshot_not_mutable_draft(db_session):
     post.published_revision_id = publication.id
     db_session.commit()
 
-    result = resolve_data_source(db_session, "web.posts")
+    result = resolve_data_source(db_session, "core.posts")
 
     assert result[0]["title"] == "Live title"
     assert result[0]["url"] == "/post/live"
+
+
+def test_collection_sources_accept_a_bounded_offset_for_pagination(db_session):
+    _seed(db_session)
+    now = _now()
+    db_session.add_all([
+        ScoutEvent(title="First", kind="trip", starts_at=now, is_public=True),
+        ScoutEvent(title="Second", kind="trip", starts_at=now + timedelta(days=1), is_public=True),
+    ])
+    db_session.commit()
+
+    result = resolve_data_source(db_session, "core.events", {"offset": 1, "limit": 1}, ResolveContext(now=now))
+
+    assert [item["title"] for item in result] == ["Second"]
 
 
 def test_menu_source_reads_published_tree_and_projects_nested_items(db_session):
@@ -175,7 +189,7 @@ def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_se
     page.published_revision_id = revision.id
     db_session.commit()
 
-    result = resolve_data_source(db_session, "web.media")
+    result = resolve_data_source(db_session, "core.media")
 
     assert {item["id"] for item in result} == {public.id, gallery.id}
     assert all(item["album"] != "Draft secret" for item in result)

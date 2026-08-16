@@ -11,7 +11,7 @@ import Button from "../components/Button";
 import Alert from "../components/Alert";
 import LoadingSpinner from "../components/LoadingSpinner";
 import DecoratedCard from "../components/DecoratedCard";
-import Textarea from "../components/Textarea";
+import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function RulesPage() {
   const { t } = useTranslation();
@@ -166,37 +166,18 @@ export default function RulesPage() {
             )}
 
             {isAdmin && isEditing ? (
-              <div className="row g-4">
-                <div className="col-12 col-xl-6">
-                  <div className="mb-3">
-                    <label className="form-label fw-bold d-flex align-items-center">
-                      <span className="me-2">📝</span>
-                      {t("rules.markdownContent")}
-                    </label>
-                    <Textarea
-                      className="border-2"
-                      rows={18}
-                      value={draft}
-                      onChange={(event) => setDraft(event.target.value)}
-                      disabled={updateMutation.isLoading}
-                      placeholder={t("rules.markdownPlaceholder")}
-                      style={{ fontFamily: 'Monaco, Consolas, monospace', fontSize: '0.9rem' }}
-                    />
-                  </div>
-                </div>
-                <div className="col-12 col-xl-6">
-                  <div className="mb-3">
-                    <label className="form-label fw-bold d-flex align-items-center">
-                      <i className="fas fa-eye text-secondary me-2"></i>
-                      {t("rules.livePreview")}
-                    </label>
-                    <div
-                      className="border-2 border-info rounded p-4 bg-light markdown-preview"
-                      style={{ minHeight: '400px', maxHeight: '500px', overflowY: 'auto' }}
-                      dangerouslySetInnerHTML={renderMarkdown(draft)}
-                    />
-                  </div>
-                </div>
+              <div className="mb-3">
+                <label className="form-label fw-bold d-flex align-items-center">
+                  <span className="me-2">📝</span>
+                  {t("rules.markdownContent")}
+                </label>
+                <MarkdownEditor
+                  rows={18}
+                  value={draft}
+                  onChange={setDraft}
+                  disabled={updateMutation.isLoading}
+                  placeholder={t("rules.markdownPlaceholder")}
+                />
               </div>
             ) : page.content ? (
               <div className="bg-white rounded-3 p-4 border border-light">

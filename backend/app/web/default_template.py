@@ -34,28 +34,7 @@ DEFAULT_SCOUT_TEMPLATE = {
                                             "text": {"scope": "site", "field": "site_title"},
                                         },
                                     },
-                                    {
-                                        "type": "default",
-                                        "tagName": "div",
-                                        "attributes": {"class": "web-nav-links"},
-                                        "components": [
-                                            {
-                                                "type": "sc-repeat",
-                                                "source": "web.menu",
-                                                "components": [
-                                                    {
-                                                        "type": "link",
-                                                        "tagName": "a",
-                                                        "attributes": {"class": "web-nav-link"},
-                                                        "scBindings": {
-                                                            "href": {"scope": "context", "field": "url"},
-                                                            "text": {"scope": "context", "field": "label"},
-                                                        },
-                                                    },
-                                                ],
-                                            },
-                                        ],
-                                    },
+                                    {"type": "sc-menu", "location": "main"},
                                 ],
                             },
                         ],
@@ -155,7 +134,7 @@ DEFAULT_SCOUT_TEMPLATE = {
                                                     },
                                                     {
                                                         "type": "sc-repeat",
-                                                        "source": "web.posts",
+                                                        "source": "core.posts",
                                                         "params": {"limit": 3},
                                                         "components": [
                                                             {
@@ -300,6 +279,7 @@ DEFAULT_SCOUT_TEMPLATE = {
                                                     },
                                                 ],
                                             },
+                                            {"type": "sc-menu", "location": "footer"},
                                         ],
                                     },
                                     {
@@ -355,16 +335,7 @@ DEFAULT_THEME_TEMPLATES = {
                                 "attributes": {"class": "web-nav-inner"},
                                 "components": [
                                     {"type": "link", "tagName": "a", "attributes": {"class": "web-nav-brand", "href": "/"}, "scBindings": {"text": {"scope": "site", "field": "site_title"}}},
-                                    {"type": "default", "tagName": "div", "attributes": {"class": "web-nav-links"}, "components": [{
-                                        "type": "sc-repeat",
-                                        "source": "web.menu",
-                                        "components": [{
-                                            "type": "link",
-                                            "tagName": "a",
-                                            "attributes": {"class": "web-nav-link"},
-                                            "scBindings": {"href": {"scope": "context", "field": "url"}, "text": {"scope": "context", "field": "label"}},
-                                        }],
-                                    }]},
+                                    {"type": "sc-menu", "location": "main"},
                                 ],
                             }],
                         },
@@ -400,7 +371,7 @@ DEFAULT_THEME_TEMPLATES = {
                                             "attributes": {"class": "web-container"},
                                             "components": [{
                                                 "type": "sc-repeat",
-                                                "source": "web.posts",
+                                                "source": "core.posts",
                                                 "params": {"limit": 12},
                                                 "components": [{
                                                     "type": "default",
@@ -431,6 +402,7 @@ DEFAULT_THEME_TEMPLATES = {
                                     {"type": "default", "tagName": "span", "attributes": {"class": "web-footer-brand"}, "components": [
                                         {"type": "text", "tagName": "span", "scBindings": {"text": {"scope": "site", "field": "site_title"}}},
                                     ]},
+                                    {"type": "sc-menu", "location": "footer"},
                                     {"type": "text", "tagName": "small", "content": "© 2026 — webové stránky oddílu"},
                                 ],
                             }],

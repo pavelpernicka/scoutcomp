@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createPrimitiveBlocks } from "./blocks";
+import { createDataSourceBlocks, createPrimitiveBlocks } from "./blocks";
 
 const STRUCTURAL_IDS = [
   "sc-container",
@@ -22,6 +22,7 @@ describe("builder primitive blocks", () => {
     expect(blockIds).toContain("sc-section");
     expect(blockIds).not.toContain("sc-template-part");
     expect(blockIds).not.toContain("sc-global-part");
+    expect(blockIds).toContain("sc-menu");
     expect(blocks.every((block) => block.media?.includes("fa-"))).toBe(true);
   });
 
@@ -39,5 +40,16 @@ describe("builder primitive blocks", () => {
       expect(block.content.style, id).toBeUndefined();
       expect(block.content.attributes, id).toBeUndefined();
     }
+  });
+
+  it("adds a native tooltip to data-source blocks", () => {
+    const [block] = createDataSourceBlocks([{
+      id: "core.events",
+      label: "Události",
+      description: "Veřejné události oddílu",
+      fields: [],
+    }], (key) => key);
+
+    expect(block.attributes.title).toBe("Veřejné události oddílu");
   });
 });

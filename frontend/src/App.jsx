@@ -20,6 +20,7 @@ import RulesPage from "./pages/Rules";
 import UserSettingsPage from "./pages/UserSettings";
 import ActivityPage from "./pages/Activity";
 import MessagesPage from "./pages/Messages";
+import { PostsPage as MemberPostsPage, PostDetailPage } from "./pages/Posts";
 import AdminModules from "./pages/AdminModules";
 import AdminAccess from "./pages/AdminAccess";
 import AdminCompetitionAudit from "./pages/AdminCompetitionAudit";
@@ -64,6 +65,8 @@ export default function App() {
             <Route path="/settings" element={<UserSettingsPage />} />
             <Route path="/messages" element={<MessagesPage />} />
             <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/posts" element={<MemberPostsPage />} />
+            <Route path="/posts/:id" element={<PostDetailPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedPermissions={["core.access.manage"]} />}>
             <Route path="/admin/core/access" element={<AdminAccess />} />
@@ -86,6 +89,12 @@ export default function App() {
           <Route element={<ProtectedRoute allowedPermissions={["core.attendance.manage"]} />}>
             <Route path="/admin/core/attendance" element={<AdminAttendance />} />
             <Route path="/admin/attendance" element={<AdminAttendance />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedPermissions={["core.posts.manage", "web.posts.manage", "web.manage"]} />}>
+            <Route path="/admin/core/posts" element={<PostsPage />} />
+          </Route>
+          <Route element={<ProtectedRoute allowedPermissions={["core.media.manage", "web.media.manage", "web.manage"]} />}>
+            <Route path="/admin/core/media" element={<MediaPage />} />
           </Route>
           <Route element={<ProtectedRoute allowedPermissions={["competitions.approvals.audit"]} />}>
             <Route path="/admin/competition/approvals" element={<AdminApprovals />} />
@@ -113,9 +122,6 @@ export default function App() {
             <Route path="/admin/web" element={<Navigate to="/admin/web/pages" replace />} />
             <Route path="/admin/web/pages" element={<WebAdminRoute><PagesPage /></WebAdminRoute>} />
             <Route path="/admin/web/pages/:id/editor" element={<WebEditorPage />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedPermissions={["web.posts.manage", "web.manage"]} />}>
-            <Route path="/admin/web/posts" element={<WebAdminRoute><PostsPage /></WebAdminRoute>} />
           </Route>
           <Route element={<ProtectedRoute allowedPermissions={["web.menus.manage", "web.manage"]} />}>
             <Route path="/admin/web/menus" element={<WebAdminRoute><MenusPage /></WebAdminRoute>} />

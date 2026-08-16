@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import api from "../../../services/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MediaPickerModal from "../media/MediaPickerModal";
+import { cmsApi } from "../api/cms";
 
 const EMPTY_SETTINGS = {
   site_title: "",
@@ -50,6 +51,20 @@ export default function WebAdminSettings() {
     mutationFn: (payload) => api.put("/web/settings", payload),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["web", "settings"] }); setFeedback({ type: "success", message: t("web.saveSuccess") }); },
     onError: (error) => setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.saveFailed") }),
+  });
+  const exportMutation = useMutation({
+    mutationFn: cmsApi.downloadSiteExport,
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "scoutcomp-web-export.zip";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+    onError: (error) => setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.exportFailed") }),
   });
 
   const handleSubmit = (event) => {
@@ -153,7 +168,10 @@ export default function WebAdminSettings() {
           </div>
 
           <div className="col-12">
-            <div className="d-flex justify-content-end">
+            <div className="d-flex justify-content-between gap-2">
+              <button type="button" className="btn btn-outline-secondary" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()}>
+                <i className={`fas ${exportMutation.isPending ? "fa-spinner fa-spin" : "fa-file-export"} me-2`} />{t("web.exportSite")}
+              </button>
               <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
                 <i className="fas fa-save me-2" />{t("web.save")}
               </button>

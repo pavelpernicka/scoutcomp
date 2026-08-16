@@ -3,6 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createEditorConfig } from "./config";
 
 describe("GrapesJS editor configuration", () => {
+  it("uses one intentional content-slot placeholder and renders column blocks as a grid", () => {
+    const config = createEditorConfig({ container: document.createElement("div") });
+    expect(config.baseCss).toContain(".sc-layout-columns");
+    expect(config.baseCss).not.toContain(":where(div, section, article");
+  });
+
   it("does not replace the selector escape function with a boolean", () => {
     const config = createEditorConfig({ container: document.createElement("div") });
 
@@ -25,7 +31,7 @@ describe("GrapesJS editor configuration", () => {
     expect(config.baseCss).toContain("Přetáhněte sem prvek");
   });
 
-  it("keeps empty structural elements large enough to accept drops", () => {
+  it("limits the editor drop hint to the explicit content slot", () => {
     const config = createEditorConfig({
       container: document.createElement("div"),
       translate: (key) => key === "web.editor.placeholder.contentSlot"
@@ -33,9 +39,8 @@ describe("GrapesJS editor configuration", () => {
         : key,
     });
 
-    expect(config.baseCss).toContain(":where(div, section, article, header, footer, main, nav, aside):empty");
-    expect(config.baseCss).toContain("min-height: 72px");
-    expect(config.baseCss).toContain(':not([data-sc-type]):not([aria-hidden="true"])');
+    expect(config.baseCss).toContain('[data-sc-type="slot"][data-sc-slot="content"]:empty::after');
+    expect(config.baseCss).not.toContain(":where(div, section, article");
     expect(config.baseCss).toContain("Přetáhněte sem prvek");
   });
 });

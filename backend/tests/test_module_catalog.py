@@ -99,7 +99,8 @@ def test_catalog_contains_only_four_modules(client, db_session):
     assert competitions_menu == {"/tasks", "/leaderboard", "/rules"}
     inventory_menu = {item["route"] for item in catalogue_by_code["inventory"]["menu"]}
     assert "/inventory/items" in inventory_menu
-    assert "/inventory/flags" in inventory_menu
+    assert "/inventory/settings" in inventory_menu
+    assert "/inventory/flags" not in inventory_menu
     # Visitor-facing pages are served exclusively by app.site_app. The logged-in
     # React application exposes only permission-filtered CMS administration.
     assert catalogue_by_code["web"]["menu"] == []

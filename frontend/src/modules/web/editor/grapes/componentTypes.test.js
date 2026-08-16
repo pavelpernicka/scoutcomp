@@ -35,4 +35,13 @@ describe("ScoutComp component types", () => {
     expect(definition.model.defaults.style.minHeight).toBe("96px");
     expect(definition.view.onRender).toBeTypeOf("function");
   });
+
+  it("registers a first-class hierarchical menu with a location trait", () => {
+    const definitions = new Map();
+    registerScoutCompTypes({ Components: { addType: (id, definition) => definitions.set(id, definition) } });
+
+    const defaults = definitions.get("sc-menu").model.defaults;
+    expect(defaults).toMatchObject({ tagName: "nav", droppable: false, location: "main" });
+    expect(defaults.traits[0].name).toBe("location");
+  });
 });

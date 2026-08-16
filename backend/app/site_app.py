@@ -41,7 +41,7 @@ from .models import (
 from .modules import registry
 from .modules.registration import register_all_modules
 from .routers.config import get_config_value
-from .web_render import render_markdown, render_site_page
+from .web_render import render_article_body, render_site_page
 from .web.renderer import CompileError, compile_project, render_document, render_project
 from .web.data_sources import is_media_published
 
@@ -527,7 +527,7 @@ def site_post(slug: str):
         post_body = (
             f'<article class="web-post">'
             f'<h2 class="web-post-title">{escape(title)}</h2>'
-            f'{cover}<div class="web-post-body">{render_markdown(body_text)}</div>'
+            f'{cover}<div class="web-post-body">{render_article_body(body_text)}</div>'
             f'</article>'
         )
         if revision is not None:

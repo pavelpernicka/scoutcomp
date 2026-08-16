@@ -60,6 +60,17 @@ export default function DesignResourcesPage({ kind }) {
       navigate(`/admin/web/design/${kind}/${resource.id}/editor`);
     },
   });
+  const edit = async (resource) => {
+    // Installed package resources are immutable by contract.  "Edit" creates
+    // a site-owned linked clone, so authors reach a real editor rather than a
+    // read-only dead end and future theme upgrades remain safe.
+    if (resource.is_locked || resource.theme_version_id) {
+      const cloned = await clone.mutateAsync(resource);
+      return cloned;
+    }
+    navigate(`/admin/web/design/${kind}/${resource.id}/editor`);
+    return resource;
+  };
   const remove = useMutation({ mutationFn: deleteRequest, onSuccess: invalidate });
   const resources = filterCatalogResources(resourcesQuery.data, activeThemeId);
   const resourcesLoading = resourcesQuery.isLoading || canvasStylesQuery.isLoading;
@@ -72,7 +83,7 @@ export default function DesignResourcesPage({ kind }) {
       const installed = Boolean(resource.is_locked || resource.theme_version_id);
       const previewUrl = resource.preview_url || (resource.preview_media_id ? `/api/web/media/${resource.preview_media_id}/file` : null);
       const icon = kind === "components" ? "fa-layer-group" : "fa-layer-group";
-      return <article key={resource.id} className="web-resource-item"><div className="web-resource-preview">{previewUrl ? <MediaPreview src={previewUrl} alt="" /> : <i className={`fas ${icon}`} />}</div><div><h3>{resource.name}</h3><p>{resource.description || t(`web.resourceKinds.${kind}`)}</p><span>{installed ? t("web.states.fromTheme") : t("web.states.siteLocal")}</span>{kind === "templates" && <small className="ms-2">{t(`web.templateUsage.${getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.copyOnCreate ? "copyOnCreate" : "linkedLayout"}`)}</small>}</div><div className="d-flex gap-1"><button type="button" className="btn btn-sm btn-outline-secondary" title={t("web.duplicate")} disabled={clone.isPending} onClick={() => clone.mutate(resource)}><i className="fas fa-copy" /></button><button type="button" className="btn btn-sm btn-outline-primary" title={t("web.edit")} onClick={() => navigate(`/admin/web/design/${kind}/${resource.id}/editor`)}><i className={`fas ${installed ? "fa-eye" : "fa-pen"}`} /></button>{!installed && !resource.is_system && <button type="button" className="btn btn-sm btn-outline-danger" title={t("web.delete")} onClick={() => { if (window.confirm(t("web.confirmDeleteResource"))) remove.mutate(resource.id); }}><i className="fas fa-trash" /></button>}</div></article>;
+      return <article key={resource.id} className="web-resource-item"><div className="web-resource-preview">{previewUrl ? <MediaPreview src={previewUrl} alt="" /> : <i className={`fas ${icon}`} />}</div><div><h3>{resource.name}</h3><p>{resource.description || t(`web.resourceKinds.${kind}`)}</p><span>{installed ? t("web.states.fromTheme") : t("web.states.siteLocal")}</span>{kind === "templates" && <small className="ms-2">{t(`web.templateUsage.${getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.copyOnCreate ? "copyOnCreate" : "linkedLayout"}`)}</small>}</div><div className="d-flex gap-1"><button type="button" className="btn btn-sm btn-outline-secondary" title={t("web.duplicate")} disabled={clone.isPending} onClick={() => clone.mutate(resource)}><i className="fas fa-copy" /></button><button type="button" className="btn btn-sm btn-outline-primary" title={t("web.edit")} disabled={clone.isPending} onClick={() => { void edit(resource); }}><i className="fas fa-pen" /></button>{!installed && !resource.is_system && <button type="button" className="btn btn-sm btn-outline-danger" title={t("web.delete")} onClick={() => { if (window.confirm(t("web.confirmDeleteResource"))) remove.mutate(resource.id); }}><i className="fas fa-trash" /></button>}</div></article>;
     })}</div>}
   </section>;
 }

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from app.config import settings
 from app.core.security import get_password_hash
-from app.models import RoleEnum, User
+from app.models import RoleEnum, ScoutEvent, User
 
 def _project(text: str) -> dict:
     return {
@@ -74,7 +74,7 @@ def test_web_data_sources_and_templates_catalogue(client, db_session):
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     sources = client.get("/web/data-sources", headers=_headers(token))
     assert sources.status_code == 200
-    assert {"core.events", "web.posts", "web.media", "web.menu"} <= {
+    assert {"core.events", "core.posts", "core.media", "web.menu"} <= {
         item["id"] for item in sources.json()
     }
 
@@ -349,6 +349,9 @@ def test_web_posts_crud_and_public_render(client, db_session, monkeypatch):
 
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     headers = _headers(token)
+    event = ScoutEvent(title="Tábor", starts_at=datetime(2026, 7, 1), requires_planned=True)
+    db_session.add(event)
+    db_session.commit()
 
     created = client.post(
         "/web/posts",
@@ -358,6 +361,7 @@ def test_web_posts_crud_and_public_render(client, db_session, monkeypatch):
             "slug": "tabor-2026",
             "excerpt": "Letní tábor se vydařil",
             "body": "## Tábor\nLetošní **tábor** byl skvělý.",
+            "event_id": event.id,
             "published": True,
         },
     )
@@ -367,7 +371,23 @@ def test_web_posts_crud_and_public_render(client, db_session, monkeypatch):
 
     listed = client.get("/web/posts", headers=headers)
     assert listed.status_code == 200
-    assert any(p["slug"] == "tabor-2026" for p in listed.json())
+    listed_body = listed.json()
+    assert listed_body["total"] == 1
+    assert any(p["slug"] == "tabor-2026" for p in listed_body["items"])
+    assert listed_body["items"][0]["author"]
+    feed = client.get("/web/posts/feed", headers=headers)
+    assert feed.status_code == 200
+    assert feed.json()["items"][0]["id"] == post["id"]
+    detail = client.get(f"/web/posts/feed/{post['id']}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["body"] == "## Tábor\nLetošní **tábor** byl skvělý."
+    assert detail.json()["event"]["id"] == event.id
+    assert client.post(f"/web/posts/{post['id']}/unpublish", headers=headers).json()["published"] is False
+    assert client.post(
+        f"/web/posts/{post['id']}/publish",
+        headers=headers,
+        json={"expected_version": post["draft_version"]},
+    ).status_code == 200
 
     updated = client.put(
         f"/web/posts/{post['id']}",
@@ -391,6 +411,16 @@ def test_web_posts_crud_and_public_render(client, db_session, monkeypatch):
 
     assert client.delete(f"/web/posts/{post['id']}", headers=headers).status_code == 204
     assert client.get(f"/web/posts/{post['id']}", headers=headers).status_code == 404
+
+
+def test_rich_article_html_is_allowlisted():
+    from app.web_render import render_article_body
+
+    rendered = render_article_body('<h2>Nadpis</h2><p><strong>Text</strong><script>alert(1)</script></p>')
+
+    assert "<h2>Nadpis</h2>" in rendered
+    assert "<strong>Text</strong>" in rendered
+    assert "script" not in rendered
 
 
 def test_web_revisions_duplicate_and_trash(client, db_session):

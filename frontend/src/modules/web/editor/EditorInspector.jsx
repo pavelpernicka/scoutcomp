@@ -23,8 +23,18 @@ export default function EditorInspector({ selected, dataSources, resources, onDu
     {!selected && <div className="web-editor-inspector-empty"><i className="fas fa-arrow-pointer" /><p>{t("web.editor.noSelection")}</p></div>}
     <div className={`web-editor-inspector-body ${selected ? "" : "web-editor-mounts-only"}`}>
       {selected && templateOwnerId ? <TemplateOwnedInfo templateId={templateOwnerId} onEdit={onEditTemplate} /> : <>
-        <div className={selected && tab === "content" ? "" : "d-none"}>{linked ? <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} /> : <div className="web-editor-trait-manager" />}</div>
-        <div className={selected && tab === "style" ? "" : "d-none"}>{linked ? <LinkedStyleInfo selected={selected} resources={resources} /> : <div className="web-editor-style-manager" />}</div>
+        {/* GrapesJS resolves appendTo only during initialization.  Keep both
+            native mounts in the DOM before the first selection; otherwise
+            React creates empty cards later but Traits/StyleManager stay
+            detached and every ordinary component appears uneditable. */}
+        <div className={tab === "content" ? "" : "d-none"}>
+          {linked && <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} />}
+          <div className={linked ? "d-none" : ""}><div className="web-editor-trait-manager" /></div>
+        </div>
+        <div className={tab === "style" ? "" : "d-none"}>
+          {linked && <LinkedStyleInfo selected={selected} resources={resources} />}
+          <div className={linked ? "d-none" : ""}><div className="web-editor-style-manager" /></div>
+        </div>
         {selected && tab === "data" && (type === "sc-repeat"
           ? <RepeatConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
           : <DataBindings selected={selected} dataSources={dataSources} />)}

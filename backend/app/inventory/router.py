@@ -9,26 +9,20 @@ from sqlalchemy.orm import Session
 from ..dependencies import get_current_active_user, get_db
 from ..models import (
     InventoryCategory,
-    InventoryEvent,
-    InventoryEventItem,
     InventoryLocation,
-    InventoryEventScan,
     InventoryFlag,
     InventoryHistoryAction,
     InventoryItem,
-    InventoryEventStatus,
+    InventoryItemLocation,
     InventoryItemStatus,
     InventoryLabelTemplate,
     InventoryLoan,
     InventoryPhoto,
+    InventorySet,
     User,
 )
 from ..permissions import permission_scopes
 from ..schemas import (
-    InventoryEventCreate,
-    InventoryEventDetail,
-    InventoryEventItemAssign,
-    InventoryEventItemReturn,
     InventoryCategoryCreate,
     InventoryCategoryPublic,
     InventoryCategoryUpdate,
@@ -36,48 +30,47 @@ from ..schemas import (
     InventoryFlagPublic,
     InventoryFlagUpdate,
     InventoryBulkUpdateRequest,
+    InventoryBulkLoanRequest,
     InventoryLocationCreate,
     InventoryLocationPublic,
     InventoryLocationUpdate,
-    InventoryEventPublic,
-    InventoryEventScanRequest,
-    InventoryEventUpdate,
     InventoryItemCreate,
     InventoryItemPublic,
     InventoryItemUpdate,
     InventoryLabelTemplateCreate,
     InventoryLabelTemplatePublic,
     InventoryLabelTemplateUpdate,
-    InventoryLabelsPreviewRequest,
-    InventoryLabelsPreviewResponse,
     InventoryLoanCreate,
     InventoryLoanPublic,
     InventoryLoanReturn,
     InventoryOverviewResponse,
     InventoryPhotoCreate,
+    InventorySetCreate,
+    InventorySetItemsUpdate,
+    InventorySetPublic,
+    InventorySetUpdate,
 )
 from .service import (
-    ACTIVE_EVENT_STATUSES,
     ensure_team_exists_and_allowed,
     generate_qr_identifier,
     get_available_quantity,
-    get_event_or_404,
+    get_available_quantity,
+    get_allowed_team_ids,
+    get_item_query,
     get_item_or_404,
     get_category_or_404,
     get_flag_or_404,
     get_location_or_404,
-    get_scoped_events,
     get_scoped_categories,
     get_scoped_flags,
     get_scoped_items,
     get_scoped_locations,
     get_scoped_templates,
+    get_scoped_sets,
+    get_set_or_404,
     get_template_or_404,
-    normalize_scan_condition,
     record_history,
     build_location_path,
-    serialize_event,
-    serialize_event_detail,
     serialize_categories,
     serialize_flags,
     serialize_item,
@@ -85,11 +78,49 @@ from .service import (
     serialize_locations,
     serialize_template,
     serialize_templates,
+    serialize_set,
+    serialize_sets,
     touch_updated_location,
     update_item_status_history,
 )
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def _normalized_locations(values) -> list[tuple[str, int]]:
+    quantities: dict[str, int] = {}
+    for value in values:
+        location = value.location.strip()
+        if not location:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Location must not be empty")
+        if location in quantities:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Location may only be listed once")
+        quantities[location] = value.quantity
+    return list(quantities.items())
+
+
+def _replace_item_locations(db: Session, item: InventoryItem, values, expected_quantity: int) -> None:
+    locations = _normalized_locations(values)
+    # Older items predate per-location quantities.  An ordinary edit must not
+    # fail solely because the client has no allocation rows to send yet.
+    if not locations and expected_quantity:
+        locations = [(item.current_location or item.default_location or "Bez lokace", expected_quantity)]
+    if sum(quantity for _, quantity in locations) != expected_quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Location quantities must equal the available item quantity")
+    existing_by_location = {entry.location: entry for entry in item.locations}
+    requested_locations = {location for location, _quantity in locations}
+    for location, quantity in locations:
+        existing = existing_by_location.get(location)
+        if existing:
+            existing.quantity = quantity
+        else:
+            item.locations.append(InventoryItemLocation(location=location, quantity=quantity))
+    for location, existing in existing_by_location.items():
+        if location not in requested_locations:
+            db.delete(existing)
+    if locations:
+        item.current_location = locations[0][0]
+        item.default_location = item.default_location or locations[0][0]
 
 
 def require_inventory_access(
@@ -134,11 +165,11 @@ def get_overview(
 ) -> InventoryOverviewResponse:
     return InventoryOverviewResponse(
         items=serialize_items(get_scoped_items(db, current_user, team_id)),
-        events=[serialize_event(event) for event in get_scoped_events(db, current_user, team_id)],
         label_templates=serialize_templates(get_scoped_templates(db, current_user, team_id)),
         locations=serialize_locations(get_scoped_locations(db, current_user, team_id)),
         categories=serialize_categories(get_scoped_categories(db, current_user, team_id)),
         flags=serialize_flags(get_scoped_flags(db, current_user, team_id)),
+        sets=serialize_sets(get_scoped_sets(db, current_user, team_id)),
     )
 
 
@@ -157,8 +188,21 @@ def bulk_update_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> list[InventoryItemPublic]:
-    items = [get_item_or_404(db, current_user, item_id) for item_id in payload.item_ids]
-    event = get_event_or_404(db, current_user, payload.assign_event_id) if payload.assign_event_id else None
+    # Fetch the selected items and their collections as one batch.  The former
+    # per-ID loader repeated all relationship queries for every selected row.
+    items_by_id = {
+        item.id: item
+        for item in get_item_query(db).filter(InventoryItem.id.in_(payload.item_ids)).all()
+    }
+    items = []
+    allowed_team_ids = get_allowed_team_ids(current_user)
+    for item_id in payload.item_ids:
+        item = items_by_id.get(item_id)
+        if not item:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+        if allowed_team_ids is not None and item.team_id not in allowed_team_ids:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
+        items.append(item)
     flag = get_flag_or_404(db, current_user, payload.set_flag_id) if payload.set_flag_id else None
     fields_set = payload.model_fields_set
 
@@ -210,27 +254,36 @@ def bulk_update_items(
                 action=InventoryHistoryAction.UPDATED,
                 payload={"flag": {"from": old_flag, "to": item.flag.name if item.flag else None}},
             )
-        if event:
-            if item.team_id != event.team_id:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item and event must belong to the same team")
-            existing = next((value for value in event.items if value.item_id == item.id), None)
-            if existing:
-                existing.planned_quantity = payload.assign_event_quantity
-            else:
-                db.add(InventoryEventItem(event=event, item=item, planned_quantity=payload.assign_event_quantity))
-            item.current_location = f"Akce: {event.name}"
-            record_history(
-                db,
-                item=item,
-                actor=current_user,
-                action=InventoryHistoryAction.EVENT_ASSIGNED,
-                payload={"event_id": event.id, "event_name": event.name, "planned_quantity": payload.assign_event_quantity},
-                event=event,
-            )
         db.add(item)
 
     db.commit()
-    return [serialize_item(get_item_or_404(db, current_user, item.id)) for item in items]
+    refreshed_items = get_item_query(db).filter(InventoryItem.id.in_(items_by_id)).all()
+    refreshed_by_id = {item.id: item for item in refreshed_items}
+    return [serialize_item(refreshed_by_id[item_id]) for item_id in payload.item_ids]
+
+
+@router.post("/items/bulk/loans", response_model=list[InventoryItemPublic], status_code=status.HTTP_201_CREATED)
+def bulk_create_loans(
+    payload: InventoryBulkLoanRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> list[InventoryItemPublic]:
+    items = get_item_query(db).filter(InventoryItem.id.in_(payload.item_ids)).all()
+    if len(items) != len(set(payload.item_ids)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+    allowed_team_ids = get_allowed_team_ids(current_user)
+    if allowed_team_ids is not None and any(item.team_id not in allowed_team_ids for item in items):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inventory item outside managed scope")
+    for item in items:
+        available = get_available_quantity(item)
+        if available <= 0:
+            continue
+        source_location = item.current_location or item.default_location
+        db.add(InventoryLoan(item=item, borrower_name=payload.borrower_name, quantity=available, due_at=payload.due_at, source_location=source_location, note=payload.note))
+    db.commit()
+    refreshed = get_item_query(db).filter(InventoryItem.id.in_(payload.item_ids)).all()
+    by_id = {item.id: item for item in refreshed}
+    return [serialize_item(by_id[item_id]) for item_id in payload.item_ids]
 
 
 @router.post("/items", response_model=InventoryItemPublic, status_code=status.HTTP_201_CREATED)
@@ -244,12 +297,15 @@ def create_item(
         flag = get_flag_or_404(db, current_user, payload.flag_id)
         if flag.team_id != payload.team_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Flag must belong to the same team")
+    if payload.set_id is not None:
+        inventory_set = get_set_or_404(db, current_user, payload.set_id)
     item = InventoryItem(
         team_id=payload.team_id,
         name=payload.name,
         description=payload.description,
         category=payload.category,
         flag_id=payload.flag_id,
+        set_id=payload.set_id,
         quantity=payload.quantity,
         quantity_unit=payload.quantity_unit,
         default_location=payload.default_location,
@@ -261,6 +317,11 @@ def create_item(
     sync_system_quantity_flag(db, item)
     db.add(item)
     db.flush()
+    if payload.locations:
+        _replace_item_locations(db, item, payload.locations, payload.quantity)
+    elif payload.quantity:
+        location = payload.current_location or payload.default_location or "Bez lokace"
+        db.add(InventoryItemLocation(item=item, location=location, quantity=payload.quantity))
     for index, photo in enumerate(payload.photos):
         db.add(InventoryPhoto(item=item, image_url=photo.image_url, caption=photo.caption, position=index))
     record_history(
@@ -291,6 +352,9 @@ def update_item(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryItemPublic:
     item = get_item_or_404(db, current_user, item_id)
+    open_loan_quantity = sum(loan.quantity for loan in item.loans if loan.returned_at is None)
+    if payload.quantity is not None and payload.quantity < open_loan_quantity:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Quantity cannot be lower than currently loaned quantity")
     previous_status = item.status
     previous_location = item.current_location
     changes = {}
@@ -302,6 +366,15 @@ def update_item(
         changes["flag_id"] = {"from": item.flag_id, "to": payload.flag_id}
         item.flag_id = payload.flag_id
 
+    next_team_id = payload.team_id if payload.team_id is not None else item.team_id
+    if "set_id" in payload.model_fields_set:
+        if payload.set_id is not None:
+            get_set_or_404(db, current_user, payload.set_id)
+        changes["set_id"] = {"from": item.set_id, "to": payload.set_id}
+        item.set_id = payload.set_id
+    elif item.set_id is not None and next_team_id != item.team_id:
+        get_set_or_404(db, current_user, item.set_id)
+
     if payload.team_id is not None and payload.team_id != item.team_id:
         ensure_team_exists_and_allowed(db, current_user, payload.team_id)
         changes["team_id"] = {"from": item.team_id, "to": payload.team_id}
@@ -311,6 +384,11 @@ def update_item(
         if value is not None and value != getattr(item, field):
             changes[field] = {"from": getattr(item, field), "to": value}
             setattr(item, field, value)
+
+    if payload.locations is not None:
+        _replace_item_locations(db, item, payload.locations, item.quantity - open_loan_quantity)
+    elif payload.quantity is not None and item.locations:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Send location quantities when changing item quantity")
 
     sync_system_quantity_flag(db, item)
 
@@ -339,7 +417,12 @@ def add_photo(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryItemPublic:
     item = get_item_or_404(db, current_user, item_id)
-    photo = InventoryPhoto(item=item, image_url=payload.image_url, caption=payload.caption, position=len(item.photos))
+    # The inventory UI exposes one primary photo. Replacing it must not append
+    # a hidden second image while the old one remains the first preview.
+    for existing_photo in list(item.photos):
+        db.delete(existing_photo)
+    db.flush()
+    photo = InventoryPhoto(item=item, image_url=payload.image_url, caption=payload.caption, position=0)
     db.add(photo)
     record_history(
         db,
@@ -384,12 +467,22 @@ def create_loan(
     item = get_item_or_404(db, current_user, item_id)
     if payload.quantity > get_available_quantity(item):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough available quantity")
+    location_entry = None
+    if item.locations:
+        requested_location = payload.location or item.locations[0].location
+        location_entry = next((entry for entry in item.locations if entry.location == requested_location), None)
+        if not location_entry:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown item location")
+        if payload.quantity > location_entry.quantity:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Not enough quantity at the selected location")
+        location_entry.quantity -= payload.quantity
     loan = InventoryLoan(
         item=item,
         borrower_name=payload.borrower_name,
         borrowed_at=payload.borrowed_at or datetime.utcnow(),
         due_at=payload.due_at,
         quantity=payload.quantity,
+        source_location=location_entry.location if location_entry else payload.location,
         note=payload.note,
     )
     db.add(loan)
@@ -398,7 +491,7 @@ def create_loan(
         item=item,
         actor=current_user,
         action=InventoryHistoryAction.LOANED,
-        payload={"borrower_name": loan.borrower_name, "quantity": loan.quantity, "due_at": loan.due_at.isoformat() if loan.due_at else None},
+        payload={"borrower_name": loan.borrower_name, "quantity": loan.quantity, "location": loan.source_location, "due_at": loan.due_at.isoformat() if loan.due_at else None},
     )
     db.commit()
     return serialize_item(get_item_or_404(db, current_user, item.id))
@@ -420,6 +513,12 @@ def return_loan(
     loan.returned_at = payload.returned_at or datetime.utcnow()
     if payload.note:
         loan.note = payload.note
+    if loan.source_location:
+        location_entry = next((entry for entry in item.locations if entry.location == loan.source_location), None)
+        if location_entry:
+            location_entry.quantity += loan.quantity
+        else:
+            db.add(InventoryItemLocation(item=item, location=loan.source_location, quantity=loan.quantity))
     record_history(
         db,
         item=item,
@@ -432,266 +531,21 @@ def return_loan(
     return serialize_item(get_item_or_404(db, current_user, item.id))
 
 
-@router.get("/events", response_model=list[InventoryEventPublic])
-def list_events(
-    team_id: Optional[int] = Query(default=None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> list[InventoryEventPublic]:
-    return [serialize_event(event) for event in get_scoped_events(db, current_user, team_id)]
-
-
-@router.post("/events", response_model=InventoryEventPublic, status_code=status.HTTP_201_CREATED)
-def create_event(
-    payload: InventoryEventCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventPublic:
-    ensure_team_exists_and_allowed(db, current_user, payload.team_id)
-    event = InventoryEvent(**payload.model_dump())
-    db.add(event)
-    db.commit()
-    db.refresh(event)
-    return serialize_event(get_event_or_404(db, current_user, event.id))
-
-
-@router.patch("/events/{event_id}", response_model=InventoryEventPublic)
-def update_event(
-    event_id: int,
-    payload: InventoryEventUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventPublic:
-    event = get_event_or_404(db, current_user, event_id)
-    data = payload.model_dump(exclude_unset=True)
-    if "team_id" in data:
-        ensure_team_exists_and_allowed(db, current_user, data["team_id"])
-    for key, value in data.items():
-        setattr(event, key, value)
-    db.add(event)
-    db.commit()
-    return serialize_event(get_event_or_404(db, current_user, event.id))
-
-
-@router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_event(
-    event_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> None:
-    event = get_event_or_404(db, current_user, event_id)
-
-    # Check if there are any items that haven't been fully returned
-    unreturned_items = [
-        item for item in event.items
-        if (item.planned_quantity or 0) > (item.returned_quantity or 0)
-    ]
-
-    if unreturned_items:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Event still contains unreturned items. Return or remove them first.",
-        )
-    db.delete(event)
-    db.commit()
-
-
-@router.get("/events/{event_id}", response_model=InventoryEventDetail)
-def get_event_detail(
-    event_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventDetail:
-    return serialize_event_detail(get_event_or_404(db, current_user, event_id))
-
-
-@router.post("/events/{event_id}/items", response_model=InventoryEventDetail)
-def assign_item_to_event(
-    event_id: int,
-    payload: InventoryEventItemAssign,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventDetail:
-    event = get_event_or_404(db, current_user, event_id)
-    item = get_item_or_404(db, current_user, payload.item_id)
-    if item.team_id != event.team_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Item and event must belong to the same team")
-    existing = next((value for value in event.items if value.item_id == item.id), None)
-    current_reserved_here = existing.planned_quantity if existing else 0
-    if payload.planned_quantity > get_available_quantity(item) + current_reserved_here:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Planned quantity exceeds item quantity")
-
-    if existing:
-        existing.planned_quantity = payload.planned_quantity
-        existing.note = payload.note
-    else:
-        existing = InventoryEventItem(event=event, item=item, planned_quantity=payload.planned_quantity, note=payload.note)
-        db.add(existing)
-    if event.status == InventoryEventStatus.PLANNED:
-        event.status = InventoryEventStatus.ACTIVE
-    item.current_location = f"Akce: {event.name}"
-    record_history(
-        db,
-        item=item,
-        actor=current_user,
-        action=InventoryHistoryAction.EVENT_ASSIGNED,
-        payload={"event_id": event.id, "event_name": event.name, "planned_quantity": payload.planned_quantity},
-        event=event,
-    )
-    db.commit()
-    return serialize_event_detail(get_event_or_404(db, current_user, event.id))
-
-
-@router.delete("/events/{event_id}/items/{event_item_id}", response_model=InventoryEventDetail)
-def remove_item_from_event(
-    event_id: int,
-    event_item_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventDetail:
-    event = get_event_or_404(db, current_user, event_id)
-    assignment = next((value for value in event.items if value.id == event_item_id), None)
-    if not assignment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event assignment not found")
-    item = assignment.item
-    record_history(
-        db,
-        item=item,
-        actor=current_user,
-        action=InventoryHistoryAction.EVENT_RETURNED,
-        payload={"event_id": event.id, "event_name": event.name, "returned_quantity": assignment.returned_quantity},
-        event=event,
-    )
-    if item.current_location == f"Akce: {event.name}":
-        item.current_location = item.default_location
-    db.delete(assignment)
-    db.commit()
-    return serialize_event_detail(get_event_or_404(db, current_user, event.id))
-
-
-@router.post("/events/{event_id}/items/{event_item_id}/return", response_model=InventoryEventDetail)
-def return_event_item(
-    event_id: int,
-    event_item_id: int,
-    payload: InventoryEventItemReturn,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventDetail:
-    event = get_event_or_404(db, current_user, event_id)
-    assignment = next((value for value in event.items if value.id == event_item_id), None)
-    if not assignment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Event assignment not found")
-
-    remaining_quantity = max(assignment.planned_quantity - assignment.returned_quantity, 0)
-    if payload.quantity > remaining_quantity:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Returned quantity exceeds remaining quantity")
-
-    item = assignment.item
-    condition = normalize_scan_condition(payload.condition) or "ok"
-    assignment.returned_quantity += payload.quantity
-    if condition == "damaged":
-        assignment.damaged_quantity += payload.quantity
-        item.status = InventoryItemStatus.DAMAGED
-
-    if payload.current_location:
-        item.current_location = payload.current_location
-    elif assignment.returned_quantity >= assignment.planned_quantity and item.current_location == f"Akce: {event.name}":
-        item.current_location = item.default_location
-
-    record_history(
-        db,
-        item=item,
-        actor=current_user,
-        action=InventoryHistoryAction.EVENT_RETURNED,
-        payload={
-            "event_id": event.id,
-            "event_name": event.name,
-            "returned_quantity": payload.quantity,
-            "condition": condition,
-            "current_location": item.current_location,
-            "note": payload.note,
-        },
-        event=event,
-    )
-    db.add(assignment)
-    db.add(item)
-    db.commit()
-    return serialize_event_detail(get_event_or_404(db, current_user, event.id))
-
-
-@router.post("/events/{event_id}/scan-return", response_model=InventoryEventDetail)
-def scan_return(
-    event_id: int,
-    payload: InventoryEventScanRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryEventDetail:
-    event = get_event_or_404(db, current_user, event_id)
-    item = (
-        db.query(InventoryItem)
-        .filter(InventoryItem.qr_identifier == payload.qr_identifier)
-        .first()
-    )
-    condition = normalize_scan_condition(payload.condition)
-    if item and item.team_id != event.team_id:
-        item = None
-
-    assignment = None
-    if item:
-        assignment = next((value for value in event.items if value.item_id == item.id), None)
-
-    if assignment:
-        if assignment.returned_quantity < assignment.planned_quantity:
-            assignment.returned_quantity += 1
-        if condition == "damaged":
-            assignment.damaged_quantity += 1
-            item.status = InventoryItemStatus.DAMAGED
-        if assignment.returned_quantity >= assignment.planned_quantity:
-            item.current_location = item.default_location
-        result = "returned"
-        record_history(
-            db,
-            item=item,
-            actor=current_user,
-            action=InventoryHistoryAction.QR_SCANNED,
-            payload={"mode": "event_return", "event_id": event.id, "result": result, "condition": condition},
-            event=event,
-        )
-        record_history(
-            db,
-            item=item,
-            actor=current_user,
-            action=InventoryHistoryAction.EVENT_RETURNED,
-            payload={"event_id": event.id, "event_name": event.name, "returned_quantity": assignment.returned_quantity},
-            event=event,
-        )
-    else:
-        result = "extra"
-
-    scan = InventoryEventScan(
-        event=event,
-        item=item,
-        actor=current_user,
-        qr_identifier=payload.qr_identifier,
-        result=result,
-        condition=condition,
-        note=payload.note,
-    )
-    db.add(scan)
-    db.commit()
-    return serialize_event_detail(get_event_or_404(db, current_user, event.id))
-
-
 @router.get("/qr/{qr_identifier}", response_model=InventoryItemPublic)
 def get_item_by_qr(
     qr_identifier: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryItemPublic:
-    item = (
-        get_scoped_items(db, current_user)
-    )
-    match = next((value for value in item if value.qr_identifier == qr_identifier), None)
+    # qr_identifier is unique and indexed.  Do not deserialize the complete
+    # inventory merely to resolve one scanned code.
+    query = get_item_query(db).filter(InventoryItem.qr_identifier == qr_identifier)
+    allowed_team_ids = get_allowed_team_ids(current_user)
+    if allowed_team_ids is not None:
+        if not allowed_team_ids:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+        query = query.filter(InventoryItem.team_id.in_(allowed_team_ids))
+    match = query.first()
     if not match:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
     record_history(
@@ -712,6 +566,101 @@ def list_label_templates(
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> list[InventoryLabelTemplatePublic]:
     return serialize_templates(get_scoped_templates(db, current_user, team_id))
+
+
+@router.get("/sets", response_model=list[InventorySetPublic])
+def list_sets(
+    team_id: Optional[int] = Query(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> list[InventorySetPublic]:
+    return serialize_sets(get_scoped_sets(db, current_user, team_id))
+
+
+@router.post("/sets", response_model=InventorySetPublic, status_code=status.HTTP_201_CREATED)
+def create_set(
+    payload: InventorySetCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventorySetPublic:
+    if payload.flag_id is not None:
+        get_flag_or_404(db, current_user, payload.flag_id)
+    inventory_set = InventorySet(**payload.model_dump())
+    db.add(inventory_set)
+    db.commit()
+    db.refresh(inventory_set)
+    return serialize_set(get_set_or_404(db, current_user, inventory_set.id))
+
+
+@router.patch("/sets/{set_id}", response_model=InventorySetPublic)
+def update_set(
+    set_id: int,
+    payload: InventorySetUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventorySetPublic:
+    inventory_set = get_set_or_404(db, current_user, set_id)
+    data = payload.model_dump(exclude_unset=True)
+    if data.get("flag_id") is not None:
+        get_flag_or_404(db, current_user, data["flag_id"])
+    for key, value in data.items():
+        setattr(inventory_set, key, value)
+    db.add(inventory_set)
+    db.commit()
+    return serialize_set(get_set_or_404(db, current_user, inventory_set.id))
+
+
+@router.post("/sets/{set_id}/items", response_model=InventorySetPublic)
+def update_set_items(
+    set_id: int,
+    payload: InventorySetItemsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventorySetPublic:
+    inventory_set = get_set_or_404(db, current_user, set_id)
+    items = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).all() if payload.item_ids else []
+    if len(items) != len(set(payload.item_ids)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+    allowed_team_ids = get_allowed_team_ids(current_user)
+    if allowed_team_ids is not None and any(item.team_id not in allowed_team_ids for item in items):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inventory item outside managed scope")
+    db.query(InventoryItem).filter(InventoryItem.set_id == inventory_set.id).update({"set_id": None}, synchronize_session=False)
+    if items:
+        db.query(InventoryItem).filter(InventoryItem.id.in_([item.id for item in items])).update({"set_id": inventory_set.id}, synchronize_session=False)
+    db.commit()
+    return serialize_set(get_set_or_404(db, current_user, set_id))
+
+
+@router.post("/sets/{set_id}/items/add", response_model=InventorySetPublic)
+def add_set_items(
+    set_id: int,
+    payload: InventorySetItemsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> InventorySetPublic:
+    inventory_set = get_set_or_404(db, current_user, set_id)
+    items = db.query(InventoryItem).filter(InventoryItem.id.in_(payload.item_ids)).all() if payload.item_ids else []
+    if len(items) != len(set(payload.item_ids)):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
+    allowed_team_ids = get_allowed_team_ids(current_user)
+    if allowed_team_ids is not None and any(item.team_id not in allowed_team_ids for item in items):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inventory item outside managed scope")
+    if items:
+        db.query(InventoryItem).filter(InventoryItem.id.in_([item.id for item in items])).update({"set_id": inventory_set.id}, synchronize_session=False)
+    db.commit()
+    return serialize_set(get_set_or_404(db, current_user, set_id))
+
+
+@router.delete("/sets/{set_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_set(
+    set_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin_or_group_admin),
+) -> None:
+    inventory_set = get_set_or_404(db, current_user, set_id)
+    db.query(InventoryItem).filter(InventoryItem.set_id == inventory_set.id).update({"set_id": None})
+    db.delete(inventory_set)
+    db.commit()
 
 
 @router.post("/label-templates", response_model=InventoryLabelTemplatePublic, status_code=status.HTTP_201_CREATED)
@@ -744,17 +693,6 @@ def update_label_template(
     db.add(template)
     db.commit()
     return serialize_template(get_template_or_404(db, current_user, template.id))
-
-
-@router.post("/labels/preview", response_model=InventoryLabelsPreviewResponse)
-def preview_labels(
-    payload: InventoryLabelsPreviewRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryLabelsPreviewResponse:
-    template = get_template_or_404(db, current_user, payload.template_id)
-    items = [get_item_or_404(db, current_user, item_id) for item_id in payload.item_ids]
-    return InventoryLabelsPreviewResponse(template=serialize_template(template), items=serialize_items(items))
 
 
 @router.get("/locations", response_model=list[InventoryLocationPublic])
@@ -997,263 +935,3 @@ def delete_flag(
     db.query(InventoryItem).filter(InventoryItem.flag_id == flag.id).update({"flag_id": None})
     db.delete(flag)
     db.commit()
-
-
-# Label Template endpoints
-@router.get("/label-templates", response_model=list[InventoryLabelTemplatePublic])
-def list_label_templates(
-    team_id: Optional[int] = Query(default=None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> list[InventoryLabelTemplatePublic]:
-    return serialize_templates(get_scoped_templates(db, current_user, team_id))
-
-
-@router.post("/label-templates", response_model=InventoryLabelTemplatePublic, status_code=status.HTTP_201_CREATED)
-def create_label_template(
-    payload: InventoryLabelTemplateCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryLabelTemplatePublic:
-    ensure_team_exists_and_allowed(db, current_user, payload.team_id)
-    template = InventoryLabelTemplate(**payload.model_dump())
-    db.add(template)
-    db.commit()
-    db.refresh(template)
-    return serialize_template(template)
-
-
-@router.patch("/label-templates/{template_id}", response_model=InventoryLabelTemplatePublic)
-def update_label_template(
-    template_id: int,
-    payload: InventoryLabelTemplateUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> InventoryLabelTemplatePublic:
-    template = get_template_or_404(db, current_user, template_id)
-    data = payload.model_dump(exclude_unset=True)
-    if "team_id" in data:
-        ensure_team_exists_and_allowed(db, current_user, data["team_id"])
-    for key, value in data.items():
-        setattr(template, key, value)
-    db.add(template)
-    db.commit()
-    return serialize_template(template)
-
-
-@router.delete("/label-templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_label_template(
-    template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-) -> None:
-    template = get_template_or_404(db, current_user, template_id)
-    db.delete(template)
-    db.commit()
-
-
-@router.post("/labels/preview")
-def preview_labels(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-):
-    try:
-        template_id = payload.get("template_id")
-        latex_template = payload.get("latex_template", "")
-
-        # Use template from DB or provided LaTeX
-        if template_id:
-            template = get_template_or_404(db, current_user, template_id)
-            latex_content = template.latex_template or latex_template
-        else:
-            latex_content = latex_template
-
-        if not latex_content:
-            raise HTTPException(status_code=400, detail="No LaTeX template provided")
-    except Exception as e:
-        print(f"Preview error: {e}")
-        print(f"Payload: {payload}")
-        raise HTTPException(status_code=400, detail=f"Error processing request: {str(e)}")
-
-    # Sample data for preview
-    sample_data = {
-        'name': 'Turistický batoh Deuter Futura Pro 36',
-        'category': 'Turistika » Batohy',
-        'current_location': 'Sklad A » Regál 3',
-        'default_location': 'Sklad A » Regál 3',
-        'status': 'Dostupné',
-        'qr_identifier': 'SCT-2024-001'
-    }
-
-    # LaTeX escape function
-    def latex_escape(text):
-        if not text:
-            return ''
-        replacements = {
-            '&': '\\&', '%': '\\%', '$': '\\$', '#': '\\#',
-            '^': '\\textasciicircum{}', '_': '\\_', '{': '\\{', '}': '\\}',
-            '~': '\\textasciitilde{}', '\\': '\\textbackslash{}'
-        }
-        for char, escape in replacements.items():
-            text = text.replace(char, escape)
-        return text
-
-    # Replace placeholders - fix double braces issue
-    preview_latex = latex_content
-    for field, value in sample_data.items():
-        escaped_value = latex_escape(value)
-        # Handle both {{field}} and {{{{field}}}} patterns
-        preview_latex = preview_latex.replace('{{' + field + '}}', escaped_value)
-        preview_latex = preview_latex.replace('{{{{' + field + '}}}}', escaped_value)
-
-    return {"latex_code": preview_latex, "sample_data": sample_data}
-
-
-@router.post("/labels/generate")
-def generate_labels(
-    payload: dict,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
-):
-    template_id = payload.get("template_id")
-    item_ids = payload.get("item_ids", [])
-
-    template = get_template_or_404(db, current_user, template_id)
-    items = db.query(InventoryItem).filter(InventoryItem.id.in_(item_ids)).all()
-
-    import os
-    import tempfile
-    import subprocess
-    from fastapi import Response
-
-    # Get field value for item
-    def get_field_value(item, field_name):
-        if field_name == 'name':
-            return item.name or ''
-        elif field_name == 'category':
-            return item.category or ''
-        elif field_name == 'current_location':
-            return item.current_location or ''
-        elif field_name == 'default_location':
-            return item.default_location or ''
-        elif field_name == 'status':
-            if item.current_location != item.default_location:
-                return 'Navráceno jinam'
-            return 'Dostupné'
-        elif field_name == 'qr_identifier':
-            return item.qr_identifier or ''
-        else:
-            return ''
-
-    # LaTeX escape function
-    def latex_escape(text):
-        if not text:
-            return ''
-        # Escape special LaTeX characters
-        replacements = {
-            '&': '\\&',
-            '%': '\\%',
-            '$': '\\$',
-            '#': '\\#',
-            '^': '\\textasciicircum{}',
-            '_': '\\_',
-            '{': '\\{',
-            '}': '\\}',
-            '~': '\\textasciitilde{}',
-            '\\': '\\textbackslash{}'
-        }
-        for char, escape in replacements.items():
-            text = text.replace(char, escape)
-        return text
-
-    # Default LaTeX template if none in database
-    width_mm = template.width_mm
-    height_mm = template.height_mm
-    qr_size_mm = template.qr_size_mm or 10
-
-    default_latex_template = f"""\\documentclass[border=2pt]{{standalone}}
-\\usepackage[utf8]{{inputenc}}
-\\usepackage[T1]{{fontenc}}
-\\usepackage{{qrcode}}
-\\usepackage{{geometry}}
-\\geometry{{paperwidth={width_mm}mm,paperheight={height_mm}mm,margin=0pt}}
-
-\\begin{{document}}
-\\pagestyle{{empty}}
-
-\\begin{{minipage}}[t][{height_mm}mm][t]{{{width_mm}mm}}
-\\vspace*{{3mm}}
-\\hspace*{{3mm}}\\qrcode[height={qr_size_mm}mm]{{{{{{qr_identifier}}}}}}
-
-\\vspace{{-{height_mm - 10}mm}}
-\\hspace*{{{qr_size_mm + 6}mm}}
-\\begin{{minipage}}{{{width_mm - qr_size_mm - 9}mm}}
-\\textbf{{{{{{name}}}}}} \\\\
-\\small {{{{{{category}}}}}} \\\\
-\\tiny {{{{{{default_location}}}}}} \\\\
-\\end{{minipage}}
-\\end{{minipage}}
-
-\\end{{document}}"""
-
-    # Use template's LaTeX code or default
-    latex_template = getattr(template, 'latex_template', None) or default_latex_template
-
-    # Create temporary directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        all_pdfs = []
-
-        for i, item in enumerate(items):
-            # Replace placeholders with actual values
-            latex_content = latex_template
-
-            # Replace all field placeholders - fix double braces issue
-            field_names = ['name', 'category', 'current_location', 'default_location', 'status', 'qr_identifier']
-            for field_name in field_names:
-                field_value = get_field_value(item, field_name)
-                escaped_value = latex_escape(field_value)
-                # Handle both {{field}} and {{{{field}}}} patterns
-                latex_content = latex_content.replace('{{' + field_name + '}}', escaped_value)
-                latex_content = latex_content.replace('{{{{' + field_name + '}}}}', escaped_value)
-
-            # Write LaTeX file
-            tex_file = os.path.join(temp_dir, f"label_{i}.tex")
-            with open(tex_file, 'w', encoding='utf-8') as f:
-                f.write(latex_content)
-
-            # Compile LaTeX to PDF
-            try:
-                result = subprocess.run([
-                    'pdflatex', '-interaction=nonstopmode', '-output-directory', temp_dir, tex_file
-                ], capture_output=True, text=True, timeout=30)
-
-                pdf_file = os.path.join(temp_dir, f"label_{i}.pdf")
-                if os.path.exists(pdf_file):
-                    with open(pdf_file, 'rb') as f:
-                        all_pdfs.append(f.read())
-                else:
-                    # Fallback to simple text if LaTeX compilation fails
-                    raise Exception("LaTeX compilation failed")
-
-            except Exception as e:
-                # Return error or fallback
-                return Response(
-                    content=f"Chyba při generování štítků: {str(e)}".encode(),
-                    media_type="text/plain",
-                    status_code=500
-                )
-
-        if all_pdfs:
-            # For now, return first PDF (could merge multiple PDFs later)
-            return Response(
-                content=all_pdfs[0],
-                media_type="application/pdf",
-                headers={"Content-Disposition": "attachment; filename=labels.pdf"}
-            )
-        else:
-            return Response(
-                content="Nepodařilo se vygenerovat žádné štítky".encode(),
-                media_type="text/plain",
-                status_code=500
-            )

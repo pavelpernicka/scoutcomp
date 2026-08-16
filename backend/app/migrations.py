@@ -9,6 +9,8 @@ from sqlalchemy import inspect, text
 from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
+from .usernames import is_canonical_username, normalize_legacy_username
+
 logger = logging.getLogger(__name__)
 
 MigrationFn = Callable[[Connection], None]
@@ -968,6 +970,133 @@ def _normalize_inventory_item_status_values(conn: Connection) -> None:
     )
 
 
+def _retire_inventory_event_locations(conn: Connection) -> None:
+    """Release legacy inventory-event placements without deleting audit data."""
+    inspector = inspect(conn)
+    if "inventory_items" not in inspector.get_table_names():
+        return
+    conn.execute(
+        text(
+            """
+            UPDATE inventory_items
+            SET current_location = default_location
+            WHERE current_location LIKE 'Akce: %'
+            """
+        )
+    )
+
+
+def _add_inventory_item_location_quantities(conn: Connection) -> None:
+    """Track physical quantities per item location and preserve legacy stock."""
+    inspector = inspect(conn)
+    tables = inspector.get_table_names()
+    if "inventory_items" not in tables:
+        return
+    if "inventory_item_locations" not in tables:
+        conn.execute(text("""
+            CREATE TABLE inventory_item_locations (
+                id INTEGER PRIMARY KEY,
+                item_id INTEGER NOT NULL REFERENCES inventory_items(id) ON DELETE CASCADE,
+                location VARCHAR(200) NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 0,
+                CONSTRAINT uq_inventory_item_location UNIQUE (item_id, location)
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_item_locations_item_id ON inventory_item_locations (item_id)"))
+    loan_columns = {column["name"] for column in inspector.get_columns("inventory_loans")} if "inventory_loans" in tables else set()
+    if "inventory_loans" in tables and "source_location" not in loan_columns:
+        conn.execute(text("ALTER TABLE inventory_loans ADD COLUMN source_location VARCHAR(200)"))
+    conn.execute(text("""
+        INSERT INTO inventory_item_locations (item_id, location, quantity)
+        SELECT item.id,
+               COALESCE(NULLIF(item.current_location, ''), NULLIF(item.default_location, ''), 'Bez lokace'),
+               MAX(item.quantity - COALESCE((SELECT SUM(loan.quantity) FROM inventory_loans loan WHERE loan.item_id = item.id AND loan.returned_at IS NULL), 0), 0)
+        FROM inventory_items item
+        WHERE NOT EXISTS (SELECT 1 FROM inventory_item_locations location WHERE location.item_id = item.id)
+          AND item.quantity > 0
+    """))
+    if "inventory_loans" in tables:
+        conn.execute(text("""
+            UPDATE inventory_loans
+            SET source_location = COALESCE((SELECT current_location FROM inventory_items WHERE id = inventory_loans.item_id),
+                                           (SELECT default_location FROM inventory_items WHERE id = inventory_loans.item_id),
+                                           'Bez lokace')
+            WHERE source_location IS NULL
+        """))
+
+
+def _add_inventory_sets(conn: Connection) -> None:
+    """Add equipment sets and optional set membership on inventory items."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "inventory_sets" not in tables:
+        conn.execute(text("""
+            CREATE TABLE inventory_sets (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+    if "inventory_items" not in tables:
+        return
+    item_columns = {column["name"] for column in inspector.get_columns("inventory_items")}
+    if "set_id" not in item_columns:
+        conn.execute(text("ALTER TABLE inventory_items ADD COLUMN set_id INTEGER REFERENCES inventory_sets(id) ON DELETE SET NULL"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_items_set_id ON inventory_items(set_id)"))
+
+
+def _remove_inventory_set_team_assignment(conn: Connection) -> None:
+    """Make existing set rows global by removing the NOT NULL team column."""
+    inspector = inspect(conn)
+    if "inventory_sets" not in inspector.get_table_names():
+        return
+    team_column = next((column for column in inspector.get_columns("inventory_sets") if column["name"] == "team_id"), None)
+    if not team_column or team_column.get("nullable", True):
+        return
+    if conn.dialect.name == "sqlite":
+        # SQLite cannot drop NOT NULL from a column in place. Foreign keys are
+        # disabled only for this atomic table rebuild and restored afterwards.
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("""
+            CREATE TABLE inventory_sets_global (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.execute(text("""
+            INSERT INTO inventory_sets_global (id, name, description, created_at, updated_at)
+            SELECT id, name, description, created_at, updated_at FROM inventory_sets
+        """))
+        conn.execute(text("DROP TABLE inventory_sets"))
+        conn.execute(text("ALTER TABLE inventory_sets_global RENAME TO inventory_sets"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+        return
+    conn.execute(text("ALTER TABLE inventory_sets ALTER COLUMN team_id DROP NOT NULL"))
+
+
+def _add_inventory_set_item_fields(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "inventory_sets" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("inventory_sets")}
+    additions = {
+        "flag_id": "INTEGER REFERENCES inventory_flags(id) ON DELETE SET NULL",
+        "default_location": "VARCHAR(200)",
+        "current_location": "VARCHAR(200)",
+        "status": "VARCHAR(20) NOT NULL DEFAULT 'AVAILABLE'",
+        "notes": "TEXT",
+    }
+    for name, definition in additions.items():
+        if name not in existing:
+            conn.execute(text(f"ALTER TABLE inventory_sets ADD COLUMN {name} {definition}"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_inventory_sets_flag_id ON inventory_sets(flag_id)"))
+
+
 def _add_latex_template_column(conn: Connection) -> None:
     """Add latex_template column to inventory_label_templates table."""
     inspector = inspect(conn)
@@ -1136,6 +1265,43 @@ def _add_attendance_mode(conn: Connection) -> None:
     )
     conn.execute(text("DROP TABLE scout_attendances"))
     conn.execute(text("ALTER TABLE scout_attendances_new RENAME TO scout_attendances"))
+
+
+def _normalize_legacy_usernames(conn: Connection) -> None:
+    """Bring historic usernames in line with the public API contract.
+
+    Usernames used to accept free-form values.  Pydantic now correctly rejects
+    those values in ``UserPublic``, so normalize existing rows before routes can
+    serialize them.  Existing valid names always win collision resolution.
+    """
+    inspector = inspect(conn)
+    if "users" not in inspector.get_table_names():
+        return
+
+    rows = conn.execute(text("SELECT id, username FROM users ORDER BY id")).mappings().all()
+    used = {row["username"] for row in rows if is_canonical_username(row["username"])}
+    changed = 0
+
+    for row in rows:
+        original = row["username"] or ""
+        if is_canonical_username(original):
+            continue
+        base = normalize_legacy_username(original, row["id"])
+        candidate = base
+        counter = 1
+        while candidate in used:
+            suffix = f"-{row['id']}" if counter == 1 else f"-{row['id']}-{counter}"
+            candidate = f"{base[:64 - len(suffix)]}{suffix}"
+            counter += 1
+        conn.execute(
+            text("UPDATE users SET username = :username WHERE id = :user_id"),
+            {"username": candidate, "user_id": row["id"]},
+        )
+        used.add(candidate)
+        changed += 1
+
+    if changed:
+        logger.info("Normalized %d legacy username(s)", changed)
 
 
 def _add_attendance_created_at_column(conn: Connection) -> None:
@@ -2027,9 +2193,7 @@ def _create_web_page_templates(conn: Connection) -> None:
 
 
 def _create_member_tables(conn: Connection) -> None:
-    """Create member evidence (CRM) tables: profiles, tags, relationships, notes."""
-def _create_member_tables(conn: Connection) -> None:
-    """Create member evidence (CRM) tables: profiles, tags, relationships, notes."""
+    """Create compact member metadata, tags and internal notes."""
     inspector = inspect(conn)
     tables = set(inspector.get_table_names())
 
@@ -2040,25 +2204,8 @@ def _create_member_tables(conn: Connection) -> None:
                 """
                 CREATE TABLE member_profiles (
                     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-                    phone VARCHAR(32),
-                    birth_date DATE,
-                    gender VARCHAR(16),
-                    address VARCHAR(255),
-                    city VARCHAR(120),
-                    zip VARCHAR(16),
-                    parent_name VARCHAR(150),
-                    parent_phone VARCHAR(32),
-                    parent_email VARCHAR(255),
-                    emergency_name VARCHAR(150),
-                    emergency_phone VARCHAR(32),
                     joined_at DATE,
                     member_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
-                    medical_note TEXT,
-                    uniform_size VARCHAR(32),
-                    scout_number VARCHAR(32),
-                    data_consent_at DATE,
-                    photo_consent_at DATE,
-                    notes TEXT,
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
@@ -2084,25 +2231,6 @@ def _create_member_tables(conn: Connection) -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_tags_user_id ON member_tags(user_id)"))
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_tags_tag ON member_tags(tag)"))
 
-    if "member_relationships" not in tables:
-        logger.info("Creating 'member_relationships' table")
-        conn.execute(
-            text(
-                """
-                CREATE TABLE member_relationships (
-                    id INTEGER PRIMARY KEY,
-                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    related_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    type VARCHAR(16) NOT NULL DEFAULT 'other',
-                    note VARCHAR(255),
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            )
-        )
-        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_relationships_user_id ON member_relationships(user_id)"))
-        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_relationships_related_user_id ON member_relationships(related_user_id)"))
-
     if "member_notes" not in tables:
         logger.info("Creating 'member_notes' table")
         conn.execute(
@@ -2119,6 +2247,23 @@ def _create_member_tables(conn: Connection) -> None:
             )
         )
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_notes_user_id ON member_notes(user_id)"))
+
+
+def _add_web_post_event_reference(conn: Connection) -> None:
+    """Link posts and their immutable revisions to an optional Scout event."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    for table in ("web_posts", "web_post_revisions"):
+        if table not in tables:
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table)}
+        if "event_id" not in columns:
+            conn.execute(text(
+                f"ALTER TABLE {table} ADD COLUMN event_id INTEGER REFERENCES scout_events(id) ON DELETE SET NULL"
+            ))
+    indexes = {index["name"] for index in inspector.get_indexes("web_posts")} if "web_posts" in tables else set()
+    if "ix_web_posts_event_id" not in indexes:
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_posts_event_id ON web_posts (event_id)"))
 
 
 MIGRATIONS: List[Migration] = [
@@ -2388,9 +2533,44 @@ MIGRATIONS: List[Migration] = [
         "Create WebGlobalPart table for site-owned shared parts",
     ),
     Migration(
+        "20260816_add_web_post_event_reference",
+        _add_web_post_event_reference,
+        "Add optional Scout event links to posts and post revisions",
+    ),
+    Migration(
+        "20260816_normalize_legacy_usernames",
+        _normalize_legacy_usernames,
+        "Normalize legacy usernames to the canonical login format",
+    ),
+    Migration(
         "20260813_create_member_tables",
         _create_member_tables,
-        "Create member evidence (CRM) tables: profiles, tags, relationships, notes",
+        "Create compact member metadata, tags and internal notes",
+    ),
+    Migration(
+        "20260816_retire_inventory_events",
+        _retire_inventory_event_locations,
+        "Release legacy inventory event placements while retaining historical audit data",
+    ),
+    Migration(
+        "20260816_inventory_item_location_quantities",
+        _add_inventory_item_location_quantities,
+        "Track physical inventory quantities across multiple locations",
+    ),
+    Migration(
+        "20260816_inventory_sets",
+        _add_inventory_sets,
+        "Add equipment sets and item membership",
+    ),
+    Migration(
+        "20260816_global_inventory_sets",
+        _remove_inventory_set_team_assignment,
+        "Remove team assignment from equipment sets",
+    ),
+    Migration(
+        "20260816_inventory_set_item_fields",
+        _add_inventory_set_item_fields,
+        "Add item-like fields to equipment sets",
     ),
 ]
 

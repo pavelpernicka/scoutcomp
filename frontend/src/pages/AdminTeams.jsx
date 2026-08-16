@@ -7,6 +7,7 @@ import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
+import MemberSearchPicker from "../components/MemberSearchPicker";
 
 const LOGO_SIZE = 256;
 
@@ -93,7 +94,6 @@ export default function AdminTeams() {
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
-  const [memberFilter, setMemberFilter] = useState("all");
   const [logoError, setLogoError] = useState(null);
   const createLogoInputRef = useRef(null);
   const editLogoInputRef = useRef(null);
@@ -205,13 +205,7 @@ export default function AdminTeams() {
     return map;
   }, [teams, users]);
 
-  const teamNameById = useMemo(() => {
-    const map = {};
-    teams.forEach((team) => {
-      map[team.id] = team.name;
-    });
-    return map;
-  }, [teams]);
+
 
   const unassignedUsers = users.filter((user) => user.team_id == null);
   const activeTeam = membersModalTeamId ? teams.find((team) => team.id === membersModalTeamId) : null;
@@ -220,7 +214,6 @@ export default function AdminTeams() {
     if (!activeTeam) {
       setSelectedMemberId("");
       setMemberSearch("");
-      setMemberFilter("all");
       setActiveTeamMembersLocal([]);
     }
   }, [activeTeam]);
@@ -261,15 +254,6 @@ export default function AdminTeams() {
         return managedTeamIds.includes(user.team_id);
       })
       .filter((user) => {
-        if (memberFilter === "unassigned") {
-          return user.team_id == null;
-        }
-        if (memberFilter === "other-teams") {
-          return user.team_id != null;
-        }
-        return true;
-      })
-      .filter((user) => {
         if (!normalizedSearch) return true;
         return (
           (user.real_name || user.username).toLowerCase().includes(normalizedSearch) ||
@@ -277,7 +261,7 @@ export default function AdminTeams() {
         );
       })
       .sort((a, b) => (a.real_name || a.username).localeCompare(b.real_name || b.username));
-  }, [activeTeam, isAdmin, managedTeamIds, memberFilter, memberSearch, users]);
+  }, [activeTeam, isAdmin, managedTeamIds, memberSearch, users]);
 
   const handleDeleteTeam = (team) => {
     if (!isAdmin) return;
@@ -381,7 +365,6 @@ export default function AdminTeams() {
     setMemberActionError(null);
     setMemberActionFeedback(null);
     setMemberSearch("");
-    setMemberFilter("all");
   };
 
   const roleLabel = (role) => {
@@ -579,50 +562,19 @@ export default function AdminTeams() {
                 <div className="modal-body">
                   <div className="d-flex flex-wrap gap-2 align-items-center mb-3">
                     <div className="flex-grow-1">
-                      <div className="input-group input-group-sm mb-2">
-                        <span className="input-group-text">{t('adminTeams.search')}</span>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={memberSearch}
-                          onChange={(event) => setMemberSearch(event.target.value)}
-                          placeholder={t('adminTeams.usernameOrEmail')}
-                        />
-                      </div>
-                      <div className="input-group input-group-sm">
-                        <span className="input-group-text">{t('adminTeams.filter')}</span>
-                        <select
-                          className="form-select"
-                          value={memberFilter}
-                          onChange={(event) => setMemberFilter(event.target.value)}
-                        >
-                          <option value="all">{t('adminTeams.allUsers')}</option>
-                          <option value="unassigned">{t('adminTeams.withoutTeam')}</option>
-                          <option value="other-teams">{t('adminTeams.otherTeams')}</option>
-                        </select>
-                      </div>
+                      <MemberSearchPicker
+                        value={memberSearch}
+                        onChange={setMemberSearch}
+                        users={availableUsersForActiveTeam}
+                        selectedId={selectedMemberId}
+                        onSelect={(user) => {
+                          setSelectedMemberId(String(user.id));
+                          setMemberSearch(user.real_name || user.username || "");
+                        }}
+                        disabled={updateUserMutation.isLoading}
+                        placeholder="Pište jméno nebo e-mail člena…"
+                      />
                     </div>
-                    <select
-                      className="form-select form-select-sm"
-                      style={{ minWidth: "14rem" }}
-                      value={selectedMemberId}
-                      onChange={(event) => setSelectedMemberId(event.target.value)}
-                      disabled={availableUsersForActiveTeam.length === 0}
-                    >
-                      <option value="">
-                        {availableUsersForActiveTeam.length === 0
-                          ? t('adminTeams.noUsersAvailable')
-                          : t('adminTeams.selectUser')}
-                      </option>
-                      {availableUsersForActiveTeam.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.real_name || user.username}
-                          {user.team_id
-                            ? ` – ${teamNameById[user.team_id] || t('adminTeams.otherTeam')}`
-                            : ` – ${t('adminTeams.noTeam')}`}
-                        </option>
-                      ))}
-                    </select>
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"

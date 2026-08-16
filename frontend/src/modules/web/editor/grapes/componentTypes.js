@@ -299,6 +299,44 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
     },
   });
 
+  // ── sc-menu ─────────────────────────────────────────────────────────
+  // A menu is a first-class data component rather than a hand-built repeat:
+  // this preserves its nested tree and gives published sites accessible,
+  // keyboard-reachable dropdowns without asking authors to wire `children`
+  // repeats manually.
+  components.addType(SC_COMPONENT_TYPES.menu, {
+    isComponent: matchesType("menu"),
+    model: {
+      defaults: {
+        tagName: "nav",
+        name: translate("web.editor.component.menu"),
+        attributes: { "data-sc-type": "menu" },
+        droppable: false,
+        editable: false,
+        location: "main",
+        content: "☰ menu: main",
+        style: {
+          padding: "8px",
+          border: "2px dashed #79c49a",
+          borderRadius: "4px",
+          minHeight: "28px",
+          color: "#2f7a4d",
+          fontFamily: "monospace",
+          fontSize: "12px",
+          background: "rgba(121,196,154,.08)",
+        },
+        traits: [trait("text", "location", translate("web.editor.data.menuLocation"))],
+      },
+      init() {
+        this.listenTo(this, "change:location", this.updateBadge);
+        this.updateBadge();
+      },
+      updateBadge() {
+        this.set("content", `☰ menu: ${this.get("location") || "main"}`);
+      },
+    },
+  });
+
   // ── sc-template-part ────────────────────────────────────────────────
   components.addType(SC_COMPONENT_TYPES.templatePart, {
     isComponent: matchesType("template-part"),

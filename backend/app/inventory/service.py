@@ -5,46 +5,40 @@ from datetime import datetime
 from typing import Iterable, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import select
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_managed_team_ids
 from ..models import (
     InventoryCategory,
-    InventoryEvent,
-    InventoryEventItem,
     InventoryLocation,
-    InventoryEventScan,
-    InventoryEventStatus,
     InventoryFlag,
     InventoryHistory,
     InventoryHistoryAction,
     InventoryItem,
+    InventoryItemLocation,
     InventoryItemStatus,
     InventoryLabelTemplate,
     InventoryLoan,
     InventoryPhoto,
+    InventorySet,
     RoleEnum,
     Team,
     User,
 )
 from ..schemas import (
-    InventoryEventDetail,
     InventoryCategoryPublic,
-    InventoryEventPublic,
-    InventoryEventScanPublic,
-    InventoryEventItemPublic,
-    InventoryItemEventAssignmentPublic,
     InventoryFlagPublic,
-    InventoryHistoryPublic,
     InventoryItemPublic,
+    InventoryItemLocationPublic,
     InventoryLabelTemplatePublic,
     InventoryLocationPublic,
     InventoryLoanPublic,
     InventoryPhotoPublic,
+    InventorySetPublic,
 )
 
-
-ACTIVE_EVENT_STATUSES = {InventoryEventStatus.PLANNED, InventoryEventStatus.ACTIVE}
+MAX_INVENTORY_HISTORY_ENTRIES_PER_ITEM = 200
 
 
 def require_team_scope(user: User, team_id: int) -> None:
@@ -78,21 +72,20 @@ def generate_qr_identifier(db: Session) -> str:
 
 
 def get_item_query(db: Session):
+    # An item has several independent collection relationships.  Loading all
+    # of them with JOINs multiplies rows (photos × loans × locations)
+    # and made even a small update slow once an item had an audit trail.
+    # Keep scalar relations in the main query and load each collection in a
+    # separate batched query instead.
+    # Audit history is persisted but is not rendered by the inventory client;
+    # loading it into every list and mutation response made payloads grow with
+    # the lifetime of each item.
     return db.query(InventoryItem).options(
         joinedload(InventoryItem.team),
         joinedload(InventoryItem.flag),
-        joinedload(InventoryItem.photos),
-        joinedload(InventoryItem.loans),
-        joinedload(InventoryItem.history_entries),
-        joinedload(InventoryItem.event_assignments).joinedload(InventoryEventItem.event),
-    )
-
-
-def get_event_query(db: Session):
-    return db.query(InventoryEvent).options(
-        joinedload(InventoryEvent.team),
-        joinedload(InventoryEvent.items).joinedload(InventoryEventItem.item),
-        joinedload(InventoryEvent.scans),
+        selectinload(InventoryItem.photos),
+        selectinload(InventoryItem.loans),
+        selectinload(InventoryItem.locations),
     )
 
 
@@ -112,6 +105,10 @@ def get_flag_query(db: Session):
     return db.query(InventoryFlag).options(joinedload(InventoryFlag.team))
 
 
+def get_set_query(db: Session):
+    return db.query(InventorySet).options(selectinload(InventorySet.items))
+
+
 def get_scoped_items(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryItem]:
     query = get_item_query(db)
     allowed_team_ids = get_allowed_team_ids(user)
@@ -124,20 +121,6 @@ def get_scoped_items(db: Session, user: User, team_id: Optional[int] = None) -> 
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
         query = query.filter(InventoryItem.team_id == team_id)
     return query.order_by(InventoryItem.name.asc()).all()
-
-
-def get_scoped_events(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryEvent]:
-    query = get_event_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryEvent.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryEvent.team_id == team_id)
-    return query.order_by(InventoryEvent.start_date.desc(), InventoryEvent.name.asc()).all()
 
 
 def get_scoped_templates(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryLabelTemplate]:
@@ -196,20 +179,19 @@ def get_scoped_flags(db: Session, user: User, team_id: Optional[int] = None) -> 
     return query.order_by(InventoryFlag.team_id.asc(), InventoryFlag.sort_order.asc(), InventoryFlag.name.asc()).all()
 
 
+def get_scoped_sets(db: Session, user: User, team_id: Optional[int] = None) -> list[InventorySet]:
+    query = get_set_query(db)
+    # A set has no team scope. For a team-filtered overview, members are
+    # filtered with the items while the global set definition remains visible.
+    return query.order_by(InventorySet.name.asc()).all()
+
+
 def get_item_or_404(db: Session, user: User, item_id: int) -> InventoryItem:
     item = get_item_query(db).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
     require_team_scope(user, item.team_id)
     return item
-
-
-def get_event_or_404(db: Session, user: User, event_id: int) -> InventoryEvent:
-    event = get_event_query(db).filter(InventoryEvent.id == event_id).first()
-    if not event:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory event not found")
-    require_team_scope(user, event.team_id)
-    return event
 
 
 def get_template_or_404(db: Session, user: User, template_id: int) -> InventoryLabelTemplate:
@@ -244,6 +226,13 @@ def get_flag_or_404(db: Session, user: User, flag_id: int) -> InventoryFlag:
     return flag
 
 
+def get_set_or_404(db: Session, user: User, set_id: int) -> InventorySet:
+    inventory_set = db.get(InventorySet, set_id)
+    if not inventory_set:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory set not found")
+    return inventory_set
+
+
 def record_history(
     db: Session,
     *,
@@ -251,16 +240,28 @@ def record_history(
     actor: User,
     action: InventoryHistoryAction,
     payload: Optional[dict] = None,
-    event: Optional[InventoryEvent] = None,
 ) -> InventoryHistory:
     entry = InventoryHistory(
         item=item,
         actor=actor,
         action=action,
         payload=payload or {},
-        event=event,
     )
     db.add(entry)
+    # Audit records are useful operational context, not an unbounded event
+    # store. Keep the most recent records per item so long-lived inventories
+    # do not grow indefinitely.
+    db.flush()
+    stale_entry_ids = (
+        db.query(InventoryHistory.id)
+        .filter(InventoryHistory.item_id == item.id)
+        .order_by(InventoryHistory.created_at.desc(), InventoryHistory.id.desc())
+        .offset(MAX_INVENTORY_HISTORY_ENTRIES_PER_ITEM)
+        .subquery()
+    )
+    db.query(InventoryHistory).filter(
+        InventoryHistory.id.in_(select(stale_entry_ids.c.id))
+    ).delete(synchronize_session=False)
     return entry
 
 
@@ -268,28 +269,13 @@ def get_open_loan_quantity(item: InventoryItem) -> int:
     return sum(loan.quantity for loan in item.loans if loan.returned_at is None)
 
 
-def get_active_event_quantity(item: InventoryItem) -> int:
-    total = 0
-    for assignment in item.event_assignments:
-        if assignment.event and assignment.event.status in ACTIVE_EVENT_STATUSES:
-            total += max(assignment.planned_quantity - assignment.returned_quantity, 0)
-    return total
-
-
-def get_current_event_assignment(item: InventoryItem) -> Optional[InventoryEventItem]:
-    for assignment in sorted(item.event_assignments, key=lambda value: value.id, reverse=True):
-        if assignment.event and assignment.event.status in ACTIVE_EVENT_STATUSES:
-            if assignment.returned_quantity < assignment.planned_quantity:
-                return assignment
-    return None
-
-
 def get_available_quantity(item: InventoryItem) -> int:
-    return max(item.quantity - get_open_loan_quantity(item) - get_active_event_quantity(item), 0)
+    if item.locations:
+        return sum(location.quantity for location in item.locations)
+    return max(item.quantity - get_open_loan_quantity(item), 0)
 
 
 def serialize_item(item: InventoryItem) -> InventoryItemPublic:
-    active_assignment = get_current_event_assignment(item)
     return InventoryItemPublic(
         id=item.id,
         team_id=item.team_id,
@@ -297,6 +283,7 @@ def serialize_item(item: InventoryItem) -> InventoryItemPublic:
         description=item.description,
         category=item.category,
         flag_id=item.flag_id,
+        set_id=item.set_id,
         flag=InventoryFlagPublic.model_validate(item.flag) if item.flag else None,
         quantity=item.quantity,
         quantity_unit=item.quantity_unit,
@@ -310,63 +297,22 @@ def serialize_item(item: InventoryItem) -> InventoryItemPublic:
         team_name=item.team.name if item.team else None,
         available_quantity=get_available_quantity(item),
         open_loan_quantity=get_open_loan_quantity(item),
-        active_event_quantity=get_active_event_quantity(item),
-        current_event_name=active_assignment.event.name if active_assignment and active_assignment.event else None,
-        event_assignments=[
-            InventoryItemEventAssignmentPublic(
-                id=assignment.id,
-                event_id=assignment.event_id,
-                event_name=assignment.event.name if assignment.event else None,
-                event_status=assignment.event.status if assignment.event else None,
-                planned_quantity=assignment.planned_quantity,
-                returned_quantity=assignment.returned_quantity,
-                damaged_quantity=assignment.damaged_quantity,
-                note=assignment.note,
-                created_at=assignment.created_at,
-                updated_at=assignment.updated_at,
-            )
-            for assignment in item.event_assignments
-            if assignment.event and assignment.returned_quantity < assignment.planned_quantity
-        ],
         photos=[InventoryPhotoPublic.model_validate(photo) for photo in item.photos],
+        locations=[InventoryItemLocationPublic.model_validate(location) for location in item.locations],
         loans=[InventoryLoanPublic.model_validate(loan) for loan in item.loans],
-        history_entries=[InventoryHistoryPublic.model_validate(entry) for entry in item.history_entries],
     )
-
-
-def serialize_event(event: InventoryEvent) -> InventoryEventPublic:
-    return InventoryEventPublic.model_validate(event)
 
 
 def serialize_template(template: InventoryLabelTemplate) -> InventoryLabelTemplatePublic:
     import json
 
-    # Convert old format fields to new format if needed
+    # Old custom-position definitions are collapsed into the supported simple
+    # configuration: chosen metadata and sheet arrangement.
     fields = template.fields
     if isinstance(fields, list):
-        # Convert old list format to new JSON format
-        default_positions = {
-            "name": {"x": 15, "y": 8, "fontSize": 12, "align": "left"},
-            "category": {"x": 15, "y": 18, "fontSize": 8, "align": "left"},
-            "current_location": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
-            "default_location": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
-            "status": {"x": 15, "y": 25, "fontSize": 6, "align": "left"},
-            "qr_identifier": {"x": 15, "y": 25, "fontSize": 6, "align": "left"}
-        }
-
-        converted_fields = []
-        for i, field_name in enumerate(fields):
-            pos = default_positions.get(field_name, {"x": 15, "y": 8 + i * 7, "fontSize": 8, "align": "left"})
-            converted_fields.append({
-                "id": field_name,
-                "enabled": True,
-                **pos
-            })
-
-        fields = json.dumps(converted_fields)
+        fields = json.dumps({"visibleFields": [field for field in fields if field not in {"name", "qr_identifier"}], "columns": 3, "gapMm": 2})
     elif not isinstance(fields, str):
-        # Fallback for any other format
-        fields = '[{"id":"name","x":15,"y":8,"fontSize":12,"align":"left","enabled":true}]'
+        fields = '{"visibleFields":["category","current_location"],"columns":3,"gapMm":2}'
 
     # Create dict with converted fields
     template_data = {
@@ -375,17 +321,21 @@ def serialize_template(template: InventoryLabelTemplate) -> InventoryLabelTempla
         "name": template.name,
         "width_mm": template.width_mm,
         "height_mm": template.height_mm,
-        "qr_x_mm": template.qr_x_mm,
-        "qr_y_mm": template.qr_y_mm,
         "qr_size_mm": template.qr_size_mm,
-        "title_font_size": template.title_font_size,
-        "meta_font_size": template.meta_font_size,
         "fields": fields,
         "created_at": template.created_at,
         "updated_at": template.updated_at
     }
 
     return InventoryLabelTemplatePublic.model_validate(template_data)
+
+
+def serialize_set(inventory_set: InventorySet) -> InventorySetPublic:
+    return InventorySetPublic.model_validate(inventory_set)
+
+
+def serialize_sets(sets: Iterable[InventorySet]) -> list[InventorySetPublic]:
+    return [serialize_set(inventory_set) for inventory_set in sets]
 
 
 def build_location_path(name: str, parent: Optional[InventoryLocation]) -> str:
@@ -447,64 +397,6 @@ def serialize_category_tree(categories: Iterable[InventoryCategory]) -> list[Inv
     return roots
 
 
-def build_event_summary(event: InventoryEvent) -> dict:
-    returned = []
-    missing = []
-    damaged = []
-    for assignment in event.items:
-        pending = max(assignment.planned_quantity - assignment.returned_quantity, 0)
-        if assignment.returned_quantity > 0:
-            returned.append(
-                {
-                    "item_id": assignment.item_id,
-                    "name": assignment.item.name if assignment.item else None,
-                    "returned_quantity": assignment.returned_quantity,
-                }
-            )
-        if pending > 0:
-            missing.append(
-                {
-                    "item_id": assignment.item_id,
-                    "name": assignment.item.name if assignment.item else None,
-                    "missing_quantity": pending,
-                }
-            )
-        if assignment.damaged_quantity > 0:
-            damaged.append(
-                {
-                    "item_id": assignment.item_id,
-                    "name": assignment.item.name if assignment.item else None,
-                    "damaged_quantity": assignment.damaged_quantity,
-                }
-            )
-
-    extra = [
-        {
-            "scan_id": scan.id,
-            "qr_identifier": scan.qr_identifier,
-            "item_id": scan.item_id,
-            "name": scan.item.name if scan.item else None,
-        }
-        for scan in event.scans
-        if scan.result == "extra"
-    ]
-    return {
-        "returned": returned,
-        "missing": missing,
-        "extra": extra,
-        "damaged": damaged,
-    }
-
-
-def serialize_event_detail(event: InventoryEvent) -> InventoryEventDetail:
-    return InventoryEventDetail(
-        event=serialize_event(event),
-        items=[InventoryEventItemPublic.model_validate(item) for item in event.items],
-        scans=[InventoryEventScanPublic.model_validate(scan) for scan in event.scans],
-        summary=build_event_summary(event),
-    )
-
-
 def update_item_status_history(
     db: Session,
     *,
@@ -528,13 +420,6 @@ def update_item_status_history(
     )
 
 
-def normalize_scan_condition(condition: Optional[str]) -> Optional[str]:
-    if not condition:
-        return None
-    value = condition.strip().lower()
-    return value or None
-
-
 def touch_updated_location(item: InventoryItem) -> None:
     if not item.current_location and item.default_location:
         item.current_location = item.default_location
@@ -542,10 +427,6 @@ def touch_updated_location(item: InventoryItem) -> None:
 
 def serialize_items(items: Iterable[InventoryItem]) -> list[InventoryItemPublic]:
     return [serialize_item(item) for item in items]
-
-
-def serialize_events(events: Iterable[InventoryEvent]) -> list[InventoryEventPublic]:
-    return [serialize_event(event) for event in events]
 
 
 def serialize_templates(templates: Iterable[InventoryLabelTemplate]) -> list[InventoryLabelTemplatePublic]:

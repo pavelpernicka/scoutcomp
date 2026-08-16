@@ -32,6 +32,7 @@ const BLOCK_ICONS = {
   "sc-repeat": "fa-repeat",
   "sc-condition": "fa-code-branch",
   "sc-empty": "fa-box-open",
+  "sc-menu": "fa-bars",
 };
 
 const withBlockIcons = (blocks) => blocks.map((block) => ({
@@ -241,6 +242,12 @@ export function createPrimitiveBlocks(translate = (key) => key) {
       category: translate(BLOCK_CATEGORIES.data),
       content: { type: SC_COMPONENT_TYPES.empty },
     },
+    {
+      id: "sc-menu",
+      label: translate("web.editor.component.menu"),
+      category: translate(BLOCK_CATEGORIES.data),
+      content: { type: SC_COMPONENT_TYPES.menu, location: "main" },
+    },
   ]);
 }
 
@@ -289,6 +296,9 @@ export function createDataSourceBlocks(dataSources = [], translate = (key) => ke
         label: source.label || source.name || source.translation_key || source.id,
         category: translate(BLOCK_CATEGORIES.data),
         media: '<i class="fas fa-database" aria-hidden="true"></i>',
+        // GrapesJS preserves block attributes on its native draggable cards.
+        // Data sources are otherwise hard to distinguish before insertion.
+        attributes: { title: source.description || source.label || source.name || source.id },
         content,
       };
     });

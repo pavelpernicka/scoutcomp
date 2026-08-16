@@ -116,7 +116,7 @@ _IMAGE_MAGIC = {
 _MANIFEST_KEYS = {
     "schema_version", "package_schema_version", "id", "name", "version",
     "author", "description", "license", "compatible_scoutcomp",
-    "scoutcomp_version", "resources", "preview", "config",
+    "scoutcomp_version", "resources", "preview", "config", "site_resources",
 }
 _CONFIG_TYPES = {"text", "color", "number", "select"}
 _THEME_KEYS = {"schema_version", "package_schema_version", "tokens", "default_tokens", "styles"}
@@ -659,6 +659,11 @@ def install_theme(
 
     entries = _resource_entries(manifest)
     declared_paths = {entry["file"] for values in entries.values() for entry in values}
+    site_resources = manifest.get("site_resources")
+    if site_resources is not None:
+        if not isinstance(site_resources, str) or _normalise_member_name(site_resources) != "site-resources.json":
+            _fail("manifest.json site_resources is invalid")
+        declared_paths.add(site_resources)
     allowed_paths = {"manifest.json", "theme.json", *declared_paths}
     unexpected = set(files) - allowed_paths
     missing = declared_paths - set(files)
@@ -1168,7 +1173,7 @@ def inspect_theme(db: Session, theme_version_id: int) -> dict[str, Any]:
 
 
 
-def export_theme_archive(db: Session, theme_version_id: int) -> bytes:
+def export_theme_archive(db: Session, theme_version_id: int, *, include_site_resources: bool = True) -> bytes:
     """Export an installed theme as a ZIP archive suitable for reinstall.
 
     For system themes with no physical storage directory we build a minimal
@@ -1182,26 +1187,36 @@ def export_theme_archive(db: Session, theme_version_id: int) -> bytes:
 
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        manifest_payload: dict[str, Any] | None = None
         if package_path.is_dir() and package_path.is_relative_to(root):
             for path in sorted(package_path.rglob("*")):
                 if not path.is_file():
                     continue
                 relative = path.relative_to(package_path).as_posix()
+                # The manifest is rewritten below when the export contains
+                # site-owned definitions, otherwise a second ZIP member would
+                # make a package deliberately fail duplicate-path validation.
+                if relative == "manifest.json" and include_site_resources:
+                    try:
+                        manifest_payload = json.loads(path.read_text(encoding="utf-8"))
+                    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                        raise ThemePackageError("Installed theme manifest is invalid") from exc
+                    continue
                 archive.write(path, arcname=relative)
 
         # Build manifest.json and theme.json from DB when the physical
         # package directory is missing (system / cloned themes).
         has_manifest = any(n == "manifest.json" for n in archive.namelist())
         if not has_manifest:
-            manifest = dict(version.manifest or {})
-            manifest.setdefault("id", "theme")
-            manifest.setdefault("name", "Theme")
-            manifest.setdefault("version", version.version)
-            archive.writestr("manifest.json", json.dumps(manifest, indent=2, ensure_ascii=False))
-            archive.writestr("theme.json", json.dumps({
-                "tokens": version.default_tokens or {},
-                "styles": [],
-            }, indent=2, ensure_ascii=False))
+            manifest_payload = manifest_payload or dict(version.manifest or {})
+            manifest_payload.setdefault("id", "theme")
+            manifest_payload.setdefault("name", "Theme")
+            manifest_payload.setdefault("version", version.version)
+            if "theme.json" not in archive.namelist():
+                archive.writestr("theme.json", json.dumps({
+                    "tokens": version.default_tokens or {},
+                    "styles": [],
+                }, indent=2, ensure_ascii=False))
 
             # Include template JSON from DB as canonical theme resources.
             templates = db.query(WebTemplate).filter_by(theme_version_id=version.id).all()
@@ -1217,6 +1232,44 @@ def export_theme_archive(db: Session, theme_version_id: int) -> bytes:
                         "css": tpl.published_css or tpl.css or "",
                     }, indent=2, ensure_ascii=False),
                 )
+
+        if include_site_resources:
+            # A downloaded theme is also the natural hand-off format for an
+            # author's own designs.  Keep those definitions in a separate
+            # namespace so they cannot overwrite immutable package resources
+            # if this ZIP is installed as a theme again.
+            def design_record(item, fields: tuple[str, ...]) -> dict[str, Any]:
+                return {field: getattr(item, field) for field in fields}
+
+            archive.writestr("site-resources.json", json.dumps({
+                "format": "scoutcomp-site-resources",
+                "version": 1,
+                "templates": [design_record(item, (
+                    "key", "qualified_key", "name", "description", "project_data", "css",
+                    "published_project_data", "published_css", "template_kind", "usage_mode",
+                    "preview_media_id",
+                )) for item in db.query(WebTemplate).filter(WebTemplate.theme_version_id.is_(None)).order_by(WebTemplate.id)],
+                "components": [design_record(item, (
+                    "qualified_key", "name", "description", "project_data", "css", "prop_schema",
+                    "default_props", "variants", "published_project_data", "published_css",
+                    "published_prop_schema", "published_default_props", "published_variants", "preview_media_id",
+                )) for item in db.query(WebReusableComponent).filter(WebReusableComponent.theme_version_id.is_(None)).order_by(WebReusableComponent.id)],
+                "sections": [design_record(item, (
+                    "qualified_key", "name", "description", "project_data", "css", "prop_schema",
+                    "default_props", "variants", "published_project_data", "published_css",
+                    "published_prop_schema", "published_default_props", "published_variants", "preview_media_id",
+                )) for item in db.query(WebSection).filter(WebSection.theme_version_id.is_(None)).order_by(WebSection.id)],
+            }, ensure_ascii=False, indent=2, default=str))
+
+            # Make the author-owned definitions a declared part of the theme
+            # archive.  The installer keeps them site-owned (rather than
+            # mutating immutable package resources), but accepts and carries
+            # the bundle across exports/imports.
+            manifest_payload = manifest_payload or dict(version.manifest or {})
+            manifest_payload["site_resources"] = "site-resources.json"
+
+        if manifest_payload is not None:
+            archive.writestr("manifest.json", json.dumps(manifest_payload, indent=2, ensure_ascii=False))
 
 
     return buffer.getvalue()

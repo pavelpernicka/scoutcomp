@@ -25,6 +25,7 @@ export default function InventoryCategoriesScreen({ categories, selectedPath, on
             onEdit={onEdit}
             onCreateChild={onCreateChild}
             onDelete={onDelete}
+            allLabel="Všechny kategorie"
           />
         </Card>
       </div>

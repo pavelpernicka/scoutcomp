@@ -9,6 +9,12 @@ router = APIRouter(prefix="/web", tags=["web"])
 # ---------------------------------------------------------------- media
 
 
+def _require_media_manage(db: Session, user: User) -> None:
+    permissions = permission_keys(db, user)
+    if not ({"web.media.manage", "core.media.manage"} & permissions):
+        raise HTTPException(403, "Missing core.media.manage")
+
+
 class MediaOut(BaseModel):
     id: int
     filename: str
@@ -61,7 +67,7 @@ def list_media(
     folder_id: int | None = Query(None, ge=1),
     db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
 ):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     query = db.query(WebMedia)
     if folder_id is not None:
         query = query.filter(WebMedia.folder_id == folder_id)
@@ -80,7 +86,7 @@ class MediaMetaPayload(BaseModel):
 
 @router.put("/media/{media_id}")
 def update_media_meta(media_id: int, payload: MediaMetaPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     record = db.query(WebMedia).filter_by(id=media_id).one_or_none()
     if not record:
         raise HTTPException(404, "Media not found")
@@ -99,7 +105,7 @@ def update_media_meta(media_id: int, payload: MediaMetaPayload, db: Session = De
 
 @router.get("/media/albums")
 def list_media_albums(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     albums = (
         db.query(WebMedia.album)
         .filter(WebMedia.album.isnot(None))
@@ -215,13 +221,13 @@ def _folder_tree(db: Session) -> list[dict]:
 
 @router.get("/media/folders")
 def list_media_folders(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     return {"items": _folder_tree(db)}
 
 
 @router.post("/media/folders", status_code=201)
 def create_media_folder(payload: MediaFolderCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     # All folders live under the root folder; a missing parent defaults to root.
     root = _ensure_root_folder(db)
     parent_id = payload.parent_id if payload.parent_id is not None else root.id
@@ -238,7 +244,7 @@ def create_media_folder(payload: MediaFolderCreate, db: Session = Depends(get_db
 
 @router.put("/media/folders/{folder_id}")
 def update_media_folder(folder_id: int, payload: MediaFolderUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     folder = db.query(WebMediaFolder).filter_by(id=folder_id).one_or_none()
     if not folder:
         raise HTTPException(404, "Folder not found")
@@ -262,7 +268,7 @@ def update_media_folder(folder_id: int, payload: MediaFolderUpdate, db: Session 
 
 @router.delete("/media/folders/{folder_id}", status_code=204)
 def delete_media_folder(folder_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     folder = db.query(WebMediaFolder).filter_by(id=folder_id).one_or_none()
     if not folder:
         raise HTTPException(404, "Folder not found")
@@ -284,7 +290,7 @@ async def upload_media(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     payload_album = album.strip() if album and album.strip() else None
     payload_folder_id = folder_id
     if payload_folder_id is None:
@@ -339,7 +345,7 @@ async def upload_media(
 
 @router.get("/media/{media_id}/file")
 def serve_media(media_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     record = db.query(WebMedia).filter_by(id=media_id).one_or_none()
     if not record:
         raise HTTPException(404, "Media not found")
@@ -356,7 +362,7 @@ def serve_media(media_id: int, db: Session = Depends(get_db), current_user: User
 
 @router.delete("/media/{media_id}", status_code=204)
 def delete_media(media_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.media.manage")
+    _require_media_manage(db, current_user)
     record = db.query(WebMedia).filter_by(id=media_id).one_or_none()
     if not record:
         raise HTTPException(404, "Media not found")

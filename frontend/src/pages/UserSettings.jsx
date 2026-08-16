@@ -11,40 +11,13 @@ import DecoratedCard from "../components/DecoratedCard";
 import Input from "../components/Input";
 import Select from "../components/Select";
 import UserAvatar from "../components/UserAvatar";
-
-const AVATAR_SIZE = 256;
-
-const processAvatarFile = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = new Image();
-      image.onload = () => {
-        try {
-          const side = Math.min(image.width, image.height);
-          const sx = (image.width - side) / 2;
-          const sy = (image.height - side) / 2;
-          const canvas = document.createElement("canvas");
-          canvas.width = AVATAR_SIZE;
-          canvas.height = AVATAR_SIZE;
-          const ctx = canvas.getContext("2d");
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(image, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
-          resolve(canvas.toDataURL("image/jpeg", 0.85));
-        } catch (error) {
-          reject(error);
-        }
-      };
-      image.onerror = () => reject(new Error("image-load-failed"));
-      image.src = reader.result;
-    };
-    reader.onerror = () => reject(new Error("file-read-failed"));
-    reader.readAsDataURL(file);
-  });
+import { processAvatarFile } from "../utils/avatar";
+import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../utils/username";
 
 export default function UserSettingsPage() {
   const { t, i18n } = useTranslation();
-  const { profile, updateProfile } = useAuth();
+  const { profile, updateProfile, can } = useAuth();
+  const canChangeUsername = can("core.users.credentials.manage");
   const queryClient = useQueryClient();
   const receiveMessages = profile?.user?.receive_messages !== false;
   const fileInputRef = useRef(null);
@@ -197,7 +170,7 @@ export default function UserSettingsPage() {
   const handleProfileSubmit = (e) => {
     e.preventDefault();
     const updateData = {
-      username: formData.username,
+      ...(canChangeUsername ? { username: formData.username } : {}),
       email: formData.email,
       preferred_language: formData.preferredLanguage,
     };
@@ -327,9 +300,13 @@ export default function UserSettingsPage() {
                       type="text"
                       className="border-success border-opacity-50"
                       value={formData.username}
-                      onChange={(e) => handleInputChange("username", e.target.value)}
+                      onChange={(e) => handleInputChange("username", normalizeUsernameInput(e.target.value))}
+                      pattern={USERNAME_PATTERN}
+                      title={USERNAME_HELP}
+                      readOnly={!canChangeUsername}
                       required
                     />
+                    <div className="form-text">{canChangeUsername ? USERNAME_HELP : "Uživatelské jméno může měnit pouze správce přihlašování."}</div>
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">

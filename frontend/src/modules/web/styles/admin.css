@@ -144,3 +144,11 @@
 .web-media-picker-body .web-media-sidebar { padding: .75rem .5rem; border-right: 1px solid #e5e7eb; }
 .web-media-library-shell { width: 100%; }
 .web-media-library-shell.embedded .web-media-layout { max-height: calc(90vh - 56px); }
+
+
+/* Article editor uses the shared media selector even outside the Web admin shell. */
+.article-edit-modal { max-width: min(880px, calc(100vw - 2rem)); }
+.article-edit-modal .article-media-picker { display:flex; align-items:center; gap:.5rem; min-height:3rem; padding:.45rem; border:1px solid #dfe3e8; border-radius:.45rem; background:#f8fafc; }
+.article-edit-modal .article-media-picker > .btn:first-child { flex:1; min-height:2.25rem; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.article-edit-modal .article-media-picker > .btn-link { color:#b42318; text-decoration:none; }
+.article-edit-modal .article-editbox { background:#fff; }

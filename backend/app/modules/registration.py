@@ -33,12 +33,16 @@ def register_all_modules() -> None:
         return
     registry.register(ModuleManifest("core", "Jádro", "Účty, družiny, kalendář, docházka a zprávy", "fa-house", "/",
         (("users.read", "Číst uživatele", "Zobrazit uživatele", False, ("team", "any")),
+         ("posts.read", "Číst příspěvky", "Číst oddílové příspěvky a novinky", True, ("any",)),
+         ("posts.manage", "Správa příspěvků", "Vytvářet a upravovat příspěvky oddílu", False, ("any",)),
+         ("posts.publish", "Publikovat příspěvky", "Publikovat příspěvky na web", False, ("any",)),
+         ("media.manage", "Správa médií", "Nahrávat a spravovat společná média", False, ("any",)),
          ("users.create", "Vytvářet uživatele", "Založit uživatele", False, ("any",)),
          ("users.edit", "Upravovat uživatele", "Změnit údaje uživatele", False, ("team", "any")),
          ("users.delete", "Mazat uživatele", "Odebrat uživatele", False, ("any",)),
          ("users.credentials.manage", "Správa přihlašování", "Měnit přihlašovací údaje a aktivaci účtů", False, ("any",)),
          ("members.read", "Číst členskou evidenci", "Zobrazit členskou evidenci a profily členů", False, ("team", "any")),
-         ("members.edit", "Upravovat členskou evidenci", "Upravovat profily, značky a rodinné vazby", False, ("team", "any")),
+         ("members.edit", "Upravovat členskou evidenci", "Upravovat stav členství a značky", False, ("team", "any")),
          ("members.notes.manage", "Spravovat poznámky členů", "Přidávat a mazat interní poznámky členů", False, ("team", "any")),
          ("members.export", "Export členské evidence", "Exportovat členskou evidenci do CSV", False, ("team", "any")),
          ("avatar.manage", "Správa profilových fotek", "Měnit profilové fotky ostatních uživatelů", False, ("any",)),
@@ -54,12 +58,15 @@ def register_all_modules() -> None:
          ("is_leader", "Vedoucí oddílu", "Vedoucí oddílu – vidí interní akce kalendáře", False, ("any",)),
          ("attendance.manage", "Docházka", "Vést docházku", False, ("team", "any")),
          ("notifications.send", "Posílat oznámení", "Posílat uživatelům soukromá oznámení", False, ("team", "any"))),
-         widgets=({"id":"core.welcome", "component":"welcome", "title":"Vítej", "text":"Vítej v oddílovém systému.", "icon":"fa-house-user", "permission":None, "width":"col-12"},
+        widgets=({"id":"core.welcome", "component":"welcome", "title":"Vítej", "text":"Vítej v oddílovém systému.", "icon":"fa-house-user", "permission":None, "width":"col-12"},
+                 {"id":"core.posts", "component":"posts", "title":"Příspěvky", "text":"Poslední novinky oddílu.", "route":"/posts", "icon":"fa-newspaper", "permission":"core.posts.read", "width":"col-12"},
                  {"id":"core.messages", "component":"messages", "title":"Zprávy", "text":"Soukromé zprávy a oznámení.", "icon":"fa-envelope", "permission":"core.messages", "width":"col-xl-6"},
                  {"id":"core.planned_events", "component":"planned_events", "title":"Plánované akce", "text":"Tvoje schůzky, výpravy a přihlášení.", "icon":"fa-calendar-check", "permission":"core.events.read", "width":"col-xl-5"},),
-        web_data_sources=(EVENTS_DATA_SOURCE,),
-        menu=({"label":"Kalendář", "route":"/activity", "icon":"fa-calendar", "permission":"core.events.read"}, {"label":"Zprávy", "route":"/messages", "icon":"fa-envelope", "permission":"core.messages"}),
-        admin_menu=({"section":"Core", "label":"Nastavení", "route":"/admin/core/config", "permission":"core.modules.manage"}, {"section":"Core", "label":"Moduly", "route":"/admin/core/modules", "permission":"core.modules.manage"}, {"section":"Core", "label":"Nástěnka", "route":"/admin/core/widgets", "permission":"core.modules.manage"}, {"section":"Core", "label":"Družiny", "route":"/admin/core/teams", "permission":"core.teams.manage"}, {"section":"Core", "label":"Členská evidence", "route":"/admin/core/users", "permission":"core.members.read"}, {"section":"Core", "label":"Oprávnění", "route":"/admin/core/access", "permission":"core.access.manage"}, {"section":"Core", "label":"Docházka", "route":"/admin/core/attendance", "permission":"core.attendance.manage"}), routers=(auth.router, users.router, members.router, teams.router, notifications.router, config.router, config.admin_router, messages.router, modules.router, modules.admin_router, widgets.router, widgets.admin_router, activity.router, activity.admin_router)))
+        # Posts and media are Core-owned content. The public CMS consumes
+        # these declared sources but does not own their lifecycle.
+        web_data_sources=(EVENTS_DATA_SOURCE, POSTS_DATA_SOURCE, MEDIA_DATA_SOURCE),
+        menu=({"label":"Kalendář", "route":"/activity", "icon":"fa-calendar", "permission":"core.events.read"}, {"label":"Zprávy", "route":"/messages", "icon":"fa-envelope", "permission":"core.messages"}, {"label":"Příspěvky", "route":"/posts", "icon":"fa-newspaper", "permission":"core.posts.read"}),
+        admin_menu=({"section":"Core", "label":"Nastavení", "route":"/admin/core/config", "permission":"core.modules.manage"}, {"section":"Core", "label":"Moduly", "route":"/admin/core/modules", "permission":"core.modules.manage"}, {"section":"Core", "label":"Nástěnka", "route":"/admin/core/widgets", "permission":"core.modules.manage"}, {"section":"Core", "label":"Družiny", "route":"/admin/core/teams", "permission":"core.teams.manage"}, {"section":"Core", "label":"Členská evidence", "route":"/admin/core/users", "permission":"core.members.read"}, {"section":"Core", "label":"Příspěvky", "route":"/admin/core/posts", "permission":"core.posts.manage"}, {"section":"Core", "label":"Média", "route":"/admin/core/media", "permission":"core.media.manage"}, {"section":"Core", "label":"Oprávnění", "route":"/admin/core/access", "permission":"core.access.manage"}, {"section":"Core", "label":"Docházka", "route":"/admin/core/attendance", "permission":"core.attendance.manage"}), routers=(auth.router, users.router, members.router, teams.router, notifications.router, config.router, config.admin_router, messages.router, modules.router, modules.admin_router, widgets.router, widgets.admin_router, activity.router, activity.admin_router)))
     registry.register(ModuleManifest("competitions", "Soutěže", "Úkoly, plnění, výsledky a týmy", "fa-trophy", "/tasks",
         (("participate", "Účast v soutěži", "Plnit soutěžní úkoly", True, ("any",)), ("tasks.manage", "Správa úkolů", "Vytvářet a upravovat úkoly", False, ("any",)), ("approvals.audit", "Audit splnění", "Schvalovat a auditovat plnění", False, ("team", "any")), ("statistics.read", "Statistiky", "Číst soutěžní statistiky", False, ("any",)), ("rules.manage", "Správa pravidel", "Upravovat pravidla a statické stránky", False, ("any",)), ("announcements.manage", "Správa ohlášek", "Spravovat soutěžní ohlášky", False, ("team", "any"))),
         menu=({"label":"Úkoly", "route":"/tasks", "icon":"fa-list-check", "permission":"competitions.participate"}, {"label":"Žebříček", "route":"/leaderboard", "icon":"fa-ranking-star", "permission":"competitions.participate"}, {"label":"Pravidla", "route":"/rules", "icon":"fa-book-open", "permission":"competitions.participate"}),
@@ -71,12 +78,11 @@ def register_all_modules() -> None:
          ("items.read", "Čtení položek", "Prohlížet skladové položky", False, ("team", "any")),
          ("items.manage", "Správa položek", "Vytvářet, upravovat a mazat položky", False, ("team", "any")),
          ("loans.manage", "Výpůjčky", "Půjčovat a přijímat vybavení", False, ("team", "any")),
-         ("events.manage", "Výdej na akce", "Přiřazovat a vracet vybavení na akcích", False, ("team", "any")),
          ("locations.manage", "Správa lokací", "Spravovat lokace", False, ("team", "any")),
          ("categories.manage", "Správa kategorií", "Spravovat kategorie", False, ("team", "any")),
          ("flags.manage", "Správa flagů", "Spravovat flagy", False, ("team", "any")),
          ("templates.manage", "Správa štítků", "Spravovat šablony a generovat štítky", False, ("team", "any"))),
-         menu=({"label":"Věci", "route":"/inventory/items", "icon":"fa-box-open", "permission":"inventory.read"}, {"label":"Vypůjčky", "route":"/inventory/loans", "icon":"fa-handshake-angle", "permission":"inventory.read"}, {"label":"Akce", "route":"/inventory/events", "icon":"fa-campground", "permission":"inventory.read"}, {"label":"Skener", "route":"/inventory/scanner", "icon":"fa-qrcode", "permission":"inventory.read"}, {"label":"Štítky", "route":"/inventory/labels", "icon":"fa-tags", "permission":"inventory.read"}, {"label":"Lokace", "route":"/inventory/locations", "icon":"fa-sitemap", "permission":"inventory.manage"}, {"label":"Kategorie", "route":"/inventory/categories", "icon":"fa-diagram-project", "permission":"inventory.manage"}, {"label":"Příznaky", "route":"/inventory/flags", "icon":"fa-palette", "permission":"inventory.manage"}), routers=(inventory_router,), dependencies=("core",)))
+         menu=({"label":"Věci", "route":"/inventory/items", "icon":"fa-box-open", "permission":"inventory.read"}, {"label":"Vypůjčky", "route":"/inventory/loans", "icon":"fa-handshake-angle", "permission":"inventory.read"}, {"label":"Skener", "route":"/inventory/scanner", "icon":"fa-qrcode", "permission":"inventory.read"}, {"label":"Nastavení skladu", "route":"/inventory/settings", "icon":"fa-sliders", "permission":"inventory.manage"}), routers=(inventory_router,), dependencies=("core",)))
     registry.register(ModuleManifest("web", "Webové stránky", "Vizuální CMS a veřejný web", "fa-globe", "/admin/web/pages",
         (("manage", "Správa webu", "Úplná správa CMS", False, ("any",)),
          ("pages.manage", "Správa stránek", "Vytvářet a upravovat stránky", False, ("any",)),
@@ -89,5 +95,5 @@ def register_all_modules() -> None:
          ("publish", "Publikování webu", "Publikovat stránky a design webu", False, ("any",)),
          ("settings.manage", "Nastavení webu", "Měnit veřejná nastavení webu", False, ("any",))),
         admin_menu=({"section":"Web", "label":"Stránky", "route":"/admin/web/pages", "permission":"web.pages.manage"},),
-        web_data_sources=(POSTS_DATA_SOURCE, MEDIA_DATA_SOURCE, MENU_DATA_SOURCE),
+        web_data_sources=(MENU_DATA_SOURCE,),
         routers=(web.router,), dependencies=("core",)))

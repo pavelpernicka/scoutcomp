@@ -1,5 +1,8 @@
 """Authenticated CMS design routes."""
+import io
+import json
 import re
+import zipfile
 
 from .routes_common import *  # noqa: F403
 from ..models import WebPreviewArtifact
@@ -13,7 +16,7 @@ from .previews import (
     project_preview_svg,
     stored_preview_path,
 )
-from .routes_content import _serialize_menus
+from .routes_content import _serialize_menus, _serialize_post
 from .linked_resources import validate_linked_resource_instances
 from .resource_props import (
     ResourcePropsError,
@@ -38,6 +41,82 @@ def _site_settings(db: Session) -> dict:
         "og_type": get_config_value(db, "web.og_type"),
         "canonical_url": get_config_value(db, "web.canonical_url"),
     }
+
+
+def _site_export_record(item, fields: tuple[str, ...]) -> dict:
+    """Return a JSON-safe, intentionally bounded backup record."""
+    return {field: getattr(item, field) for field in fields}
+
+
+@router.get("/export")
+def export_site(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """Download a portable backup of authored web content and its media.
+
+    This is deliberately a data export rather than a theme package: installed
+    theme resources remain immutable package dependencies, while every
+    site-owned template/component/section is retained in the backup.
+    """
+    _require_action(db, current_user, "web.settings.manage")
+    pages = db.query(WebPage).filter(WebPage.deleted_at.is_(None)).order_by(WebPage.id).all()
+    templates = db.query(WebTemplate).filter(WebTemplate.theme_version_id.is_(None)).order_by(WebTemplate.id).all()
+    components = db.query(WebReusableComponent).filter(WebReusableComponent.theme_version_id.is_(None)).order_by(WebReusableComponent.id).all()
+    sections = db.query(WebSection).filter(WebSection.theme_version_id.is_(None)).order_by(WebSection.id).all()
+    media = db.query(WebMedia).order_by(WebMedia.id).all()
+    style = db.query(WebSiteStyle).filter_by(id=1).one_or_none()
+    payload = {
+        "format": "scoutcomp-web-export",
+        "version": 1,
+        "settings": _site_settings(db),
+        "menus": _serialize_menus(db),
+        "posts": [_serialize_post(post) for post in db.query(WebPost).filter(WebPost.deleted_at.is_(None)).order_by(WebPost.id)],
+        "styles": _site_export_record(style, (
+            "active_theme_version_id", "draft_tokens", "draft_css", "draft_version",
+            "published_tokens", "published_css", "published_version",
+        )) if style else None,
+        "pages": [_site_export_record(page, (
+            "id", "title", "slug", "path_segment", "path", "data", "template_id", "template",
+            "source_template_id", "source_template_version", "meta_description", "seo_title",
+            "canonical_url", "og_image_id", "noindex", "sitemap_include", "parent_id", "position",
+        )) for page in pages],
+        "templates": [_site_export_record(item, (
+            "id", "key", "qualified_key", "name", "description", "project_data", "css",
+            "published_project_data", "published_css", "usage_mode", "template_kind", "preview_media_id",
+        )) for item in templates],
+        "components": [_site_export_record(item, (
+            "id", "qualified_key", "name", "description", "project_data", "css", "prop_schema",
+            "default_props", "variants", "published_project_data", "published_css",
+            "published_prop_schema", "published_default_props", "published_variants", "preview_media_id",
+        )) for item in components],
+        "sections": [_site_export_record(item, (
+            "id", "qualified_key", "name", "description", "project_data", "css", "prop_schema",
+            "default_props", "variants", "published_project_data", "published_css",
+            "published_prop_schema", "published_default_props", "published_variants", "preview_media_id",
+        )) for item in sections],
+        "media": [],
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for item in media:
+            # Never trust user-controlled filenames for a ZIP member path.
+            filename = re.sub(r"[^A-Za-z0-9._-]", "_", item.filename) or "media"
+            archive_path = f"media/{item.id}-{filename}"
+            record = _site_export_record(item, ("id", "filename", "mime", "size", "album", "alt", "caption", "note", "is_public", "folder_id"))
+            try:
+                path = _stored_media_path(item)
+            except HTTPException:
+                record["missing"] = True
+            else:
+                if path.is_file():
+                    archive.write(path, archive_path)
+                    record["archive_path"] = archive_path
+                else:
+                    record["missing"] = True
+            payload["media"].append(record)
+        archive.writestr("scoutcomp-web.json", json.dumps(payload, ensure_ascii=False, indent=2, default=str))
+    return Response(
+        content=buffer.getvalue(), media_type="application/zip",
+        headers={"Content-Disposition": 'attachment; filename="scoutcomp-web-export.zip"'},
+    )
 
 
 @router.get("/settings")

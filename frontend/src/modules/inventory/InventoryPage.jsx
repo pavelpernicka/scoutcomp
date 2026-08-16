@@ -1,6 +1,6 @@
 import React from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { inventoryApi } from "./api";
@@ -17,21 +17,20 @@ import {
 } from "./helpers";
 import InventoryBulkDialog from "./components/InventoryBulkDialog";
 import InventoryCategoryDialog from "./components/InventoryCategoryDialog";
-import InventoryEventDialog from "./components/InventoryEventDialog";
-import InventoryEventReturnDialog from "./components/InventoryEventReturnDialog";
 import InventoryFlagDialog from "./components/InventoryFlagDialog";
 import InventoryItemDialog from "./components/InventoryItemDialog";
+import InventorySetDialog from "./components/InventorySetDialog";
 import InventoryLabelGenerateDialog from "./components/InventoryLabelGenerateDialog";
 import InventoryLocationDialog from "./components/InventoryLocationDialog";
-import InventoryTemplateDialog from "./components/InventoryTemplateDialog";
 import InventoryCategoriesScreen from "./screens/InventoryCategoriesScreen";
-import InventoryEventsScreen from "./screens/InventoryEventsScreen";
 import InventoryFlagsScreen from "./screens/InventoryFlagsScreen";
 import InventoryItemsScreen from "./screens/InventoryItemsScreen";
 import InventoryLabelsScreen from "./screens/InventoryLabelsScreen";
 import InventoryLocationsScreen from "./screens/InventoryLocationsScreen";
 import InventoryLoansScreen from "./screens/InventoryLoansScreen";
 import InventoryScannerScreen from "./screens/InventoryScannerScreen";
+import InventorySettingsScreen from "./screens/InventorySettingsScreen";
+import InventorySetsScreen from "./screens/InventorySetsScreen";
 
 const emptyItemForm = {
   name: "",
@@ -42,58 +41,50 @@ const emptyItemForm = {
   quantity_unit: "ks",
   default_location: "",
   current_location: "",
-  current_location_mode: "location",
-  current_event_id: null,
-  current_event_quantity: 1,
+  locations: [],
   status: "available",
   notes: "",
   team_id: "",
 };
 
-const emptyEventForm = { name: "", team_id: "", start_date: "", end_date: "", note: "", status: "active" };
 const emptyPhotoForm = { image_url: "", caption: "" };
-const emptyLoanForm = { borrower_name: "", quantity: 1, due_at: "", note: "" };
-const emptyTemplateForm = {
-  name: "",
-  team_id: "",
-  width_mm: 62,
-  height_mm: 29,
-  qr_x_mm: 3,
-  qr_y_mm: 3,
-  qr_size_mm: 18,
-  title_font_size: 14,
-  meta_font_size: 9,
-  fields: ["name", "category", "current_location", "qr_identifier"],
-};
+const emptyLoanForm = { borrower_name: "", quantity: 1, due_at: "", note: "", location: "" };
 const emptyLocationForm = { name: "", description: "", parent_id: null, sort_order: 0, team_id: "" };
 const emptyCategoryForm = { name: "", description: "", parent_id: null, color: "#5b8def", sort_order: 0, team_id: "" };
-const emptyFlagForm = { name: "", description: "", color: "neutral", sort_order: 0, team_id: "" };
+const emptyFlagForm = { name: "", description: "", color: "#526174", sort_order: 0, team_id: "" };
 const emptyBulkForm = {
   set_default_location: "",
   set_current_location: "",
   set_category: "",
   set_flag_id: null,
-  assign_event_id: null,
-  assign_event_quantity: 1,
-};
-const emptyEventReturnForm = {
-  quantity: 1,
-  condition: "ok",
-  current_location: "",
+  set_id: null,
+  borrower_name: "",
+  due_at: "",
   note: "",
 };
+const EMPTY_LIST = [];
 
 function toIsoOrNull(value) {
   return value ? new Date(value).toISOString() : null;
 }
 
+function inventoryErrorMessage(error, fallback) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((entry) => entry?.msg || entry?.message || "Neplatná hodnota").join(" ");
+  }
+  if (detail && typeof detail === "object") return detail.msg || detail.message || fallback;
+  return fallback;
+}
+
 export default function InventoryPage() {
   const queryClient = useQueryClient();
   const { screen } = useParams();
+  const navigate = useNavigate();
   const activeScreen = INVENTORY_SCREENS.some((entry) => entry.id === screen) ? screen : "items";
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [selectedItemIds, setSelectedItemIds] = useState([]);
-  const [selectedEventId, setSelectedEventId] = useState(null);
   const [search, setSearch] = useState("");
   const [presenceFilter, setPresenceFilter] = useState("");
   const [flagFilter, setFlagFilter] = useState("");
@@ -102,63 +93,59 @@ export default function InventoryPage() {
   const [sortBy, setSortBy] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
   const [scanValue, setScanValue] = useState("");
-  const [eventScanValue, setEventScanValue] = useState("");
   const [scanFeedback, setScanFeedback] = useState("");
-  const [labelPreview, setLabelPreview] = useState(null);
+  const [settingsSection, setSettingsSection] = useState("categories");
   const [selectedLabelTemplateId, setSelectedLabelTemplateId] = useState(null);
+  const [labelItemIds, setLabelItemIds] = useState([]);
 
   const [itemDialogVisible, setItemDialogVisible] = useState(false);
   const [itemDialogMode, setItemDialogMode] = useState("create");
-  const [eventDialogVisible, setEventDialogVisible] = useState(false);
-  const [eventDialogMode, setEventDialogMode] = useState("create");
-  const [templateDialogVisible, setTemplateDialogVisible] = useState(false);
   const [labelDialogVisible, setLabelDialogVisible] = useState(false);
   const [locationDialogVisible, setLocationDialogVisible] = useState(false);
   const [categoryDialogVisible, setCategoryDialogVisible] = useState(false);
   const [flagDialogVisible, setFlagDialogVisible] = useState(false);
   const [bulkDialogVisible, setBulkDialogVisible] = useState(false);
-  const [eventReturnDialogVisible, setEventReturnDialogVisible] = useState(false);
   const [bulkMode, setBulkMode] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingFlag, setEditingFlag] = useState(null);
+  const [setDialogVisible, setSetDialogVisible] = useState(false);
+  const [editingSet, setEditingSet] = useState(null);
 
   const [itemForm, setItemForm] = useState(emptyItemForm);
-  const [eventForm, setEventForm] = useState(emptyEventForm);
-  const [templateForm, setTemplateForm] = useState(emptyTemplateForm);
   const [locationForm, setLocationForm] = useState(emptyLocationForm);
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm);
   const [flagForm, setFlagForm] = useState(emptyFlagForm);
   const [bulkForm, setBulkForm] = useState(emptyBulkForm);
-  const [eventReturnForm, setEventReturnForm] = useState(emptyEventReturnForm);
   const [photoForm, setPhotoForm] = useState(emptyPhotoForm);
   const [loanForm, setLoanForm] = useState(emptyLoanForm);
-  const [returningEventEntry, setReturningEventEntry] = useState(null);
-  const [returningEventItem, setReturningEventItem] = useState(null);
+  const [itemSaveError, setItemSaveError] = useState("");
 
-  const { data: teams = [] } = useQuery({
+  useEffect(() => {
+    if (screen === "locations") {
+      setSettingsSection("locations");
+      navigate("/inventory/settings", { replace: true });
+    }
+  }, [navigate, screen]);
+
+  const { data: teamsData } = useQuery({
     queryKey: ["inventory", "teams"],
     queryFn: inventoryApi.getTeams,
     staleTime: 60_000,
   });
+  const teams = teamsData ?? EMPTY_LIST;
 
   const { data: overview, isLoading, error } = useQuery({
     queryKey: ["inventory", "overview"],
     queryFn: () => inventoryApi.getOverview(),
   });
 
-  const { data: eventDetail } = useQuery({
-    queryKey: ["inventory", "event", selectedEventId],
-    queryFn: () => inventoryApi.getEventDetail(selectedEventId),
-    enabled: Boolean(selectedEventId),
-  });
-
-  const items = overview?.items ?? [];
-  const events = overview?.events ?? [];
-  const templates = overview?.label_templates ?? [];
-  const locations = overview?.locations ?? [];
-  const categoriesTree = overview?.categories ?? [];
-  const flags = overview?.flags ?? [];
+  const items = overview?.items ?? EMPTY_LIST;
+  const templates = overview?.label_templates ?? EMPTY_LIST;
+  const locations = overview?.locations ?? EMPTY_LIST;
+  const categoriesTree = overview?.categories ?? EMPTY_LIST;
+  const flags = overview?.flags ?? EMPTY_LIST;
+  const sets = overview?.sets ?? EMPTY_LIST;
   const editableFlags = useMemo(() => flags.filter((flag) => !flag.is_system), [flags]);
   const flatLocations = useMemo(() => flattenLocationTree(locations), [locations]);
   const flatCategories = useMemo(() => flattenLocationTree(categoriesTree), [categoriesTree]);
@@ -186,43 +173,81 @@ export default function InventoryPage() {
   }, [categoriesTree, items]);
   const openLoanEntries = useMemo(() => buildOpenLoanEntries(items), [items]);
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
-  const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null;
 
   useEffect(() => {
     const fallbackTeamId = teams[0]?.id ?? "";
-    setItemForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
-    setEventForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
-    setTemplateForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
-    setLocationForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
-    setCategoryForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
-    setFlagForm((current) => ({ ...current, team_id: current.team_id || fallbackTeamId }));
+    if (!fallbackTeamId) return;
+
+    const applyFallbackTeam = (setForm) => {
+      setForm((current) => (
+        current.team_id ? current : { ...current, team_id: fallbackTeamId }
+      ));
+    };
+
+    applyFallbackTeam(setItemForm);
+    applyFallbackTeam(setLocationForm);
+    applyFallbackTeam(setCategoryForm);
+    applyFallbackTeam(setFlagForm);
   }, [teams]);
 
-  useEffect(() => {
-    if (!selectedEventId) {
-      const candidate = events.find((event) => event.status === "active") || events.find((event) => event.status === "planned");
-      if (candidate) {
-        setSelectedEventId(candidate.id);
-      }
-    }
-  }, [events, selectedEventId]);
-
   const filteredItems = useMemo(
-    () => sortItems(filterItems(items, { search, presence: presenceFilter, flagId: flagFilter, locationPath: locationFilter, categoryPath: categoryFilter }), sortBy, sortDir),
-    [items, search, presenceFilter, flagFilter, locationFilter, categoryFilter, sortBy, sortDir]
+    () => sortItems(filterItems(items, { search, presence: presenceFilter, flagId: flagFilter, locationPath: locationFilter, categoryPath: categoryFilter }, sets), sortBy, sortDir),
+    [items, sets, search, presenceFilter, flagFilter, locationFilter, categoryFilter, sortBy, sortDir]
   );
 
-  const invalidateInventory = () => {
-    queryClient.invalidateQueries({ queryKey: ["inventory"] });
-    if (selectedEventId) {
-      queryClient.invalidateQueries({ queryKey: ["inventory", "event", selectedEventId] });
-    }
+  const replaceItemInOverview = (item) => {
+    queryClient.setQueryData(["inventory", "overview"], (current) => {
+      if (!current) return current;
+      const exists = current.items.some((currentItem) => currentItem.id === item.id);
+      return {
+        ...current,
+        items: exists
+          ? current.items.map((currentItem) => (currentItem.id === item.id ? item : currentItem))
+          : [...current.items, item],
+      };
+    });
   };
+
+  const replaceItemsInOverview = (updatedItems) => {
+    const itemsById = new Map(updatedItems.map((item) => [item.id, item]));
+    queryClient.setQueryData(["inventory", "overview"], (current) => (
+      current
+        ? { ...current, items: current.items.map((item) => itemsById.get(item.id) ?? item) }
+        : current
+    ));
+  };
+
+  const refreshOverviewPart = async (key, fetcher) => {
+    const value = await fetcher();
+    queryClient.setQueryData(["inventory", "overview"], (current) => (
+      current ? { ...current, [key]: value } : current
+    ));
+  };
+
+  const refreshOverviewFlags = async () => {
+    const updatedFlags = await inventoryApi.getFlags();
+    const flagsById = new Map(updatedFlags.map((flag) => [flag.id, flag]));
+    queryClient.setQueryData(["inventory", "overview"], (current) => (
+      current
+        ? {
+          ...current,
+          flags: updatedFlags,
+          items: current.items.map((item) => ({
+            ...item,
+            flag: item.flag_id ? flagsById.get(item.flag_id) ?? null : null,
+            flag_id: item.flag_id && !flagsById.has(item.flag_id) ? null : item.flag_id,
+          })),
+        }
+        : current
+    ));
+  };
+
+  const refreshOverviewSets = async () => refreshOverviewPart("sets", inventoryApi.getSets);
 
   const createItemMutation = useMutation({
     mutationFn: inventoryApi.createItem,
     onSuccess: (item) => {
-      invalidateInventory();
+      replaceItemInOverview(item);
       setSelectedItemId(item.id);
       setSelectedItemIds((current) => Array.from(new Set([...current, item.id])));
     },
@@ -230,72 +255,44 @@ export default function InventoryPage() {
 
   const updateItemMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.updateItem(id, payload),
-    onSuccess: () => invalidateInventory(),
-  });
-
-  const saveEventMutation = useMutation({
-    mutationFn: ({ id, payload }) => (id ? inventoryApi.updateEvent(id, payload) : inventoryApi.createEvent(payload)),
-    onSuccess: (event) => {
-      invalidateInventory();
-      setSelectedEventId(event.id);
-      setEventDialogVisible(false);
-    },
+    onSuccess: replaceItemInOverview,
   });
 
   const addPhotoMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.addPhoto(id, payload),
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: (item) => {
+      replaceItemInOverview(item);
       setPhotoForm(emptyPhotoForm);
     },
   });
 
   const createLoanMutation = useMutation({
     mutationFn: ({ itemId, payload }) => inventoryApi.createLoan(itemId, payload),
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: (item) => {
+      replaceItemInOverview(item);
       setLoanForm(emptyLoanForm);
     },
   });
 
   const returnLoanMutation = useMutation({
     mutationFn: ({ loanId, payload = {} }) => inventoryApi.returnLoan(loanId, payload),
-    onSuccess: () => invalidateInventory(),
+    onSuccess: replaceItemInOverview,
   });
 
   const templateMutation = useMutation({
     mutationFn: (data) => data.id ? inventoryApi.updateTemplate(data.id, data) : inventoryApi.createTemplate(data),
-    onSuccess: () => {
-      invalidateInventory();
-      setTemplateDialogVisible(false);
-      setTemplateForm(emptyTemplateForm);
-    },
+    onSuccess: () => refreshOverviewPart("label_templates", inventoryApi.getLabelTemplates),
   });
 
   const deleteTemplateMutation = useMutation({
     mutationFn: inventoryApi.deleteTemplate,
-    onSuccess: () => invalidateInventory(),
-  });
-
-  const generateLabelsMutation = useMutation({
-    mutationFn: inventoryApi.generateLabels,
-    onSuccess: (pdfBlob) => {
-      // Create download link for PDF
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'labels.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    },
+    onSuccess: () => refreshOverviewPart("label_templates", inventoryApi.getLabelTemplates),
   });
 
   const createLocationMutation = useMutation({
     mutationFn: inventoryApi.createLocation,
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewPart("locations", inventoryApi.getLocations);
       setLocationDialogVisible(false);
       setEditingLocation(null);
     },
@@ -303,8 +300,8 @@ export default function InventoryPage() {
 
   const updateLocationMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.updateLocation(id, payload),
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewPart("locations", inventoryApi.getLocations);
       setLocationDialogVisible(false);
       setEditingLocation(null);
     },
@@ -312,13 +309,13 @@ export default function InventoryPage() {
 
   const deleteLocationMutation = useMutation({
     mutationFn: inventoryApi.deleteLocation,
-    onSuccess: () => invalidateInventory(),
+    onSuccess: () => refreshOverviewPart("locations", inventoryApi.getLocations),
   });
 
   const createCategoryMutation = useMutation({
     mutationFn: inventoryApi.createCategory,
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewPart("categories", inventoryApi.getCategories);
       setCategoryDialogVisible(false);
       setEditingCategory(null);
     },
@@ -326,8 +323,8 @@ export default function InventoryPage() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.updateCategory(id, payload),
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewPart("categories", inventoryApi.getCategories);
       setCategoryDialogVisible(false);
       setEditingCategory(null);
     },
@@ -335,13 +332,13 @@ export default function InventoryPage() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: inventoryApi.deleteCategory,
-    onSuccess: () => invalidateInventory(),
+    onSuccess: () => refreshOverviewPart("categories", inventoryApi.getCategories),
   });
 
   const createFlagMutation = useMutation({
     mutationFn: inventoryApi.createFlag,
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewFlags();
       setFlagDialogVisible(false);
       setEditingFlag(null);
     },
@@ -349,8 +346,8 @@ export default function InventoryPage() {
 
   const updateFlagMutation = useMutation({
     mutationFn: ({ id, payload }) => inventoryApi.updateFlag(id, payload),
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: async () => {
+      await refreshOverviewFlags();
       setFlagDialogVisible(false);
       setEditingFlag(null);
     },
@@ -358,57 +355,49 @@ export default function InventoryPage() {
 
   const deleteFlagMutation = useMutation({
     mutationFn: inventoryApi.deleteFlag,
-    onSuccess: () => invalidateInventory(),
+    onSuccess: refreshOverviewFlags,
   });
 
-  const assignEventItemMutation = useMutation({
-    mutationFn: ({ eventId, payload }) => inventoryApi.assignItemToEvent(eventId, payload),
-    onSuccess: () => invalidateInventory(),
+  const createSetMutation = useMutation({
+    mutationFn: inventoryApi.createSet,
+    onSuccess: refreshOverviewSets,
   });
 
-  const deleteEventMutation = useMutation({
-    mutationFn: inventoryApi.deleteEvent,
-    onSuccess: () => {
-      const fallback = events.find((entry) => entry.id !== selectedEventId) || null;
-      setSelectedEventId(fallback?.id ?? null);
-      invalidateInventory();
+  const updateSetMutation = useMutation({
+    mutationFn: ({ id, payload }) => inventoryApi.updateSet(id, payload),
+    onSuccess: refreshOverviewSets,
+  });
+
+  const deleteSetMutation = useMutation({
+    mutationFn: inventoryApi.deleteSet,
+    onSuccess: async (_data, setId) => {
+      await refreshOverviewSets();
+      queryClient.setQueryData(["inventory", "overview"], (current) => (
+        current ? { ...current, items: current.items.map((item) => item.set_id === setId ? { ...item, set_id: null } : item) } : current
+      ));
     },
   });
 
-  const returnEventItemMutation = useMutation({
-    mutationFn: ({ eventId, eventItemId, payload }) => inventoryApi.returnEventItem(eventId, eventItemId, payload),
-    onSuccess: (detail) => {
-      queryClient.setQueryData(["inventory", "event", selectedEventId], detail);
-      invalidateInventory();
-      setEventReturnDialogVisible(false);
-      setReturningEventEntry(null);
-      setReturningEventItem(null);
-      setEventReturnForm(emptyEventReturnForm);
-    },
+  const addItemsToSetMutation = useMutation({
+    mutationFn: ({ id, item_ids }) => inventoryApi.addItemsToSet(id, { item_ids }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inventory", "overview"] }),
   });
 
   const bulkUpdateMutation = useMutation({
     mutationFn: inventoryApi.bulkUpdateItems,
-    onSuccess: () => {
-      invalidateInventory();
+    onSuccess: (items) => {
+      replaceItemsInOverview(items);
       setBulkDialogVisible(false);
       setBulkMode(null);
     },
   });
-
-  const scanReturnMutation = useMutation({
-    mutationFn: ({ eventId, payload }) => inventoryApi.scanEventReturn(eventId, payload),
-    onSuccess: (detail) => {
-      queryClient.setQueryData(["inventory", "event", selectedEventId], detail);
-      invalidateInventory();
-      setScanFeedback(`Sken zpracován. Vráceno: ${detail.summary.returned.length}, chybí: ${detail.summary.missing.length}, navíc: ${detail.summary.extra.length}.`);
-      setEventScanValue("");
+  const bulkLoanMutation = useMutation({
+    mutationFn: inventoryApi.bulkCreateLoans,
+    onSuccess: (updatedItems) => {
+      replaceItemsInOverview(updatedItems);
+      setBulkDialogVisible(false);
+      setBulkMode(null);
     },
-  });
-
-  const previewLabelsMutation = useMutation({
-    mutationFn: inventoryApi.previewLabels,
-    onSuccess: (data) => setLabelPreview(data),
   });
 
   const hydrateItemEditor = (item) => {
@@ -419,13 +408,12 @@ export default function InventoryPage() {
       description: item.description || "",
       category: item.category || "",
       flag_id: item.flag_id ?? null,
+      set_id: item.set_id ?? null,
       quantity: item.quantity || 0,
       quantity_unit: item.quantity_unit || "ks",
       default_location: item.default_location || "",
       current_location: item.current_location || "",
-      current_location_mode: item.current_event_name ? "event" : item.open_loan_quantity > 0 ? "loan" : "location",
-      current_event_id: item.current_event_name ? (events.find((event) => event.name === item.current_event_name)?.id ?? null) : null,
-      current_event_quantity: item.active_event_quantity || 1,
+      locations: (item.locations || []).map((location) => ({ location: location.location, quantity: location.quantity })),
       status: item.status || "available",
       notes: item.notes || "",
       team_id: item.team_id || teams[0]?.id || "",
@@ -437,36 +425,42 @@ export default function InventoryPage() {
       quantity: openLoan.quantity || 1,
       due_at: formatServerDateToInputValue(openLoan.due_at),
       note: openLoan.note || "",
+      location: openLoan.source_location || "",
     } : emptyLoanForm);
   };
 
   const openCreateItem = () => {
+    setItemSaveError("");
     setItemDialogMode("create");
     setItemForm({
       ...emptyItemForm,
       team_id: teams[0]?.id || "",
       category: categoryFilter || "",
       flag_id: null,
+      set_id: null,
       default_location: locationFilter || "",
       current_location: locationFilter || "",
-      current_location_mode: "location",
-      current_event_id: null,
-      current_event_quantity: 1,
+      locations: [{ location: locationFilter || "", quantity: 1 }],
     });
     setLoanForm(emptyLoanForm);
     setItemDialogVisible(true);
   };
 
+  const openSetDialog = (inventorySet) => {
+    setEditingSet(inventorySet);
+    setSetDialogVisible(true);
+  };
+
   const openEditItem = (item) => {
+    setItemSaveError("");
     hydrateItemEditor(item);
     setItemDialogVisible(true);
   };
 
   const openLabelDialog = () => {
     if (selectedItem && templates.length > 0) {
-      // Open dialog to select template
+      setLabelItemIds([selectedItem.id]);
       setSelectedLabelTemplateId(templates[0]?.id ?? null);
-      setLabelPreview(null);
       setLabelDialogVisible(true);
     } else {
       // No templates available
@@ -474,24 +468,15 @@ export default function InventoryPage() {
     }
   };
 
-  const openCreateEvent = () => {
-    setEventDialogMode("create");
-    setEventForm({ ...emptyEventForm, team_id: teams[0]?.id || "" });
-    setEventDialogVisible(true);
-  };
-
-  const openEditEvent = () => {
-    if (!selectedEvent) return;
-    setEventDialogMode("edit");
-    setEventForm({
-      name: selectedEvent.name || "",
-      team_id: selectedEvent.team_id || teams[0]?.id || "",
-      start_date: formatServerDateToInputValue(selectedEvent.start_date),
-      end_date: formatServerDateToInputValue(selectedEvent.end_date),
-      note: selectedEvent.note || "",
-      status: selectedEvent.status || "active",
-    });
-    setEventDialogVisible(true);
+  const openBulkLabelDialog = () => {
+    if (!selectedItemIds.length) return;
+    if (!templates.length) {
+      alert("Nejsou k dispozici žádné šablony štítků.");
+      return;
+    }
+    setLabelItemIds(selectedItemIds);
+    setSelectedLabelTemplateId(templates[0]?.id ?? null);
+    setLabelDialogVisible(true);
   };
 
   const openCreateRootLocation = () => {
@@ -564,7 +549,7 @@ export default function InventoryPage() {
     setFlagForm({
       name: flag.name,
       description: flag.description || "",
-      color: flag.color,
+      color: /^#[0-9a-f]{6}$/i.test(flag.color || "") ? flag.color : "#526174",
       sort_order: flag.sort_order,
       team_id: flag.team_id,
     });
@@ -590,41 +575,49 @@ export default function InventoryPage() {
   };
 
   const handleSaveItem = async ({ closeAfterSave = true, section = "all" } = {}) => {
-    const shouldProcessLocationFlows = section === "all" || section === "location";
+    if (!itemForm.name.trim()) {
+      setItemSaveError("Vyplň název věci.");
+      return;
+    }
+    if (!itemForm.team_id) {
+      setItemSaveError("Vyber družinu.");
+      return;
+    }
+    if (!Number.isInteger(Number(itemForm.quantity)) || Number(itemForm.quantity) < 1) {
+      setItemSaveError("Množství musí být celé číslo alespoň 1.");
+      return;
+    }
+    const locations = (itemForm.locations || []).map((location) => ({
+      location: location.location.trim(),
+      quantity: Number(location.quantity) || 0,
+    }));
+    const availableQuantity = Number(itemForm.quantity) - Number(selectedItem?.open_loan_quantity || 0);
+    const hasLegacyAllocation = itemDialogMode === "edit" && locations.length === 0 && availableQuantity > 0;
+    const hasInvalidAllocation = !hasLegacyAllocation && (
+      locations.some((location) => !location.location)
+      || new Set(locations.map((location) => location.location)).size !== locations.length
+      || locations.reduce((total, location) => total + location.quantity, 0) !== availableQuantity
+    );
+    if (hasInvalidAllocation) {
+      setItemSaveError(`Rozděl množství do lokací přesně na ${availableQuantity} ${itemForm.quantity_unit}. Každá lokace může být uvedena jen jednou.`);
+      return;
+    }
+    setItemSaveError("");
     const payload = {
       ...itemForm,
       team_id: Number(itemForm.team_id),
       flag_id: itemForm.flag_id || null,
-      current_location: itemForm.current_location_mode === "location" ? itemForm.current_location : itemForm.default_location,
+      current_location: itemForm.current_location || itemForm.default_location,
+      locations,
       photos: !selectedItem && photoForm.image_url ? [{ image_url: photoForm.image_url }] : [],
     };
     try {
-      const savedItem = itemDialogMode === "create"
+      let savedItem = itemDialogMode === "create"
         ? await createItemMutation.mutateAsync(payload)
         : await updateItemMutation.mutateAsync({ id: selectedItemId, payload });
 
-      if (shouldProcessLocationFlows && itemForm.current_location_mode === "event" && itemForm.current_event_id) {
-        await assignEventItemMutation.mutateAsync({
-          eventId: itemForm.current_event_id,
-          payload: {
-            item_id: savedItem.id,
-            planned_quantity: Number(itemForm.current_event_quantity || 1),
-          },
-        });
-
-        // Refresh the item data to show the new assignment
-        if (!closeAfterSave) {
-          const freshItem = await inventoryApi.getItem(savedItem.id);
-          openEditItem(freshItem);
-        }
-      }
-
-      if (
-        shouldProcessLocationFlows
-        && itemForm.current_location_mode === "loan"
-        && loanForm.borrower_name.trim()
-      ) {
-        await createLoanMutation.mutateAsync({
+      if (section === "loan" && loanForm.borrower_name.trim()) {
+        savedItem = await createLoanMutation.mutateAsync({
           itemId: savedItem.id,
           payload: {
             ...loanForm,
@@ -633,17 +626,8 @@ export default function InventoryPage() {
         });
       }
 
-      invalidateInventory();
-      const freshItem = await inventoryApi.getItem(savedItem.id);
-      hydrateItemEditor(freshItem);
-      if (!closeAfterSave && section === "location" && itemForm.current_location_mode === "event") {
-        setItemForm((current) => ({
-          ...current,
-          current_event_id: null,
-          current_event_quantity: Math.max(1, freshItem.available_quantity || 1),
-        }));
-      }
-      if (!closeAfterSave && section === "location" && itemForm.current_location_mode === "loan") {
+      hydrateItemEditor(savedItem);
+      if (!closeAfterSave && section === "loan") {
         setLoanForm(emptyLoanForm);
       }
       if (closeAfterSave) {
@@ -651,25 +635,10 @@ export default function InventoryPage() {
       } else {
         setItemDialogVisible(true);
       }
-    } catch {
+    } catch (error) {
+      setItemSaveError(inventoryErrorMessage(error, "Věc se nepodařilo uložit. Zkontroluj vyplněné údaje."));
       return;
     }
-  };
-
-  const handleSaveEvent = () => {
-    saveEventMutation.mutate({
-      id: eventDialogMode === "edit" ? selectedEventId : null,
-      payload: {
-        ...eventForm,
-        team_id: Number(eventForm.team_id),
-        start_date: toIsoOrNull(eventForm.start_date),
-        end_date: toIsoOrNull(eventForm.end_date),
-      },
-    });
-  };
-
-  const handleSaveTemplate = () => {
-    templateMutation.mutate({ ...templateForm, team_id: Number(templateForm.team_id) });
   };
 
   const handleSaveLocation = () => {
@@ -730,89 +699,39 @@ export default function InventoryPage() {
   };
 
   const handleBulkSubmit = () => {
+    if (bulkMode === "set") {
+      if (!bulkForm.set_id) return;
+      addItemsToSetMutation.mutate({ id: bulkForm.set_id, item_ids: selectedItemIds });
+      setBulkDialogVisible(false);
+      setBulkMode(null);
+      return;
+    }
+    if (bulkMode === "loan") {
+      if (!bulkForm.borrower_name?.trim()) return;
+      bulkLoanMutation.mutate({ item_ids: selectedItemIds, borrower_name: bulkForm.borrower_name.trim(), due_at: toIsoOrNull(bulkForm.due_at), note: bulkForm.note || null });
+      return;
+    }
     const payload = { item_ids: selectedItemIds };
     if (bulkMode === "flag") payload.set_flag_id = bulkForm.set_flag_id;
     if (bulkMode === "location") payload.set_default_location = bulkForm.set_default_location;
     if (bulkMode === "category") payload.set_category = bulkForm.set_category;
-    if (bulkMode === "event") {
-      payload.assign_event_id = bulkForm.assign_event_id;
-      payload.assign_event_quantity = bulkForm.assign_event_quantity;
-    }
     bulkUpdateMutation.mutate(payload);
   };
 
-  const handleFindItem = async () => {
-    if (!scanValue.trim()) return;
+  const handleFindItem = async (value = scanValue) => {
+    const qrIdentifier = String(value || "").trim();
+    if (!qrIdentifier) return { found: false, message: "Zadej QR identifikátor." };
     try {
-      const item = await inventoryApi.findByQr(scanValue.trim());
+      const item = await inventoryApi.findByQr(qrIdentifier);
       openEditItem(item);
       setScanFeedback(`Načtena věc: ${item.name}`);
       setScanValue("");
-    } catch {
-      setScanFeedback("QR identifikátor se nepodařilo najít.");
-    }
-  };
-
-  const handleScanReturn = () => {
-    if (!selectedEventId || !eventScanValue.trim()) return;
-    scanReturnMutation.mutate({ eventId: selectedEventId, payload: { qr_identifier: eventScanValue.trim() } });
-  };
-
-  const openEventReturnDialog = (entry, item) => {
-    const remainingQuantity = Math.max((entry?.planned_quantity || 0) - (entry?.returned_quantity || 0), 0);
-    setReturningEventEntry(entry);
-    setReturningEventItem(item);
-    setEventReturnForm({
-      quantity: Math.max(remainingQuantity, 1),
-      condition: "ok",
-      current_location: item?.default_location || "",
-      note: "",
-    });
-    setEventReturnDialogVisible(true);
-  };
-
-  const openLoanReturnDialog = (loan, item) => {
-    if (item) openEditItem(item);
-  };
-
-  const handleDeleteEvent = () => {
-    if (!selectedEvent) return;
-
-    // Check if there are any items that haven't been fully returned
-    const unreturned = (eventDetail?.items || []).filter((entry) => {
-      const plannedQuantity = entry.planned_quantity || 0;
-      const returnedQuantity = entry.returned_quantity || 0;
-      return plannedQuantity > returnedQuantity;
-    });
-
-    if (unreturned.length > 0) {
-      window.alert("Tuto akci teď nelze smazat. Nejdřív vrať nebo odeber všechny věci z akce.");
-      return;
-    }
-
-    if (!window.confirm(`Smazat akci "${selectedEvent.name}"?`)) return;
-    deleteEventMutation.mutate(selectedEvent.id);
-  };
-
-  const handleSubmitEventReturn = async (editAfterSave = false) => {
-    if (!selectedEventId || !returningEventEntry) return;
-    try {
-      await returnEventItemMutation.mutateAsync({
-        eventId: selectedEventId,
-        eventItemId: returningEventEntry.id,
-        payload: {
-          quantity: Number(eventReturnForm.quantity || 1),
-          condition: eventReturnForm.condition,
-          current_location: eventReturnForm.current_location || null,
-          note: eventReturnForm.note || null,
-        },
-      });
-      if (editAfterSave && returningEventItem) {
-        const freshItem = await inventoryApi.getItem(returningEventItem.id);
-        openEditItem(freshItem);
-      }
-    } catch {
-      return;
+      return { found: true, item };
+    } catch (error) {
+      const missing = error?.response?.status === 404;
+      const message = missing ? `Věc s QR kódem ${qrIdentifier} neexistuje.` : "QR kód se nepodařilo ověřit. Zkus to znovu.";
+      setScanFeedback(message);
+      return { found: false, message };
     }
   };
 
@@ -829,16 +748,11 @@ export default function InventoryPage() {
   return (
     <>
       <div className="inventory-content">
-        <div className="inventory-mobile-topbar inventory-mobile-only">
-          <div className="inventory-mobile-topbar-title">Oddílový inventář</div>
-          <button type="button" className="btn btn-primary" onClick={openCreateItem}>
-            <i className="fas fa-plus"></i>
-          </button>
-        </div>
           {activeScreen === "items" && (
             <InventoryItemsScreen
               items={filteredItems}
               onCreateItem={openCreateItem}
+              onOpenSet={openSetDialog}
               search={search}
               onSearchChange={setSearch}
               presenceFilter={presenceFilter}
@@ -852,6 +766,7 @@ export default function InventoryPage() {
               locations={locations}
               categories={categoriesTree}
               flags={flags}
+              sets={sets}
               categoryMetaByPath={categoryMetaByPath}
               sortBy={sortBy}
               sortDir={sortDir}
@@ -868,7 +783,13 @@ export default function InventoryPage() {
               onToggleSelected={(itemId) => setSelectedItemIds((current) => (
                 current.includes(itemId) ? current.filter((value) => value !== itemId) : [...current, itemId]
               ))}
+              onToggleAll={(visibleIds) => setSelectedItemIds((current) => {
+                const visibleSet = new Set(visibleIds);
+                const allSelected = visibleIds.every((id) => current.includes(id));
+                return allSelected ? current.filter((id) => !visibleSet.has(id)) : [...new Set([...current, ...visibleIds])];
+              })}
               onOpenBulkAction={openBulkAction}
+              onGenerateLabels={openBulkLabelDialog}
             />
           )}
           {activeScreen === "loans" && (
@@ -878,22 +799,7 @@ export default function InventoryPage() {
                 const item = items.find((entry) => entry.id === itemId);
                 if (item) openEditItem(item);
               }}
-              onOpenReturnLoan={openLoanReturnDialog}
-            />
-          )}
-          {activeScreen === "events" && (
-            <InventoryEventsScreen
-              events={events}
-              selectedEvent={selectedEvent}
-              eventDetail={eventDetail}
-              items={items}
-              categoryMetaByPath={categoryMetaByPath}
-              onSelectEvent={setSelectedEventId}
-              onOpenCreate={openCreateEvent}
-              onOpenEdit={openEditEvent}
-              onDeleteEvent={handleDeleteEvent}
-              onOpenReturnItem={openEventReturnDialog}
-              onOpenItem={openEditItem}
+              onOpenReturnLoan={(_, item) => { if (item) openEditItem(item); }}
             />
           )}
           {activeScreen === "scanner" && (
@@ -901,53 +807,51 @@ export default function InventoryPage() {
               scanValue={scanValue}
               onScanValueChange={setScanValue}
               onFindItem={handleFindItem}
-              eventScanValue={eventScanValue}
-              onEventScanValueChange={setEventScanValue}
-              onScanReturn={handleScanReturn}
-              activeEvent={eventDetail}
               scanFeedback={scanFeedback}
             />
           )}
-          {activeScreen === "labels" && (
-            <InventoryLabelsScreen
-              templates={templates}
-              selectedItemIds={selectedItemIds}
-              teams={teams}
-              onCreateTemplate={(templateData) => templateMutation.mutate(templateData)}
-              onUpdateTemplate={(id, templateData) => templateMutation.mutate({ ...templateData, id })}
-              onDeleteTemplate={(id) => deleteTemplateMutation.mutate(id)}
-              onGenerateLabels={(templateId, itemIds) => generateLabelsMutation.mutate({ template_id: templateId, item_ids: itemIds })}
-            />
-          )}
-          {activeScreen === "locations" && (
-            <InventoryLocationsScreen
-              locations={locations}
-              selectedPath={locationFilter}
-              onSelect={setLocationFilter}
-              onCreateRoot={openCreateRootLocation}
-              onCreateChild={openCreateChildLocation}
-              onEdit={openEditLocation}
-              onDelete={handleDeleteLocation}
-            />
-          )}
-          {activeScreen === "categories" && (
-            <InventoryCategoriesScreen
-              categories={categoriesTree}
-              selectedPath={categoryFilter}
-              onSelect={setCategoryFilter}
-              onCreateRoot={openCreateRootCategory}
-              onCreateChild={openCreateChildCategory}
-              onEdit={openEditCategory}
-              onDelete={handleDeleteCategory}
-            />
-          )}
-          {activeScreen === "flags" && (
-            <InventoryFlagsScreen
-              flags={flags}
-              onCreate={openCreateFlag}
-              onEdit={openEditFlag}
-              onDelete={handleDeleteFlag}
-            />
+          {activeScreen === "settings" && (
+            <InventorySettingsScreen activeSection={settingsSection} onSectionChange={setSettingsSection}>
+              {settingsSection === "labels" && (
+                <InventoryLabelsScreen
+                  templates={templates}
+                  items={items}
+                  selectedItemIds={selectedItemIds}
+                  teams={teams}
+                  onCreateTemplate={(templateData) => templateMutation.mutateAsync(templateData)}
+                  onUpdateTemplate={(id, templateData) => templateMutation.mutateAsync({ ...templateData, id })}
+                  onDeleteTemplate={(id) => deleteTemplateMutation.mutate(id)}
+                />
+              )}
+              {settingsSection === "locations" && (
+                <InventoryLocationsScreen
+                  locations={locations}
+                  selectedPath={locationFilter}
+                  onSelect={setLocationFilter}
+                  onCreateRoot={openCreateRootLocation}
+                  onCreateChild={openCreateChildLocation}
+                  onEdit={openEditLocation}
+                  onDelete={handleDeleteLocation}
+                />
+              )}
+              {settingsSection === "categories" && (
+                <InventoryCategoriesScreen
+                  categories={categoriesTree}
+                  selectedPath={categoryFilter}
+                  onSelect={setCategoryFilter}
+                  onCreateRoot={openCreateRootCategory}
+                  onCreateChild={openCreateChildCategory}
+                  onEdit={openEditCategory}
+                  onDelete={handleDeleteCategory}
+                />
+              )}
+              {settingsSection === "flags" && (
+                <InventoryFlagsScreen flags={flags} onCreate={openCreateFlag} onEdit={openEditFlag} onDelete={handleDeleteFlag} />
+              )}
+              {settingsSection === "sets" && (
+                <InventorySetsScreen sets={sets} onCreate={(payload) => createSetMutation.mutateAsync(payload)} onUpdate={(id, payload) => updateSetMutation.mutateAsync({ id, payload })} onDelete={(id) => deleteSetMutation.mutate(id)} />
+              )}
+            </InventorySettingsScreen>
           )}
       </div>
 
@@ -958,11 +862,15 @@ export default function InventoryPage() {
         form={itemForm}
         categories={categoryOptions.map((option) => option.value)}
         flags={flags}
+        sets={sets}
         locationTreeOptions={locationTreeOptions}
-        eventOptions={events}
+        saveError={itemSaveError}
         photoForm={photoForm}
         loanForm={loanForm}
-        onChange={(field, value) => setItemForm((current) => ({ ...current, [field]: value }))}
+        onChange={(field, value) => {
+          setItemSaveError("");
+          setItemForm((current) => ({ ...current, [field]: value }));
+        }}
         onPhotoChange={(field, value) => setPhotoForm((current) => ({ ...current, [field]: value }))}
         onLoanChange={(field, value) => setLoanForm((current) => ({ ...current, [field]: value }))}
         onUploadPhoto={(imageUrl) => {
@@ -970,71 +878,34 @@ export default function InventoryPage() {
             addPhotoMutation.mutate({ id: selectedItem.id, payload: { image_url: imageUrl, caption: null } });
           }
         }}
-        onReturnLoan={(loanId) => returnLoanMutation.mutate({ loanId })}
-        onClose={() => setItemDialogVisible(false)}
+        onReturnLoan={async (loanId) => {
+          const updatedItem = await returnLoanMutation.mutateAsync({ loanId });
+          hydrateItemEditor(updatedItem);
+        }}
+        onClose={() => { setItemSaveError(""); setItemDialogVisible(false); }}
         onSubmit={() => handleSaveItem({ closeAfterSave: true })}
         onSaveSection={(section) => handleSaveItem({ closeAfterSave: false, section })}
-        onOpenReturnEvent={(assignment) => {
-          if (!selectedItem) return;
-          openEventReturnDialog(assignment, selectedItem);
-        }}
         onOpenLabelDialog={openLabelDialog}
       />
 
       <InventoryLabelGenerateDialog
         isVisible={labelDialogVisible}
-        item={selectedItem}
+        items={items.filter((item) => labelItemIds.includes(item.id))}
         templates={templates}
         selectedTemplateId={selectedLabelTemplateId}
-        labelPreview={labelPreview}
         onChangeTemplate={setSelectedLabelTemplateId}
-        onClose={() => {
-          setLabelDialogVisible(false);
-          setLabelPreview(null);
-        }}
-        onPreview={() => {
-          if (selectedItem && selectedLabelTemplateId) {
-            previewLabelsMutation.mutate({ item_ids: [selectedItem.id], template_id: selectedLabelTemplateId });
-          }
-        }}
+        onClose={() => { setLabelDialogVisible(false); setLabelItemIds([]); }}
       />
 
-      <InventoryEventDialog
-        isVisible={eventDialogVisible}
-        form={eventForm}
-        onChange={(field, value) => setEventForm((current) => ({ ...current, [field]: value }))}
-        onClose={() => setEventDialogVisible(false)}
-        onSubmit={handleSaveEvent}
-      />
-
-      <InventoryEventReturnDialog
-        isVisible={eventReturnDialogVisible}
-        entry={returningEventEntry}
-        item={returningEventItem}
-        form={eventReturnForm}
-        locationOptions={locationTreeOptions}
-        onChange={(field, value) => setEventReturnForm((current) => ({ ...current, [field]: value }))}
-        onClose={() => {
-          setEventReturnDialogVisible(false);
-          setReturningEventEntry(null);
-          setReturningEventItem(null);
-          setEventReturnForm(emptyEventReturnForm);
-        }}
-        onSubmit={() => handleSubmitEventReturn(false)}
-        onSubmitAndEdit={() => handleSubmitEventReturn(true)}
-      />
-
-
-      <InventoryTemplateDialog
-        isVisible={templateDialogVisible}
-        form={templateForm}
-        onChange={(field, value) => setTemplateForm((current) => ({ ...current, [field]: value }))}
-        onToggleField={(field) => setTemplateForm((current) => ({
-          ...current,
-          fields: current.fields.includes(field) ? current.fields.filter((value) => value !== field) : [...current.fields, field],
-        }))}
-        onClose={() => setTemplateDialogVisible(false)}
-        onSubmit={handleSaveTemplate}
+      <InventorySetDialog
+        isVisible={setDialogVisible}
+        inventorySet={editingSet}
+        items={items}
+        flags={editableFlags}
+        locationOptions={locationOptions}
+        onClose={() => { setSetDialogVisible(false); setEditingSet(null); }}
+        onSubmit={async (payload) => { if (editingSet) { await updateSetMutation.mutateAsync({ id: editingSet.id, payload }); } setSetDialogVisible(false); setEditingSet(null); }}
+        onRemoveItem={(item) => updateItemMutation.mutateAsync({ id: item.id, payload: { set_id: null } })}
       />
 
       <InventoryLocationDialog
@@ -1070,10 +941,10 @@ export default function InventoryPage() {
         isVisible={bulkDialogVisible}
         mode={bulkMode}
         form={bulkForm}
-        eventOptions={events}
         locationOptions={locationOptions}
         categoryOptions={categoryOptions}
         flags={editableFlags}
+        sets={sets}
         selectedCount={selectedItemIds.length}
         onChange={(field, value) => setBulkForm((current) => ({ ...current, [field]: value }))}
         onClose={() => { setBulkDialogVisible(false); setBulkMode(null); }}

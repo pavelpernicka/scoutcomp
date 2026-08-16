@@ -7,6 +7,7 @@ import { useAuth, PasswordChangeRequiredError } from "../providers/AuthProvider"
 import { useConfig } from "../providers/ConfigProvider";
 import api from "../services/api";
 import defaultAppIcon from "../assets/default-app-icon.svg";
+import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../utils/username";
 
 const extractErrorMessage = (error, fallback, t) => {
   const detail = error?.response?.data?.detail;
@@ -51,7 +52,7 @@ export default function LoginPage() {
   const location = useLocation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("login");
-  const [loginState, setLoginState] = useState({ username: "", password: "" });
+  const [loginState, setLoginState] = useState({ username: "", password: "", rememberMe: false });
   const [passwordChangeRequired, setPasswordChangeRequired] = useState(false);
   const [passwordChangeForm, setPasswordChangeForm] = useState({
     username: "",
@@ -169,6 +170,7 @@ useEffect(() => {
         username: passwordChangeForm.username,
         oldPassword: passwordChangeForm.oldPassword,
         newPassword: passwordChangeForm.newPassword,
+        rememberMe: loginState.rememberMe,
       });
       navigate("/");
     } catch (error) {
@@ -463,6 +465,25 @@ useEffect(() => {
                         />
                       </div>
 
+                      <div className="col-12">
+                        <div className="form-check">
+                          <input
+                            id="login-remember-me"
+                            className="form-check-input"
+                            type="checkbox"
+                            checked={loginState.rememberMe}
+                            onChange={(event) =>
+                              setLoginState((prev) => ({ ...prev, rememberMe: event.target.checked }))
+                            }
+                            disabled={isSubmittingLogin || isLoading}
+                          />
+                          <label className="form-check-label fw-medium" htmlFor="login-remember-me">
+                            {t("login.rememberMe")}
+                          </label>
+                          <div className="form-text">{t("login.rememberMeHint")}</div>
+                        </div>
+                      </div>
+
                       {loginError && (
                         <div className="col-12">
                           <div className="alert alert-danger border-0 shadow-sm" role="alert">
@@ -533,8 +554,10 @@ useEffect(() => {
                           className="form-control form-control-lg"
                           placeholder={t("register.usernamePlaceholder")}
                           value={memberForm.username}
+                          pattern={USERNAME_PATTERN}
+                          title={USERNAME_HELP}
                           onChange={(event) =>
-                            setMemberForm((prev) => ({ ...prev, username: event.target.value }))
+                            setMemberForm((prev) => ({ ...prev, username: normalizeUsernameInput(event.target.value) }))
                           }
                           required
                         />
@@ -684,8 +707,10 @@ useEffect(() => {
                           className="form-control form-control-lg"
                           placeholder={t("register.usernamePlaceholder")}
                           value={adminForm.username}
+                          pattern={USERNAME_PATTERN}
+                          title={USERNAME_HELP}
                           onChange={(event) =>
-                            setAdminForm((prev) => ({ ...prev, username: event.target.value }))
+                            setAdminForm((prev) => ({ ...prev, username: normalizeUsernameInput(event.target.value) }))
                           }
                           required
                         />

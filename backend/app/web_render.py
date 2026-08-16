@@ -476,6 +476,14 @@ def render_markdown(markdown_text: str) -> str:
     return "\n".join(output)
 
 
+def render_article_body(value: str | None) -> str:
+    """Render legacy Markdown and rich-editor HTML through a safe boundary."""
+    content = (value or "").strip()
+    if content.startswith("<"):
+        return sanitize_legacy_html(content)
+    return render_markdown(content)
+
+
 def render_news_post(db: Session, params: dict, *, team_id: int | None = None, current_slug: str | None = None, media_base: str = "") -> str:
     from .models import WebPost
 
@@ -485,7 +493,7 @@ def render_news_post(db: Session, params: dict, *, team_id: int | None = None, c
     cover = ""
     if post.cover_media_id:
         cover = f'<img src="{media_base}/media/{post.cover_media_id}/file" alt="{escape(post.title)}" class="web-post-cover">'
-    body = render_markdown(post.body or "")
+    body = render_article_body(post.body)
     return (
         f'<article class="web-post">'
         f'<p class="web-list-meta">{_fmt_datetime(post.published_at) if post.published_at else ""}</p>'

@@ -17,6 +17,7 @@ import Textarea from "../components/Textarea";
 import Select from "../components/Select";
 import LoadingSpinner from "../components/LoadingSpinner";
 import AttendanceDialog from "../components/AttendanceDialog";
+import EventMonthCalendar from "../components/calendar/EventMonthCalendar";
 
 const KIND_STYLES = {
   meeting: { badge: "text-bg-primary", chip: "bg-primary", icon: "fa-people-group" },
@@ -45,26 +46,10 @@ const isDeadlinePassed = (event) => {
 
 const eventColor = (event) => event.color || KIND_CHIP_HEX[event.kind] || KIND_CHIP_HEX.other;
 
-const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
-
-const PCT = 100 / 7;
-const CELL_HEIGHT = 110;
-const BAR_HEIGHT = 20;
-const BAR_GAP = 2;
-const BAR_TOP_OFFSET = 26;
-const MAX_LANES = 3;
-
-const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const isSameDay = (a, b) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
   a.getDate() === b.getDate();
-
-const daysBetween = (a, b) => {
-  const utcA = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
-  const utcB = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
-  return Math.round((utcA - utcB) / 86400000);
-};
 
 const formatEventTime = (value, language) =>
   parseServerDate(value)?.toLocaleTimeString(language === "cs" ? "cs-CZ" : "en-US", {
@@ -102,7 +87,7 @@ const emptyForm = () => ({
   audience: "members",
   requires_planned: false,
   planned_deadline: "",
-  is_public: false,
+  is_public: true,
 });
 
 const mapEventToForm = (event) => ({
@@ -322,74 +307,6 @@ export default function Activity() {
     [filteredEvents]
   );
 
-  const monthWeeks = useMemo(() => {
-    const firstOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const offset = (firstOfMonth.getDay() + 6) % 7; // Monday-first
-    const daysInMonth = new Date(
-      viewDate.getFullYear(),
-      viewDate.getMonth() + 1,
-      0
-    ).getDate();
-    const weekCount = Math.ceil((offset + daysInMonth) / 7);
-    const weeks = [];
-    for (let w = 0; w < weekCount; w++) {
-      const days = [];
-      for (let c = 0; c < 7; c++) {
-        const day = new Date(firstOfMonth);
-        day.setDate(1 - offset + w * 7 + c);
-        days.push(day);
-      }
-      weeks.push(days);
-    }
-    return weeks;
-  }, [viewDate]);
-
-  const monthLayout = useMemo(
-    () =>
-      monthWeeks.map((weekDays) => {
-        const weekStart = weekDays[0];
-        const weekEnd = weekDays[6];
-        const items = [];
-        for (const event of filteredEvents) {
-          const start = startOfDay(parseServerDate(event.starts_at));
-          const rawEnd = event.ends_at ? parseServerDate(event.ends_at) : null;
-          const end = rawEnd ? startOfDay(rawEnd) : new Date(start);
-          if (rawEnd && rawEnd.getHours() === 0 && rawEnd.getMinutes() === 0) {
-            end.setDate(end.getDate() - 1);
-          }
-          if (end < start) end.setTime(start.getTime());
-          if (end < weekStart || start > weekEnd) continue;
-          const startCol = Math.max(0, daysBetween(start, weekStart));
-          const endCol = Math.min(6, Math.max(startCol, daysBetween(end, weekStart)));
-          items.push({
-            event,
-            startCol,
-            endCol,
-            continuesBefore: daysBetween(start, weekStart) < 0,
-            continuesAfter: daysBetween(end, weekStart) > 6,
-          });
-        }
-        items.sort(
-          (a, b) =>
-            a.startCol - b.startCol ||
-            parseServerDate(a.event.starts_at) - parseServerDate(b.event.starts_at) ||
-            (b.endCol - b.startCol) - (a.endCol - a.startCol)
-        );
-        const lanes = [];
-        for (const item of items) {
-          let lane = lanes.findIndex((lastEnd) => lastEnd <= item.startCol);
-          if (lane === -1) {
-            lane = lanes.length;
-            lanes.push(item.endCol + 1);
-          } else {
-            lanes[lane] = item.endCol + 1;
-          }
-          item.lane = lane;
-        }
-        return { days: weekDays, items };
-      }),
-    [filteredEvents, monthWeeks]
-  );
 
   const attendanceByEvent = useMemo(() => {
     const map = {};
@@ -414,7 +331,8 @@ export default function Activity() {
     return map;
   }, [events, userId]);
 
-  const today = startOfDay(new Date());
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
   const upcoming = sortedEvents.filter((event) => parseServerDate(event.starts_at) >= today);
   const past = sortedEvents.filter((event) => parseServerDate(event.starts_at) < today);
@@ -668,108 +586,16 @@ export default function Activity() {
         </div>
       ) : view === "month" ? (
         <div className="card shadow-sm border-0">
-          <div className="overflow-auto" style={{ minWidth: "640px" }}>
-            <div className="d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)" }}>
-              {WEEKDAYS.map((day) => (
-                <div
-                  key={day}
-                  className="text-center bg-success text-white py-2 small fw-semibold border"
-                >
-                  {t(`calendar.${day}`)}
-                </div>
-              ))}
-            </div>
-            {monthLayout.map((week, weekIndex) => (
-              <div
-                key={weekIndex}
-                className="position-relative d-grid"
-                style={{ gridTemplateColumns: "repeat(7, 1fr)", borderTop: "1px solid #dee2e6" }}
-              >
-                {week.items.map((item) => {
-                  return item.lane < MAX_LANES ? (
-                    <button
-                      key={item.event.id}
-                      type="button"
-                      className="calendar-event-bar d-block text-start border-0 rounded-1 text-white small text-truncate"
-                      style={{
-                        position: "absolute",
-                        left: `${item.startCol * PCT}%`,
-                        width: `${(item.endCol - item.startCol + 1) * PCT}%`,
-                        top: BAR_TOP_OFFSET + item.lane * (BAR_HEIGHT + BAR_GAP),
-                        height: BAR_HEIGHT,
-                        lineHeight: `${BAR_HEIGHT}px`,
-                        padding: "0 6px",
-                        zIndex: 2,
-                        backgroundColor: eventColor(item.event),
-                      }}
-                      title={item.event.title}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openDetail(item.event);
-                      }}
-                    >
-                      {item.continuesBefore && <i className="fas fa-chevron-left me-1 small"></i>}
-                      {!item.continuesBefore && (
-                        <span className="me-1">
-                          {formatEventTime(item.event.starts_at, i18n.language)}
-                        </span>
-                      )}
-                      {item.event.title}
-                      {myPlannedByEvent[item.event.id] && (
-                        <i
-                          className={`fas ${PLANNED_STATUS_META[myPlannedByEvent[item.event.id]]?.icon || "fa-question"} ms-1 small`}
-                          style={{ opacity: 0.9 }}
-                        ></i>
-                      )}
-                      {item.continuesAfter && <i className="fas fa-chevron-right ms-1 small"></i>}
-                    </button>
-                  ) : null;
-                })}
-                {week.days.map((day) => {
-                  const inMonth = day.getMonth() === viewDate.getMonth();
-                  const isToday = isSameDay(day, today);
-                  const dayKey = day.toDateString();
-                  const col = daysBetween(day, week.days[0]);
-                  const hiddenCount = week.items.filter(
-                    (item) => item.lane >= MAX_LANES && col >= item.startCol && col <= item.endCol
-                  ).length;
-                  return (
-                    <div
-                      key={dayKey}
-                      className={`calendar-day ${inMonth ? "" : "bg-light"}`}
-                      style={{
-                        height: `${CELL_HEIGHT}px`,
-                        minWidth: "80px",
-                        borderRight: "1px solid #dee2e6",
-                        cursor: inMonth && canCreate ? "pointer" : "default",
-                        backgroundColor: isToday ? "#d8f3dc" : undefined,
-                      }}
-                      onClick={() => inMonth && canCreate && openCreateForm(day)}
-                    >
-                      <div className="d-flex justify-content-between align-items-center p-1">
-                        <span
-                          className={
-                            isToday
-                              ? "fw-bold text-success"
-                              : inMonth
-                                ? "text-muted"
-                                : "text-muted opacity-50"
-                          }
-                        >
-                          {day.getDate()}
-                        </span>
-                      </div>
-                      {hiddenCount > 0 && (
-                        <div className="small text-muted ps-2">
-                          +{hiddenCount} {t("calendar.more")}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+          <EventMonthCalendar
+            events={filteredEvents}
+            viewDate={viewDate}
+            onEventClick={openDetail}
+            onCreateDay={openCreateForm}
+            canCreate={canCreate}
+            getEventColor={eventColor}
+            getEventLabel={(event) => formatEventTime(event.starts_at, i18n.language)}
+            plannedStatusByEvent={myPlannedByEvent}
+          />
         </div>
       ) : (
         <div className="card shadow-sm border-0">

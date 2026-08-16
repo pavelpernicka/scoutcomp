@@ -30,6 +30,19 @@ class FakeSelected {
 }
 
 describe("EditorInspector linked props", () => {
+  it("keeps native content and style mounts available before a selection", () => {
+    const { container } = render(<EditorInspector
+      selected={null}
+      dataSources={[]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+    />);
+
+    expect(container.querySelector(".web-editor-trait-manager")).toBeInTheDocument();
+    expect(container.querySelector(".web-editor-style-manager")).toBeInTheDocument();
+  });
+
   it("configures a repeat from the declared data-source schema", () => {
     const onContentChange = vi.fn();
     const selected = new FakeSelected({ type: "sc-repeat", source: "", params: {} });

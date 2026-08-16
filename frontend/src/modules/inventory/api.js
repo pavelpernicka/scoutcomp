@@ -9,6 +9,45 @@ export const inventoryApi = {
     const { data } = await api.get("/teams");
     return data;
   },
+  getLabelTemplates: async () => {
+    const { data } = await api.get("/inventory/label-templates");
+    return data;
+  },
+  getLocations: async () => {
+    const { data } = await api.get("/inventory/locations");
+    return data;
+  },
+  getCategories: async () => {
+    const { data } = await api.get("/inventory/categories");
+    return data;
+  },
+  getFlags: async () => {
+    const { data } = await api.get("/inventory/flags");
+    return data;
+  },
+  getSets: async () => {
+    const { data } = await api.get("/inventory/sets");
+    return data;
+  },
+  createSet: async (payload) => {
+    const { data } = await api.post("/inventory/sets", payload);
+    return data;
+  },
+  updateSet: async (id, payload) => {
+    const { data } = await api.patch(`/inventory/sets/${id}`, payload);
+    return data;
+  },
+  deleteSet: async (id) => {
+    await api.delete(`/inventory/sets/${id}`);
+  },
+  updateSetItems: async (id, payload) => {
+    const { data } = await api.post(`/inventory/sets/${id}/items`, payload);
+    return data;
+  },
+  addItemsToSet: async (id, payload) => {
+    const { data } = await api.post(`/inventory/sets/${id}/items/add`, payload);
+    return data;
+  },
   createItem: async (payload) => {
     const { data } = await api.post("/inventory/items", payload);
     return data;
@@ -23,6 +62,10 @@ export const inventoryApi = {
   },
   bulkUpdateItems: async (payload) => {
     const { data } = await api.post("/inventory/items/bulk", payload);
+    return data;
+  },
+  bulkCreateLoans: async (payload) => {
+    const { data } = await api.post("/inventory/items/bulk/loans", payload);
     return data;
   },
   addPhoto: async (id, payload) => {
@@ -41,37 +84,6 @@ export const inventoryApi = {
     const { data } = await api.post(`/inventory/loans/${loanId}/return`, payload);
     return data;
   },
-  createEvent: async (payload) => {
-    const { data } = await api.post("/inventory/events", payload);
-    return data;
-  },
-  updateEvent: async (id, payload) => {
-    const { data } = await api.patch(`/inventory/events/${id}`, payload);
-    return data;
-  },
-  deleteEvent: async (id) => {
-    await api.delete(`/inventory/events/${id}`);
-  },
-  getEventDetail: async (id) => {
-    const { data } = await api.get(`/inventory/events/${id}`);
-    return data;
-  },
-  assignItemToEvent: async (eventId, payload) => {
-    const { data } = await api.post(`/inventory/events/${eventId}/items`, payload);
-    return data;
-  },
-  removeItemFromEvent: async (eventId, eventItemId) => {
-    const { data } = await api.delete(`/inventory/events/${eventId}/items/${eventItemId}`);
-    return data;
-  },
-  returnEventItem: async (eventId, eventItemId, payload) => {
-    const { data } = await api.post(`/inventory/events/${eventId}/items/${eventItemId}/return`, payload);
-    return data;
-  },
-  scanEventReturn: async (eventId, payload) => {
-    const { data } = await api.post(`/inventory/events/${eventId}/scan-return`, payload);
-    return data;
-  },
   findByQr: async (qrIdentifier) => {
     const { data } = await api.get(`/inventory/qr/${encodeURIComponent(qrIdentifier)}`);
     return data;
@@ -86,20 +98,6 @@ export const inventoryApi = {
   },
   deleteTemplate: async (id) => {
     await api.delete(`/inventory/label-templates/${id}`);
-  },
-  generateLabels: async (payload) => {
-    const response = await api.post("/inventory/labels/generate", payload, {
-      responseType: 'blob',
-    });
-    return response.data;
-  },
-  previewLabels: async (payload) => {
-    const { data } = await api.post("/inventory/labels/preview", payload);
-    return data;
-  },
-  previewLatexTemplate: async (payload) => {
-    const { data } = await api.post("/inventory/labels/preview", payload);
-    return data;
   },
   createLocation: async (payload) => {
     const { data } = await api.post("/inventory/locations", payload);

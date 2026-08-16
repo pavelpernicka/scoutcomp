@@ -277,7 +277,7 @@ function MenuItemsEditor({ menu, onCancel, onSaved }) {
     staleTime: 30_000,
   });
 
-  const { data: posts = [] } = useQuery({
+  const { data: postsResponse } = useQuery({
     queryKey: ["web", "posts"],
     queryFn: async () => {
       const { data } = await api.get("/web/posts");
@@ -285,6 +285,7 @@ function MenuItemsEditor({ menu, onCancel, onSaved }) {
     },
     staleTime: 30_000,
   });
+  const posts = postsResponse?.items || [];
 
   const saveMutation = useMutation({
     mutationFn: async (payload) => api.put(`/web/menus/${menu.id}/items`, payload),

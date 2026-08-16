@@ -1,5 +1,8 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+import io
+import json
+import zipfile
 
 import pytest
 from fastapi import HTTPException
@@ -73,6 +76,51 @@ def test_real_grapes_project_repeat_bind_condition_and_empty(db_session):
     )
     empty = render_project(db_session, compiled.tree, resolver=lambda *_: [])
     assert "Nic tu není" in empty
+
+
+def test_hierarchical_menu_component_preserves_children_and_safe_links(db_session):
+    compiled = compile_project(project({"type": "sc-menu", "location": "main"}))
+    assert compiled.tree["components"][0] == {"type": "sc-menu", "location": "main", "components": []}
+
+    rendered = render_project(
+        db_session,
+        compiled.tree,
+        resolver=lambda *_: [{
+            "label": "O oddílu",
+            "url": "/o-oddilu",
+            "children": [{"label": "Historie", "url": "/historie", "target": "_blank"}],
+        }],
+    )
+    assert 'class="sc-menu-list"' in rendered
+    assert 'class="sc-menu-dropdown"' in rendered
+    assert 'href="/historie" target="_blank" rel="noopener noreferrer"' in rendered
+
+
+def test_theme_export_declares_user_resources_as_a_template_bundle(db_session):
+    from app.web.theme_package import export_theme_archive
+
+    theme = WebTheme(stable_key="export-bundle", name="Export bundle")
+    db_session.add(theme)
+    db_session.flush()
+    version = WebThemeVersion(
+        theme_id=theme.id,
+        version="1.0.0",
+        schema_version=1,
+        manifest={"id": "export-bundle", "name": "Export bundle", "version": "1.0.0", "resources": {"templates": []}},
+        default_tokens={}, base_css="", package_hash="b" * 64,
+        install_path="missing-export-bundle/1.0.0",
+    )
+    db_session.add_all([version, WebReusableComponent(
+        qualified_key="site:export-card", name="Export card", project_data=project(text("Card")),
+    )])
+    db_session.commit()
+
+    with zipfile.ZipFile(io.BytesIO(export_theme_archive(db_session, version.id))) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        resources = json.loads(archive.read("site-resources.json"))
+
+    assert manifest["site_resources"] == "site-resources.json"
+    assert resources["components"][0]["qualified_key"] == "site:export-card"
 
 
 def test_repeat_can_traverse_a_bounded_context_collection(db_session):
@@ -1422,3 +1470,44 @@ def test_switching_linked_layout_splits_against_the_editor_shell(db_session):
     assert page.template_id is None
     assert page.template is None
     assert page.data["pages"][0]["frames"][0]["component"]["components"][0]["content"] == "Body"
+
+
+def test_media_id_repairs_transient_editor_blob_url_for_public_render(db_session):
+    compiled = compile_project(project({
+        "type": "image",
+        "attributes": {
+            "src": "blob:http://editor.invalid/temporary",
+            "data-sc-media-id": "42",
+            "alt": "Oddílový znak",
+        },
+    }))
+    rendered = render_project(db_session, compiled.tree)
+    assert 'src="/api/web/media/42/file"' in rendered
+    assert "blob:" not in rendered
+
+
+def test_column_primitive_has_a_public_grid_fallback():
+    document = render_document("<main><div class=\"sc-layout-columns\"></div></main>", title="Columns")
+    assert ".sc-layout-columns{display:grid" in document
+
+
+def test_whole_site_export_keeps_site_owned_designs_and_metadata(db_session, monkeypatch):
+    from app.web import routes_design
+
+    page = WebPage(
+        slug="export", path_segment="export", path="/export", title="Export",
+        data=project(text("Obsah")), draft_version=1,
+    )
+    component = WebReusableComponent(
+        qualified_key="site:export-card", name="Export card", project_data=project(text("Card")),
+    )
+    db_session.add_all([page, component])
+    db_session.commit()
+    monkeypatch.setattr(routes_design, "_require_action", lambda *_: None)
+
+    response = routes_design.export_site(db_session, User(username="export-user"))
+    with zipfile.ZipFile(io.BytesIO(response.body)) as archive:
+        exported = json.loads(archive.read("scoutcomp-web.json"))
+    assert exported["format"] == "scoutcomp-web-export"
+    assert exported["pages"][0]["title"] == "Export"
+    assert exported["components"][0]["qualified_key"] == "site:export-card"

@@ -15,6 +15,7 @@ class DatabaseSettings(BaseModel):
 class TokenSettings(BaseModel):
     access_expire_minutes: int = 30
     refresh_expire_minutes: int = 60 * 24 * 7
+    remember_me_refresh_expire_minutes: int = 60 * 24 * 30
     algorithm: str = "HS256"
 
 

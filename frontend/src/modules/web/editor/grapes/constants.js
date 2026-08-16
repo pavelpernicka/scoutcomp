@@ -4,6 +4,7 @@ export const SC_COMPONENT_TYPES = Object.freeze({
   repeat: "sc-repeat",
   condition: "sc-condition",
   empty: "sc-empty",
+  menu: "sc-menu",
   templatePart: "sc-template-part",
   globalPart: "sc-global-part",
   resourceInstance: "sc-resource-instance",

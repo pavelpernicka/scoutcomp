@@ -50,6 +50,14 @@ describe("CMS design resource API", () => {
     expect(http.post).toHaveBeenCalledWith("/web/templates/4/clone", { name: "Homepage copy" });
   });
 
+  it("downloads a whole-site export as a blob", async () => {
+    http.get.mockResolvedValue({ data: new Blob(["zip"]) });
+
+    await cmsApi.downloadSiteExport();
+
+    expect(http.get).toHaveBeenCalledWith("/web/export", { responseType: "blob" });
+  });
+
   it("exposes only the consolidated template and section contracts", () => {
     expect(cmsApi.listPageTemplates).toBeUndefined();
     expect(cmsApi.listGlobalParts).toBeUndefined();

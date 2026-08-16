@@ -23,7 +23,7 @@ describe("PagesPage copy-on-create templates", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { container } = render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <PagesPage />
         </MemoryRouter>
       </QueryClientProvider>,

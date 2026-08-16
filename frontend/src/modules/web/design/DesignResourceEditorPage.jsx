@@ -170,6 +170,13 @@ export default function DesignResourceEditorPage({ kind }) {
     editGenerationRef.current += 1;
     setStatus("unsaved");
   };
+  const startResourceDrag = (event, blockId) => {
+    const instance = editor.editorRef.current;
+    const block = instance?.BlockManager?.get?.(blockId);
+    if (!instance || !block || readOnly) return;
+    event.dataTransfer.effectAllowed = "copy";
+    instance.BlockManager.startDrag?.(block, event.nativeEvent);
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -298,11 +305,11 @@ export default function DesignResourceEditorPage({ kind }) {
       <div className="web-editor-catalog-tabs"><button type="button" className={leftPanel === "insert" ? "active" : ""} onClick={() => setLeftPanel("insert")}>{t("web.editor.insert")}</button><button type="button" className={leftPanel === "layers" ? "active" : ""} onClick={() => setLeftPanel("layers")}>{t("web.editor.layers")}</button></div>
       <div className={leftPanel === "insert" ? "" : "d-none"}>
         {(catalogSections.length > 0 || catalogComponents.length > 0) && <div className="web-resource-preview-catalog">
-          {catalogSections.map((section) => <button key={`section-${section.id}`} type="button" disabled={!editor.isReady} onClick={() => editor.addBlock(`sc-section-${section.id}`)}>
+          {catalogSections.map((section) => <button key={`section-${section.id}`} type="button" draggable={!readOnly && editor.isReady} onDragStart={(event) => startResourceDrag(event, `sc-section-${section.id}`)} disabled={!editor.isReady || readOnly} onClick={() => editor.addBlock(`sc-section-${section.id}`)}>
             <span>{section.preview_url ? <MediaPreview src={section.preview_url} alt="" /> : <i className="fas fa-layer-group" />}</span>
             <strong>{section.name}</strong>
           </button>)}
-          {catalogComponents.map((component) => <button key={`component-${component.id}`} type="button" disabled={!editor.isReady} onClick={() => editor.addBlock(`sc-component-${component.id}`)}>
+          {catalogComponents.map((component) => <button key={`component-${component.id}`} type="button" draggable={!readOnly && editor.isReady} onDragStart={(event) => startResourceDrag(event, `sc-component-${component.id}`)} disabled={!editor.isReady || readOnly} onClick={() => editor.addBlock(`sc-component-${component.id}`)}>
             <span>{component.preview_url ? <MediaPreview src={component.preview_url} alt="" /> : <i className="fas fa-cube" />}</span>
             <strong>{component.name}</strong>
           </button>)}
@@ -336,7 +343,8 @@ export default function DesignResourceEditorPage({ kind }) {
               showActions={false}
               onContentChange={markComponentChanged}
             /></div>
-          : <div className="web-editor-trait-manager" />}
+          : null}
+        <div className={selectedLinkedResource ? "d-none" : ""}><div className="web-editor-trait-manager" /></div>
       </div>
       {rightPanel === "data" && selectedComponent && (selectedComponent.get?.("type") === "sc-repeat"
         ? <div className="web-editor-inspector-body"><RepeatConfigurator selected={selectedComponent} dataSources={itemsFrom(sourcesQuery.data)} onContentChange={markComponentChanged} /></div>

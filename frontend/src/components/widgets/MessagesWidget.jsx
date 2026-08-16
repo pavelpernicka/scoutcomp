@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import api from "../../services/api";
@@ -6,134 +8,51 @@ import { useAuth } from "../../providers/AuthProvider";
 import DecoratedCard from "../DecoratedCard";
 import UserAvatar from "../UserAvatar";
 import { formatRelativeTime } from "./utils";
+import { parseServerDate } from "../../utils/dateUtils";
 
+const timestamp = (value) => parseServerDate(value)?.getTime() || 0;
+
+/** Unified, priority-first inbox: unread items lead, then newest read history. */
 export default function MessagesWidget() {
   const { t, i18n } = useTranslation();
   const { profile } = useAuth();
+  const { data: conversations = [] } = useQuery({ queryKey: ["messages", "conversations"], queryFn: async () => (await api.get("/messages")).data, enabled: Boolean(profile), staleTime: 30_000 });
+  const { data: notifications = [] } = useQuery({ queryKey: ["notifications"], queryFn: async () => (await api.get("/notifications")).data, enabled: Boolean(profile), staleTime: 30_000 });
 
-  const { data: conversations = [] } = useQuery({
-    queryKey: ["messages", "conversations"],
-    queryFn: async () => {
-      const { data } = await api.get("/messages");
-      return data;
-    },
-    enabled: Boolean(profile),
-    staleTime: 30_000,
-  });
+  const rows = useMemo(() => {
+    const messageRows = conversations.filter((conversation) => conversation.last_message).map((conversation) => ({
+      key: `message-${conversation.other_user?.id || conversation.id}`,
+      user: conversation.other_user,
+      name: conversation.other_user?.name || t("messages.system"),
+      body: conversation.last_message.body,
+      createdAt: conversation.last_message_at,
+      unread: Boolean(conversation.unread_count),
+      count: conversation.unread_count || 0,
+      kind: "message",
+    }));
+    const notificationRows = notifications.map((notification) => ({
+      key: `notification-${notification.id}`,
+      name: notification.title || t("messages.system"),
+      body: notification.message,
+      createdAt: notification.created_at,
+      unread: !notification.read_at,
+      count: 0,
+      kind: "notification",
+    }));
+    return [...messageRows, ...notificationRows]
+      .sort((a, b) => Number(b.unread) - Number(a.unread) || timestamp(b.createdAt) - timestamp(a.createdAt))
+      .slice(0, 8);
+  }, [conversations, notifications, t]);
+  const unreadTotal = rows.reduce((sum, row) => sum + (row.unread ? Math.max(1, row.count) : 0), 0);
 
-  const { data: notifications = [] } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: async () => {
-      const { data } = await api.get("/notifications");
-      return data;
-    },
-    enabled: Boolean(profile),
-    staleTime: 30_000,
-  });
-
-  const unreadReceived = conversations.filter(
-    (conversation) =>
-      (conversation.unread_count || 0) > 0 &&
-      conversation.last_message &&
-      !conversation.last_message.from_me
-  );
-
-  const unreadNotifications = notifications.filter((notification) => !notification.read_at).length;
-  const unreadTotal = unreadReceived.reduce(
-    (sum, conversation) => sum + (conversation.unread_count || 0),
-    0
-  ) + unreadNotifications;
-
-  const lastNotification = notifications[0];
-
-  const rows = [];
-  if (lastNotification && unreadNotifications > 0) {
-    rows.push({
-      key: "system",
-      avatar: t("messages.system").charAt(0).toUpperCase(),
-      avatarColor: "bg-info",
-      name: t("messages.system"),
-      time: formatRelativeTime(lastNotification.created_at, i18n.language, t),
-      body: lastNotification.message,
-      unread: unreadNotifications,
-    });
-  }
-  unreadReceived.slice(0, 5).forEach((conversation) => {
-    const user = conversation.other_user;
-    if (!user) return;
-    rows.push({
-      key: `user-${user.id}`,
-      user,
-      avatar: user.name ? user.name.charAt(0).toUpperCase() : null,
-      avatarColor: "bg-success",
-      name: user.name,
-      time: conversation.last_message_at
-        ? formatRelativeTime(conversation.last_message_at, i18n.language, t)
-        : "",
-      body: conversation.last_message ? conversation.last_message.body : "",
-      unread: conversation.unread_count || 0,
-    });
-  });
-
-  return (
-    <DecoratedCard
-      title={t("dashboard.messages")}
-      subtitle={t("dashboard.messagesSubtitle")}
-      icon={<span className="flip_vert fs-2">💬</span>}
-      headerGradient="linear-gradient(135deg, #0f766e 0%, #22d3ee 100%)"
-      shadow={true}
-      border={false}
-      bodyClassName="p-0"
-    >
-      <div className="p-3 bg-light border-bottom">
-        <div className="d-flex align-items-center justify-content-between">
-          <span className="fw-medium text-dark">{t("dashboard.conversations")}</span>
-          <span className="badge bg-primary">{unreadTotal}</span>
-        </div>
-      </div>
-      {rows.length === 0 ? (
-        <div
-          className="d-flex flex-column align-items-center justify-content-center p-4 text-center"
-          style={{ minHeight: "160px" }}
-        >
-          <i className="fas fa-envelope-open-text fs-3 text-muted mb-2 opacity-50"></i>
-          <p className="small text-muted mb-0">{t("dashboard.noConversations")}</p>
-        </div>
-      ) : (
-        <div className="d-flex flex-column">
-          {rows.map((row, index) => (
-              <div
-                key={row.key}
-                className={`d-flex align-items-start gap-3 p-3 ${
-                  index !== rows.length - 1 ? "border-bottom" : ""
-                } ${index % 2 === 0 ? "bg-light" : ""}`}
-              >
-                {row.user ? (
-                  <UserAvatar user={row.user} size={36} fallbackClass={row.avatarColor} />
-                ) : (
-                  <div
-                    className={`${row.avatarColor} rounded-circle d-flex align-items-center justify-content-center flex-shrink-0`}
-                    style={{ width: "36px", height: "36px", fontSize: "15px", color: "white" }}
-                  >
-                    {row.avatar || <i className="fas fa-user"></i>}
-                  </div>
-                )}
-                <div className="flex-grow-1 overflow-hidden">
-                <div className="d-flex justify-content-between align-items-baseline gap-2">
-                  <span className="fw-semibold text-dark text-truncate">{row.name}</span>
-                  <small className="text-muted text-nowrap">{row.time}</small>
-                </div>
-                <p className="mb-0 text-dark text-truncate" style={{ lineHeight: "1.5" }}>
-                  {row.body}
-                </p>
-              </div>
-              {row.unread > 0 && (
-                <span className="badge bg-primary rounded-pill">{row.unread}</span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </DecoratedCard>
-  );
+  return <DecoratedCard title={t("dashboard.messages")} subtitle={t("dashboard.messagesSubtitle")} icon={<span className="flip_vert fs-2">💬</span>} headerGradient="linear-gradient(135deg, #0f766e 0%, #22d3ee 100%)" shadow border={false} className="h-100 dashboard-messages-card" bodyClassName="p-0 d-flex flex-column">
+    <div className="p-3 bg-light border-bottom d-flex align-items-center justify-content-between"><span className="fw-medium text-dark">{t("dashboard.conversations")}</span><span className="badge bg-primary">{unreadTotal}</span></div>
+    {rows.length === 0 ? <div className="d-flex flex-column align-items-center justify-content-center p-4 text-center flex-grow-1"><i className="fas fa-envelope-open-text fs-3 text-muted mb-2 opacity-50" /><p className="small text-muted mb-0">{t("dashboard.noConversations")}</p></div> : <div className="d-flex flex-column dashboard-message-list">
+      {rows.map((row) => <Link to="/messages" key={row.key} className={`dashboard-message-row d-flex align-items-start gap-3 p-3 text-decoration-none text-reset ${row.unread ? "dashboard-message-unread" : ""}`}>
+        {row.user ? <UserAvatar user={{ real_name: row.name, avatar: row.user.avatar }} size={36} fallbackClass="bg-success" /> : <span className="bg-info rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0" style={{ width: 36, height: 36 }}><i className="fas fa-bell" /></span>}
+        <span className="flex-grow-1 overflow-hidden"><span className="d-flex justify-content-between gap-2"><strong className="text-truncate">{row.name}</strong><small className="text-muted text-nowrap">{formatRelativeTime(row.createdAt, i18n.language, t)}</small></span><span className="d-block text-truncate small text-muted mt-1">{row.body}</span></span>
+        {row.unread && <span className="badge bg-primary rounded-pill">{row.count || "Nové"}</span>}
+      </Link>)}
+    </div>}
+  </DecoratedCard>;
 }

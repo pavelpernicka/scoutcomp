@@ -4,6 +4,20 @@ from .routes_common import *  # noqa: F403
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload
+
+
+def _require_post_manage(db: Session, user: User) -> None:
+    permissions = permission_keys(db, user)
+    if not ({"web.posts.manage", "core.posts.manage"} & permissions):
+        raise HTTPException(403, "Missing core.posts.manage")
+
+
+def _require_post_publish(db: Session, user: User) -> None:
+    permissions = permission_keys(db, user)
+    if not ({"web.publish", "core.posts.publish"} & permissions):
+        raise HTTPException(403, "Missing core.posts.publish")
+
+
 # ---------------------------------------------------------------- menus
 
 
@@ -223,6 +237,7 @@ class PostPayload(BaseModel):
     excerpt: str | None = None
     body: str | None = None
     cover_media_id: int | None = None
+    event_id: int | None = None
     published: bool = False
     published_at: str | None = None
     expected_version: int | None = None
@@ -242,6 +257,7 @@ def _serialize_post(post: WebPost) -> dict:
         "excerpt": post.excerpt,
         "body": post.body,
         "cover_media_id": post.cover_media_id,
+        "event_id": post.event_id,
         "published": post.published,
         "draft_version": post.draft_version,
         "published_revision_id": post.published_revision_id,
@@ -265,8 +281,8 @@ def _snapshot_post(db: Session, post: WebPost, user_id: int, reason: str, public
     revision = WebPostRevision(
         post_id=post.id, revision_number=_next_post_revision(db, post.id),
         source_version=post.draft_version or 1, title=post.title, slug=post.slug,
-        excerpt=post.excerpt, body=post.body, cover_media_id=post.cover_media_id,
-        compiled_html=render_markdown(post.body or "") if publication else None,
+        excerpt=post.excerpt, body=post.body, cover_media_id=post.cover_media_id, event_id=post.event_id,
+        compiled_html=render_article_body(post.body) if publication else None,
         reason=reason, is_publication=publication, seo_title=post.seo_title,
         meta_description=post.meta_description, canonical_url=post.canonical_url,
         og_image_id=post.og_image_id, noindex=post.noindex,
@@ -311,43 +327,182 @@ def _publish_post(db: Session, post: WebPost, expected_version: int, user_id: in
 
 
 @router.get("/posts")
-def list_posts(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
-    posts = (
-        db.query(WebPost)
-        .filter(WebPost.deleted_at.is_(None))
-        .order_by(WebPost.updated_at.desc())
-        .all()
-    )
-    return [
-        {
+def list_posts(
+    status: str = Query("all"),
+    sort: str = Query("updated_desc"),
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
+):
+    _require_post_manage(db, current_user)
+    if status not in {"all", "published", "draft"}:
+        raise HTTPException(422, "Invalid post status")
+    if sort not in {"updated_desc", "updated_asc", "title_asc", "title_desc", "published_desc"}:
+        raise HTTPException(422, "Invalid post sort")
+    query = db.query(WebPost).filter(WebPost.deleted_at.is_(None))
+    if status == "published":
+        query = query.filter(WebPost.published.is_(True))
+    elif status == "draft":
+        query = query.filter(WebPost.published.is_(False))
+    order_by = {
+        "updated_desc": (WebPost.updated_at.desc(), WebPost.id.desc()),
+        "updated_asc": (WebPost.updated_at.asc(), WebPost.id.asc()),
+        "title_asc": (WebPost.title.asc(), WebPost.id.asc()),
+        "title_desc": (WebPost.title.desc(), WebPost.id.desc()),
+        "published_desc": (WebPost.published_at.desc(), WebPost.id.desc()),
+    }[sort]
+    total = query.count()
+    posts = query.order_by(*order_by).offset(offset).limit(limit).all()
+    return {
+        "items": [{
             "id": p.id,
             "title": p.title,
             "slug": p.slug,
             "excerpt": p.excerpt,
             "cover_media_id": p.cover_media_id,
+            "event_id": p.event_id,
             "published": p.published,
+            "draft_version": p.draft_version,
             "published_at": p.published_at.isoformat() if p.published_at else None,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-        }
-        for p in posts
-    ]
+            "author": p.created_by.real_name if p.created_by else None,
+            "author_avatar": p.created_by.avatar if p.created_by else None,
+        } for p in posts],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "page": (offset // limit) + 1,
+        "pages": max(1, (total + limit - 1) // limit),
+    }
+
+
+def _require_post_read(db: Session, user: User) -> None:
+    permissions = permission_keys(db, user)
+    if not ({"core.posts.read", "core.posts.manage", "web.posts.manage", "web.manage"} & permissions):
+        raise HTTPException(403, "Missing core.posts.read")
+
+
+def _serialize_linked_event(db: Session, event_id: int | None, user: User) -> dict | None:
+    if event_id is None:
+        return None
+    event = db.query(ScoutEvent).filter_by(id=event_id).one_or_none()
+    if event is None:
+        return None
+    permissions = permission_keys(db, user)
+    is_leader = "core.is_leader" in permissions
+    if (event.audience == "leaders" and not is_leader) or (
+        event.team_id is not None and event.team_id != user.team_id and not is_leader
+    ):
+        return None
+    planned = db.query(ScoutAttendance).filter_by(
+        event_id=event.id, user_id=user.id, mode="planned",
+    ).one_or_none()
+    return {
+        "id": event.id,
+        "title": event.title,
+        "description": event.description,
+        "kind": event.kind,
+        "starts_at": event.starts_at.isoformat() if event.starts_at else None,
+        "ends_at": event.ends_at.isoformat() if event.ends_at else None,
+        "location": event.location,
+        "requires_planned": bool(event.requires_planned),
+        "planned_deadline": event.planned_deadline.isoformat() if event.planned_deadline else None,
+        "planned_status": planned.status if planned else None,
+        "planned_registered_at": planned.created_at.isoformat() if planned and planned.created_at else None,
+    }
+
+
+def _article_excerpt(body: str | None, limit: int = 190) -> str | None:
+    """Derive feed teasers from the article; manual perexes are no longer used."""
+    text = re.sub(r"<[^>]+>", " ", body or "")
+    text = re.sub(r"[`*_>#~]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return None
+    return f"{text[:limit].rsplit(' ', 1)[0]}…" if len(text) > limit else text
+
+
+def _serialize_feed_post(db: Session, post: WebPost, user: User, include_body: bool = False) -> dict:
+    """Read the immutable publication snapshot, never a potentially newer draft."""
+    revision = (
+        db.query(WebPostRevision)
+        .filter_by(id=post.published_revision_id, post_id=post.id, is_publication=True)
+        .one_or_none()
+    )
+    source = revision or post
+    author = post.created_by.real_name if post.created_by and post.created_by.real_name else (
+        post.created_by.username if post.created_by else None
+    )
+    result = {
+        "id": post.id,
+        "title": source.title,
+        "slug": source.slug,
+        "excerpt": _article_excerpt(source.body),
+        "cover_media_id": source.cover_media_id,
+        "published_at": post.published_at.isoformat() if post.published_at else None,
+        "author": author,
+        "author_avatar": post.created_by.avatar if post.created_by else None,
+        "event": _serialize_linked_event(db, source.event_id, user),
+    }
+    if include_body:
+        result["body"] = source.body or ""
+    return result
+
+
+@router.get("/posts/feed")
+def list_post_feed(
+    limit: int = Query(12, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
+):
+    """Authenticated reader feed. Only published posts are intentionally exposed."""
+    _require_post_read(db, current_user)
+    query = db.query(WebPost).filter(
+        WebPost.deleted_at.is_(None), WebPost.published.is_(True),
+    )
+    total = query.count()
+    posts = query.order_by(WebPost.published_at.desc(), WebPost.id.desc()).offset(offset).limit(limit).all()
+    return {
+        "items": [_serialize_feed_post(db, post, current_user) for post in posts],
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "page": (offset // limit) + 1,
+        "pages": max(1, (total + limit - 1) // limit),
+    }
+
+
+@router.get("/posts/feed/{post_id}")
+def get_post_feed_item(
+    post_id: int,
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
+):
+    _require_post_read(db, current_user)
+    post = db.query(WebPost).filter(
+        WebPost.id == post_id, WebPost.deleted_at.is_(None), WebPost.published.is_(True),
+    ).one_or_none()
+    if not post:
+        raise HTTPException(404, "Post not found")
+    return _serialize_feed_post(db, post, current_user, include_body=True)
 
 
 @router.post("/posts", status_code=201)
 def create_post(payload: PostPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
+    _require_post_manage(db, current_user)
     slug = _slugify(payload.slug or payload.title)
     base, counter = slug, 1
     while db.query(WebPost).filter_by(slug=slug).one_or_none():
         counter += 1
         slug = f"{base}-{counter}"
+    if payload.event_id is not None and not db.query(ScoutEvent.id).filter_by(id=payload.event_id).first():
+        raise HTTPException(404, "Event not found")
     post = WebPost(
         slug=slug,
         title=payload.title.strip(),
         excerpt=payload.excerpt,
         body=payload.body,
         cover_media_id=payload.cover_media_id,
+        event_id=payload.event_id,
         published=False,
         draft_version=1,
         created_by_id=current_user.id,
@@ -360,14 +515,14 @@ def create_post(payload: PostPayload, db: Session = Depends(get_db), current_use
     db.commit()
     db.refresh(post)
     if payload.published:
-        _require_action(db, current_user, "web.publish")
+        _require_post_publish(db, current_user)
         _publish_post(db, post, post.draft_version, current_user.id)
     return _serialize_post(post)
 
 
 @router.get("/posts/{post_id}")
 def get_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
+    _require_post_manage(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
@@ -376,7 +531,7 @@ def get_post(post_id: int, db: Session = Depends(get_db), current_user: User = D
 
 @router.put("/posts/{post_id}")
 def update_post(post_id: int, payload: PostPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
+    _require_post_manage(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
@@ -398,6 +553,9 @@ def update_post(post_id: int, payload: PostPayload, db: Session = Depends(get_db
     post.excerpt = payload.excerpt
     post.body = payload.body
     post.cover_media_id = payload.cover_media_id
+    if payload.event_id is not None and not db.query(ScoutEvent.id).filter_by(id=payload.event_id).first():
+        raise HTTPException(404, "Event not found")
+    post.event_id = payload.event_id
     post.updated_by_id = current_user.id
     post.seo_title = payload.seo_title
     post.meta_description = payload.meta_description
@@ -413,15 +571,15 @@ def update_post(post_id: int, payload: PostPayload, db: Session = Depends(get_db
     db.commit()
     db.refresh(post)
     if payload.published:
-        _require_action(db, current_user, "web.publish")
+        _require_post_publish(db, current_user)
         _publish_post(db, post, post.draft_version, current_user.id)
     return _serialize_post(post)
 
 
 @router.post("/posts/{post_id}/publish")
 def publish_post(post_id: int, payload: PublishPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
-    _require_action(db, current_user, "web.publish")
+    _require_post_manage(db, current_user)
+    _require_post_publish(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
@@ -429,14 +587,28 @@ def publish_post(post_id: int, payload: PublishPayload, db: Session = Depends(ge
     return {"post": _serialize_post(post), "published_revision_id": revision.id}
 
 
+@router.post("/posts/{post_id}/unpublish")
+def unpublish_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    _require_post_manage(db, current_user)
+    _require_post_publish(db, current_user)
+    post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
+    if not post:
+        raise HTTPException(404, "Post not found")
+    post.published = False
+    post.published_at = None
+    db.commit()
+    db.refresh(post)
+    return _serialize_post(post)
+
+
 @router.delete("/posts/{post_id}", status_code=204)
 def delete_post(post_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.posts.manage")
+    _require_post_manage(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
     if post.published_revision_id or post.published:
-        _require_action(db, current_user, "web.publish")
+        _require_post_publish(db, current_user)
     post.deleted_at = datetime.now(timezone.utc)
     post.published = False
     db.commit()

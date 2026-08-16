@@ -19,13 +19,13 @@ describe("CMS content API contracts", () => {
   it("preserves the complete post draft and optimistic version when editing", () => {
     expect(buildPostDraftPayload(
       { id: 7, draft_version: 4, seo_title: "SEO", noindex: true },
-      { title: "  News  ", slug: "news", excerpt: "Intro", body: "Full body", cover_media_id: "12" },
+      { title: "  News  ", slug: "news", excerpt: "Intro", body: "Full body", cover_media_id: "12", event_id: "31" },
     )).toEqual({
       title: "News",
-      slug: "news",
-      excerpt: "Intro",
+      excerpt: null,
       body: "Full body",
       cover_media_id: 12,
+      event_id: 31,
       published: false,
       seo_title: "SEO",
       meta_description: null,

@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.core.security import get_password_hash
-from app.models import RoleEnum, Team, User
+from app.models import RoleEnum, ScoutAttendance, ScoutEvent, Team, User
 
 
 def _user(username: str, role: RoleEnum, team: Team | None = None):
@@ -57,7 +57,7 @@ def test_member_directory_search_and_filters(client, db_session):
     names = {item["real_name"] for item in body["items"]}
     assert {"Alice Veselá", "Bob Nový", "Carol Stará"} <= names
     assert all(item["member_status"] == "active" for item in body["items"])
-    assert all(item["age"] is None for item in body["items"])
+    assert all(item["years_in_group"] is None for item in body["items"])
 
     found = client.get("/members?search=vesel", headers=headers).json()
     assert [item["real_name"] for item in found["items"]] == ["Alice Veselá"]
@@ -70,15 +70,13 @@ def test_member_directory_search_and_filters(client, db_session):
     assert len(paginated["items"]) == 1
 
 
-def test_member_profile_tags_relationships_notes_flow(client, db_session):
+def test_member_profile_tags_and_notes_flow(client, db_session):
     team = Team(name="Vlci", join_code="VLCI0001")
     db_session.add(team)
     db_session.commit()
     alice = _user("alice2", RoleEnum.MEMBER, team)
     alice.real_name = "Alice"
-    bob = _user("bob2", RoleEnum.MEMBER, team)
-    bob.real_name = "Bob"
-    db_session.add_all([alice, bob])
+    db_session.add(alice)
     db_session.commit()
 
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
@@ -88,32 +86,24 @@ def test_member_profile_tags_relationships_notes_flow(client, db_session):
         f"/members/{alice.id}",
         headers=headers,
         json={
-            "phone": "123456789",
-            "birth_date": "2010-05-01",
-            "gender": "female",
+            "joined_at": "2010-05-01",
             "member_status": "active",
-            "parent_name": "Rodič Alice",
-            "address": "Nádražní 1",
         },
     )
     assert created.status_code == 200
     profile = created.json()["profile"]
-    assert profile["phone"] == "123456789"
-    assert profile["gender"] == "female"
-    assert profile["parent_name"] == "Rodič Alice"
+    assert profile["joined_at"] == "2010-05-01"
 
     updated = client.put(
         f"/members/{alice.id}",
         headers=headers,
-        json={"phone": "", "parent_name": ""},
+        json={"member_status": "inactive"},
     ).json()["profile"]
-    assert updated["phone"] is None
-    assert updated["parent_name"] is None
-    assert updated["birth_date"] == "2010-05-01"  # untouched fields preserved
+    assert updated["member_status"] == "inactive"
+    assert updated["joined_at"] == "2010-05-01"  # untouched fields preserved
 
     detail = client.get(f"/members/{alice.id}", headers=headers).json()
-    assert detail["profile"]["city"] is None
-    assert detail["activity"] == {"attendance_count": 0, "completion_count": 0, "total_points": 0.0}
+    assert set(detail["profile"]) == {"user_id", "joined_at", "member_status"}
 
     tagged = client.post(f"/members/{alice.id}/tags", headers=headers, json={"tag": "Skaut"}).json()
     assert tagged["tags"] == ["skaut"]
@@ -122,68 +112,52 @@ def test_member_profile_tags_relationships_notes_flow(client, db_session):
     by_tag = client.get("/members?tag=skaut", headers=headers).json()
     assert alice.id in {item["id"] for item in by_tag["items"]}
 
-    rel = client.post(
-        f"/members/{alice.id}/relationships",
-        headers=headers,
-        json={"related_user_id": bob.id, "type": "parent", "note": "tatínek"},
-    ).json()
-    assert len(rel["relationships"]) == 1
-    assert rel["relationships"][0]["type"] == "parent"
-    assert rel["relationships"][0]["related_user"]["real_name"] == "Bob"
-
-    self_rel = client.post(
-        f"/members/{alice.id}/relationships",
-        headers=headers,
-        json={"related_user_id": alice.id},
-    )
-    assert self_rel.status_code == 422
-
     notes = client.post(f"/members/{alice.id}/notes", headers=headers, json={"content": "Pozor, alergie"}).json()
     assert len(notes["notes"]) == 1
     assert notes["notes"][0]["content"] == "Pozor, alergie"
 
     detail = client.get(f"/members/{alice.id}", headers=headers).json()
     assert len(detail["notes"]) == 1
-    assert len(detail["relationships"]) == 1
+    assert "relationships" not in detail
     assert detail["tags"] == ["skaut"]
 
     removed_note = client.delete(
         f"/members/{alice.id}/notes/{notes['notes'][0]['id']}", headers=headers
     ).json()
     assert removed_note["notes"] == []
-    removed_rel = client.delete(
-        f"/members/{alice.id}/relationships/{rel['relationships'][0]['id']}", headers=headers
-    ).json()
-    assert removed_rel["relationships"] == []
     removed_tag = client.delete(f"/members/{alice.id}/tags/skaut", headers=headers).json()
     assert removed_tag["tags"] == []
 
 
-def test_member_stats(client, db_session):
+def test_member_attendance_is_paginated_and_excludes_planned(client, db_session):
     team = Team(name="Vlci", join_code="VLCI0001")
-    db_session.add(team)
+    member = _user("attendance_member", RoleEnum.MEMBER, team)
+    db_session.add_all([team, member])
     db_session.commit()
-    a = _user("stat_a", RoleEnum.MEMBER, team)
-    a.real_name = "A"
-    b = _user("stat_b", RoleEnum.MEMBER, team)
-    b.real_name = "B"
-    c = _user("stat_c", RoleEnum.MEMBER)
-    c.real_name = "C"
-    db_session.add_all([a, b, c])
+    older = ScoutEvent(team_id=team.id, title="Starší schůzka", starts_at=datetime(2025, 1, 1))
+    newer = ScoutEvent(team_id=team.id, title="Novější schůzka", starts_at=datetime(2025, 2, 1))
+    upcoming = ScoutEvent(team_id=team.id, title="Příští schůzka", starts_at=datetime(2025, 3, 1))
+    db_session.add_all([older, newer, upcoming])
+    db_session.flush()
+    db_session.add_all([
+        ScoutAttendance(event_id=older.id, user_id=member.id, mode="real", status="present"),
+        ScoutAttendance(event_id=newer.id, user_id=member.id, mode="real", status="late"),
+        ScoutAttendance(event_id=newer.id, user_id=member.id, mode="planned", status="present"),
+    ])
     db_session.commit()
 
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
-    headers = _headers(token)
-    client.put(f"/members/{b.id}", headers=headers, json={"member_status": "inactive"})
+    response = client.get(f"/members/{member.id}/attendance?limit=1&offset=1", headers=_headers(token))
 
-    stats = client.get("/members/stats", headers=headers).json()
-    assert stats["total"] == 4  # a + b + c + admin_user
-    assert stats["by_status"]["active"] == 3
-    assert stats["by_status"]["inactive"] == 1
-    assert stats["by_status"]["alumni"] == 0
-    vlci = next(entry for entry in stats["by_team"] if entry["team_id"] == team.id)
-    assert vlci["count"] == 2
-    assert vlci["team_name"] == "Vlci"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 3
+    assert len(body["items"]) == 1
+    assert body["items"][0]["title"] == "Novější schůzka"
+    assert body["items"][0]["status"] == "late"
+    upcoming_entry = client.get(f"/members/{member.id}/attendance?limit=1&offset=0", headers=_headers(token)).json()
+    assert upcoming_entry["items"][0]["title"] == "Příští schůzka"
+    assert upcoming_entry["items"][0]["status"] == "not_recorded"
 
 
 def test_member_csv_export(client, db_session):
@@ -200,15 +174,14 @@ def test_member_csv_export(client, db_session):
     client.put(
         f"/members/{alice.id}",
         headers=headers,
-        json={"phone": "777888999", "parent_name": "Rodič", "member_status": "active"},
+        json={"joined_at": "2015-09-01", "member_status": "active"},
     )
 
     exported = client.get("/members/export.csv", headers=headers)
     assert exported.status_code == 200
     assert exported.headers["content-type"].startswith("text/csv")
     assert "Alice Export" in exported.text
-    assert "777888999" in exported.text
-    assert "Rodič" in exported.text
+    assert "2015-09-01" in exported.text
 
     member_token = _seed_and_login(client, db_session, RoleEnum.MEMBER)
     assert client.get("/members/export.csv", headers=_headers(member_token)).status_code == 403

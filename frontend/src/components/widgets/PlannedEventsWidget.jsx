@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -6,19 +6,8 @@ import { useTranslation } from "react-i18next";
 import api from "../../services/api";
 import { useAuth } from "../../providers/AuthProvider";
 import DecoratedCard from "../DecoratedCard";
-import { formatDate } from "./utils";
 import { parseServerDate } from "../../utils/dateUtils";
-
-const STATUS_META = {
-  present: { badge: "bg-success", icon: "fa-check", label: "calendar.present" },
-  absent: { badge: "bg-danger", icon: "fa-xmark", label: "calendar.absent" },
-  excused: { badge: "bg-warning text-dark", icon: "fa-umbrella-beach", label: "calendar.excused" },
-  attending: { badge: "bg-success", icon: "fa-check", label: "calendar.attending" },
-  not_attending: { badge: "bg-warning text-dark", icon: "fa-umbrella-beach", label: "calendar.not_attending" },
-  unknown: { badge: "bg-secondary", icon: "fa-question", label: "calendar.unknown" },
-};
-
-const PLANNED_STATUS_OPTIONS = ["attending", "not_attending", "unknown"];
+import EventMonthCalendar from "../calendar/EventMonthCalendar";
 
 const KIND_STYLES = {
   meeting: { chip: "#0d6efd", icon: "fa-people-group", label: "calendar.meeting" },
@@ -31,6 +20,7 @@ export default function PlannedEventsWidget() {
   const { userId } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date());
 
   const { data: events = [] } = useQuery({
     queryKey: ["activity-events"],
@@ -56,16 +46,6 @@ export default function PlannedEventsWidget() {
     mutationFn: async ({ eventId, status }) => {
       const { data } = await api.post(`/activity/events/${eventId}/planned`, { status });
       return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["activity-events"] });
-    },
-  });
-
-  const unregisterMutation = useMutation({
-    mutationFn: async (eventId) => {
-      await api.delete(`/activity/events/${eventId}/planned`);
-      return eventId;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activity-events"] });
@@ -128,110 +108,97 @@ export default function PlannedEventsWidget() {
           {t("dashboard.noPlannedEvents")}
         </div>
       ) : (
-        <div className="d-flex flex-column">
+        <div className="row g-0">
+          <div className="col-12 col-lg-7 border-end p-2">
+            <div className="d-flex align-items-center justify-content-between px-1 pb-2">
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label="Předchozí měsíc" onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))}><i className="fas fa-chevron-left" /></button>
+              <strong className="small text-capitalize">{calendarMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}</strong>
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label="Další měsíc" onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))}><i className="fas fa-chevron-right" /></button>
+            </div>
+            <EventMonthCalendar
+              events={events}
+              viewDate={calendarMonth}
+              onEventClick={(event) => navigate(`/activity?event=${event.id}`)}
+              getEventColor={(event) => (KIND_STYLES[event.kind] || KIND_STYLES.other).chip}
+              getEventLabel={(event) => parseServerDate(event.starts_at).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
+              plannedStatusByEvent={myStatusByEvent}
+              compact
+            />
+          </div>
+          <div className="col-12 col-lg-5 d-flex flex-column">
           {upcoming.map((event, index) => {
             const style = KIND_STYLES[event.kind] || KIND_STYLES.other;
             const myEntry = myStatusByEvent[event.id];
-            const status = myEntry?.status;
+            const status = myEntry?.status || "unknown";
             const deadlinePassed =
               event.requires_planned &&
               event.planned_deadline &&
               parseServerDate(event.planned_deadline) < new Date();
-            const registeredAt = myEntry?.created_at ? parseServerDate(myEntry.created_at) : null;
 
             return (
-              <div
-                key={event.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => navigate(`/activity?event=${event.id}`)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    navigate(`/activity?event=${event.id}`);
-                  }
-                }}
-                className={`p-3 ${index !== upcoming.length - 1 ? "border-bottom" : ""} d-flex flex-column flex-md-row align-items-md-center gap-3 widget-event-row`}
-                style={{ background: index % 2 === 0 ? "#f8f9fa" : "white", cursor: "pointer" }}
-              >
+              <div key={event.id} className={`p-3 ${index !== upcoming.length - 1 ? "border-bottom" : ""} widget-event-row`} style={{ background: index % 2 === 0 ? "#f8f9fa" : "white" }}>
                 <div
-                  className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
-                  style={{ width: "36px", height: "36px", color: "white", fontSize: "14px", backgroundColor: style.chip }}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/activity?event=${event.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/activity?event=${event.id}`);
+                    }
+                  }}
+                  className="d-flex flex-column flex-sm-row align-items-sm-center gap-3"
+                  style={{ cursor: "pointer" }}
                 >
-                  <i className={`fas ${style.icon}`}></i>
-                </div>
-                <div className="flex-grow-1 min-w-0">
-                  <div className="fw-semibold text-truncate">{event.title}</div>
-                  <div className="small text-muted d-flex flex-wrap gap-3">
-                    <span>
-                      <i className="fas fa-clock me-1"></i>
-                      {parseServerDate(event.starts_at).toLocaleString(locale, {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                    {event.location && (
+                  <div
+                    className="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                    style={{ width: "36px", height: "36px", color: "white", fontSize: "14px", backgroundColor: style.chip }}
+                  >
+                    <i className={`fas ${style.icon}`}></i>
+                  </div>
+                  <div className="flex-grow-1 min-w-0">
+                    <div className="fw-semibold text-truncate">{event.title}</div>
+                    <div className="small text-muted d-flex flex-wrap gap-3">
                       <span>
-                        <i className="fas fa-map-marker-alt me-1"></i>
-                        {event.location}
+                        <i className="fas fa-clock me-1"></i>
+                        {parseServerDate(event.starts_at).toLocaleString(locale, {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </span>
-                    )}
-                    {event.filteredGroups?.length > 0 && (
-                      <span className="text-truncate" style={{ maxWidth: "200px" }}>
-                        <i className="fas fa-users me-1"></i>
-                        {getEventGroupLabel(event)}
-                      </span>
-                    )}
-                    {registeredAt && (
-                      <span className="text-info">
-                        <i className="fas fa-user-check me-1"></i>
-                        {t("calendar.registeredOn")}: {formatDate(registeredAt, locale)}
-                      </span>
-                    )}
+                      {status === "attending" && <span className="badge bg-success small px-2 py-1"><i className="fas fa-check me-1" />Přihlášen</span>}
+                      {status === "not_attending" && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-xmark me-1" />Omluven</span>}
+                      {status === "unknown" && event.requires_planned && !deadlinePassed && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-triangle-exclamation me-1" />Nutnost přihlášení</span>}
+                      {event.location && (
+                        <span>
+                          <i className="fas fa-map-marker-alt me-1"></i>
+                          {event.location}
+                        </span>
+                      )}
+                      {event.filteredGroups?.length > 0 && (
+                        <span className="text-truncate" style={{ maxWidth: "200px" }}>
+                          <i className="fas fa-users me-1"></i>
+                          {getEventGroupLabel(event)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="d-flex flex-column flex-md-row align-items-md-center gap-2">
-                  {status ? (
-                    <>
-                      <span className={`badge ${STATUS_META[status]?.badge || "bg-secondary"} small px-2 py-1`}>
-                        <i className={`fas ${STATUS_META[status]?.icon || "fa-question"} me-1`}></i>
-                        {t(STATUS_META[status]?.label || `calendar.${status}`)}
-                      </span>
-                      {!deadlinePassed && (
-                        <button
-                          type="button"
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => unregisterMutation.mutate(event.id)}
-                          disabled={unregisterMutation.isPending}
-                          title={t("calendar.unregister")}
-                        >
-                          <i className="fas fa-times me-1"></i>{t("calendar.unregister")}
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <div className="btn-group btn-group-sm" role="group" aria-label={event.title}>
-                      {PLANNED_STATUS_OPTIONS.map((value) => (
-                        <button
-                          key={value}
-                          type="button"
-                          className={`btn ${STATUS_META[value]?.badge ? STATUS_META[value].badge.replace("bg-", "btn-") : "btn-outline-secondary"}`}
-                          disabled={Boolean(deadlinePassed) || signupMutation.isPending}
-                          title={t(`calendar.${value}`)}
-                          onClick={() => signupMutation.mutate({ eventId: event.id, status: value })}
-                        >
-                          <i className={`fas ${STATUS_META[value]?.icon || "fa-question"}`}></i>
-                          <span className="d-none d-sm-inline ms-1">{t(`calendar.${value}`)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                <div className="mt-3 d-flex flex-wrap align-items-center gap-2">
+                  {!deadlinePassed && <div className="btn-group" role="group" aria-label={`Účast na akci ${event.title}`}>
+                    {[
+                      ["attending", "btn-success", "fa-check", "Zúčastním se"],
+                      ["not_attending", "btn-warning", "fa-xmark", "Nezúčastním se"],
+                      ["unknown", "btn-outline-secondary", "fa-question", "Nevím"],
+                    ].map(([value, className, icon, label]) => <button key={value} type="button" className={`btn btn-sm ${status === value ? className : "btn-outline-secondary"}`} disabled={signupMutation.isPending} onClick={() => signupMutation.mutate({ eventId: event.id, status: value })}><i className={`fas ${icon} me-1`} /><span className="d-none d-xl-inline">{label}</span></button>)}
+                  </div>}
                 </div>
               </div>
             );
           })}
+          </div>
         </div>
       )}
     </DecoratedCard>

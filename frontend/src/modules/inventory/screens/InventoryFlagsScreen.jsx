@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import { useMemo, useState } from "react";
 
 import Card from "../../../components/Card";
-import { buildColorStyle } from "../helpers";
+import { buildColorStyle, formatInventoryFlagName } from "../helpers";
 
 export default function InventoryFlagsScreen({ flags, onCreate, onEdit, onDelete }) {
   const editableFlags = useMemo(() => flags.filter((flag) => !flag.is_system), [flags]);
@@ -28,7 +28,7 @@ export default function InventoryFlagsScreen({ flags, onCreate, onEdit, onDelete
               <div key={flag.id} className={`inventory-location-row ${selectedFlag?.id === flag.id ? "selected" : ""}`}>
                 <button type="button" className="inventory-location-select" onClick={() => setSelectedFlagId(flag.id)}>
                   <i className="fas fa-bookmark" style={{ color: buildColorStyle(flag.color, 0.16).color }}></i>
-                  <span>{flag.name}</span>
+                  <span>{formatInventoryFlagName(flag)}</span>
                 </button>
                 <div className="inventory-location-actions">
                   <button type="button" className="btn btn-sm btn-link" onClick={() => onEdit(flag)} title="Upravit příznak">
@@ -49,7 +49,7 @@ export default function InventoryFlagsScreen({ flags, onCreate, onEdit, onDelete
           {selectedFlag ? (
             <div>
               <span className="inventory-inline-badge" style={buildColorStyle(selectedFlag.color, 0.16)}>
-                {selectedFlag.name}
+                {formatInventoryFlagName(selectedFlag)}
               </span>
               <div className="small text-muted mt-3">{selectedFlag.description || "Bez popisu"}</div>
               <div className="small text-muted mt-2">Pořadí {selectedFlag.sort_order}</div>

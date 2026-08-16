@@ -2,7 +2,11 @@ import React from "react";
 import PropTypes from "prop-types";
 
 import Modal from "../../../components/Modal";
-import { THEME_COLOR_OPTIONS } from "../helpers";
+const DEFAULT_FLAG_COLOR = "#526174";
+
+function colorPickerValue(color) {
+  return /^#[0-9a-f]{6}$/i.test(color || "") ? color : DEFAULT_FLAG_COLOR;
+}
 
 export default function InventoryFlagDialog({
   isVisible,
@@ -34,9 +38,7 @@ export default function InventoryFlagDialog({
         </div>
         <div className="col-md-4">
           <label className="form-label">Barva</label>
-          <select className="form-select" value={form.color} onChange={(event) => onChange("color", event.target.value)}>
-            {THEME_COLOR_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
+          <input className="form-control form-control-color" type="color" value={colorPickerValue(form.color)} onChange={(event) => onChange("color", event.target.value)} title="Vyber barvu příznaku" />
         </div>
         <div className="col-12">
           <label className="form-label">Popis</label>

@@ -5,10 +5,10 @@ export const normalizeCollection = (payload) => {
 
 export const buildPostDraftPayload = (post, form) => ({
   title: form.title.trim(),
-  slug: form.slug || undefined,
-  excerpt: form.excerpt || null,
+  excerpt: null,
   body: form.body || null,
   cover_media_id: form.cover_media_id ? Number(form.cover_media_id) : null,
+  event_id: form.event_id ? Number(form.event_id) : null,
   published: false,
   seo_title: post.seo_title ?? null,
   meta_description: post.meta_description ?? null,

@@ -73,13 +73,6 @@ class InventoryHistoryAction(str, Enum):
     PHOTO_REMOVED = "photo_removed"
 
 
-class InventoryEventStatus(str, Enum):
-    PLANNED = "planned"
-    ACTIVE = "active"
-    COMPLETED = "completed"
-    ARCHIVED = "archived"
-
-
 class User(Base):
     __tablename__ = "users"
 
@@ -146,11 +139,6 @@ class User(Base):
         back_populates="actor",
         foreign_keys="InventoryHistory.actor_id",
     )
-    inventory_event_scans = relationship(
-        "InventoryEventScan",
-        back_populates="actor",
-        foreign_keys="InventoryEventScan.actor_id",
-    )
     permission_groups = relationship(
         "PermissionGroup",
         secondary="user_permission_groups",
@@ -194,11 +182,6 @@ class Team(Base):
     )
     inventory_items = relationship(
         "InventoryItem",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
-    inventory_events = relationship(
-        "InventoryEvent",
         back_populates="team",
         cascade="all, delete-orphan",
     )
@@ -417,6 +400,23 @@ class StaticPage(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class InventorySet(Base):
+    __tablename__ = "inventory_sets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    flag_id = Column(Integer, ForeignKey("inventory_flags.id", ondelete="SET NULL"), nullable=True, index=True)
+    default_location = Column(String(200), nullable=True)
+    current_location = Column(String(200), nullable=True)
+    status = Column(SAEnum(InventoryItemStatus), nullable=False, default=InventoryItemStatus.AVAILABLE)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    items = relationship("InventoryItem", back_populates="inventory_set")
+
+
 class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
@@ -426,6 +426,7 @@ class InventoryItem(Base):
     description = Column(Text, nullable=True)
     category = Column(String(120), nullable=True, index=True)
     flag_id = Column(Integer, ForeignKey("inventory_flags.id", ondelete="SET NULL"), nullable=True, index=True)
+    set_id = Column(Integer, ForeignKey("inventory_sets.id", ondelete="SET NULL"), nullable=True, index=True)
     quantity = Column(Integer, nullable=False, default=1)
     quantity_unit = Column(String(32), nullable=False, default="ks")
     default_location = Column(String(200), nullable=True)
@@ -438,6 +439,7 @@ class InventoryItem(Base):
 
     team = relationship("Team", back_populates="inventory_items")
     flag = relationship("InventoryFlag", back_populates="items")
+    inventory_set = relationship("InventorySet", back_populates="items")
     photos = relationship(
         "InventoryPhoto",
         back_populates="item",
@@ -456,18 +458,12 @@ class InventoryItem(Base):
         cascade="all, delete-orphan",
         order_by="InventoryLoan.borrowed_at.desc()",
     )
-    event_assignments = relationship(
-        "InventoryEventItem",
+    locations = relationship(
+        "InventoryItemLocation",
         back_populates="item",
         cascade="all, delete-orphan",
+        order_by="InventoryItemLocation.location.asc()",
     )
-    scans = relationship(
-        "InventoryEventScan",
-        back_populates="item",
-        cascade="all, delete-orphan",
-    )
-
-
 class InventoryPhoto(Base):
     __tablename__ = "inventory_photos"
 
@@ -481,53 +477,16 @@ class InventoryPhoto(Base):
     item = relationship("InventoryItem", back_populates="photos")
 
 
-class InventoryEvent(Base):
-    __tablename__ = "inventory_events"
+class InventoryItemLocation(Base):
+    __tablename__ = "inventory_item_locations"
+    __table_args__ = (UniqueConstraint("item_id", "location", name="uq_inventory_item_location"),)
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
-    name = Column(String(200), nullable=False, index=True)
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
-    note = Column(Text, nullable=True)
-    status = Column(SAEnum(InventoryEventStatus), nullable=False, default=InventoryEventStatus.PLANNED)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
-
-    team = relationship("Team", back_populates="inventory_events")
-    items = relationship(
-        "InventoryEventItem",
-        back_populates="event",
-        cascade="all, delete-orphan",
-        order_by="InventoryEventItem.id.desc()",
-    )
-    history_entries = relationship("InventoryHistory", back_populates="event")
-    scans = relationship(
-        "InventoryEventScan",
-        back_populates="event",
-        cascade="all, delete-orphan",
-        order_by="InventoryEventScan.created_at.desc()",
-    )
-
-
-class InventoryEventItem(Base):
-    __tablename__ = "inventory_event_items"
-    __table_args__ = (
-        UniqueConstraint("event_id", "item_id", name="uq_inventory_event_item"),
-    )
-
-    id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("inventory_events.id", ondelete="CASCADE"), nullable=False, index=True)
     item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True)
-    planned_quantity = Column(Integer, nullable=False, default=1)
-    returned_quantity = Column(Integer, nullable=False, default=0)
-    damaged_quantity = Column(Integer, nullable=False, default=0)
-    note = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    location = Column(String(200), nullable=False)
+    quantity = Column(Integer, nullable=False, default=0)
 
-    event = relationship("InventoryEvent", back_populates="items")
-    item = relationship("InventoryItem", back_populates="event_assignments")
+    item = relationship("InventoryItem", back_populates="locations")
 
 
 class InventoryLoan(Base):
@@ -540,6 +499,7 @@ class InventoryLoan(Base):
     due_at = Column(DateTime, nullable=True)
     returned_at = Column(DateTime, nullable=True)
     quantity = Column(Integer, nullable=False, default=1)
+    source_location = Column(String(200), nullable=True)
     note = Column(Text, nullable=True)
     item = relationship("InventoryItem", back_populates="loans")
 
@@ -549,35 +509,16 @@ class InventoryHistory(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True)
-    event_id = Column(Integer, ForeignKey("inventory_events.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Legacy audit records retain their former event identifier only as a scalar;
+    # actions are no longer part of the inventory domain.
+    event_id = Column(Integer, nullable=True, index=True)
     actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     action = Column(SAEnum(InventoryHistoryAction), nullable=False, index=True)
     payload = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
 
     item = relationship("InventoryItem", back_populates="history_entries")
-    event = relationship("InventoryEvent", back_populates="history_entries")
     actor = relationship("User", back_populates="inventory_history_entries")
-
-
-class InventoryEventScan(Base):
-    __tablename__ = "inventory_event_scans"
-
-    id = Column(Integer, primary_key=True, index=True)
-    event_id = Column(Integer, ForeignKey("inventory_events.id", ondelete="CASCADE"), nullable=False, index=True)
-    item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="SET NULL"), nullable=True, index=True)
-    actor_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    qr_identifier = Column(String(64), nullable=False, index=True)
-    result = Column(String(32), nullable=False, default="returned")
-    condition = Column(String(32), nullable=True)
-    note = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-
-    event = relationship("InventoryEvent", back_populates="scans")
-    item = relationship("InventoryItem", back_populates="scans")
-    actor = relationship("User", back_populates="inventory_event_scans")
-
-
 class InventoryLabelTemplate(Base):
     __tablename__ = "inventory_label_templates"
 
@@ -586,13 +527,8 @@ class InventoryLabelTemplate(Base):
     name = Column(String(200), nullable=False)
     width_mm = Column(Float, nullable=False, default=62)
     height_mm = Column(Float, nullable=False, default=29)
-    qr_x_mm = Column(Float, nullable=False, default=3)
-    qr_y_mm = Column(Float, nullable=False, default=3)
     qr_size_mm = Column(Float, nullable=False, default=18)
-    title_font_size = Column(Float, nullable=False, default=14)
-    meta_font_size = Column(Float, nullable=False, default=9)
     fields = Column(JSON, nullable=False, default=list)
-    latex_template = Column(Text, nullable=True)  # LaTeX template with {{field}} placeholders
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -790,7 +726,7 @@ class ScoutEvent(Base):
     audience = Column(String(20), nullable=False, default="members")
     requires_planned = Column(Boolean, nullable=False, default=False)
     planned_deadline = Column(DateTime, nullable=True)
-    is_public = Column(Boolean, nullable=False, default=False)
+    is_public = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -858,19 +794,6 @@ class MemberStatus(str, Enum):
     ALUMNI = "alumni"
 
 
-class MemberGender(str, Enum):
-    MALE = "male"
-    FEMALE = "female"
-    OTHER = "other"
-
-
-class MemberRelationshipType(str, Enum):
-    PARENT = "parent"
-    GUARDIAN = "guardian"
-    SIBLING = "sibling"
-    OTHER = "other"
-
-
 class MemberTag(Base):
     __tablename__ = "member_tags"
     __table_args__ = (
@@ -889,42 +812,12 @@ class MemberProfile(Base):
     __tablename__ = "member_profiles"
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    phone = Column(String(32), nullable=True)
-    birth_date = Column(Date, nullable=True)
-    gender = Column(SAEnum(MemberGender), nullable=True)
-    address = Column(String(255), nullable=True)
-    city = Column(String(120), nullable=True)
-    zip = Column(String(16), nullable=True)
-    parent_name = Column(String(150), nullable=True)
-    parent_phone = Column(String(32), nullable=True)
-    parent_email = Column(String(255), nullable=True)
-    emergency_name = Column(String(150), nullable=True)
-    emergency_phone = Column(String(32), nullable=True)
     joined_at = Column(Date, nullable=True)
     member_status = Column(SAEnum(MemberStatus), nullable=False, default=MemberStatus.ACTIVE)
-    medical_note = Column(Text, nullable=True)
-    uniform_size = Column(String(32), nullable=True)
-    scout_number = Column(String(32), nullable=True)
-    data_consent_at = Column(Date, nullable=True)
-    photo_consent_at = Column(Date, nullable=True)
-    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     user = relationship("User", back_populates="member_profile")
-
-
-class MemberRelationship(Base):
-    __tablename__ = "member_relationships"
-
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    related_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    type = Column(SAEnum(MemberRelationshipType), nullable=False, default=MemberRelationshipType.OTHER)
-    note = Column(String(255), nullable=True)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-
-    related_user = relationship("User", foreign_keys=[related_user_id])
 
 
 class MemberNote(Base):
@@ -1018,6 +911,7 @@ class WebPost(Base):
     excerpt = Column(String(500), nullable=True)
     body = Column(Text, nullable=True)
     cover_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    event_id = Column(Integer, ForeignKey("scout_events.id", ondelete="SET NULL"), nullable=True, index=True)
     published = Column(Boolean, nullable=False, default=False)
     draft_version = Column(Integer, nullable=False, default=1)
     published_revision_id = Column(
@@ -1038,6 +932,7 @@ class WebPost(Base):
 
     created_by = relationship("User", foreign_keys=[created_by_id])
     cover = relationship("WebMedia", foreign_keys=[cover_media_id])
+    event = relationship("ScoutEvent", foreign_keys=[event_id])
 
 
 class WebPostRevision(Base):
@@ -1053,6 +948,7 @@ class WebPostRevision(Base):
     excerpt = Column(String(500), nullable=True)
     body = Column(Text, nullable=True)
     cover_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    event_id = Column(Integer, ForeignKey("scout_events.id", ondelete="SET NULL"), nullable=True)
     compiled_html = Column(Text, nullable=True)
     revision_number = Column(Integer, nullable=True)
     source_version = Column(Integer, nullable=False, default=1)

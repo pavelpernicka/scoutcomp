@@ -83,7 +83,7 @@ def test_qr_identifier_stays_stable_after_rename(client, db_session):
     assert fetched.json()["name"] == "Velká sekera"
 
 
-def test_inventory_loan_event_and_return_scan_flow(client, db_session):
+def test_inventory_loan_return_and_qr_lookup_flow(client, db_session):
     team_alpha, _team_beta, admin, _group_admin = _seed_inventory_scope(db_session)
     created = client.post(
         "/inventory/items",
@@ -108,29 +108,68 @@ def test_inventory_loan_event_and_return_scan_flow(client, db_session):
     assert loan.json()["open_loan_quantity"] == 2
     assert loan.json()["available_quantity"] == 4
 
-    event = client.post(
-        "/inventory/events",
-        json={"team_id": team_alpha.id, "name": "Tábor 2026", "status": "planned"},
+    too_low = client.patch(
+        f"/inventory/items/{item['id']}",
+        json={"quantity": 1},
         headers=_auth_headers_for_user(admin),
     )
-    assert event.status_code == 201
-    event_id = event.json()["id"]
+    assert too_low.status_code == 400
 
-    assigned = client.post(
-        f"/inventory/events/{event_id}/items",
-        json={"item_id": item["id"], "planned_quantity": 3},
+    scanned = client.get(
+        f"/inventory/qr/{item['qr_identifier']}",
         headers=_auth_headers_for_user(admin),
     )
-    assert assigned.status_code == 200
-    assert len(assigned.json()["items"]) == 1
+    assert scanned.status_code == 200
+    assert scanned.json()["id"] == item["id"]
 
-    scan = client.post(
-        f"/inventory/events/{event_id}/scan-return",
-        json={"qr_identifier": item["qr_identifier"]},
+    loan_id = next(loan["id"] for loan in loan.json()["loans"] if not loan["returned_at"])
+    returned = client.post(
+        f"/inventory/loans/{loan_id}/return",
         headers=_auth_headers_for_user(admin),
     )
-    assert scan.status_code == 200
-    body = scan.json()
-    assert body["items"][0]["returned_quantity"] == 1
-    assert len(body["summary"]["returned"]) == 1
-    assert len(body["summary"]["missing"]) == 1
+    assert returned.status_code == 200
+    assert returned.json()["open_loan_quantity"] == 0
+
+    removed_endpoint = client.get("/inventory/events", headers=_auth_headers_for_user(admin))
+    assert removed_endpoint.status_code == 404
+
+
+def test_inventory_item_keeps_location_quantities_in_sync_after_return(client, db_session):
+    team_alpha, _team_beta, admin, _group_admin = _seed_inventory_scope(db_session)
+    headers = _auth_headers_for_user(admin)
+    created = client.post(
+        "/inventory/items",
+        json={
+            "team_id": team_alpha.id,
+            "name": "Podsada",
+            "quantity": 6,
+            "locations": [
+                {"location": "Sklad A", "quantity": 2},
+                {"location": "Sklad B", "quantity": 4},
+            ],
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    item = created.json()
+
+    loaned = client.post(
+        f"/inventory/items/{item['id']}/loans",
+        json={"borrower_name": "Kuba", "quantity": 3, "location": "Sklad B"},
+        headers=headers,
+    )
+    assert loaned.status_code == 201
+    assert {entry["location"]: entry["quantity"] for entry in loaned.json()["locations"]} == {"Sklad A": 2, "Sklad B": 1}
+
+    loan_id = next(loan["id"] for loan in loaned.json()["loans"] if not loan["returned_at"])
+    returned = client.post(f"/inventory/loans/{loan_id}/return", headers=headers)
+    assert returned.status_code == 200
+    locations = returned.json()["locations"]
+    assert {entry["location"]: entry["quantity"] for entry in locations} == {"Sklad A": 2, "Sklad B": 4}
+
+    updated = client.patch(
+        f"/inventory/items/{item['id']}",
+        json={"name": "Podsada velká", "locations": locations},
+        headers=headers,
+    )
+    assert updated.status_code == 200

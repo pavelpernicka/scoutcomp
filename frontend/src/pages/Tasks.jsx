@@ -14,6 +14,7 @@ import Modal from "../components/Modal";
 
 const COOLDOWN_MS = 5000;
 const MAX_PREVIEW_LENGTH = 220;
+const EMPTY_TASKS = [];
 
 marked.setOptions({ breaks: true });
 
@@ -77,7 +78,7 @@ export default function TasksPage() {
   const [cooldownTick, setCooldownTick] = useState(Date.now());
 
   const {
-    data: tasks = [],
+    data: tasksData,
     isLoading,
     isError,
     error,
@@ -90,6 +91,7 @@ export default function TasksPage() {
     enabled: Boolean(profile),
     retry: 1,
   });
+  const tasks = tasksData ?? EMPTY_TASKS;
 
   const submissionMutation = useMutation({
     mutationFn: async ({ taskId, count, note, variantId }) => {
@@ -161,12 +163,14 @@ export default function TasksPage() {
   useEffect(() => {
     setExpandedDescriptions((prev) => {
       const next = { ...prev };
+      let changed = false;
       tasks.forEach((task) => {
         if (!(task.id in next)) {
           next[task.id] = false;
+          changed = true;
         }
       });
-      return next;
+      return changed ? next : prev;
     });
   }, [tasks]);
 

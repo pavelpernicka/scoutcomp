@@ -8,6 +8,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import UserAvatar from "../../components/UserAvatar";
 import Modal from "../../components/Modal";
 import { useAuth } from "../../providers/AuthProvider";
+import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
 
 const PAGE_SIZE = 50;
 
@@ -53,6 +54,14 @@ export default function MembersDirectory() {
     return () => clearTimeout(timeout);
   }, [feedback]);
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setQuery(search.trim());
+      setPage(0);
+    }, 180);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
   const { data: teams = [] } = useQuery({
     queryKey: ["members", "teams"],
     queryFn: async () => {
@@ -82,15 +91,6 @@ export default function MembersDirectory() {
       return data;
     },
     staleTime: 10_000,
-  });
-
-  const { data: stats } = useQuery({
-    queryKey: ["members", "stats"],
-    queryFn: async () => {
-      const { data } = await api.get("/members/stats");
-      return data;
-    },
-    staleTime: 30_000,
   });
 
   const createMutation = useMutation({
@@ -142,11 +142,6 @@ export default function MembersDirectory() {
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [items]);
-
-  const submitFilters = () => {
-    setQuery(search.trim());
-    setPage(0);
-  };
 
   const resetFilters = () => {
     setSearch("");
@@ -210,13 +205,6 @@ export default function MembersDirectory() {
     }
   };
 
-  const statsCards = [
-    { key: "total", icon: "fa-users", label: t("members.total"), value: stats?.total ?? 0, badge: "bg-primary" },
-    { key: "active", icon: "fa-user-check", label: t("members.statusActive"), value: stats?.by_status?.active ?? 0, badge: "bg-success" },
-    { key: "inactive", icon: "fa-user-slash", label: t("members.statusInactive"), value: stats?.by_status?.inactive ?? 0, badge: "bg-secondary" },
-    { key: "alumni", icon: "fa-user-graduate", label: t("members.statusAlumni"), value: stats?.by_status?.alumni ?? 0, badge: "bg-info" },
-  ];
-
   return (
     <>
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
@@ -249,24 +237,6 @@ export default function MembersDirectory() {
 
       {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
 
-      <div className="row g-3 mb-4">
-        {statsCards.map((card) => (
-          <div className="col-6 col-xl-3" key={card.key}>
-            <div className="card shadow-sm h-100">
-              <div className="card-body d-flex align-items-center gap-3">
-                <span className={`${card.badge} badge rounded-pill p-3`}>
-                  <i className={`fas ${card.icon} fs-5`}></i>
-                </span>
-                <div>
-                  <div className="fs-4 fw-bold">{card.value}</div>
-                  <div className="text-muted small">{card.label}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div className="card shadow-sm mb-4">
         <div className="card-body">
           <div className="row g-2 align-items-end">
@@ -279,11 +249,9 @@ export default function MembersDirectory() {
                   placeholder={t("members.searchPlaceholder")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitFilters()}
+                  onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
                 />
-                <button type="button" className="btn btn-primary" onClick={submitFilters}>
-                  <i className="fas fa-magnifying-glass"></i>
-                </button>
+                <span className="input-group-text text-muted"><i className="fas fa-magnifying-glass" /></span>
               </div>
             </div>
             <div className="col-6 col-md-3">
@@ -349,9 +317,7 @@ export default function MembersDirectory() {
                   <th>{t("members.team")}</th>
                   <th>{t("members.status")}</th>
                   <th>{t("members.email")}</th>
-                  <th>{t("members.phone")}</th>
-                  <th>{t("members.age")}</th>
-                  <th>{t("members.memberSince")}</th>
+                  <th>{t("members.yearsInGroup")}</th>
                   <th>{t("members.tags")}</th>
                 </tr>
               </thead>
@@ -378,9 +344,7 @@ export default function MembersDirectory() {
                       </span>
                     </td>
                     <td>{member.email ? <a className="text-decoration-none" href={`mailto:${member.email}`}>{member.email}</a> : <span className="text-muted">—</span>}</td>
-                    <td>{member.phone || <span className="text-muted">—</span>}</td>
-                    <td>{member.age != null ? member.age : <span className="text-muted">—</span>}</td>
-                    <td>{member.joined_at || <span className="text-muted">—</span>}</td>
+                    <td>{member.years_in_group != null ? t("members.years", { count: member.years_in_group }) : <span className="text-muted">—</span>}</td>
                     <td>
                       {member.tags?.length ? (
                         <div className="d-flex flex-wrap gap-1">
@@ -450,7 +414,9 @@ export default function MembersDirectory() {
                 type="text"
                 className="form-control"
                 value={createForm.username}
-                onChange={(e) => setCreateForm((f) => ({ ...f, username: e.target.value }))}
+                pattern={USERNAME_PATTERN}
+                title={USERNAME_HELP}
+                onChange={(e) => setCreateForm((f) => ({ ...f, username: normalizeUsernameInput(e.target.value) }))}
                 required
               />
             </div>

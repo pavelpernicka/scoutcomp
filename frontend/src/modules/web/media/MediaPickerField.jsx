@@ -10,10 +10,10 @@ const mediaLabel = (value) => {
   return value.filename || value.alt || value.url || String(value.id || "");
 };
 
-export default function MediaPickerField({ value, onChange, disabled }) {
+export default function MediaPickerField({ value, onChange, disabled, className = "" }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  return <div className="web-prop-media-field">
+  return <div className={`web-prop-media-field ${className}`}>
     <button type="button" className="btn btn-sm btn-outline-secondary" disabled={disabled} onClick={() => setOpen(true)}>
       <i className="fas fa-images me-2" />{mediaLabel(value) || t("web.props.chooseMedia")}
     </button>
@@ -33,4 +33,5 @@ MediaPickerField.propTypes = {
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.object]),
   onChange: PropTypes.func.isRequired,
   disabled: PropTypes.bool,
+  className: PropTypes.string,
 };

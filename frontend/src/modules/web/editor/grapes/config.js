@@ -38,24 +38,13 @@ export const editorCanvasCss = (translate = (key) => key) => `
   text-align: center;
   pointer-events: none;
 }
-:where(div, section, article, header, footer, main, nav, aside):empty:not([data-sc-type]):not([aria-hidden="true"]) {
-  box-sizing: border-box !important;
-  position: relative !important;
-  min-height: 72px !important;
-  outline: 1px dashed rgba(104, 109, 204, .72) !important;
-  outline-offset: -1px !important;
-  background-color: rgba(104, 109, 204, .05) !important;
-}
-:where(div, section, article, header, footer, main, nav, aside):empty:not([data-sc-type]):not([aria-hidden="true"])::after {
-  content: ${cssContent(translate("web.editor.placeholder.contentSlot"))};
-  position: absolute;
-  inset: 8px;
+.sc-layout-columns {
   display: grid;
-  place-items: center;
-  color: #5b61b5;
-  font: 600 12px/1.4 system-ui, sans-serif;
-  text-align: center;
-  pointer-events: none;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 575px) {
+  .sc-layout-columns { grid-template-columns: 1fr; }
 }
 `;
 

@@ -38,6 +38,7 @@ SAFE_ATTRS = {
     "class", "colspan", "datetime", "height", "id", "loading", "rel", "role",
     "rowspan", "src", "srcset", "target", "title", "width",
 }
+MEDIA_ID = re.compile(r"^[1-9][0-9]{0,9}$")
 URL_ATTRS = {"href", "src"}
 SAFE_CSS_PROPERTIES = {
     "align-content", "align-items", "align-self", "background", "background-color",
@@ -75,6 +76,21 @@ SAFE_COLOR = re.compile(
 SAFE_LENGTH = re.compile(r"^(?:0|-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vw|vh|ch|vmin|vmax))$", re.I)
 SAFE_FONT = re.compile(r"^[A-Za-z0-9 '\",._-]{1,160}$")
 SLOT_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,49}$")
+# Builder primitives must render correctly even with a minimalist custom theme.
+# Authors can still override these classes in their own theme/resource CSS.
+BUILDER_LAYOUT_CSS = (
+    ".sc-layout-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}"
+    "@media (max-width:575px){.sc-layout-columns{grid-template-columns:1fr}}"
+    ".sc-menu,.sc-menu ul{margin:0;padding:0;list-style:none}"
+    ".sc-menu-list{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem}"
+    ".sc-menu-item{position:relative}.sc-menu-link{display:block;padding:.45rem .65rem;text-decoration:none}"
+    ".sc-menu-dropdown{display:none;min-width:12rem;padding:.35rem;background:var(--sc-menu-surface,#fff);box-shadow:0 .5rem 1.25rem rgba(0,0,0,.16)}"
+    ".sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:absolute;z-index:20;left:0;top:100%}"
+    ".sc-menu-dropdown .sc-menu-dropdown{left:100%;top:0}"
+    ".sc-menu--footer .sc-menu-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.25rem 1rem}"
+    ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
+    "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
+)
 
 
 class CompileError(ValueError):
@@ -282,6 +298,11 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         result["name"] = name
     elif component_type == "sc-empty":
         pass
+    elif component_type == "sc-menu":
+        location = str(node.get("location") or "main").strip().lower()
+        if not re.fullmatch(r"[a-z][a-z0-9_-]{0,49}", location):
+            raise CompileError("Menu location is invalid")
+        result["location"] = location
     else:
         tag = (
             "main" if component_type == "wrapper" else
@@ -296,6 +317,14 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
                 raise CompileError("Component content must be text")
             result["content"] = str(content)[:MAX_TEXT]
         attributes = node.get("attributes") if isinstance(node.get("attributes"), dict) else {}
+        # The editor iframe uses a transient blob URL for authenticated media.
+        # A persisted GrapesJS document carries the stable media id alongside
+        # it; always compile that id back to the authenticated API URL.  The
+        # public renderer subsequently rewrites this to /media/{id}/file.
+        # This also repairs documents saved by earlier editor versions.
+        media_id = str(attributes.get("data-sc-media-id") or "").strip()
+        if media_id and MEDIA_ID.fullmatch(media_id):
+            attributes = {**attributes, "src": f"/api/web/media/{media_id}/file"}
         clean_attrs: dict[str, str] = {}
         class_value = node.get("classes") or attributes.get("class")
         if class_value:
@@ -519,6 +548,27 @@ def _rich_text(value: Any) -> str:
     return "<br>".join(escape(part) for part in _format_value(value, None).splitlines())
 
 
+def _render_menu_items(items: Any, *, level: int = 0) -> str:
+    """Render a validated menu tree without flattening child relationships."""
+    if not isinstance(items, (list, tuple)) or level > 8:
+        return ""
+    rows: list[str] = []
+    for item in items[:100]:
+        if not isinstance(item, dict):
+            continue
+        label = escape(_format_value(item.get("label"), None))
+        href = _safe_url(item.get("url")) or "#"
+        target = ' target="_blank" rel="noopener noreferrer"' if item.get("target") == "_blank" else ""
+        children = _render_menu_items(item.get("children"), level=level + 1)
+        rows.append(
+            '<li class="sc-menu-item">'
+            f'<a class="sc-menu-link" href="{escape(href, quote=True)}"{target}>{label}</a>'
+            + (f'<ul class="sc-menu-dropdown">{children}</ul>' if children else "")
+            + "</li>"
+        )
+    return "".join(rows)
+
+
 def _render_nodes(nodes: list[dict[str, Any]], state: _RenderState, context: Any, depth: int) -> str:
     return "".join(_render_node(node, state, context, depth) for node in nodes)
 
@@ -551,6 +601,15 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
         return _rich_text(value) if node.get("mode") == "richText" else escape(_format_value(value, node["binding"].get("format")))
     if component_type == "sc-empty":
         return _render_nodes(node.get("components", []), state, context, depth + 1)
+    if component_type == "sc-menu":
+        location = node.get("location", "main")
+        items = state.resolve_source("web.menu", {"location": location})
+        rendered_items = _render_menu_items(items)
+        if not rendered_items:
+            return ""
+        modifier = " sc-menu--footer" if location == "footer" else ""
+        label = "Patičkové menu" if location == "footer" else "Navigace"
+        return f'<nav class="sc-menu{modifier}" aria-label="{label}"><ul class="sc-menu-list">{rendered_items}</ul></nav>'
     if component_type == "sc-template-part":
         resource_id = str(node["resourceId"])
         if resource_id in state.parts or len(state.parts) >= 12:
@@ -700,7 +759,7 @@ def has_runtime_bindings(node: dict[str, Any]) -> bool:
         if not isinstance(item, dict):
             continue
         component_type = str(item.get("type") or "default")
-        if component_type in {"sc-repeat", "sc-condition", "sc-template-part", "sc-global-part", "sc-slot"}:
+        if component_type in {"sc-repeat", "sc-condition", "sc-menu", "sc-template-part", "sc-global-part", "sc-slot"}:
             return True
         if component_type == "sc-bind":
             binding = item.get("binding") or {}
@@ -821,6 +880,6 @@ def render_document(
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         f'<meta name="description" content="{escape(description, quote=True)}">'
-        f"{robots}{canonical}<style>{root_css}{base_css}{css}</style></head>"
+        f"{robots}{canonical}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
         f"<body>{body}</body></html>"
     )

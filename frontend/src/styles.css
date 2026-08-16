@@ -330,3 +330,57 @@ span:has(.flip_vert) {
 .calendar-list-item {
   transition: background-color 0.12s ease;
 }
+
+/* CMS article editor (Tiptap/ProseMirror). */
+.article-editbox-content .ProseMirror {
+  min-height: 16rem;
+  padding: 0.85rem 1rem;
+  outline: 0;
+}
+
+.article-editbox-content .ProseMirror > :first-child { margin-top: 0; }
+.article-editbox-content .ProseMirror > :last-child { margin-bottom: 0; }
+.article-editbox-content .ProseMirror p { margin-bottom: 0.85rem; }
+.article-editbox-content .ProseMirror blockquote { border-left: 3px solid #9ca3af; color: #4b5563; margin: 1rem 0; padding-left: 1rem; }
+.article-editbox-content .ProseMirror ul, .article-editbox-content .ProseMirror ol { padding-left: 1.5rem; }
+
+/* Member-facing posts and dashboard feed. */
+.dashboard-post-card { border-bottom: 1px solid var(--bs-border-color, #dee2e6); min-height: 0; }
+.dashboard-post-card:last-child { border-bottom: 0; }
+.dashboard-post-cover { width: 35%; min-height: 180px; height: auto; object-fit: cover; display: block; flex: 0 0 35%; }
+.dashboard-post-content { min-width: 0; }
+.dashboard-post-title { font-size: clamp(1.28rem, 2.4vw, 2rem); line-height: 1.15; letter-spacing: -.02em; font-weight: 750; }
+.dashboard-post-placeholder { display: grid; place-items: center; background: #e8f2ed; color: #527063; font-size: 1.75rem; }
+.dashboard-post-excerpt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.post-list-cover { height: 190px; object-fit: cover; display: block; }
+.post-list-card { transition: box-shadow .15s ease, transform .15s ease; }
+.post-list-card:hover { box-shadow: 0 .5rem 1.25rem rgba(28, 60, 46, .12) !important; transform: translateY(-2px); }
+.post-reading article { max-width: 760px; }
+.post-reading-header h1 { font-size: clamp(2rem, 4vw, 3.25rem); letter-spacing: -.025em; }
+.post-reading-cover { max-height: 440px; object-fit: cover; border-radius: .5rem; }
+.post-reading-body { font-size: 1.075rem; line-height: 1.8; }
+.post-reading-body > * + * { margin-top: 1rem; }
+.post-reading-body h2, .post-reading-body h3 { margin-top: 2rem; line-height: 1.25; }
+.post-event-info { background: #f2f8f5; border-color: #bfdbc9 !important; }
+.post-event-icon { width: 2.5rem; height: 2.5rem; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #198754; flex: 0 0 auto; }
+.event-month-calendar { overflow: hidden; width: 100%; }
+.event-month-calendar .calendar-event-bar { max-width: 100%; font-size: .68rem !important; }
+.dashboard-primary-row > [class*="col-"] { display: flex; }
+.dashboard-primary-row > [class*="col-"] > .card { width: 100%; }
+.dashboard-message-list { max-height: 610px; overflow-y: auto; }
+.dashboard-message-row { border-bottom: 1px solid var(--bs-border-color, #dee2e6); min-height: 68px; }
+.dashboard-message-row:last-child { border-bottom: 0; }
+.dashboard-message-unread { background: #eef8f3; box-shadow: inset 3px 0 #198754; }
+.member-search-picker-results { max-height: 17rem; overflow-y: auto; }
+@media (max-width: 991.98px) {
+  .dashboard-post-cover { width: 100%; min-height: 200px; height: 200px; flex-basis: auto; }
+  .dashboard-message-list { max-height: none; }
+}
+@media (max-width: 767.98px) {
+  .post-reading { padding-left: 1rem; padding-right: 1rem; }
+  .event-month-calendar .calendar-day { height: 72px !important; }
+  .event-month-calendar .calendar-event-bar { padding: 0 2px !important; font-size: .58rem !important; }
+}
+.widget-event-row, .widget-event-row > * { min-width: 0; }
+.widget-event-row .btn-group { flex-wrap: wrap; }
+.widget-event-row .btn { white-space: nowrap; }

@@ -25,6 +25,8 @@ from ..dependencies import get_current_active_user, get_db
 from ..models import (
     Config,
     RegisteredModule,
+    ScoutAttendance,
+    ScoutEvent,
     User,
     WebMedia,
     WebMediaFolder,
@@ -66,7 +68,7 @@ from ..web.pages import (
     validate_template_usage,
 )
 from ..web.renderer import CompileError, compile_project, render_document, render_project
-from ..web_render import render_markdown
+from ..web_render import render_article_body
 
 COMPONENT_TAG = "scoutcomp-web-component"
 MAX_MEDIA_SIZE = 10 * 1024 * 1024
@@ -138,7 +140,12 @@ def _require_manage(db: Session, user: User) -> None:
 
 
 def _require_action(db: Session, user: User, action: str) -> None:
-    """Enforce a granular CMS action (coarse web.manage may imply it)."""
+    """Enforce an explicit CMS action.
+
+    Cross-module compatibility must be handled by the route that owns the
+    resource.  In particular, ``web.publish`` also grants page publication and
+    must never be implied by the narrower post-publishing permission.
+    """
     if action not in permission_keys(db, user):
         raise HTTPException(403, f"Missing {action}")
 

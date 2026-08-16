@@ -14,7 +14,7 @@ import EditorRail from "./EditorRail";
 import EditorTopbar from "./EditorTopbar";
 import PreviewDialog from "./PreviewDialog";
 import RevisionsDialog from "./RevisionsDialog";
-import { detachLinkedResource, filterCatalogResources, insertLinkedResource } from "./resourceBlocks";
+import { detachLinkedResource, filterCatalogResources, insertLinkedResource, linkedResourceInstance } from "./resourceBlocks";
 import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
@@ -50,7 +50,7 @@ export default function WebEditorPage() {
   const [previewError, setPreviewError] = useState("");
   const [publishedNotice, setPublishedNotice] = useState("");
   const [revisionsOpen, setRevisionsOpen] = useState(false);
-  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [mediaPickerTarget, setMediaPickerTarget] = useState(null); // null | "insert" | GrapesJS image component
 
   const pageQuery = useQuery({ queryKey: ["web", "page", pageId], queryFn: () => cmsApi.getPageEditorData(pageId).then((data) => normalizePage({ ...data, project_data: data.project_data || data.data })), enabled: Number.isFinite(pageId) });
   const pagesQuery = useQuery({ queryKey: ["web", "pages"], queryFn: cmsApi.listPages });
@@ -80,6 +80,22 @@ export default function WebEditorPage() {
     TEMPLATE_USAGE_MODES.linkedLayout,
   );
   const canvasStyles = canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [];
+  const editorBlocks = useMemo(() => [
+    ...components.map((item) => ({
+      id: `sc-resource-component-${item.id}`,
+      label: item.name,
+      category: t("web.editor.catalog.components"),
+      content: linkedResourceInstance(item, "component"),
+      attributes: { title: item.description || item.name },
+    })),
+    ...sections.map((item) => ({
+      id: `sc-resource-section-${item.id}`,
+      label: item.name,
+      category: t("web.editor.catalog.sections"),
+      content: linkedResourceInstance(item, "section"),
+      attributes: { title: item.description || item.name },
+    })),
+  ], [components, sections, t]);
   const templateCSSQuery = useQuery({
     queryKey: ["web", "template", page?.template_id],
     queryFn: () => cmsApi.getTemplate(page.template_id).then((tpl) => tpl?.published_css || tpl?.css || ""),
@@ -94,7 +110,7 @@ export default function WebEditorPage() {
     legacyHtml: page?.html || "",
     legacyCss: page?.draft_css || "",
     dataSources,
-    blocks: EMPTY,
+    blocks: editorBlocks,
     translate: t,
     language: i18n.language,
     loadKey: page ? `${page.id}:${page.draft_version}:${page.template_id || "none"}` : undefined,
@@ -132,11 +148,45 @@ export default function WebEditorPage() {
       if (cancelled) return;
       const assets = results.filter(Boolean).map((item) => ({ src: item.blobUrl, name: item.filename, attributes: { alt: item.alt || "" } }));
       if (editor.editorRef.current && assets.length) {
-        editor.editorRef.current.AssetManager.add(assets);
+        const instance = editor.editorRef.current;
+        instance.AssetManager.add(assets);
+        const previewById = new Map(results.filter(Boolean).map((item) => [String(item.id), item.blobUrl]));
+        const replacePersistedMediaUrls = (component) => {
+          const mediaId = component?.getAttributes?.()?.["data-sc-media-id"];
+          const previewUrl = previewById.get(String(mediaId || ""));
+          if (previewUrl) component.addAttributes?.({ src: previewUrl });
+          component?.components?.().forEach?.(replacePersistedMediaUrls);
+        };
+        replacePersistedMediaUrls(instance.getWrapper?.());
       }
     });
     return () => { cancelled = true; };
   }, [editor.editorRef, mediaQuery.data]);
+
+  useEffect(() => {
+    const instance = editor.editorRef.current;
+    const definitions = [...components, ...sections].filter((item) => item.preview_url);
+    if (!instance || definitions.length === 0) return undefined;
+    let cancelled = false;
+    Promise.all(definitions.map(async (item) => {
+      try {
+        const { data } = await api.get(item.preview_url.replace(/^\/api\//, "/"), { responseType: "blob" });
+        return [String(item.qualified_key || item.id), URL.createObjectURL(data)];
+      } catch { return null; }
+    })).then((entries) => {
+      if (cancelled) return;
+      const previews = new Map(entries.filter(Boolean));
+      const apply = (component) => {
+        if (component?.get?.("type") === "sc-resource-instance") {
+          const url = previews.get(String(component.get("resourceId") || ""));
+          if (url && component.get("previewUrl") !== url) component.set("previewUrl", url, { avoidStore: true });
+        }
+        component?.components?.().forEach?.(apply);
+      };
+      apply(instance.getWrapper?.());
+    });
+    return () => { cancelled = true; };
+  }, [activeThemeVersionId, componentsQuery.data, editor.editorRef, sectionsQuery.data]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -181,8 +231,10 @@ export default function WebEditorPage() {
     setPageForm(next);
     autosave.schedule();
   };
+  const openMediaPicker = useCallback((target = "insert") => setMediaPickerTarget(target), []);
   const handleMediaSelect = useCallback(async (mediaItem) => {
-    setMediaPickerOpen(false);
+    const target = mediaPickerTarget;
+    setMediaPickerTarget(null);
     const instance = editor.editorRef.current;
     if (!instance) return;
     if (mediaItem.is_image || (mediaItem.mime && mediaItem.mime.startsWith("image/"))) {
@@ -192,13 +244,22 @@ export default function WebEditorPage() {
         const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
         src = URL.createObjectURL(data);
       } catch { /* fall back to raw URL (broken icon if auth-required) */ }
+      const attributes = {
+        // Keep a blob URL only in the currently-open authenticated canvas.
+        // The renderer derives the durable public URL from data-sc-media-id.
+        src,
+        alt: mediaItem.alt || "",
+        "data-sc-media-id": String(mediaItem.id),
+      };
+      if (target && target !== "insert" && target.get?.("type") === "image") {
+        target.addAttributes?.(attributes);
+        target.set?.("src", src);
+        autosaveRef.current?.schedule();
+        return;
+      }
       insertEditorComponents(instance, {
         type: "image",
-        attributes: {
-          src,
-          alt: mediaItem.alt || "",
-          "data-sc-media-id": String(mediaItem.id),
-        },
+        attributes,
       });
     } else {
       insertEditorComponents(instance, {
@@ -207,7 +268,34 @@ export default function WebEditorPage() {
         attributes: { href: mediaItem.url, target: "_blank", "data-sc-media-id": String(mediaItem.id) },
       });
     }
-  }, [editor.editorRef]);
+  }, [editor.editorRef, mediaPickerTarget]);
+
+  useEffect(() => {
+    const instance = editor.editorRef.current;
+    if (!instance || !editor.isReady) return undefined;
+    const command = "sc:select-media";
+    instance.Commands.add(command, {
+      run: (_editor, _sender, options = {}) => {
+        const component = options.component || instance.getSelected?.();
+        if (component?.get?.("type") === "image") openMediaPicker(component);
+      },
+    });
+    const addImageToolbarAction = (component) => {
+      if (component?.get?.("type") !== "image") return;
+      const toolbar = component.get?.("toolbar") || [];
+      if (toolbar.some((item) => item.command === command)) return;
+      component.set?.("toolbar", [...toolbar, {
+        attributes: { class: "fa fa-images", title: t("web.chooseFromMedia") },
+        command,
+      }]);
+    };
+    instance.on("component:selected", addImageToolbarAction);
+    addImageToolbarAction(instance.getSelected?.());
+    return () => {
+      instance.off("component:selected", addImageToolbarAction);
+      instance.Commands.remove(command);
+    };
+  }, [editor.editorRef, editor.isReady, openMediaPicker, t]);
   const changePageForm = (patch) => {
     const next = { ...pageRef.current, ...patch };
     pageRef.current = next;
@@ -324,7 +412,7 @@ export default function WebEditorPage() {
 
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
     <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
-    <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => setMediaPickerOpen(true)} />
+    <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => openMediaPicker()} />
     <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
     <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} />
@@ -333,6 +421,6 @@ export default function WebEditorPage() {
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}
     {(preview !== null || previewMutation.isPending || previewError) && <PreviewDialog html={preview || ""} loading={previewMutation.isPending} error={previewError} device={device} onClose={closePreview} />}
     {revisionsOpen && <RevisionsDialog pageId={pageId} onClose={() => setRevisionsOpen(false)} />}
-    {mediaPickerOpen && <MediaPickerModal onSelect={handleMediaSelect} onClose={() => setMediaPickerOpen(false)} />}
+    {mediaPickerTarget && <MediaPickerModal title={t("web.chooseFromMedia")} onSelect={handleMediaSelect} onClose={() => setMediaPickerTarget(null)} />}
   </div>;
 }

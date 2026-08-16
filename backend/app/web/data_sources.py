@@ -114,6 +114,14 @@ class ResolveContext:
 
 Resolver = Callable[[Session, Mapping[str, Any], ResolveContext], Mapping[str, Any] | Sequence[Mapping[str, Any]] | None]
 
+# Stored editor documents from before the ownership move retain their original
+# source IDs.  Resolve those IDs as Core content while exposing only the new
+# canonical IDs in authoring catalogues.
+_SOURCE_ALIASES = {
+    "web.posts": "core.posts",
+    "web.media": "core.media",
+}
+
 
 @dataclass(frozen=True)
 class WebDataSourceManifest:
@@ -215,6 +223,7 @@ def _project_record(record: Mapping[str, Any], fields: Mapping[str, PublicField]
 def _find_manifest(source_id: str) -> tuple[str, WebDataSourceManifest] | None:
     from ..modules import registry
 
+    source_id = _SOURCE_ALIASES.get(source_id, source_id)
     module_code, separator, local_id = source_id.partition(".")
     if not separator:
         return None
@@ -287,7 +296,8 @@ def resolve_data_source(
     cache: DataSourceCache | None = None,
 ) -> dict[str, Any] | list[dict[str, Any]] | None:
     """Validate, resolve, and project one enabled public source."""
-    found = _find_manifest(source_id)
+    canonical_source_id = _SOURCE_ALIASES.get(source_id, source_id)
+    found = _find_manifest(canonical_source_id)
     if found is None:
         raise DataSourceUnavailableError(f"Unknown data source '{source_id}'")
     module_code, manifest = found
@@ -296,7 +306,7 @@ def resolve_data_source(
     validated = validate_parameters(manifest, params)
     resolve_context = context or ResolveContext()
     canonical_params = json.dumps(validated, sort_keys=True, separators=(",", ":"), default=lambda value: value.isoformat())
-    cache_key = (source_id, canonical_params, resolve_context.cache_key)
+    cache_key = (canonical_source_id, canonical_params, resolve_context.cache_key)
     if cache is not None and cache_key in cache:
         return cache[cache_key]
     raw = manifest.resolver(db, validated, resolve_context)
@@ -395,7 +405,7 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     if params.get("to"):
         query = query.filter(ScoutEvent.starts_at <= params["to"])
     order = ScoutEvent.starts_at.desc() if params.get("sort") == "start_at_desc" else ScoutEvent.starts_at.asc()
-    events = query.order_by(order).limit(params.get("limit", 10)).all()
+    events = query.order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 10)).all()
     return [{
         "id": event.id,
         "title": event.title,
@@ -415,6 +425,7 @@ def _posts_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
         .filter(WebPost.deleted_at.is_(None), WebPostRevision.is_publication.is_(True))
         .order_by(order)
+        .offset(params.get("offset", 0))
         .limit(params.get("limit", 10))
         .all()
     )
@@ -440,7 +451,7 @@ def _media_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     if params.get("album"):
         query = query.filter(WebMedia.album == params["album"])
     order = WebMedia.created_at.asc() if params.get("sort") == "created_at_asc" else WebMedia.created_at.desc()
-    media = query.order_by(order).limit(params.get("limit", 24)).all()
+    media = query.order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 24)).all()
     return [{
         "id": item.id,
         "filename": item.filename,
@@ -475,6 +486,7 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
     parameters={
         "kind": QueryParameter("string", "Kind", choices=("meeting", "trip", "other")),
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
+        "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
         "from": QueryParameter("datetime", "From"),
         "to": QueryParameter("datetime", "To"),
         "sort": QueryParameter("string", "Sort", default="start_at_asc", choices=("start_at_asc", "start_at_desc")),
@@ -492,6 +504,7 @@ POSTS_DATA_SOURCE = WebDataSourceManifest(
     },
     parameters={
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
+        "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
         "sort": QueryParameter("string", "Sort", default="published_at_desc", choices=("published_at_asc", "published_at_desc")),
     }, resolver=_posts_source, cache_ttl_seconds=60,
     label_key="web.dataSources.posts.label", description_key="web.dataSources.posts.description",
@@ -508,6 +521,7 @@ MEDIA_DATA_SOURCE = WebDataSourceManifest(
     parameters={
         "album": QueryParameter("string", "Album"),
         "limit": QueryParameter("integer", "Limit", default=24, minimum=1, maximum=100),
+        "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
         "sort": QueryParameter("string", "Sort", default="created_at_desc", choices=("created_at_asc", "created_at_desc")),
     }, resolver=_media_source, cache_ttl_seconds=300,
     label_key="web.dataSources.media.label", description_key="web.dataSources.media.description",

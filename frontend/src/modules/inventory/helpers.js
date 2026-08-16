@@ -3,17 +3,8 @@ import { parseServerDate } from "../../utils/dateUtils";
 export const ITEM_PRESENCE_OPTIONS = [
   { value: "", label: "Vše" },
   { value: "available", label: "Dostupné" },
-  { value: "returned_elsewhere", label: "Navráceno jinam" },
   { value: "loaned", label: "Zapůjčeno" },
-  { value: "on_event", label: "Na akci" },
-];
-
-export const THEME_COLOR_OPTIONS = [
-  { value: "neutral", label: "Neutrální" },
-  { value: "match", label: "Zelená" },
-  { value: "mismatch", label: "Červená" },
-  { value: "loan", label: "Oranžová" },
-  { value: "event", label: "Modrá" },
+  { value: "sold_out", label: "Došlo" },
 ];
 
 const THEME_COLOR_STYLES = {
@@ -31,13 +22,6 @@ const THEME_COLOR_STYLES = {
   dark: { color: "#24324d", background: "#e9ecef", border: "#ced4da" },
 };
 
-export const EVENT_STATUS_OPTIONS = [
-  { value: "planned", label: "Plánovaná" },
-  { value: "active", label: "Probíhá" },
-  { value: "completed", label: "Ukončená" },
-  { value: "archived", label: "Archiv" },
-];
-
 export const LABEL_FIELD_OPTIONS = [
   { value: "name", label: "Název" },
   { value: "category", label: "Kategorie" },
@@ -51,12 +35,8 @@ export const LABEL_FIELD_OPTIONS = [
 export const INVENTORY_SCREENS = [
   { id: "items", label: "Věci", icon: "fas fa-box-open" },
   { id: "loans", label: "Vypůjčky", icon: "fas fa-handshake-angle" },
-  { id: "events", label: "Akce", icon: "fas fa-campground" },
   { id: "scanner", label: "Skener", icon: "fas fa-qrcode" },
-  { id: "labels", label: "Štítky", icon: "fas fa-tags" },
-  { id: "locations", label: "Lokace", icon: "fas fa-sitemap" },
-  { id: "categories", label: "Kategorie", icon: "fas fa-diagram-project" },
-  { id: "flags", label: "Příznaky", icon: "fas fa-palette" },
+  { id: "settings", label: "Nastavení skladu", icon: "fas fa-sliders" },
 ];
 
 export function getQrImageUrl(qrIdentifier) {
@@ -64,10 +44,8 @@ export function getQrImageUrl(qrIdentifier) {
 }
 
 export function getItemPresence(item) {
-  if ((item.active_event_quantity || 0) > 0 || item.current_event_name) return "on_event";
   if ((item.open_loan_quantity || 0) > 0) return "loaned";
-  const current = item.current_location || item.default_location || "";
-  if (current && item.default_location && current !== item.default_location) return "returned_elsewhere";
+  if ((item.available_quantity ?? item.quantity ?? 0) <= 0) return "sold_out";
   return "available";
 }
 
@@ -116,6 +94,12 @@ export function getItemFlagId(item) {
 }
 
 export function getItemFlagBadge(item) {
+  if ((item.open_loan_quantity || 0) > 0) {
+    return {
+      label: "Vypůjčeno",
+      style: buildColorStyle("loan", 0.15),
+    };
+  }
   if (item?.flag) {
     return {
       label: item.flag.name,
@@ -128,40 +112,41 @@ export function getItemFlagBadge(item) {
   };
 }
 
+export function formatInventoryFlagName(flag) {
+  return flag.name;
+}
+
 export function buildFlagFilterOptions(flags) {
   return [
     { value: "", label: "Vše", color: "neutral" },
-    ...flags.map((flag) => ({ value: String(flag.id), label: flag.name, color: flag.color })),
+    ...flags.map((flag) => ({ value: String(flag.id), label: formatInventoryFlagName(flag), color: flag.color })),
   ];
 }
 
 export function getItemStatusBadge(item) {
   const presence = getItemPresence(item);
-  if (presence === "on_event") return { label: "Na akci", className: "text-bg-info" };
   if (presence === "loaned") return { label: "Zapůjčeno", className: "text-bg-warning" };
-  if (presence === "returned_elsewhere") return { label: "Navráceno jinam", className: "text-bg-danger" };
+  if (presence === "sold_out") return { label: "Došlo", className: "text-bg-danger" };
   return { label: "Dostupné", className: "text-bg-success" };
 }
 
 export function getPresenceTone(presence) {
-  if (presence === "on_event") return "event";
   if (presence === "loaned") return "loan";
-  if (presence === "returned_elsewhere") return "mismatch";
+  if (presence === "sold_out") return "mismatch";
   return "match";
 }
 
 export function getItemCurrentLocation(item) {
-  if ((item.active_event_quantity || 0) > 0 || item.current_event_name) {
+  if ((item.locations || []).length > 1) {
     return {
-      label: item.current_event_name ? `Akce: ${item.current_event_name}` : item.current_location || "Na akci",
-      tone: "event",
+      label: `Více lokací (${item.locations.length})`,
+      tone: "match",
     };
   }
-  const openBorrowers = [...new Set((item.loans || []).filter((loan) => !loan.returned_at).map((loan) => loan.borrower_name).filter(Boolean))];
-  if (openBorrowers.length > 0) {
+  if (item.locations?.length === 1) {
     return {
-      label: `Vypůjčeno: ${openBorrowers.join(", ")}`,
-      tone: "loan",
+      label: `${item.locations[0].location} · ${item.locations[0].quantity} ${item.quantity_unit}`,
+      tone: "match",
     };
   }
   const current = item.current_location || item.default_location || "";
@@ -185,8 +170,9 @@ export function collectLocationPaths(nodes) {
   return flattenLocationTree(nodes).map((node) => node.path);
 }
 
-export function filterItems(items, { search, presence, flagId, locationPath, categoryPath }) {
+export function filterItems(items, { search, presence, flagId, locationPath, categoryPath }, sets = []) {
   const normalizedSearch = search.trim().toLowerCase();
+  const setById = new Map(sets.map((inventorySet) => [inventorySet.id, inventorySet]));
   return items.filter((item) => {
     if (presence && getItemPresence(item) !== presence) return false;
     if (flagId && String(getItemFlagId(item)) !== String(flagId)) return false;
@@ -203,6 +189,8 @@ export function filterItems(items, { search, presence, flagId, locationPath, cat
       }
     }
     if (!normalizedSearch) return true;
+    const inventorySet = item.set_id ? setById.get(item.set_id) : null;
+    const setMatches = inventorySet && [inventorySet.name, inventorySet.description].filter(Boolean).join(" ").toLowerCase().includes(normalizedSearch);
     const haystack = [
       item.name,
       item.description,
@@ -210,7 +198,6 @@ export function filterItems(items, { search, presence, flagId, locationPath, cat
       item.default_location,
       item.current_location,
       item.qr_identifier,
-      item.current_event_name,
       getItemStatusBadge(item).label,
       getItemFlagBadge(item).label,
     ]
@@ -219,7 +206,7 @@ export function filterItems(items, { search, presence, flagId, locationPath, cat
       .toLowerCase();
     const currentLocation = getItemCurrentLocation(item).label.toLowerCase();
     const flagLabel = getItemFlagBadge(item).label.toLowerCase();
-    return haystack.includes(normalizedSearch) || currentLocation.includes(normalizedSearch) || flagLabel.includes(normalizedSearch);
+    return setMatches || haystack.includes(normalizedSearch) || currentLocation.includes(normalizedSearch) || flagLabel.includes(normalizedSearch);
   });
 }
 
@@ -251,6 +238,8 @@ export function sortItems(items, sortBy, sortDir) {
 
 export function buildLocationOptions(locations) {
   return flattenLocationTree(locations).map((location) => ({
+    id: location.id,
+    teamId: location.team_id,
     value: location.path,
     label: `${"· ".repeat(location.depth)}${location.name}`,
   }));
@@ -272,16 +261,6 @@ export function buildPathMetaMap(nodes) {
 
 export function getLocationSelectValue(item) {
   return item?.current_location || item?.default_location || "";
-}
-
-export function getEventSummaryCards(detail) {
-  if (!detail) return [];
-  return [
-    { id: "returned", label: "Vráceno", value: detail.summary.returned.length, icon: "fas fa-check-circle", accent: "success" },
-    { id: "missing", label: "Chybí", value: detail.summary.missing.length, icon: "fas fa-person-circle-question", accent: "warning" },
-    { id: "extra", label: "Navíc", value: detail.summary.extra.length, icon: "fas fa-plus-circle", accent: "info" },
-    { id: "damaged", label: "Poškozené", value: detail.summary.damaged.length, icon: "fas fa-screwdriver-wrench", accent: "danger" },
-  ];
 }
 
 export function buildLoanGroups(items) {

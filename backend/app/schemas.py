@@ -5,9 +5,9 @@ from typing import List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
+from .usernames import USERNAME_HELP, USERNAME_PATTERN
 from .models import (
     CompletionStatus,
-    InventoryEventStatus,
     InventoryHistoryAction,
     InventoryItemStatus,
     RoleEnum,
@@ -27,6 +27,7 @@ class TokenPair(BaseModel):
 class LoginRequest(BaseModel):
     username: str
     password: str
+    remember_me: bool = False
 
 
 class RefreshRequest(BaseModel):
@@ -34,7 +35,7 @@ class RefreshRequest(BaseModel):
 
 
 class RegistrationRequest(BaseModel):
-    username: str
+    username: str = Field(min_length=3, max_length=64, pattern=USERNAME_PATTERN, description=USERNAME_HELP)
     real_name: str = Field(min_length=1, max_length=150)
     email: Optional[EmailStr] = None
     password: str = Field(min_length=8)
@@ -74,10 +75,11 @@ class ForcePasswordChangeRequest(BaseModel):
     username: str
     old_password: str
     new_password: str = Field(min_length=8)
+    remember_me: bool = False
 
 
 class UserBase(BaseModel):
-    username: str
+    username: str = Field(min_length=3, max_length=64, pattern=USERNAME_PATTERN, description=USERNAME_HELP)
     real_name: str = Field(min_length=1, max_length=150)
     email: Optional[EmailStr] = None
     preferred_language: str = Field(default="cs", max_length=8)
@@ -98,7 +100,7 @@ class BulkUserRegistration(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
+    username: Optional[str] = Field(default=None, min_length=3, max_length=64, pattern=USERNAME_PATTERN, description=USERNAME_HELP)
     real_name: Optional[str] = Field(default=None, min_length=1, max_length=150)
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=8)
@@ -561,6 +563,7 @@ class InventoryItemBase(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = Field(default=None, max_length=120)
     flag_id: Optional[int] = None
+    set_id: Optional[int] = None
     quantity: int = Field(default=1, ge=0)
     quantity_unit: str = Field(default="ks", min_length=1, max_length=32)
     default_location: Optional[str] = Field(default=None, max_length=200)
@@ -570,8 +573,20 @@ class InventoryItemBase(BaseModel):
     team_id: int
 
 
+class InventoryItemLocationInput(BaseModel):
+    location: str = Field(min_length=1, max_length=200)
+    quantity: int = Field(ge=0)
+
+
+class InventoryItemLocationPublic(InventoryItemLocationInput):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class InventoryItemCreate(InventoryItemBase):
     photos: List[InventoryPhotoCreate] = Field(default_factory=list)
+    locations: List[InventoryItemLocationInput] = Field(default_factory=list)
 
 
 class InventoryItemUpdate(BaseModel):
@@ -579,6 +594,7 @@ class InventoryItemUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = Field(default=None, max_length=120)
     flag_id: Optional[int] = None
+    set_id: Optional[int] = None
     quantity: Optional[int] = Field(default=None, ge=0)
     quantity_unit: Optional[str] = Field(default=None, min_length=1, max_length=32)
     default_location: Optional[str] = Field(default=None, max_length=200)
@@ -586,6 +602,7 @@ class InventoryItemUpdate(BaseModel):
     status: Optional[InventoryItemStatus] = None
     notes: Optional[str] = None
     team_id: Optional[int] = None
+    locations: Optional[List[InventoryItemLocationInput]] = None
 
 
 class InventoryHistoryPublic(BaseModel):
@@ -604,6 +621,7 @@ class InventoryLoanCreate(BaseModel):
     borrowed_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
     quantity: int = Field(default=1, ge=1)
+    location: Optional[str] = Field(default=None, max_length=200)
     note: Optional[str] = None
 
 
@@ -619,102 +637,8 @@ class InventoryLoanPublic(BaseModel):
     due_at: Optional[datetime]
     returned_at: Optional[datetime]
     quantity: int
+    source_location: Optional[str]
     note: Optional[str]
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class InventoryEventBase(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
-    team_id: int
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    note: Optional[str] = None
-    status: InventoryEventStatus = InventoryEventStatus.PLANNED
-
-
-class InventoryEventCreate(InventoryEventBase):
-    pass
-
-
-class InventoryEventUpdate(BaseModel):
-    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    team_id: Optional[int] = None
-    start_date: Optional[datetime] = None
-    end_date: Optional[datetime] = None
-    note: Optional[str] = None
-    status: Optional[InventoryEventStatus] = None
-
-
-class InventoryEventItemAssign(BaseModel):
-    item_id: int
-    planned_quantity: int = Field(default=1, ge=1)
-    note: Optional[str] = None
-
-
-class InventoryEventItemReturn(BaseModel):
-    quantity: int = Field(default=1, ge=1)
-    condition: Optional[str] = None
-    current_location: Optional[str] = Field(default=None, max_length=200)
-    note: Optional[str] = None
-
-
-class InventoryEventItemPublic(BaseModel):
-    id: int
-    event_id: int
-    item_id: int
-    planned_quantity: int
-    returned_quantity: int
-    damaged_quantity: int
-    note: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class InventoryItemEventAssignmentPublic(BaseModel):
-    id: int
-    event_id: int
-    event_name: Optional[str] = None
-    event_status: Optional[InventoryEventStatus] = None
-    planned_quantity: int
-    returned_quantity: int
-    damaged_quantity: int
-    note: Optional[str]
-    created_at: datetime
-    updated_at: datetime
-
-
-class InventoryEventPublic(BaseModel):
-    id: int
-    team_id: int
-    name: str
-    start_date: Optional[datetime]
-    end_date: Optional[datetime]
-    note: Optional[str]
-    status: InventoryEventStatus
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class InventoryEventScanRequest(BaseModel):
-    qr_identifier: str = Field(min_length=1, max_length=64)
-    condition: Optional[str] = None
-    note: Optional[str] = None
-
-
-class InventoryEventScanPublic(BaseModel):
-    id: int
-    event_id: int
-    item_id: Optional[int]
-    qr_identifier: str
-    result: str
-    condition: Optional[str]
-    note: Optional[str]
-    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -724,13 +648,8 @@ class InventoryLabelTemplateBase(BaseModel):
     team_id: int
     width_mm: float = Field(default=62, gt=0)
     height_mm: float = Field(default=29, gt=0)
-    qr_x_mm: float = Field(default=3, ge=0)
-    qr_y_mm: float = Field(default=3, ge=0)
     qr_size_mm: float = Field(default=18, gt=0)
-    title_font_size: float = Field(default=14, gt=0)
-    meta_font_size: float = Field(default=9, gt=0)
-    fields: str = Field(default='[{"id":"name","x":15,"y":8,"fontSize":12,"align":"left","enabled":true},{"id":"category","x":15,"y":18,"fontSize":8,"align":"left","enabled":true},{"id":"qr_identifier","x":15,"y":25,"fontSize":6,"align":"left","enabled":true}]')
-    latex_template: Optional[str] = None
+    fields: str = Field(default='{"visibleFields":["category","current_location"],"columns":3,"gapMm":2}')
 
 
 class InventoryLabelTemplateCreate(InventoryLabelTemplateBase):
@@ -742,13 +661,8 @@ class InventoryLabelTemplateUpdate(BaseModel):
     team_id: Optional[int] = None
     width_mm: Optional[float] = Field(default=None, gt=0)
     height_mm: Optional[float] = Field(default=None, gt=0)
-    qr_x_mm: Optional[float] = Field(default=None, ge=0)
-    qr_y_mm: Optional[float] = Field(default=None, ge=0)
     qr_size_mm: Optional[float] = Field(default=None, gt=0)
-    title_font_size: Optional[float] = Field(default=None, gt=0)
-    meta_font_size: Optional[float] = Field(default=None, gt=0)
     fields: Optional[str] = None
-    latex_template: Optional[str] = None
 
 
 class InventoryLabelTemplatePublic(InventoryLabelTemplateBase):
@@ -873,6 +787,7 @@ class InventoryItemPublic(BaseModel):
     description: Optional[str]
     category: Optional[str]
     flag_id: Optional[int]
+    set_id: Optional[int] = None
     flag: Optional[InventoryFlagPublic] = None
     quantity: int
     quantity_unit: str
@@ -886,38 +801,55 @@ class InventoryItemPublic(BaseModel):
     team_name: Optional[str] = None
     available_quantity: int = 0
     open_loan_quantity: int = 0
-    active_event_quantity: int = 0
-    current_event_name: Optional[str] = None
-    event_assignments: List[InventoryItemEventAssignmentPublic] = Field(default_factory=list)
     photos: List[InventoryPhotoPublic] = Field(default_factory=list)
+    locations: List[InventoryItemLocationPublic] = Field(default_factory=list)
     loans: List[InventoryLoanPublic] = Field(default_factory=list)
     history_entries: List[InventoryHistoryPublic] = Field(default_factory=list)
 
 
+class InventorySetBase(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: Optional[str] = None
+    flag_id: Optional[int] = None
+    default_location: Optional[str] = None
+    current_location: Optional[str] = None
+    status: InventoryItemStatus = InventoryItemStatus.AVAILABLE
+    notes: Optional[str] = None
+
+
+class InventorySetCreate(InventorySetBase):
+    pass
+
+
+class InventorySetUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    flag_id: Optional[int] = None
+    default_location: Optional[str] = None
+    current_location: Optional[str] = None
+    status: Optional[InventoryItemStatus] = None
+    notes: Optional[str] = None
+
+
+class InventorySetPublic(InventorySetBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventorySetItemsUpdate(BaseModel):
+    item_ids: List[int] = Field(default_factory=list)
+
+
 class InventoryOverviewResponse(BaseModel):
     items: List[InventoryItemPublic]
-    events: List[InventoryEventPublic]
     label_templates: List[InventoryLabelTemplatePublic]
     locations: List[InventoryLocationPublic]
     categories: List[InventoryCategoryPublic]
     flags: List[InventoryFlagPublic]
-
-
-class InventoryEventDetail(BaseModel):
-    event: InventoryEventPublic
-    items: List[InventoryEventItemPublic]
-    scans: List[InventoryEventScanPublic]
-    summary: dict
-
-
-class InventoryLabelsPreviewRequest(BaseModel):
-    item_ids: List[int] = Field(min_length=1)
-    template_id: int
-
-
-class InventoryLabelsPreviewResponse(BaseModel):
-    template: InventoryLabelTemplatePublic
-    items: List[InventoryItemPublic]
+    sets: List[InventorySetPublic]
 
 
 class InventoryBulkUpdateRequest(BaseModel):
@@ -927,8 +859,13 @@ class InventoryBulkUpdateRequest(BaseModel):
     set_current_location: Optional[str] = Field(default=None, max_length=200)
     set_category: Optional[str] = Field(default=None, max_length=120)
     set_flag_id: Optional[int] = None
-    assign_event_id: Optional[int] = None
-    assign_event_quantity: int = Field(default=1, ge=1)
+
+
+class InventoryBulkLoanRequest(BaseModel):
+    item_ids: List[int] = Field(min_length=1)
+    borrower_name: str = Field(min_length=1, max_length=200)
+    due_at: Optional[datetime] = None
+    note: Optional[str] = None
 
 
 TaskPublic.model_rebuild()

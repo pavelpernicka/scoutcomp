@@ -161,6 +161,8 @@
 /* Editor catalog icon images */
 .web-editor-catalog-icon { overflow:hidden; }
 .web-editor-catalog-icon img { width:100%; height:100%; object-fit:cover; }
+.web-editor-catalog-list button[draggable="true"],.web-resource-preview-catalog button[draggable="true"] { cursor:grab; }
+.web-editor-catalog-list button[draggable="true"]:active,.web-resource-preview-catalog button[draggable="true"]:active { cursor:grabbing; }
 
 /* ── reusable media picker modal ── */
 .web-media-picker-modal {

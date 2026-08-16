@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -8,6 +8,8 @@ import api from "../../services/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import UserAvatar from "../../components/UserAvatar";
 import { useAuth } from "../../providers/AuthProvider";
+import { processAvatarFile } from "../../utils/avatar";
+import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
 
 const STATUS_BADGE = {
   active: "bg-success",
@@ -15,34 +17,8 @@ const STATUS_BADGE = {
   alumni: "bg-info",
 };
 
-const RELATIONSHIP_TYPE_LABEL = {
-  parent: "members.relParent",
-  guardian: "members.relGuardian",
-  sibling: "members.relSibling",
-  other: "members.relOther",
-};
 
-const emptyProfile = {
-  phone: "",
-  birth_date: "",
-  gender: "",
-  address: "",
-  city: "",
-  zip: "",
-  parent_name: "",
-  parent_phone: "",
-  parent_email: "",
-  emergency_name: "",
-  emergency_phone: "",
-  joined_at: "",
-  member_status: "active",
-  medical_note: "",
-  uniform_size: "",
-  scout_number: "",
-  data_consent_at: "",
-  photo_consent_at: "",
-  notes: "",
-};
+const emptyProfile = { joined_at: "", member_status: "active" };
 
 function Field({ label, children }) {
   return (
@@ -64,6 +40,7 @@ export default function MemberDetail() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { can, userId } = useAuth();
+  const avatarInputRef = useRef(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["members", "detail", id],
@@ -83,15 +60,6 @@ export default function MemberDetail() {
     staleTime: 30_000,
   });
 
-  const { data: directory = { items: [] } } = useQuery({
-    queryKey: ["members", "options"],
-    queryFn: async () => {
-      const { data } = await api.get("/members?limit=1000");
-      return data;
-    },
-    staleTime: 30_000,
-  });
-
   const { data: teams = [] } = useQuery({
     queryKey: ["members", "teams"],
     queryFn: async () => {
@@ -104,17 +72,23 @@ export default function MemberDetail() {
     },
     staleTime: 60_000,
   });
+  const [attendanceOffset, setAttendanceOffset] = useState(0);
+  const attendanceQuery = useQuery({
+    queryKey: ["members", "attendance", id, attendanceOffset],
+    queryFn: async () => (await api.get(`/members/${id}/attendance?limit=10&offset=${attendanceOffset}`)).data,
+    enabled: Boolean(id),
+    staleTime: 15_000,
+  });
 
   const member = data;
   const [form, setForm] = useState(emptyProfile);
   const [newTag, setNewTag] = useState("");
   const [noteContent, setNoteContent] = useState("");
-  const [relMemberId, setRelMemberId] = useState("");
-  const [relType, setRelType] = useState("parent");
-  const [relNote, setRelNote] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [accountForm, setAccountForm] = useState(null);
   const [generatedPassword, setGeneratedPassword] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarError, setAvatarError] = useState(null);
 
   useEffect(() => {
     if (!data) return;
@@ -143,6 +117,7 @@ export default function MemberDetail() {
       preferred_language: account.preferred_language || "cs",
       team_id: account.team_id != null ? String(account.team_id) : "",
       is_active: account.is_active !== false,
+      role: account.role || "member",
     });
   }, [account]);
 
@@ -208,6 +183,34 @@ export default function MemberDetail() {
     },
   });
 
+  const avatarMutation = useMutation({
+    mutationFn: async (avatar) => (await api.patch(`/users/${id}`, { avatar })).data,
+    onSuccess: () => {
+      setAvatarPreview(null);
+      setAvatarError(null);
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ["members", "account", id] });
+      setFeedback({ type: "success", message: t("members.saveSuccess") });
+    },
+    onError: (error) => setAvatarError(error?.response?.data?.detail || t("members.saveFailed")),
+  });
+
+  const handleAvatarFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024 || !file.type.startsWith("image/")) {
+      setAvatarError(t("userSettings.photoInvalid"));
+      return;
+    }
+    try {
+      setAvatarPreview(await processAvatarFile(file));
+      setAvatarError(null);
+    } catch {
+      setAvatarError(t("userSettings.photoInvalid"));
+    }
+  };
+
   const handleSaveAccount = (e) => {
     e.preventDefault();
     if (!account) return;
@@ -231,6 +234,9 @@ export default function MemberDetail() {
       if (accountForm.is_active !== (account.is_active !== false)) {
         payload.is_active = accountForm.is_active;
       }
+    }
+    if (can("core.access.manage") && accountForm.role !== (account.role || "member")) {
+      payload.role = accountForm.role;
     }
     if (Object.keys(payload).length === 0) {
       setFeedback({ type: "info", message: t("members.nothingToUpdate") });
@@ -264,40 +270,14 @@ export default function MemberDetail() {
     },
   });
 
-  const relMutation = useMutation({
-    mutationFn: async (action) => {
-      if (action.type === "add") {
-        const { data } = await api.post(`/members/${id}/relationships`, {
-          related_user_id: Number(relMemberId),
-          type: relType,
-          note: relNote || null,
-        });
-        return data;
-      }
-      const { data } = await api.delete(`/members/${id}/relationships/${action.relId}`);
-      return data;
-    },
-    onSuccess: () => {
-      invalidate();
-      setRelMemberId("");
-      setRelNote("");
-    },
-  });
-
   const noteMutation = useMutation({
     mutationFn: async (action) => {
-      if (action.type === "add") {
-        const { data } = await api.post(`/members/${id}/notes`, { content: noteContent });
-        return data;
-      }
-      const { data } = await api.delete(`/members/${id}/notes/${action.noteId}`);
-      return data;
+      if (action.type === "add") return (await api.post(`/members/${id}/notes`, { content: noteContent })).data;
+      return (await api.delete(`/members/${id}/notes/${action.noteId}`)).data;
     },
-    onSuccess: () => {
-      invalidate();
-      setNoteContent("");
-    },
+    onSuccess: () => { invalidate(); setNoteContent(""); },
   });
+
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -309,17 +289,9 @@ export default function MemberDetail() {
         payload[key] = value;
       }
     });
-    if (!payload.gender) payload.gender = null;
     saveMutation.mutate(payload);
   };
 
-  const candidateOptions = useMemo(
-    () =>
-      directory.items
-        .filter((item) => item.id !== Number(id))
-        .map((item) => ({ id: item.id, name: item.real_name, team: item.team_name || "" })),
-    [directory.items, id]
-  );
 
   if (isLoading) {
     return (
@@ -338,12 +310,7 @@ export default function MemberDetail() {
     );
   }
 
-  const activity = member.activity || {};
-  const activityCards = [
-    { icon: "fa-calendar-check", label: t("members.attendanceCount"), value: activity.attendance_count ?? 0, badge: "bg-primary" },
-    { icon: "fa-list-check", label: t("members.completionCount"), value: activity.completion_count ?? 0, badge: "bg-success" },
-    { icon: "fa-trophy", label: t("members.totalPoints"), value: activity.total_points ?? 0, badge: "bg-warning" },
-  ];
+  const canEditAvatar = Number(id) === Number(userId) || can("core.avatar.manage");
 
   return (
     <>
@@ -353,7 +320,10 @@ export default function MemberDetail() {
           {t("members.backToDirectory")}
         </Link>
         <div className="d-flex align-items-center gap-2">
-          <UserAvatar user={member} size={42} fallbackClass="bg-primary" />
+          <div className="position-relative">
+            <UserAvatar user={{ ...member, avatar: avatarPreview || member.avatar }} size={42} fallbackClass="bg-primary" />
+            {canEditAvatar && <><input ref={avatarInputRef} type="file" accept="image/*" className="d-none" onChange={handleAvatarFile} /><button type="button" className="btn btn-sm btn-light border position-absolute bottom-0 end-0 rounded-circle p-1" title={t("userSettings.uploadPhoto")} onClick={() => avatarInputRef.current?.click()}><i className="fas fa-camera" /></button></>}
+          </div>
           <div>
             <h1 className="h4 mb-0">{member.real_name}</h1>
             <div className="text-muted small">
@@ -367,24 +337,8 @@ export default function MemberDetail() {
       </div>
 
       {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
-
-      <div className="row g-3 mb-4">
-        {activityCards.map((card) => (
-          <div className="col-4" key={card.label}>
-            <div className="card shadow-sm h-100">
-              <div className="card-body d-flex align-items-center gap-3">
-                <span className={`${card.badge} badge rounded-pill p-3`}>
-                  <i className={`fas ${card.icon} fs-5`}></i>
-                </span>
-                <div>
-                  <div className="fs-4 fw-bold">{card.value}</div>
-                  <div className="text-muted small">{card.label}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+      {avatarPreview && <div className="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 py-2"><span>{t("userSettings.photoHint")}</span><div className="d-flex gap-2"><button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setAvatarPreview(null)}>{t("web.cancel")}</button><button type="button" className="btn btn-sm btn-primary" disabled={avatarMutation.isPending} onClick={() => avatarMutation.mutate(avatarPreview)}>{t("userSettings.savePhoto")}</button></div></div>}
+      {avatarError && <div className="alert alert-danger py-2">{avatarError}</div>}
 
       <div className="row g-4">
         <div className="col-lg-7">
@@ -409,7 +363,8 @@ export default function MemberDetail() {
                         <>
                           <div className="col-md-6">
                             <Field label={t("members.username")}>
-                              <input type="text" className="form-control" value={accountForm.username} onChange={(e) => setAccountForm((f) => ({ ...f, username: e.target.value }))} />
+                              <input type="text" className="form-control" value={accountForm.username} pattern={USERNAME_PATTERN} title={USERNAME_HELP} onChange={(e) => setAccountForm((f) => ({ ...f, username: normalizeUsernameInput(e.target.value) }))} />
+                              <div className="form-text">{USERNAME_HELP}</div>
                             </Field>
                           </div>
                           <div className="col-md-6">
@@ -459,7 +414,11 @@ export default function MemberDetail() {
                       {account.role && (
                         <div className="col-md-6">
                           <Field label={t("members.role")}>
-                            <input type="text" className="form-control" value={account.role.replace("_", " ")} disabled />
+                            {can("core.access.manage") ? <select className="form-select" value={accountForm.role} onChange={(e) => setAccountForm((f) => ({ ...f, role: e.target.value }))}>
+                              <option value="member">Člen</option>
+                              <option value="group_admin">Vedoucí družiny</option>
+                              <option value="admin">Administrátor</option>
+                            </select> : <input type="text" className="form-control" value={account.role.replace("_", " ")} disabled />}
                           </Field>
                         </div>
                       )}
@@ -513,42 +472,15 @@ export default function MemberDetail() {
           )}
           <form onSubmit={handleSave}>
             <div className="card shadow-sm mb-4">
-              <div className="card-header bg-white fw-semibold">
-                <i className="fas fa-id-card me-2 text-primary"></i>
-                {t("members.memberProfile")}
+              <div className="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2">
+                <span><i className="fas fa-id-card me-2 text-primary"></i>{t("members.memberProfile")}</span>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="fas fa-save me-1"></i>}
+                  {t("members.save")}
+                </button>
               </div>
               <div className="card-body">
                 <div className="row g-3">
-                  <div className="col-md-6">
-                    <Field label={t("members.phone")}>
-                      <input type="tel" className="form-control" value={form.phone} onChange={setField("phone")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.birthDate")}>
-                      <input type="date" className="form-control" value={form.birth_date} onChange={setField("birth_date")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.gender")}>
-                      <select className="form-select" value={form.gender} onChange={setField("gender")}>
-                        <option value="">—</option>
-                        <option value="male">{t("members.genderMale")}</option>
-                        <option value="female">{t("members.genderFemale")}</option>
-                        <option value="other">{t("members.genderOther")}</option>
-                      </select>
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.uniformSize")}>
-                      <input type="text" className="form-control" value={form.uniform_size} onChange={setField("uniform_size")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.scoutNumber")}>
-                      <input type="text" className="form-control" value={form.scout_number} onChange={setField("scout_number")} />
-                    </Field>
-                  </div>
                   <div className="col-md-6">
                     <Field label={t("members.memberStatus")}>
                       <select className="form-select" value={form.member_status} onChange={setField("member_status")}>
@@ -563,118 +495,10 @@ export default function MemberDetail() {
                       <input type="date" className="form-control" value={form.joined_at} onChange={setField("joined_at")} />
                     </Field>
                   </div>
-                  <div className="col-12">
-                    <Field label={t("members.address")}>
-                      <input type="text" className="form-control" value={form.address} onChange={setField("address")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-8">
-                    <Field label={t("members.city")}>
-                      <input type="text" className="form-control" value={form.city} onChange={setField("city")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-4">
-                    <Field label={t("members.zip")}>
-                      <input type="text" className="form-control" value={form.zip} onChange={setField("zip")} />
-                    </Field>
-                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="card shadow-sm mb-4">
-              <div className="card-header bg-white fw-semibold">
-                <i className="fas fa-people-roof me-2 text-primary"></i>
-                {t("members.parent")}
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <Field label={t("members.parentName")}>
-                      <input type="text" className="form-control" value={form.parent_name} onChange={setField("parent_name")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.parentPhone")}>
-                      <input type="tel" className="form-control" value={form.parent_phone} onChange={setField("parent_phone")} />
-                    </Field>
-                  </div>
-                  <div className="col-12">
-                    <Field label={t("members.parentEmail")}>
-                      <input type="email" className="form-control" value={form.parent_email} onChange={setField("parent_email")} />
-                    </Field>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card shadow-sm mb-4">
-              <div className="card-header bg-white fw-semibold">
-                <i className="fas fa-briefcase-medical me-2 text-primary"></i>
-                {t("members.emergency")}
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <Field label={t("members.emergencyName")}>
-                      <input type="text" className="form-control" value={form.emergency_name} onChange={setField("emergency_name")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.emergencyPhone")}>
-                      <input type="tel" className="form-control" value={form.emergency_phone} onChange={setField("emergency_phone")} />
-                    </Field>
-                  </div>
-                  <div className="col-12">
-                    <Field label={t("members.medicalNote")}>
-                      <textarea className="form-control" rows="2" value={form.medical_note} onChange={setField("medical_note")} />
-                    </Field>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card shadow-sm mb-4">
-              <div className="card-header bg-white fw-semibold">
-                <i className="fas fa-file-shield me-2 text-primary"></i>
-                {t("members.consents")}
-              </div>
-              <div className="card-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <Field label={t("members.dataConsentAt")}>
-                      <input type="date" className="form-control" value={form.data_consent_at} onChange={setField("data_consent_at")} />
-                    </Field>
-                  </div>
-                  <div className="col-md-6">
-                    <Field label={t("members.photoConsentAt")}>
-                      <input type="date" className="form-control" value={form.photo_consent_at} onChange={setField("photo_consent_at")} />
-                    </Field>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="card shadow-sm mb-4">
-              <div className="card-header bg-white fw-semibold">
-                <i className="fas fa-note-sticky me-2 text-primary"></i>
-                {t("members.notes")}
-              </div>
-              <div className="card-body">
-                <textarea className="form-control" rows="3" value={form.notes} onChange={setField("notes")} />
-              </div>
-            </div>
-
-            <div className="d-flex justify-content-end mb-4">
-              <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? (
-                  <span className="spinner-border spinner-border-sm me-2"></span>
-                ) : (
-                  <i className="fas fa-save me-2"></i>
-                )}
-                {t("members.save")}
-              </button>
-            </div>
           </form>
 
           {can("core.users.delete") && (
@@ -697,6 +521,19 @@ export default function MemberDetail() {
               </div>
             </div>
           )}
+
+          <section className="card shadow-sm mb-4">
+            <div className="card-header bg-white fw-semibold"><i className="fas fa-calendar-check me-2 text-primary" />{t("members.attendance")}</div>
+            {attendanceQuery.isLoading ? <div className="card-body"><LoadingSpinner /></div> : <>
+              <div className="table-responsive">
+                <table className="table table-sm align-middle mb-0"><thead><tr><th>{t("calendar.title")}</th><th>{t("calendar.startsAt")}</th><th>{t("calendar.status")}</th></tr></thead><tbody>
+                  {(attendanceQuery.data?.items || []).map((entry) => <tr key={entry.event_id}><td>{entry.title}<div className="small text-muted">{entry.kind === "meeting" ? t("members.meeting") : t("members.event")}</div></td><td className="text-muted small">{entry.starts_at ? new Date(entry.starts_at).toLocaleDateString() : "—"}</td><td><span className={`badge ${entry.status === "present" ? "bg-success" : entry.status === "excused" ? "bg-warning text-dark" : entry.status === "not_recorded" ? "bg-light text-dark border" : "bg-secondary"}`}>{entry.status === "not_recorded" ? t("members.notRecorded") : t(`calendar.${entry.status}`, entry.status)}</span></td></tr>)}
+                  {!attendanceQuery.data?.items?.length && <tr><td colSpan="3" className="text-muted text-center py-3">{t("members.noAttendance")}</td></tr>}
+                </tbody></table>
+              </div>
+              {(attendanceQuery.data?.total || 0) > 10 && <div className="card-footer d-flex justify-content-between"><button type="button" className="btn btn-sm btn-outline-secondary" disabled={attendanceOffset === 0} onClick={() => setAttendanceOffset((value) => Math.max(0, value - 10))}>{t("members.prev")}</button><button type="button" className="btn btn-sm btn-outline-secondary" disabled={attendanceOffset + 10 >= attendanceQuery.data.total} onClick={() => setAttendanceOffset((value) => value + 10)}>{t("members.next")}</button></div>}
+            </>}
+          </section>
         </div>
 
         <div className="col-lg-5">
@@ -741,83 +578,6 @@ export default function MemberDetail() {
                   onClick={() => tagMutation.mutate({ type: "add" })}
                 >
                   <i className="fas fa-plus"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="card shadow-sm mb-4">
-            <div className="card-header bg-white fw-semibold">
-              <i className="fas fa-people-arrows me-2 text-primary"></i>
-              {t("members.relationships")}
-            </div>
-            <div className="card-body">
-              {member.relationships?.length ? (
-                <ul className="list-unstyled mb-3 d-flex flex-column gap-2">
-                  {member.relationships.map((rel) => (
-                    <li key={rel.id} className="d-flex justify-content-between align-items-center border rounded p-2">
-                      <div>
-                        <div className="fw-semibold">{rel.related_user.real_name}</div>
-                        <div className="text-muted small">
-                          {t(RELATIONSHIP_TYPE_LABEL[rel.type] || "members.relOther")}
-                          {rel.related_user.team_name ? ` · ${rel.related_user.team_name}` : ""}
-                          {rel.note ? ` — ${rel.note}` : ""}
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className="btn btn-sm btn-outline-danger border-0"
-                        onClick={() => {
-                          if (window.confirm(t("members.deleteRelationshipConfirm"))) {
-                            relMutation.mutate({ type: "remove", relId: rel.id });
-                          }
-                        }}
-                      >
-                        <i className="fas fa-trash"></i>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted small">{t("members.noRelationships")}</p>
-              )}
-              <div className="border-top pt-3">
-                <select className="form-select mb-2" value={relMemberId} onChange={(e) => setRelMemberId(e.target.value)}>
-                  <option value="">{t("members.selectMember")}</option>
-                  {candidateOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.name}
-                      {option.team ? ` (${option.team})` : ""}
-                    </option>
-                  ))}
-                </select>
-                <div className="row g-2">
-                  <div className="col-6">
-                    <select className="form-select" value={relType} onChange={(e) => setRelType(e.target.value)}>
-                      <option value="parent">{t("members.relParent")}</option>
-                      <option value="guardian">{t("members.relGuardian")}</option>
-                      <option value="sibling">{t("members.relSibling")}</option>
-                      <option value="other">{t("members.relOther")}</option>
-                    </select>
-                  </div>
-                  <div className="col-6">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder={t("members.relationshipNote")}
-                      value={relNote}
-                      onChange={(e) => setRelNote(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="btn btn-primary w-100 mt-2"
-                  disabled={!relMemberId || relMutation.isPending}
-                  onClick={() => relMutation.mutate({ type: "add" })}
-                >
-                  <i className="fas fa-plus me-2"></i>
-                  {t("members.addRelationship")}
                 </button>
               </div>
             </div>

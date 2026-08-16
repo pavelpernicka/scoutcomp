@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import text, func
+from sqlalchemy import text, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_current_active_user, get_db
@@ -26,7 +26,7 @@ class EventPayload(BaseModel):
     audience: str = "members"  # members | leaders
     requires_planned: bool = False
     planned_deadline: datetime | None = None
-    is_public: bool = False
+    is_public: bool = True
 
 class AttendancePayload(BaseModel):
     user_id: int
@@ -99,6 +99,46 @@ def list_events(team_id: int | None = Query(None), db: Session = Depends(get_db)
     if not _is_leader(db, current_user):
         query = query.filter(ScoutEvent.audience == "members")
     return [serialize(e) for e in query.order_by(ScoutEvent.starts_at.desc()).all()]
+
+
+@router.get("/events/options")
+def list_event_options(
+    q: str = Query("", max_length=120),
+    limit: int = Query(20, ge=1, le=50),
+    include_id: int | None = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Lightweight event browser for pickers; newest events are returned first."""
+    if not allows(db, current_user, "core.events.read"):
+        raise HTTPException(403, "Missing permission")
+    visible = db.query(ScoutEvent).options(joinedload(ScoutEvent.team))
+    if current_user.team_id:
+        visible = visible.filter((ScoutEvent.team_id == current_user.team_id) | (ScoutEvent.team_id.is_(None)))
+    if not _is_leader(db, current_user):
+        visible = visible.filter(ScoutEvent.audience == "members")
+
+    search = q.strip()
+    filtered = visible
+    if search:
+        pattern = f"%{search}%"
+        filtered = filtered.filter(or_(ScoutEvent.title.ilike(pattern), ScoutEvent.location.ilike(pattern)))
+    events = filtered.order_by(ScoutEvent.starts_at.desc(), ScoutEvent.id.desc()).limit(limit).all()
+
+    if include_id is not None and not any(event.id == include_id for event in events):
+        selected = visible.filter(ScoutEvent.id == include_id).one_or_none()
+        if selected is not None:
+            events.append(selected)
+
+    return {"items": [
+        {
+            "id": event.id,
+            "title": event.title,
+            "starts_at": event.starts_at,
+            "location": event.location,
+        }
+        for event in events
+    ]}
 
 
 @router.get("/event-presets")
@@ -202,6 +242,12 @@ def set_own_planned_attendance(event_id: int, payload: SelfPlannedPayload, db: S
         if now > event.planned_deadline:
             raise HTTPException(400, "Planned attendance deadline has passed")
     entry = db.query(ScoutAttendance).filter_by(event_id=event_id, user_id=current_user.id, mode="planned").one_or_none()
+    # "Nevím" is the default, not a second kind of registration or attendance.
+    if payload.status == "unknown":
+        if entry:
+            db.delete(entry)
+            db.commit()
+        return {"event_id": event_id, "user_id": current_user.id, "mode": "planned", "status": "unknown", "created_at": None, "updated_at": None}
     if not entry:
         entry = ScoutAttendance(event_id=event_id, user_id=current_user.id, mode="planned")
         db.add(entry)

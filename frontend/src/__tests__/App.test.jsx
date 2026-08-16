@@ -17,7 +17,7 @@ describe("App shell", () => {
     const { container } = render(
       <I18nextProvider i18n={i18n}>
         <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
             <AuthProvider>
               <ConfigProvider>
                 <App />

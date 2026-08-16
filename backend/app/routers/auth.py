@@ -119,7 +119,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         return PasswordChangeRequired()
 
     access_token, expires_in = create_access_token(user.id, user.role)
-    refresh_token_value, refresh_expires = create_refresh_token()
+    refresh_token_value, refresh_expires = create_refresh_token(remember_me=payload.remember_me)
 
     refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)
     db.add(refresh_token)
@@ -210,7 +210,7 @@ def force_change_password(payload: ForcePasswordChangeRequest, db: Session = Dep
     db.commit()
 
     access_token, expires_in = create_access_token(user.id, user.role)
-    refresh_token_value, refresh_expires = create_refresh_token()
+    refresh_token_value, refresh_expires = create_refresh_token(remember_me=payload.remember_me)
 
     refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)
     db.add(refresh_token)

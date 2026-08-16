@@ -7,6 +7,9 @@ import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
 
+const COMPLETIONS_PAGE_SIZE = 20;
+const EMPTY_LIST = [];
+
 const emptyCompletionForm = {
   taskId: "",
   variantId: "",
@@ -38,6 +41,14 @@ const getErrorMessage = (error, fallbackMessage) => {
   return error?.message || fallbackMessage;
 };
 
+const haveSameDrafts = (current, next) => {
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  return currentKeys.length === nextKeys.length && currentKeys.every(
+    (key) => current[key] === next[key]
+  );
+};
+
 export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
@@ -48,11 +59,12 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
   const [completionTaskFilter, setCompletionTaskFilter] = useState("all");
   const [completionFrom, setCompletionFrom] = useState("");
   const [completionTo, setCompletionTo] = useState("");
+  const [completionPage, setCompletionPage] = useState(1);
   const [showCreateCompletionModal, setShowCreateCompletionModal] = useState(false);
   const [newCompletionForm, setNewCompletionForm] = useState(emptyCompletionForm);
   const [completionCreateError, setCompletionCreateError] = useState(null);
 
-  const { data: activeTasks = [], isLoading: tasksLoading } = useQuery({
+  const { data: activeTasksData, isLoading: tasksLoading } = useQuery({
     queryKey: ["admin", "tasks", "for-completions"],
     queryFn: async () => {
       const { data } = await api.get("/tasks", { params: { status: "active" } });
@@ -61,7 +73,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
     staleTime: 30_000,
   });
 
-  const { data: userCompletions = [], isFetching: completionsLoading } = useQuery({
+  const { data: userCompletionsData, isFetching: completionsLoading } = useQuery({
     queryKey: ["admin", "user-completions", selectedUserId],
     queryFn: async () => {
       if (!selectedUserId) return [];
@@ -70,25 +82,29 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
     },
     enabled: Boolean(selectedUserId),
   });
+  const activeTasks = activeTasksData ?? EMPTY_LIST;
+  const userCompletions = userCompletionsData ?? EMPTY_LIST;
 
   useEffect(() => {
     setCompletionTaskFilter("all");
     setCompletionFrom("");
     setCompletionTo("");
+    setCompletionPage(1);
     setCompletionError(null);
   }, [selectedUserId]);
 
   useEffect(() => {
-    if (!userCompletions.length) {
-      setCompletionDrafts({});
-      return;
-    }
-    setCompletionDrafts(
-      userCompletions.reduce((acc, item) => {
+    setCompletionPage(1);
+  }, [completionTaskFilter, completionFrom, completionTo]);
+
+  useEffect(() => {
+    const nextDrafts = userCompletions.reduce((acc, item) => {
         acc[item.id] = String(item.count);
         return acc;
-      }, {})
-    );
+      }, {});
+    setCompletionDrafts((current) => (
+      haveSameDrafts(current, nextDrafts) ? current : nextDrafts
+    ));
   }, [userCompletions]);
 
   const assignableTasks = useMemo(() => {
@@ -113,7 +129,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
   }, [assignableTasks, newCompletionForm.taskId]);
 
   const availableVariants = useMemo(() => {
-    if (!selectedTaskForCompletion?.variants) return [];
+    if (!selectedTaskForCompletion?.variants) return EMPTY_LIST;
     return selectedTaskForCompletion.variants.map((variant) => ({
       value: String(variant.id),
       label: `${variant.name} (${variant.points} pts)`,
@@ -127,6 +143,9 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
       const nextTaskId = assignableTasks.some((task) => task.value === prev.taskId)
         ? prev.taskId
         : defaultTaskId;
+      if (prev.taskId === nextTaskId) {
+        return prev;
+      }
       return {
         ...prev,
         taskId: nextTaskId,
@@ -136,18 +155,17 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
   }, [assignableTasks]);
 
   useEffect(() => {
-    if (availableVariants.length > 0 && !newCompletionForm.variantId) {
-      setNewCompletionForm((prev) => ({
-        ...prev,
-        variantId: availableVariants[0]?.value || "",
-      }));
-    } else if (availableVariants.length === 0) {
-      setNewCompletionForm((prev) => ({
-        ...prev,
-        variantId: "",
-      }));
-    }
-  }, [availableVariants, newCompletionForm.variantId]);
+    setNewCompletionForm((prev) => {
+      const firstVariantId = availableVariants[0]?.value || "";
+      const variantIsAvailable = availableVariants.some(
+        (variant) => variant.value === prev.variantId
+      );
+      const nextVariantId = variantIsAvailable ? prev.variantId : firstVariantId;
+      return prev.variantId === nextVariantId
+        ? prev
+        : { ...prev, variantId: nextVariantId };
+    });
+  }, [availableVariants]);
 
   const updateCompletionMutation = useMutation({
     mutationFn: async ({ completionId, payload }) =>
@@ -311,6 +329,13 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
     });
   }, [userCompletions, completionTaskFilter, completionFrom, completionTo]);
 
+  const completionPages = Math.max(1, Math.ceil(filteredCompletions.length / COMPLETIONS_PAGE_SIZE));
+  const visibleCompletionPage = Math.min(completionPage, completionPages);
+  const paginatedCompletions = useMemo(() => {
+    const start = (visibleCompletionPage - 1) * COMPLETIONS_PAGE_SIZE;
+    return filteredCompletions.slice(start, start + COMPLETIONS_PAGE_SIZE);
+  }, [filteredCompletions, visibleCompletionPage]);
+
   const totalPoints = useMemo(() => {
     return filteredCompletions
       .filter((item) => item.status === "approved")
@@ -445,7 +470,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCompletions.map((item) => (
+                  {paginatedCompletions.map((item) => (
                     <tr key={item.id}>
                       <td>{formatDateToLocal(item.submitted_at)}</td>
                       <td>{item.task?.name || `Task #${item.task_id}`}</td>
@@ -528,6 +553,13 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+          {filteredCompletions.length > COMPLETIONS_PAGE_SIZE && (
+            <div className="d-flex justify-content-between align-items-center gap-2 p-3 border-top">
+              <button type="button" className="btn btn-outline-secondary btn-sm" disabled={visibleCompletionPage === 1} onClick={() => setCompletionPage((page) => page - 1)}>{t("adminUsers.prev")}</button>
+              <span className="small text-muted">{t("adminUsers.page", { page: visibleCompletionPage, pages: completionPages })}</span>
+              <button type="button" className="btn btn-outline-secondary btn-sm" disabled={visibleCompletionPage === completionPages} onClick={() => setCompletionPage((page) => page + 1)}>{t("adminUsers.next")}</button>
             </div>
           )}
         </div>
