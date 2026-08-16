@@ -11,6 +11,8 @@ const cameraErrorMessage = (error) => {
 export default function InventoryQrScanner({ onDetected, disabled = false }) {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
+  const activeVideoRef = useRef(null);
+  const releaseAllStreamsRef = useRef(null);
   const onDetectedRef = useRef(onDetected);
   const startingRef = useRef(false);
   const detectedRef = useRef(false);
@@ -22,9 +24,23 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
 
   const stop = useCallback((nextStatus = "idle") => {
     startingRef.current = false;
+    const video = activeVideoRef.current || videoRef.current;
+    // Capture the stream before ZXing tears down the video element; some
+    // browser implementations clear srcObject without stopping its tracks.
+    const stream = video?.srcObject;
     controlsRef.current?.stop();
     controlsRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
+    if (stream instanceof MediaStream) stream.getTracks().forEach((track) => track.stop());
+    // @zxing/browser keeps an internal stream tracker. Releasing it is
+    // necessary on Chromium when the video element has already been detached.
+    releaseAllStreamsRef.current?.();
+    if (video) {
+      video.pause();
+      video.srcObject = null;
+      video.removeAttribute("src");
+      video.load();
+    }
+    activeVideoRef.current = null;
     if (mountedRef.current) setStatus(nextStatus);
   }, []);
 
@@ -36,23 +52,25 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
       return;
     }
     if (!videoRef.current) return;
+    const video = videoRef.current;
+    activeVideoRef.current = video;
 
     startingRef.current = true;
     detectedRef.current = false;
     setStatus("starting");
     setMessage("Spouštím kameru…");
     try {
-      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      const { BrowserQRCodeReader, BrowserCodeReader } = await import("@zxing/browser");
+      releaseAllStreamsRef.current = () => BrowserCodeReader.releaseAllStreams();
       const reader = new BrowserQRCodeReader();
       const controls = await reader.decodeFromConstraints(
         { video: { facingMode: { ideal: "environment" } }, audio: false },
-        videoRef.current,
+        video,
         async (result) => {
           const code = result?.getText()?.trim();
           if (!code || detectedRef.current) return;
           detectedRef.current = true;
-          controlsRef.current?.stop();
-          controlsRef.current = null;
+          stop("detected");
           if (!mountedRef.current) return;
           const outcome = await onDetectedRef.current(code);
           if (!mountedRef.current) return;
@@ -65,14 +83,21 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
           setMessage(`Načtena věc: ${outcome.item.name}`);
         }
       );
-      controlsRef.current = controls;
-      startingRef.current = false;
-      if (detectedRef.current) {
+      if (!mountedRef.current || detectedRef.current) {
+        const stream = video.srcObject;
         controls.stop();
-        controlsRef.current = null;
+        if (stream instanceof MediaStream) stream.getTracks().forEach((track) => track.stop());
+        releaseAllStreamsRef.current?.();
+        video.pause();
+        video.srcObject = null;
+        video.removeAttribute("src");
+        video.load();
+        activeVideoRef.current = null;
         return;
       }
-      if (mountedRef.current && !detectedRef.current) {
+      controlsRef.current = controls;
+      startingRef.current = false;
+      if (mountedRef.current) {
         setStatus("scanning");
         setMessage("Namiř kameru na QR kód.");
       }

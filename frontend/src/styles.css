@@ -384,3 +384,22 @@ span:has(.flip_vert) {
 .widget-event-row, .widget-event-row > * { min-width: 0; }
 .widget-event-row .btn-group { flex-wrap: wrap; }
 .widget-event-row .btn { white-space: nowrap; }
+/* Member detail: the avatar action remains a clear, touch-friendly circular control. */
+.member-avatar-upload-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--bs-body-bg);
+  border-radius: 50%;
+  background: var(--bs-primary);
+  color: #fff;
+  box-shadow: 0 0.2rem 0.45rem rgb(0 0 0 / 18%);
+}
+
+.member-avatar-upload-button:hover,
+.member-avatar-upload-button:focus-visible {
+  background: var(--bs-primary-dark, #0a58ca);
+  color: #fff;
+}

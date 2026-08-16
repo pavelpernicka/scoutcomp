@@ -87,7 +87,6 @@ export default function MemberDetail() {
   const [feedback, setFeedback] = useState(null);
   const [accountForm, setAccountForm] = useState(null);
   const [generatedPassword, setGeneratedPassword] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarError, setAvatarError] = useState(null);
 
   useEffect(() => {
@@ -128,31 +127,20 @@ export default function MemberDetail() {
   const setField = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   const saveMutation = useMutation({
-    mutationFn: async (payload) => {
-      const { data } = await api.put(`/members/${id}`, payload);
-      return data;
+    mutationFn: async ({ profilePayload, accountPayload }) => {
+      const requests = [api.put(`/members/${id}`, profilePayload)];
+      if (Object.keys(accountPayload).length > 0) {
+        requests.push(api.patch(`/users/${id}`, accountPayload));
+      }
+      await Promise.all(requests);
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["members", "account", id] });
       invalidate();
       setFeedback({ type: "success", message: t("members.saveSuccess") });
     },
     onError: (error) => {
       setFeedback({ type: "danger", message: error?.response?.data?.detail || t("members.saveFailed") });
-    },
-  });
-
-  const accountMutation = useMutation({
-    mutationFn: async (payload) => {
-      const { data } = await api.patch(`/users/${id}`, payload);
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["members", "account", id] });
-      invalidate();
-      setFeedback({ type: "success", message: t("members.accountSaved") });
-    },
-    onError: (error) => {
-      setFeedback({ type: "danger", message: error?.response?.data?.detail || t("members.accountSaveFailed") });
     },
   });
 
@@ -186,7 +174,6 @@ export default function MemberDetail() {
   const avatarMutation = useMutation({
     mutationFn: async (avatar) => (await api.patch(`/users/${id}`, { avatar })).data,
     onSuccess: () => {
-      setAvatarPreview(null);
       setAvatarError(null);
       invalidate();
       queryClient.invalidateQueries({ queryKey: ["members", "account", id] });
@@ -204,16 +191,15 @@ export default function MemberDetail() {
       return;
     }
     try {
-      setAvatarPreview(await processAvatarFile(file));
+      avatarMutation.mutate(await processAvatarFile(file));
       setAvatarError(null);
     } catch {
       setAvatarError(t("userSettings.photoInvalid"));
     }
   };
 
-  const handleSaveAccount = (e) => {
-    e.preventDefault();
-    if (!account) return;
+  const accountPayload = () => {
+    if (!account || !accountForm) return {};
     const payload = {};
     if (accountForm.real_name.trim() !== (account.real_name || "")) {
       payload.real_name = accountForm.real_name.trim();
@@ -238,11 +224,7 @@ export default function MemberDetail() {
     if (can("core.access.manage") && accountForm.role !== (account.role || "member")) {
       payload.role = accountForm.role;
     }
-    if (Object.keys(payload).length === 0) {
-      setFeedback({ type: "info", message: t("members.nothingToUpdate") });
-      return;
-    }
-    accountMutation.mutate(payload);
+    return payload;
   };
 
   const handleDeleteAccount = () => {
@@ -279,17 +261,24 @@ export default function MemberDetail() {
   });
 
 
-  const handleSave = (e) => {
-    e.preventDefault();
-    const payload = {};
+  const handleSave = () => {
+    const profilePayload = {};
     Object.entries(form).forEach(([key, value]) => {
       if (value === "") {
-        payload[key] = null;
+        profilePayload[key] = null;
       } else {
-        payload[key] = value;
+        profilePayload[key] = value;
       }
     });
-    saveMutation.mutate(payload);
+    const nextAccountPayload = accountPayload();
+    if (Object.keys(nextAccountPayload).length === 0 && !can("core.users.edit")) {
+      const unchangedProfile = Object.entries(profilePayload).every(([key, value]) => value === (member.profile?.[key] ?? null));
+      if (unchangedProfile) {
+        setFeedback({ type: "info", message: t("members.nothingToUpdate") });
+        return;
+      }
+    }
+    saveMutation.mutate({ profilePayload, accountPayload: nextAccountPayload });
   };
 
 
@@ -321,29 +310,36 @@ export default function MemberDetail() {
         </Link>
         <div className="d-flex align-items-center gap-2">
           <div className="position-relative">
-            <UserAvatar user={{ ...member, avatar: avatarPreview || member.avatar }} size={42} fallbackClass="bg-primary" />
-            {canEditAvatar && <><input ref={avatarInputRef} type="file" accept="image/*" className="d-none" onChange={handleAvatarFile} /><button type="button" className="btn btn-sm btn-light border position-absolute bottom-0 end-0 rounded-circle p-1" title={t("userSettings.uploadPhoto")} onClick={() => avatarInputRef.current?.click()}><i className="fas fa-camera" /></button></>}
+            <UserAvatar user={member} size={112} fallbackClass="bg-primary" />
+            {canEditAvatar && <><input ref={avatarInputRef} type="file" accept="image/*" className="d-none" onChange={handleAvatarFile} /><button type="button" className="member-avatar-upload-button position-absolute bottom-0 end-0" title={t("userSettings.uploadPhoto")} aria-label={t("userSettings.uploadPhoto")} onClick={() => avatarInputRef.current?.click()}><i className="fas fa-camera" /></button></>}
           </div>
           <div>
-            <h1 className="h4 mb-0">{member.real_name}</h1>
+            <div className="d-flex flex-wrap align-items-center gap-2">
+              <h1 className="h4 mb-0">{member.real_name}</h1>
+              <span className={`badge ${STATUS_BADGE[member.profile?.member_status || "active"] || "bg-secondary"}`}>
+                {t(`members.status${member.profile?.member_status === "alumni" ? "Alumni" : member.profile?.member_status === "inactive" ? "Inactive" : "Active"}`)}
+              </span>
+            </div>
             <div className="text-muted small">
               {member.team_name || t("members.noTeam")} · @{member.username}
             </div>
           </div>
         </div>
-        <span className={`badge ${STATUS_BADGE[member.profile?.member_status || "active"] || "bg-secondary"} fs-6 px-3 py-2`}>
-          {t(`members.status${member.profile?.member_status === "alumni" ? "Alumni" : member.profile?.member_status === "inactive" ? "Inactive" : "Active"}`)}
-        </span>
+        <div className="d-flex align-items-start">
+          <button type="button" className="btn btn-primary" disabled={saveMutation.isPending} onClick={handleSave}>
+            {saveMutation.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="fas fa-save me-1"></i>}
+            {t("members.save")}
+          </button>
+        </div>
       </div>
 
       {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
-      {avatarPreview && <div className="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2 py-2"><span>{t("userSettings.photoHint")}</span><div className="d-flex gap-2"><button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setAvatarPreview(null)}>{t("web.cancel")}</button><button type="button" className="btn btn-sm btn-primary" disabled={avatarMutation.isPending} onClick={() => avatarMutation.mutate(avatarPreview)}>{t("userSettings.savePhoto")}</button></div></div>}
       {avatarError && <div className="alert alert-danger py-2">{avatarError}</div>}
 
       <div className="row g-4">
         <div className="col-lg-7">
           {can("core.users.edit") && (
-            <form onSubmit={handleSaveAccount}>
+            <div>
               <div className="card shadow-sm mb-4">
                 <div className="card-header bg-white fw-semibold">
                   <i className="fas fa-user-gear me-2 text-primary"></i>
@@ -462,22 +458,14 @@ export default function MemberDetail() {
                       {t("members.generatedPassword")}: {generatedPassword}
                     </code>
                   )}
-                  <button type="submit" className="btn btn-primary btn-sm" disabled={accountMutation.isPending}>
-                    {accountMutation.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : null}
-                    {t("members.saveAccount")}
-                  </button>
                 </div>
               </div>
-            </form>
+            </div>
           )}
-          <form onSubmit={handleSave}>
+          <div>
             <div className="card shadow-sm mb-4">
               <div className="card-header bg-white fw-semibold d-flex justify-content-between align-items-center gap-2">
                 <span><i className="fas fa-id-card me-2 text-primary"></i>{t("members.memberProfile")}</span>
-                <button type="submit" className="btn btn-primary btn-sm" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="fas fa-save me-1"></i>}
-                  {t("members.save")}
-                </button>
               </div>
               <div className="card-body">
                 <div className="row g-3">
@@ -499,7 +487,7 @@ export default function MemberDetail() {
               </div>
             </div>
 
-          </form>
+          </div>
 
           {can("core.users.delete") && (
             <div className="card shadow-sm mb-4 border-danger-subtle">

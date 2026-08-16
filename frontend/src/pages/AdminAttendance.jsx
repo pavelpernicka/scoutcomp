@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
 
@@ -32,6 +32,7 @@ const PLANNED_STATUS_META = {
 };
 
 const CYCLE_ORDER = ["present", "excused", "absent"];
+const MATRIX_EVENT_LIMIT = 40;
 
 const schoolYearStart = () => {
   const now = new Date();
@@ -71,7 +72,6 @@ const getErrorMessage = (error) => {
 
 export default function AdminAttendance() {
   const { t, i18n } = useTranslation();
-  const queryClient = useQueryClient();
   const { can } = useAuth();
 
   const [activeTab, setActiveTab] = useState("matrix");
@@ -81,6 +81,7 @@ export default function AdminAttendance() {
     dateTo: "",
     kind: "",
   });
+  const [eventOffset, setEventOffset] = useState(0);
   const [feedback, setFeedback] = useState(null);
 
   const [matrixData, setMatrixData] = useState(null);
@@ -103,21 +104,20 @@ export default function AdminAttendance() {
   }, [memberQuery]);
 
   const matrixQuery = useQuery({
-    queryKey: ["admin-attendance-matrix", filters],
+    queryKey: ["admin-attendance-matrix", filters, eventOffset],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters.dateFrom) params.append("date_from", filters.dateFrom);
       if (filters.dateTo) params.append("date_to", filters.dateTo);
       if (filters.kind) params.append("kind", filters.kind);
+      params.append("offset", String(eventOffset));
+      params.append("limit", String(MATRIX_EVENT_LIMIT));
       const { data } = await api.get(`/admin/core/attendance/matrix?${params}`);
       return data;
     },
-    enabled: can("core.attendance.manage"),
-    onError: (error) => {
-      if (error.response?.status !== 403) {
-        setFeedback({ type: "danger", message: getErrorMessage(error) });
-      }
-    },
+    enabled: can("core.attendance.manage") && activeTab === "matrix",
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   useEffect(() => {
@@ -125,6 +125,12 @@ export default function AdminAttendance() {
       setMatrixData(matrixQuery.data);
     }
   }, [matrixQuery.data]);
+
+  useEffect(() => {
+    if (matrixQuery.isError && matrixQuery.error?.response?.status !== 403) {
+      setFeedback({ type: "danger", message: getErrorMessage(matrixQuery.error) });
+    }
+  }, [matrixQuery.error, matrixQuery.isError]);
 
   const events = useMemo(() => {
     const list = matrixData?.events || [];
@@ -179,6 +185,7 @@ export default function AdminAttendance() {
   };
 
   const handleFilterChange = (key, value) => {
+    setEventOffset(0);
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
@@ -226,7 +233,8 @@ export default function AdminAttendance() {
         mode: "real",
         status: next,
       })
-      .then(() => queryClient.invalidateQueries({ queryKey: ["admin-attendance-matrix"] }))
+      // The optimistic matrix already contains the saved state. Refetching the
+      // complete matrix after every cell made editing increasingly sluggish.
       .catch((error) => {
         setMatrixData((data) => updateMatrixCell(data, groupKey, member.id, event.id, current));
         if (error.response?.status !== 403) {
@@ -392,7 +400,7 @@ export default function AdminAttendance() {
                 </div>
                 <div className="col-md-3 col-sm-6 d-flex gap-2">
                   {filters.dateFrom !== schoolYearStart() || filters.dateTo || filters.kind ? (
-                    <Button variant="outline-secondary" size="sm" onClick={() => setFilters({ dateFrom: schoolYearStart(), dateTo: "", kind: "" })}>
+                    <Button variant="outline-secondary" size="sm" onClick={() => { setEventOffset(0); setFilters({ dateFrom: schoolYearStart(), dateTo: "", kind: "" }); }}>
                       <i className="fas fa-times me-1"></i>{t("admin.attendance.clearFilters")}
                     </Button>
                   ) : null}
@@ -415,11 +423,23 @@ export default function AdminAttendance() {
 
           {/* Matrix */}
           <div className="card shadow-sm border-0 mb-4">
-            <div className="card-header bg-white border-0 py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-              <h5 className="mb-0">{t("admin.attendance.matrixTitle")}</h5>
-              <div className="d-flex align-items-center gap-2">
-                <span className="text-muted small">{events.length} {t("calendar.events").toLowerCase()}</span>
-                <Button variant={editingEnabled ? "primary" : "outline-secondary"} size="sm" onClick={() => setEditingEnabled((value) => !value)}>
+              <div className="card-header bg-white border-0 py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h5 className="mb-0">{t("admin.attendance.matrixTitle")}</h5>
+                <div className="d-flex align-items-center gap-2">
+                  <span className="text-muted small">{events.length} {t("calendar.events").toLowerCase()}</span>
+                  {(eventOffset > 0 || matrixData?.has_more) && (
+                    <div className="btn-group" role="group" aria-label={t("admin.attendance.matrixTitle")}>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={eventOffset === 0 || matrixQuery.isFetching} onClick={() => setEventOffset((value) => Math.max(0, value - MATRIX_EVENT_LIMIT))}>
+                        <i className="fas fa-chevron-left" aria-hidden="true" />
+                        <span className="visually-hidden">{t("members.prev")}</span>
+                      </button>
+                      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={!matrixData?.has_more || matrixQuery.isFetching} onClick={() => setEventOffset((value) => value + MATRIX_EVENT_LIMIT)}>
+                        <i className="fas fa-chevron-right" aria-hidden="true" />
+                        <span className="visually-hidden">{t("members.next")}</span>
+                      </button>
+                    </div>
+                  )}
+                  <Button variant={editingEnabled ? "primary" : "outline-secondary"} size="sm" onClick={() => setEditingEnabled((value) => !value)}>
                   <i className={`fas fa-${editingEnabled ? "lock-open" : "pen"} me-1`} />
                   {editingEnabled ? t("admin.attendance.finishEditing") : t("admin.attendance.enableEditing")}
                 </Button>

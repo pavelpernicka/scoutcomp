@@ -26,6 +26,21 @@ def test_public_config_exposes_leaderboard_mode_lock_default(client):
     assert body["leaderboard_show_only_default_mode"] is False
 
 
+def test_app_shell_contains_saved_name_and_favicon_before_client_javascript(client, db_session):
+    from app.routers.config import set_config_value
+
+    set_config_value(db_session, "app_name", "Oddíl & spol.")
+    set_config_value(db_session, "app_icon", "data:image/svg+xml;base64,PHN2Zy8+")
+
+    response = client.get("/app-shell")
+
+    assert response.status_code == 200
+    assert "<title>Oddíl &amp; spol.</title>" in response.text
+    assert 'rel="icon" href="data:image/svg+xml;base64,PHN2Zy8+"' in response.text
+    assert "__SCOUTCOMP_APP_TITLE__" not in response.text
+    assert "__SCOUTCOMP_APP_ICON__" not in response.text
+
+
 def test_admin_can_update_leaderboard_mode_lock(client, db_session):
     admin = User(
         username="admin",

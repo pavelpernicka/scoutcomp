@@ -1,11 +1,16 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from html import escape
+from pathlib import Path
+from urllib.parse import urlparse
+
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
 
 from .config import settings
 from .database import Base, engine, SessionLocal
+from .dependencies import get_db
 from .modules import registry
 from .modules.registration import register_all_modules
 from .migrations import run_migrations
@@ -24,6 +29,43 @@ from .routers import (
     users,
     web,
 )
+from sqlalchemy.orm import Session
+
+
+_FRONTEND_DIST_DIR = Path("/frontend-dist")
+_APP_SHELL_TITLE = "__SCOUTCOMP_APP_TITLE__"
+_APP_SHELL_ICON = "__SCOUTCOMP_APP_ICON__"
+
+
+def _favicon_href(value: str) -> str:
+    """Keep the persisted icon usable without allowing an unsafe URL scheme."""
+    if value.startswith("data:image/") or value.startswith("/"):
+        return value
+    if urlparse(value).scheme in {"http", "https"}:
+        return value
+    return "/favicon.svg"
+
+
+def _app_shell(db: Session) -> str:
+    """Render the SPA document with the persisted brand before JavaScript runs."""
+    index_path = _FRONTEND_DIST_DIR / "index.html"
+    try:
+        template = index_path.read_text(encoding="utf-8")
+    except OSError:
+        # This only applies to source-only development/test checkouts. The
+        # production image always copies the built document beside the API.
+        template = (
+            "<!doctype html><html lang=\"cs\"><head><meta charset=\"UTF-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            f"<title>{_APP_SHELL_TITLE}</title><link rel=\"icon\" href=\"{_APP_SHELL_ICON}\"></head>"
+            "<body><div id=\"root\"></div><script type=\"module\" src=\"/src/main.jsx\"></script></body></html>"
+        )
+
+    app_name = config.get_config_value(db, "app_name") or "ScoutComp"
+    app_icon = _favicon_href(config.get_config_value(db, "app_icon"))
+    return template.replace(_APP_SHELL_TITLE, escape(app_name)).replace(
+        _APP_SHELL_ICON, escape(app_icon, quote=True)
+    )
 
 Base.metadata.create_all(bind=engine)
 run_migrations(engine)
@@ -73,6 +115,12 @@ def root():
 @app.get("/healthz", tags=["meta"]) # healthchecks
 def healthcheck():
     return {"status": "ok"}
+
+
+@app.get("/app-shell", include_in_schema=False, response_class=HTMLResponse)
+def app_shell(db: Session = Depends(get_db)):
+    """Server-rendered HTML shell used by the production SPA web server."""
+    return HTMLResponse(_app_shell(db), headers={"Cache-Control": "no-store"})
 
 
 # Custom documentation endpoints

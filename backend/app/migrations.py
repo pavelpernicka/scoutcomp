@@ -2249,6 +2249,20 @@ def _create_member_tables(conn: Connection) -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_notes_user_id ON member_notes(user_id)"))
 
 
+def _add_attendance_query_indexes(conn: Connection) -> None:
+    """Indexes for the administrative attendance matrix and member overview."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "scout_events" in tables:
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_scout_events_starts_at ON scout_events(starts_at)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_scout_events_kind_starts_at ON scout_events(kind, starts_at)"))
+    if "scout_attendances" in tables:
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_scout_attendances_user_event_mode "
+            "ON scout_attendances(user_id, event_id, mode)"
+        ))
+
+
 def _add_web_post_event_reference(conn: Connection) -> None:
     """Link posts and their immutable revisions to an optional Scout event."""
     inspector = inspect(conn)
@@ -2571,6 +2585,11 @@ MIGRATIONS: List[Migration] = [
         "20260816_inventory_set_item_fields",
         _add_inventory_set_item_fields,
         "Add item-like fields to equipment sets",
+    ),
+    Migration(
+        "20260816_attendance_query_indexes",
+        _add_attendance_query_indexes,
+        "Add indexes used by the administrative attendance views",
     ),
 ]
 

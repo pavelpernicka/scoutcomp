@@ -6,7 +6,19 @@ from sqlalchemy import text, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_current_active_user, get_db
-from ..models import Config, DirectMessage, ScoutAttendance, ScoutEvent, User, PermissionGroup, Team
+from ..models import (
+    Config,
+    DirectMessage,
+    DirectUserPermission,
+    DirectUserPermissionDeny,
+    PermissionDefinition,
+    PermissionGroupPermission,
+    ScoutAttendance,
+    ScoutEvent,
+    Team,
+    User,
+    UserPermissionGroup,
+)
 from ..permissions import allows, managed_team_ids, permission_keys, permission_scopes
 
 router = APIRouter(prefix="/activity", tags=["scout activity"])
@@ -74,6 +86,48 @@ def _set_event_presets(db: Session, presets: list) -> None:
 
 def _is_leader(db: Session, user: User) -> bool:
     return "core.is_leader" in permission_keys(db, user)
+
+
+def _leader_user_ids(db: Session, user_ids: list[int]) -> set[int]:
+    """Resolve the leader permission for many users without per-user queries."""
+    if not user_ids:
+        return set()
+    permission_id = (
+        db.query(PermissionDefinition.id)
+        .filter_by(module_code="core", code="is_leader")
+        .scalar()
+    )
+    if permission_id is None:
+        return set()
+
+    group_ids = {
+        user_id
+        for (user_id,) in (
+            db.query(UserPermissionGroup.user_id)
+            .join(PermissionGroupPermission, PermissionGroupPermission.group_id == UserPermissionGroup.group_id)
+            .filter(
+                UserPermissionGroup.user_id.in_(user_ids),
+                PermissionGroupPermission.permission_id == permission_id,
+            )
+            .distinct()
+            .all()
+        )
+    }
+    direct_ids = {
+        user_id
+        for (user_id,) in db.query(DirectUserPermission.user_id).filter(
+            DirectUserPermission.user_id.in_(user_ids),
+            DirectUserPermission.permission_id == permission_id,
+        )
+    }
+    denied_ids = {
+        user_id
+        for (user_id,) in db.query(DirectUserPermissionDeny.user_id).filter(
+            DirectUserPermissionDeny.user_id.in_(user_ids),
+            DirectUserPermissionDeny.permission_id == permission_id,
+        )
+    }
+    return (group_ids | direct_ids) - denied_ids
 
 def serialize(event):
     return {"id": event.id, "team_id": event.team_id, "title": event.title, "description": event.description,
@@ -385,6 +439,8 @@ def admin_list_events(
         writer = csv.writer(output)
         writer.writerow(["Event ID", "Title", "Kind", "Starts At", "Ends At", "Location", "Team", "Real Present", "Planned"])
         for event in events:
+            real_count = sum(1 for attendance in event.attendances if attendance.mode == "real" and attendance.status == "present")
+            planned_count = sum(1 for attendance in event.attendances if attendance.mode == "planned")
             writer.writerow([
                 event.id, event.title, event.kind, event.starts_at, event.ends_at or "",
                 event.location or "", event.team.name if event.team else "", real_count, planned_count
@@ -450,24 +506,29 @@ def admin_member_attendance(
 
     query = (
         db.query(ScoutEvent)
-        .options(
-            joinedload(ScoutEvent.team),
-            joinedload(ScoutEvent.attendances),
-        )
+        .options(joinedload(ScoutEvent.team))
         .join(ScoutAttendance, ScoutAttendance.event_id == ScoutEvent.id)
         .filter(ScoutAttendance.user_id == user_id)
+        .distinct()
     )
     if date_from:
         query = query.filter(ScoutEvent.starts_at >= date_from)
     if date_to:
         query = query.filter(ScoutEvent.starts_at <= date_to)
     events = query.order_by(ScoutEvent.starts_at.desc()).all()
+    attendance_by_event: dict[int, dict[str, ScoutAttendance]] = {}
+    if events:
+        for attendance in db.query(ScoutAttendance).filter(
+            ScoutAttendance.user_id == user_id,
+            ScoutAttendance.event_id.in_([event.id for event in events]),
+        ):
+            attendance_by_event.setdefault(attendance.event_id, {})[attendance.mode] = attendance
 
     kinds = ("meeting", "trip", "other")
     summary = {k: {"events": 0, "present": 0, "absent": 0, "excused": 0, "attending": 0, "not_attending": 0, "unknown": 0} for k in kinds}
     rows = []
     for event in events:
-        atts = {a.mode: a for a in event.attendances if a.user_id == user_id}
+        atts = attendance_by_event.get(event.id, {})
         real = atts.get("real")
         planned = atts.get("planned")
         row = {
@@ -500,25 +561,33 @@ def admin_attendance_matrix(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     kind: str | None = Query(None),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(40, ge=1, le=80),
     db: Session = Depends(get_db),
     _: User = Depends(require_attendance_manage),
 ):
     """Attendance matrix: events as columns, members grouped by team with per-event real status."""
-    event_query = db.query(ScoutEvent).options(joinedload(ScoutEvent.attendances))
+    event_query = db.query(ScoutEvent)
     if date_from:
         event_query = event_query.filter(ScoutEvent.starts_at >= date_from)
     if date_to:
         event_query = event_query.filter(ScoutEvent.starts_at <= date_to)
     if kind:
         event_query = event_query.filter(ScoutEvent.kind == kind)
-    events = event_query.order_by(ScoutEvent.starts_at.desc()).all()
+    total_events = event_query.count()
+    events = event_query.order_by(ScoutEvent.starts_at.desc()).offset(offset).limit(limit).all()
 
     by_member: dict[int, dict[int, str]] = {}
-    for event in events:
-        for attendance in event.attendances:
-            if attendance.mode != "real":
-                continue
-            by_member.setdefault(attendance.user_id, {})[event.id] = attendance.status
+    if events:
+        for user_id, event_id, status in db.query(
+            ScoutAttendance.user_id,
+            ScoutAttendance.event_id,
+            ScoutAttendance.status,
+        ).filter(
+            ScoutAttendance.event_id.in_([event.id for event in events]),
+            ScoutAttendance.mode == "real",
+        ):
+            by_member.setdefault(user_id, {})[event_id] = status
 
     users = (
         db.query(User)
@@ -527,7 +596,8 @@ def admin_attendance_matrix(
         .order_by(User.real_name)
         .all()
     )
-    users = [user for user in users if not _is_leader(db, user)]
+    leader_ids = _leader_user_ids(db, [user.id for user in users])
+    users = [user for user in users if user.id not in leader_ids]
 
     groups: list[dict] = []
     grouped: dict[int | None, list[dict]] = {}
@@ -549,4 +619,6 @@ def admin_attendance_matrix(
     return {
         "events": [{"id": event.id, "title": event.title, "starts_at": event.starts_at, "kind": event.kind} for event in events],
         "groups": groups,
+        "total_events": total_events,
+        "has_more": offset + len(events) < total_events,
     }

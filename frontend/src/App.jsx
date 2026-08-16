@@ -1,5 +1,5 @@
 import React from "react";
-import { Suspense, useEffect } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import Layout from "./components/Layout";
@@ -28,7 +28,6 @@ import ModuleSettings from "./pages/ModuleSettings";
 import AdminWidgets from "./pages/AdminWidgets";
 import MembersDirectory from "./modules/members/MembersDirectory";
 import MemberDetail from "./modules/members/MemberDetail";
-import { useConfig } from "./providers/ConfigProvider";
 
 const WebAdminRoute = React.lazy(() => import("./modules/web/WebAdminRoute"));
 const PagesPage = React.lazy(() => import("./modules/web/pages/PagesPage"));
@@ -43,16 +42,8 @@ const ThemesPage = React.lazy(() => import("./modules/web/themes/ThemesPage"));
 const WebEditorPage = React.lazy(() => import("./modules/web/editor/WebEditorPage"));
 
 export default function App() {
-  const { config } = useConfig();
   const location = useLocation();
   const isWebEditor = /^\/admin\/web\/(?:pages\/\d+|design\/(?:templates|components|sections)\/\d+)\/editor\/?$/.test(location.pathname);
-
-  // Update document title when config changes
-  useEffect(() => {
-    if (config?.app_name) {
-      document.title = config.app_name;
-    }
-  }, [config?.app_name]);
 
   const routes = (
     <Suspense fallback={<div className="loader">Loading…</div>}>

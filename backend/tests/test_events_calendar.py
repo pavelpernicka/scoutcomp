@@ -306,6 +306,52 @@ def test_admin_member_search_and_overview(client, db_session):
     assert data["events"][0]["planned_status"] == "attending"
 
 
+def test_admin_attendance_matrix_is_paginated_and_export_counts_are_computed(client, db_session):
+    team = Team(name="Alpha", join_code="JOINALPHA")
+    admin = _user("admin", RoleEnum.ADMIN)
+    member = _user("member", RoleEnum.MEMBER, team)
+    db_session.add_all([team, admin, member])
+    db_session.commit()
+    headers = _headers(_login(client, "admin"))
+
+    event_ids = []
+    for index in range(3):
+        event = client.post(
+            "/activity/events",
+            json=_event_payload(
+                title=f"Schůzka {index}",
+                team_id=team.id,
+                starts_at=(datetime.now(timezone.utc) + timedelta(days=index + 1)).isoformat(),
+            ),
+            headers=headers,
+        ).json()
+        event_ids.append(event["id"])
+    client.post(
+        f"/activity/events/{event_ids[0]}/attendance",
+        json={"user_id": member.id, "mode": "real", "status": "present"},
+        headers=headers,
+    )
+
+    matrix = client.get(
+        "/admin/core/attendance/matrix",
+        params={"limit": 2, "offset": 0},
+        headers=headers,
+    )
+    assert matrix.status_code == 200
+    assert matrix.json()["total_events"] == 3
+    assert len(matrix.json()["events"]) == 2
+    assert matrix.json()["has_more"] is True
+
+    exported = client.get(
+        "/admin/core/attendance/events",
+        params={"export": "csv", "page_size": 10},
+        headers=headers,
+    )
+    assert exported.status_code == 200
+    assert "Schůzka 0" in exported.text
+    assert ",1," in exported.text
+
+
 def test_message_attendees_sends_only_to_present(client, db_session):
     team = Team(name="Alpha", join_code="JOINALPHA")
     admin = _user("admin", RoleEnum.ADMIN)
