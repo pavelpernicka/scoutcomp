@@ -34,7 +34,7 @@ def test_admin_can_create_global_dashboard_message(client, db_session):
 
     token = _login(client, "admin", "secret")
     response = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Notice", "body": "Hello scouts!"},
         headers=_auth_headers(token),
     )
@@ -70,21 +70,21 @@ def test_group_admin_restricted_to_managed_teams(client, db_session):
     headers = _auth_headers(token)
 
     disallowed = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Global", "body": "General info"},
         headers=headers,
     )
     assert disallowed.status_code == 403
 
     other_team_attempt = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Wrong team", "body": "Info", "team_id": team_bravo.id},
         headers=headers,
     )
     assert other_team_attempt.status_code == 403
 
     allowed = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Alpha news", "body": "Stay ready!", "team_id": team_alpha.id},
         headers=headers,
     )
@@ -126,7 +126,7 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
     group_token = _login(client, "captain", "secret")
 
     create_response = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Briefing", "body": "Initial", "team_id": team_alpha.id},
         headers=_auth_headers(admin_token),
     )
@@ -134,7 +134,7 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
     message_id = create_response.json()["id"]
 
     update_response = client.patch(
-        f"/dashboard-messages/{message_id}",
+        f"/announcements/{message_id}",
         json={"body": "Updated info", "team_id": None},
         headers=_auth_headers(admin_token),
     )
@@ -144,14 +144,14 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
     assert updated["body"] == "Updated info"
 
     forbidden_change = client.patch(
-        f"/dashboard-messages/{message_id}",
+        f"/announcements/{message_id}",
         json={"body": "Group tries"},
         headers=_auth_headers(group_token),
     )
     assert forbidden_change.status_code == 403
 
     group_create = client.post(
-        "/dashboard-messages",
+        "/announcements",
         json={"title": "Alpha", "body": "Initial", "team_id": team_alpha.id},
         headers=_auth_headers(group_token),
     )
@@ -159,7 +159,7 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
     group_message_id = group_create.json()["id"]
 
     group_update = client.patch(
-        f"/dashboard-messages/{group_message_id}",
+        f"/announcements/{group_message_id}",
         json={"body": "Edited by group", "title": "  Alpha Alert  "},
         headers=_auth_headers(group_token),
     )
@@ -169,7 +169,7 @@ def test_dashboard_message_update_respects_permissions(client, db_session):
     assert result["title"] == "Alpha Alert"
 
     make_global_attempt = client.patch(
-        f"/dashboard-messages/{group_message_id}",
+        f"/announcements/{group_message_id}",
         json={"team_id": None},
         headers=_auth_headers(group_token),
     )

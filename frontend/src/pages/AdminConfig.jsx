@@ -56,8 +56,6 @@ export default function AdminConfig() {
       const { data: response } = await api.patch("/admin/config", {
         app_name: data.appName,
         app_icon: data.appIcon,
-        leaderboard_default_view: data.leaderboardDefaultView,
-        leaderboard_show_only_default_mode: data.leaderboardShowOnlyDefaultMode,
         allow_self_registration: data.allowSelfRegistration,
       });
       return response;
@@ -157,7 +155,7 @@ export default function AdminConfig() {
 
       {/* Configuration Form */}
       <div className="row">
-        <div className="col-12 col-xl-8 mx-auto">
+        <div className="col-12">
           <div className="card shadow-lg border-0" style={{ borderTop: '4px solid #6f42c1' }}>
             <div className="card-header bg-light border-0">
               <div className="d-flex align-items-center gap-2">
@@ -241,46 +239,6 @@ export default function AdminConfig() {
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Leaderboard Default View */}
-                  <div className="col-12">
-                    <label className="form-label fw-medium">
-                      {t("adminConfig.leaderboardDefault")}
-                    </label>
-                    <select
-                      className="form-select border-primary border-opacity-50"
-                      value={formData.leaderboardDefaultView}
-                      onChange={(e) => handleInputChange("leaderboardDefaultView", e.target.value)}
-                    >
-                      <option value="total">{t("adminConfig.totalPoints")}</option>
-                      <option value="average">{t("adminConfig.averagePoints")}</option>
-                    </select>
-                    <div className="form-text">
-                      {t("adminConfig.leaderboardHelp")}
-                    </div>
-                  </div>
-
-                  {/* Leaderboard: Show Only Default Mode */}
-                  <div className="col-12">
-                    <div className="d-flex align-items-center gap-3">
-                      <div className="form-check form-switch">
-                        <input
-                          className="form-check-input"
-                          type="checkbox"
-                          role="switch"
-                          id="leaderboardShowOnlyDefaultMode"
-                          checked={formData.leaderboardShowOnlyDefaultMode}
-                          onChange={(e) => handleInputChange("leaderboardShowOnlyDefaultMode", e.target.checked)}
-                        />
-                        <label className="form-check-label fw-medium" htmlFor="leaderboardShowOnlyDefaultMode">
-                          {t("adminConfig.showOnlyDefaultMode")}
-                        </label>
-                      </div>
-                    </div>
-                    <div className="form-text mt-2">
-                      {t("adminConfig.showOnlyDefaultModeHelp")}
                     </div>
                   </div>
 

@@ -3,25 +3,24 @@ import secrets
 import string
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from ..dependencies import (
     get_current_active_user,
     get_db,
-    get_managed_team_ids,
-    require_admin,
-    require_admin_or_group_admin,
+    require_action,
 )
-from ..models import Completion, CompletionStatus, RoleEnum, Team, User
-from ..schemas import BulkRegistrationResult, BulkUserRegistration, MeResponse, PasswordChangeRequest, ScoreSummary, UserCreate, UserPublic, UserUpdate, UserWithPassword
+from ..models import RoleEnum, Team, User
+from ..schemas import BulkRegistrationResult, BulkUserRegistration, MeResponse, PasswordChangeRequest, UserCreate, UserPublic, UserUpdate, UserWithPassword
 from ..core.security import get_password_hash, verify_password
+from ..permissions import allows_team, managed_team_ids, permission_keys, permission_scopes
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def _user_to_public(user: User) -> UserPublic:
+def _user_to_public(user: User, db: Session | None = None) -> UserPublic:
     return UserPublic(
         id=user.id,
         username=user.username,
@@ -31,11 +30,16 @@ def _user_to_public(user: User) -> UserPublic:
         role=user.role,
         team_id=user.team_id,
         is_active=user.is_active,
+        receive_messages=user.receive_messages,
+        avatar=user.avatar,
         created_at=user.created_at,
         updated_at=user.updated_at,
         needs_password_change=user.first_login_at is None,  # First login requires password change
         managed_team_ids=[team.id for team in getattr(user, "managed_teams", [])],
         team_name=user.team.name if hasattr(user, 'team') and user.team else None,
+        permission_group_ids=[group.id for group in getattr(user, "permission_groups", [])],
+        permission_group_names=[group.name for group in getattr(user, "permission_groups", [])],
+        permissions=sorted(permission_keys(db, user)) if db is not None else [],
     )
 
 
@@ -52,16 +56,6 @@ def _set_managed_teams(db: Session, user: User, team_ids: Optional[List[int]]) -
     user.managed_teams = teams
 
 
-def _assert_group_admin_can_manage(current_user: User, target_user: User) -> None:
-    if current_user.role != RoleEnum.GROUP_ADMIN:
-        return
-    allowed = get_managed_team_ids(current_user)
-    if target_user.id == current_user.id:
-        return
-    if not allowed or (target_user.team_id not in allowed):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
-
-
 @router.get("/me", response_model=MeResponse)
 def read_current_user(
     db: Session = Depends(get_db),
@@ -69,95 +63,39 @@ def read_current_user(
 ) -> MeResponse:
     if current_user.team_id:
         current_user = db.query(User).options(joinedload(User.team)).filter(User.id == current_user.id).first()
-    total_points = (
-        db.query(func.coalesce(func.sum(Completion.points_awarded), 0))
-        .filter(Completion.member_id == current_user.id, Completion.status == CompletionStatus.APPROVED)
-        .scalar()
-    )
+    return MeResponse(user=_user_to_public(current_user, db))
 
-    member_scores = (
-        db.query(
-            Completion.member_id.label("member_id"),
-            func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
-        )
-        .filter(Completion.status == CompletionStatus.APPROVED)
-        .group_by(Completion.member_id)
-        .subquery()
-    )
 
-    member_rank = None
-    member_score_row = (
-        db.query(member_scores.c.score)
-        .filter(member_scores.c.member_id == current_user.id)
-        .one_or_none()
-    )
-    if member_score_row:
-        higher = (
-            db.query(func.count())
-            .select_from(member_scores)
-            .filter(member_scores.c.score > member_score_row.score)
-            .scalar()
-        )
-        member_rank = (higher or 0) + 1
+class UserPreferenceUpdate(BaseModel):
+    receive_messages: bool
 
-    team_rank = None
-    if current_user.team_id:
-        team_scores = (
-            db.query(
-                Team.id.label("team_id"),
-                func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
-            )
-            .join(User, User.team_id == Team.id)
-            .outerjoin(
-                Completion,
-                (Completion.member_id == User.id) & (Completion.status == CompletionStatus.APPROVED),
-            )
-            .group_by(Team.id)
-            .subquery()
-        )
-        team_score_row = (
-            db.query(team_scores.c.score)
-            .filter(team_scores.c.team_id == current_user.team_id)
-            .one_or_none()
-        )
-        if team_score_row:
-            higher_teams = (
-                db.query(func.count())
-                .select_from(team_scores)
-                .filter(team_scores.c.score > team_score_row.score)
-                .scalar()
-            )
-            team_rank = (higher_teams or 0) + 1
 
-    return MeResponse(
-        user=_user_to_public(current_user),
-        scoreboard=ScoreSummary(
-            total_points=float(total_points or 0),
-            member_rank=member_rank,
-            team_rank=team_rank,
-        ),
-    )
+@router.patch("/me", response_model=MeResponse)
+def update_own_preferences(
+    payload: UserPreferenceUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> MeResponse:
+    current_user.receive_messages = payload.receive_messages
+    db.commit()
+    return MeResponse(user=_user_to_public(current_user, db))
 
 
 @router.get("/", response_model=List[UserPublic])
 @router.get("", response_model=List[UserPublic], include_in_schema=False)
 def list_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("core.users.read")),
     team_id: Optional[int] = Query(default=None),
     role: Optional[RoleEnum] = Query(default=None),
 ) -> List[UserPublic]:
     query = db.query(User).options(joinedload(User.team), joinedload(User.managed_teams))
-    managed_ids: set[int] = set()
-
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids:
-            return []
+    managed_ids = managed_team_ids(current_user)
+    if "any" not in permission_scopes(db, current_user, "core.users.read"):
         query = query.filter(User.team_id.in_(managed_ids))
 
     if team_id is not None:
-        if current_user.role == RoleEnum.GROUP_ADMIN and team_id not in managed_ids:
+        if "any" not in permission_scopes(db, current_user, "core.users.read") and team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
         query = query.filter(User.team_id == team_id)
 
@@ -171,7 +109,7 @@ def list_users(
 def get_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("core.users.read")),
 ) -> UserPublic:
     user = (
         db.query(User)
@@ -182,10 +120,8 @@ def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or user.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
+    if not allows_team(db, current_user, "core.users.read", user.team_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside permitted scope")
 
     return _user_to_public(user)
 
@@ -195,8 +131,10 @@ def get_user(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_action("core.users.create")),
 ) -> UserPublic:
+    if "any" not in permission_scopes(db, current_user, "core.users.create"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Creating users requires global scope")
     if payload.team_id is not None:
         team = db.get(Team, payload.team_id)
         if not team:
@@ -208,8 +146,12 @@ def create_user(
         password_hash=get_password_hash(payload.password),
         preferred_language=payload.preferred_language,
         team_id=payload.team_id,
-        role=payload.role,
+        role=RoleEnum.MEMBER,
     )
+    from ..modules import registry
+    member = registry.member_group(db)
+    if member:
+        user.permission_groups.append(member)
     db.add(user)
     try:
         db.flush()
@@ -236,68 +178,30 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("core.users.edit")),
 ) -> UserPublic:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No managed teams configured",
-            )
-        if user.team_id not in managed_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User outside managed teams",
-            )
-        if "team_id" in payload.model_fields_set and payload.team_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Group admins cannot remove team assignment",
-            )
-        if payload.team_id is not None and payload.team_id not in managed_ids:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Team outside managed scope",
-            )
-        forbidden_updates = [
-            payload.username,
-            payload.email,
-            payload.role,
-            payload.password,
-            payload.preferred_language,
-            payload.is_active,
-            payload.managed_team_ids,
-        ]
-        if any(value is not None for value in forbidden_updates):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Group admins cannot modify roles, credentials, or managed teams",
-            )
-
+    if not allows_team(db, current_user, "core.users.edit", user.team_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside permitted scope")
+    security_changes = any(value is not None for value in [payload.username, payload.email, payload.password, payload.is_active])
+    if security_changes and "any" not in permission_scopes(db, current_user, "core.users.credentials.manage"):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing core.users.credentials.manage")
     if payload.username is not None:
-        if current_user.role != RoleEnum.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change usernames")
         user.username = payload.username
 
     if payload.real_name is not None:
         user.real_name = payload.real_name
 
     if payload.email is not None:
-        if current_user.role != RoleEnum.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change emails")
         user.email = payload.email
 
     if payload.password:
-        if current_user.role != RoleEnum.ADMIN and current_user.id != user.id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Cannot modify password")
         user.password_hash = get_password_hash(payload.password)
         # If admin is changing someone else's password, require password change on next login
-        if current_user.role == RoleEnum.ADMIN and current_user.id != user.id:
+        if current_user.id != user.id:
             user.first_login_at = None
     if payload.preferred_language is not None:
         user.preferred_language = payload.preferred_language
@@ -306,34 +210,22 @@ def update_user(
             team = db.get(Team, payload.team_id)
             if not team:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+            if not allows_team(db, current_user, "core.users.edit", payload.team_id):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Target team outside permitted scope")
         user.team_id = payload.team_id
     elif "team_id" in payload.model_fields_set:
+        if "any" not in permission_scopes(db, current_user, "core.users.edit"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team assignment cannot be removed")
         user.team_id = None
-    if payload.role is not None:
-        if current_user.id == user.id and payload.role != RoleEnum.ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Admins cannot remove their own admin role",
-            )
-        if current_user.role != RoleEnum.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change roles")
-        user.role = payload.role
-        if payload.role != RoleEnum.GROUP_ADMIN:
-            user.managed_teams = []
+    if payload.role is not None or payload.managed_team_ids is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Roles and managed teams are administered through permission groups")
     if payload.is_active is not None:
-        if current_user.role != RoleEnum.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may change activation state")
         user.is_active = payload.is_active
 
-    if payload.managed_team_ids is not None:
-        if current_user.role != RoleEnum.ADMIN:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins may update managed teams")
-        if user.role != RoleEnum.GROUP_ADMIN:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Managed teams require group admin role",
-            )
-        _set_managed_teams(db, user, payload.managed_team_ids)
+    if "avatar" in payload.model_fields_set:
+        if current_user.id != user.id and "core.avatar.manage" not in permission_keys(db, current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing core.avatar.manage")
+        user.avatar = payload.avatar
 
     db.add(user)
     try:
@@ -367,12 +259,14 @@ def generate_password(length: int = 12) -> str:
 def generate_and_set_password(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_action("core.users.edit")),
 ) -> dict:
     """Generate a random password for a user and require them to change it on next login."""
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if not allows_team(db, current_user, "core.users.edit", user.team_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside permitted scope")
 
     if current_user.id == user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot generate password for yourself")
@@ -401,7 +295,7 @@ def transliterate_text(text: str) -> str:
 def bulk_register_users(
     payload: BulkUserRegistration,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("core.users.create")),
 ) -> BulkRegistrationResult:
     def generate_username(real_name: str) -> str:
         return (
@@ -457,6 +351,10 @@ def bulk_register_users(
                 team_id=payload.team_id,
                 role=payload.role,
             )
+            from ..modules import registry
+            member = registry.member_group(db)
+            if member:
+                user.permission_groups.append(member)
             db.add(user)
             db.flush()
 
@@ -485,13 +383,20 @@ def bulk_register_users(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_action("core.users.delete")),
 ) -> None:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if current_user.id == user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot delete your own account")
+    if not allows_team(db, current_user, "core.users.delete", user.team_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside permitted scope")
+    if any(group.name == "Superadmin" for group in user.permission_groups):
+        from ..models import PermissionGroup
+        admin = db.query(PermissionGroup).filter_by(name="Superadmin").one_or_none()
+        if admin is not None and not any(other.id != user.id and other.is_active for other in admin.members):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nelze smazat posledního superadmina")
     db.delete(user)
     db.commit()
 
@@ -519,3 +424,5 @@ def change_own_password(
     db.refresh(current_user)
 
     return _user_to_public(current_user)
+    if not allows_team(db, current_user, "core.users.delete", user.team_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside permitted scope")

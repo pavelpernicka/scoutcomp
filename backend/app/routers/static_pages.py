@@ -3,7 +3,7 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_current_active_user, get_db, require_admin
+from ..dependencies import get_current_active_user, get_db, require_action
 from ..models import StaticPage, User
 from ..schemas import StaticPagePublic, StaticPageUpdate
 
@@ -45,7 +45,7 @@ def upsert_static_page(
     slug: str,
     payload: StaticPageUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.rules.manage")),
 ) -> StaticPagePublic:
     normalized = _normalize_slug(slug)
     page = db.query(StaticPage).filter(StaticPage.slug == normalized).first()

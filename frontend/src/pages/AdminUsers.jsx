@@ -4,7 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import { formatDateToLocal } from "../utils/dateUtils";
+import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
+import HeroHeader from "../components/HeroHeader";
 
 const emptyCreateForm = {
   username: "",
@@ -785,7 +786,7 @@ export default function AdminUsers() {
           return false;
         }
       }
-      const submitted = new Date(item.submitted_at);
+      const submitted = parseServerDate(item.submitted_at);
       if (completionFrom) {
         const fromDate = new Date(completionFrom);
         if (submitted < fromDate) {
@@ -856,7 +857,15 @@ export default function AdminUsers() {
   }
 
   return (
-    <div className="container px-0">
+    <>
+      <HeroHeader
+        title={t("adminUsers.title")}
+        subtitle={t("adminUsers.subtitle")}
+        icon="👥"
+        gradient="linear-gradient(135deg, #4338ca 0%, #6366f1 100%)"
+      />
+
+      <div className="container px-0">
       {feedback && (
         <div className={`alert alert-${feedback.type}`} role="alert">
           {feedback.message}
@@ -2076,5 +2085,6 @@ export default function AdminUsers() {
         </>
       )}
     </div>
+    </>
   );
 }

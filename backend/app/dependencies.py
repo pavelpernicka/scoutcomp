@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from .core.security import decode_token
 from .database import SessionLocal
-from .models import RoleEnum, User
+from .models import User
+from .permissions import permission_scopes
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
@@ -47,20 +48,17 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     return current_user
 
 
-def require_admin(current_user: User = Depends(get_current_active_user)) -> User:
-    if current_user.role != RoleEnum.ADMIN:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
-    return current_user
-
-
-def require_admin_or_group_admin(current_user: User = Depends(get_current_active_user)) -> User:
-    if current_user.role not in {RoleEnum.ADMIN, RoleEnum.GROUP_ADMIN}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin or group admin privileges required",
-        )
-    return current_user
-
-
 def get_managed_team_ids(user: User) -> set[int]:
     return {team.id for team in getattr(user, "managed_teams", [])}
+
+
+def require_action(action: str):
+    """Authorize an action; object/team scope is checked by the endpoint."""
+    def dependency(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_active_user),
+    ) -> User:
+        if not permission_scopes(db, current_user, action):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing {action}")
+        return current_user
+    return dependency

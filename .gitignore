@@ -31,6 +31,9 @@ db.sqlite3
 
 # Node
 node_modules/
+.node_modules-legacy-*
+.node_modules-docker-orphaned
+.node_modules-local-incomplete
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -53,3 +56,7 @@ frontend/src/translations/*.json
 .env.*
 !.env.example
 .DS_Store
+backend/uploads/
+
+.codex/
+.vexp/

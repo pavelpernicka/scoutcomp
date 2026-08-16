@@ -103,6 +103,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = Field(default=None, min_length=8)
     preferred_language: Optional[str] = Field(default=None, max_length=8)
+    avatar: Optional[str] = Field(default=None, max_length=200000)
     team_id: Optional[int] = None
     role: Optional[RoleEnum] = None
     is_active: Optional[bool] = None
@@ -120,10 +121,15 @@ class UserPublic(UserBase):
     team_id: Optional[int]
     team_name: Optional[str] = None
     is_active: bool
+    receive_messages: bool = True
+    avatar: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     needs_password_change: bool = False  # True if this is first login and password should be changed
     managed_team_ids: List[int] = Field(default_factory=list)
+    permission_group_ids: List[int] = Field(default_factory=list)
+    permission_group_names: List[str] = Field(default_factory=list)
+    permissions: List[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -147,12 +153,12 @@ class ScoreSummary(BaseModel):
 
 class MeResponse(BaseModel):
     user: UserPublic
-    scoreboard: ScoreSummary
 
 
 class TeamBase(BaseModel):
     name: str
     description: Optional[str] = None
+    logo: Optional[str] = None
 
 
 class TeamCreate(TeamBase):
@@ -162,6 +168,7 @@ class TeamCreate(TeamBase):
 class TeamUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    logo: Optional[str] = None
 
 
 class TeamPublic(TeamBase):
@@ -371,19 +378,19 @@ class NotificationPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class DashboardMessageCreate(BaseModel):
+class AnnouncementCreate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=150)
     body: str = Field(min_length=1, max_length=1000)
     team_id: Optional[int] = None
 
 
-class DashboardMessageUpdate(BaseModel):
+class AnnouncementUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=150)
     body: Optional[str] = Field(default=None, min_length=1, max_length=1000)
     team_id: Optional[int] = None
 
 
-class DashboardMessagePublic(BaseModel):
+class AnnouncementPublic(BaseModel):
     id: int
     title: Optional[str]
     body: str

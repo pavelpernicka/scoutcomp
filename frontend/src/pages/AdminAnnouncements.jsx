@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal } from "../utils/dateUtils";
+import HeroHeader from "../components/HeroHeader";
 
 const initialCreateScope = (isAdmin) => (isAdmin ? "global" : "team");
 
@@ -47,7 +48,7 @@ export default function AdminAnnouncements() {
   const { data: dashboardMessages = [], isLoading: messagesLoading } = useQuery({
     queryKey: ["admin", "dashboard-messages"],
     queryFn: async () => {
-      const { data } = await api.get("/dashboard-messages/manage");
+      const { data } = await api.get("/announcements/manage");
       return data;
     },
     enabled: canManageUsers,
@@ -96,7 +97,7 @@ export default function AdminAnnouncements() {
   }));
 
   const createMessageMutation = useMutation({
-    mutationFn: async (payload) => api.post("/dashboard-messages", payload),
+    mutationFn: async (payload) => api.post("/announcements", payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-messages"] });
       setCreateForm({
@@ -117,7 +118,7 @@ export default function AdminAnnouncements() {
 
   const updateMessageMutation = useMutation({
     mutationFn: async ({ messageId, payload }) =>
-      api.patch(`/dashboard-messages/${messageId}`, payload),
+      api.patch(`/announcements/${messageId}`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-messages"] });
       setEditingMessage(null);
@@ -132,7 +133,7 @@ export default function AdminAnnouncements() {
   });
 
   const deleteMessageMutation = useMutation({
-    mutationFn: async (messageId) => api.delete(`/dashboard-messages/${messageId}`),
+    mutationFn: async (messageId) => api.delete(`/announcements/${messageId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-messages"] });
       setFeedback({ type: "success", message: t('adminAnnouncements.announcementRemoved') });
@@ -249,7 +250,15 @@ export default function AdminAnnouncements() {
   };
 
   return (
-    <div className="container px-0">
+    <>
+      <HeroHeader
+        title={t("adminAnnouncements.title")}
+        subtitle={t("adminAnnouncements.subtitle")}
+        icon="📢"
+        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+      />
+
+      <div className="container px-0">
       {feedback && (
         <div className={`alert alert-${feedback.type}`} role="alert">
           {feedback.message}
@@ -546,5 +555,6 @@ export default function AdminAnnouncements() {
         </div>
       </div>
     </div>
+    </>
   );
 }

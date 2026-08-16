@@ -6,7 +6,7 @@ import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import { formatDateToLocal } from "../utils/dateUtils";
+import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
@@ -222,7 +222,7 @@ export default function TasksPage() {
   );
 
   const formatRelativeTime = (dateString) => {
-    const diffMs = new Date(dateString).getTime() - Date.now();
+    const diffMs = (parseServerDate(dateString)?.getTime() ?? 0) - Date.now();
     if (diffMs <= 0) {
       return t("tasks.resetSoon");
     }

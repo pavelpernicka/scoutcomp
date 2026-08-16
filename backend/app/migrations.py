@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import json
 from datetime import datetime, timezone
 from typing import Callable, List
 
@@ -90,6 +91,116 @@ def _create_group_admin_table(conn: Connection) -> None:
             """
         )
     )
+
+
+def _create_web_tables(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "web_pages" not in inspector.get_table_names():
+        logger.info("Creating 'web_pages' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_pages (
+                    id INTEGER PRIMARY KEY,
+                    slug VARCHAR(200) NOT NULL UNIQUE,
+                    title VARCHAR(200) NOT NULL,
+                    template VARCHAR(50),
+                    data JSON,
+                    html TEXT,
+                    published BOOLEAN NOT NULL DEFAULT 0,
+                    team_id INTEGER REFERENCES teams(id) ON DELETE SET NULL,
+                    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    if "web_media" not in inspector.get_table_names():
+        logger.info("Creating 'web_media' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_media (
+                    id INTEGER PRIMARY KEY,
+                    filename VARCHAR(255) NOT NULL,
+                    path VARCHAR(500) NOT NULL,
+                    mime VARCHAR(100),
+                    size INTEGER NOT NULL DEFAULT 0,
+                    uploaded_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+
+def _create_web_templates_table(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "web_templates" not in inspector.get_table_names():
+        logger.info("Creating 'web_templates' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_templates (
+                    id INTEGER PRIMARY KEY,
+                    key VARCHAR(50) NOT NULL UNIQUE,
+                    name VARCHAR(200) NOT NULL,
+                    description VARCHAR(500),
+                    html TEXT NOT NULL,
+                    css TEXT NOT NULL DEFAULT '',
+                    is_system BOOLEAN NOT NULL DEFAULT 0,
+                    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    from .web_defaults import DEFAULT_TEMPLATES
+
+    for key, template in DEFAULT_TEMPLATES.items():
+        existing = conn.execute(
+            text("SELECT 1 FROM web_templates WHERE key = :key"), {"key": key}
+        ).fetchone()
+        if existing:
+            continue
+        values = {
+            "key": key,
+            "name": template["name"],
+            "description": template.get("description"),
+            "html": template["html"],
+            "css": template.get("css", ""),
+        }
+        # Base.metadata.create_all() runs before migrations.  On a fresh
+        # database the advanced model columns therefore already exist while
+        # this legacy seed step is still pending.
+        template_columns = {column["name"] for column in inspect(conn).get_columns("web_templates")}
+        if "template_kind" in template_columns:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO web_templates
+                        (key, name, description, html, css, is_system,
+                         template_kind, draft_version, published_css, published_version,
+                         created_at, updated_at)
+                    VALUES
+                        (:key, :name, :description, :html, :css, 1,
+                         'page', 1, :css, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """
+                ),
+                values,
+            )
+        else:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO web_templates (key, name, description, html, css, is_system, created_at, updated_at)
+                    VALUES (:key, :name, :description, :html, :css, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """
+                ),
+                values,
+            )
 
 
 def _create_dashboard_messages_table(conn: Connection) -> None:
@@ -870,6 +981,1147 @@ def _add_latex_template_column(conn: Connection) -> None:
             raise
 
 
+def _extend_module_authorization_schema(conn: Connection) -> None:
+    """Forward-only upgrade for the module catalogue and scoped RBAC grants."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "registered_modules" in tables:
+        columns = {c["name"] for c in inspector.get_columns("registered_modules")}
+        if "installed" not in columns:
+            conn.execute(text("ALTER TABLE registered_modules ADD COLUMN installed BOOLEAN NOT NULL DEFAULT 1"))
+    if "permission_definitions" in tables:
+        columns = {c["name"] for c in inspector.get_columns("permission_definitions")}
+        if "scopes" not in columns:
+            conn.execute(text("ALTER TABLE permission_definitions ADD COLUMN scopes JSON"))
+            conn.execute(text("UPDATE permission_definitions SET scopes = '[\"any\"]' WHERE scopes IS NULL"))
+    if "permission_group_permissions" in tables:
+        columns = {c["name"] for c in inspector.get_columns("permission_group_permissions")}
+        if "scope" not in columns:
+            conn.execute(text("ALTER TABLE permission_group_permissions ADD COLUMN scope VARCHAR(32) NOT NULL DEFAULT 'any'"))
+
+
+def _extend_module_dependency_columns(conn: Connection) -> None:
+    """Add dependency and metadata columns for the module catalogue."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "registered_modules" not in tables:
+        return
+    columns = {c["name"] for c in inspector.get_columns("registered_modules")}
+    if "dependencies" not in columns:
+        conn.execute(text("ALTER TABLE registered_modules ADD COLUMN dependencies JSON NOT NULL DEFAULT ('[]')"))
+    if "metadata" not in columns:
+        conn.execute(text("ALTER TABLE registered_modules ADD COLUMN metadata JSON NOT NULL DEFAULT ('{}')"))
+
+
+def _rename_dashboard_messages_to_announcements(conn: Connection) -> None:
+    """Rename 'dashboard_messages' to 'announcements' to match the competitions module."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "dashboard_messages" not in tables:
+        logger.debug("Table 'dashboard_messages' already renamed or missing")
+        return
+    if "announcements" in tables:
+        logger.info("Copying 'dashboard_messages' rows into 'announcements' table")
+        conn.execute(
+            text(
+                """
+                INSERT INTO announcements (id, title, body, team_id, created_by_id, created_at)
+                SELECT id, title, body, team_id, created_by_id, created_at FROM dashboard_messages
+                """
+            )
+        )
+        conn.execute(text("DROP TABLE dashboard_messages"))
+    else:
+        logger.info("Renaming 'dashboard_messages' table to 'announcements'")
+        conn.execute(text("ALTER TABLE dashboard_messages RENAME TO announcements"))
+
+
+def _add_receive_messages_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "receive_messages" in columns:
+        return
+    logger.info("Adding 'receive_messages' column to users table")
+    conn.execute(text("ALTER TABLE users ADD COLUMN receive_messages BOOLEAN NOT NULL DEFAULT 1"))
+
+
+def _add_user_avatar_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "avatar" in columns:
+        return
+    logger.info("Adding 'avatar' column to users table")
+    conn.execute(text("ALTER TABLE users ADD COLUMN avatar TEXT"))
+
+
+def _add_team_logo_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "teams" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("teams")}
+    if "logo" in columns:
+        return
+    logger.info("Adding 'logo' column to teams table")
+    conn.execute(text("ALTER TABLE teams ADD COLUMN logo TEXT"))
+
+
+def _add_event_color_column(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "scout_events" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("scout_events")}
+    if "color" in columns:
+        return
+    logger.info("Adding 'color' column to scout_events table")
+    conn.execute(text("ALTER TABLE scout_events ADD COLUMN color VARCHAR(16)"))
+
+
+def _add_event_attendance_fields(conn: Connection) -> None:
+    inspector = inspect(conn)
+    if "scout_events" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("scout_events")}
+    if "audience" not in columns:
+        logger.info("Adding 'audience' column to scout_events table")
+        conn.execute(text("ALTER TABLE scout_events ADD COLUMN audience VARCHAR(20) NOT NULL DEFAULT 'members'"))
+    if "requires_planned" not in columns:
+        logger.info("Adding 'requires_planned' column to scout_events table")
+        conn.execute(text("ALTER TABLE scout_events ADD COLUMN requires_planned BOOLEAN NOT NULL DEFAULT 0"))
+    if "planned_deadline" not in columns:
+        logger.info("Adding 'planned_deadline' column to scout_events table")
+        conn.execute(text("ALTER TABLE scout_events ADD COLUMN planned_deadline DATETIME"))
+
+
+def _add_attendance_mode(conn: Connection) -> None:
+    """Add the planned/real mode to scout_attendances.
+
+    The old unique constraint covered (event_id, user_id); a user now needs a
+    separate row per mode, so the table is rebuilt with a composite constraint.
+    """
+    inspector = inspect(conn)
+    if "scout_attendances" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("scout_attendances")}
+    if "mode" in columns:
+        return
+    logger.info("Rebuilding scout_attendances with 'mode' column and composite unique constraint")
+    conn.execute(
+        text(
+            """
+            CREATE TABLE scout_attendances_new (
+                id INTEGER PRIMARY KEY,
+                event_id INTEGER NOT NULL REFERENCES scout_events(id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                mode VARCHAR(20) NOT NULL DEFAULT 'real',
+                status VARCHAR(20) NOT NULL DEFAULT 'present',
+                note TEXT,
+                marked_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                marked_at DATETIME NOT NULL,
+                CONSTRAINT uq_scout_event_user UNIQUE (event_id, user_id, mode)
+            )
+            """
+        )
+    )
+    conn.execute(
+        text(
+            """
+            INSERT INTO scout_attendances_new (id, event_id, user_id, mode, status, note, marked_by_id, marked_at)
+            SELECT id, event_id, user_id, 'real', status, note, marked_by_id, marked_at FROM scout_attendances
+            """
+        )
+    )
+    conn.execute(text("DROP TABLE scout_attendances"))
+    conn.execute(text("ALTER TABLE scout_attendances_new RENAME TO scout_attendances"))
+
+
+def _add_attendance_created_at_column(conn: Connection) -> None:
+    """Add created_at column to scout_attendances table for tracking registration date."""
+    inspector = inspect(conn)
+    if "scout_attendances" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("scout_attendances")}
+    if "created_at" in columns:
+        logger.debug("Column 'created_at' already present on scout_attendances table")
+        return
+    logger.info("Adding 'created_at' column to scout_attendances table")
+    # SQLite doesn't support non-constant defaults in ALTER TABLE
+    # Step 1: Add nullable column
+    conn.execute(text("ALTER TABLE scout_attendances ADD COLUMN created_at DATETIME"))
+    # Step 2: Update existing rows with marked_at value
+    conn.execute(text("UPDATE scout_attendances SET created_at = marked_at WHERE created_at IS NULL"))
+    # Step 3: For future inserts, we'll rely on the model's default=func.now()
+
+
+def _web_cms_extend(conn: Connection) -> None:
+    """Extend web tables into a full CMS: page hierarchy/trash/revisions,
+    posts/news, menus and media albums/alt/caption."""
+    inspector = inspect(conn)
+
+    def _ensure_column(table: str, column: str, ddl: str) -> None:
+        columns = {col["name"] for col in inspector.get_columns(table)}
+        if column not in columns:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
+
+    if "web_pages" in inspector.get_table_names():
+        _ensure_column("web_pages", "position", "position INTEGER NOT NULL DEFAULT 0")
+        _ensure_column("web_pages", "parent_id", "parent_id INTEGER REFERENCES web_pages(id) ON DELETE SET NULL")
+        _ensure_column("web_pages", "meta_description", "meta_description VARCHAR(300)")
+        _ensure_column("web_pages", "deleted_at", "deleted_at TIMESTAMP")
+    if "web_media" in inspector.get_table_names():
+        _ensure_column("web_media", "album", "album VARCHAR(100)")
+        _ensure_column("web_media", "alt", "alt VARCHAR(300)")
+        _ensure_column("web_media", "caption", "caption VARCHAR(500)")
+
+    if "web_page_revisions" not in inspector.get_table_names():
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_page_revisions (
+                    id INTEGER PRIMARY KEY,
+                    page_id INTEGER NOT NULL REFERENCES web_pages(id) ON DELETE CASCADE,
+                    html TEXT,
+                    data JSON,
+                    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    if "web_posts" not in inspector.get_table_names():
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_posts (
+                    id INTEGER PRIMARY KEY,
+                    title VARCHAR(200) NOT NULL,
+                    slug VARCHAR(200) NOT NULL UNIQUE,
+                    excerpt VARCHAR(500),
+                    body TEXT,
+                    cover_media_id INTEGER REFERENCES web_media(id) ON DELETE SET NULL,
+                    published BOOLEAN NOT NULL DEFAULT 0,
+                    published_at TIMESTAMP,
+                    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    if "web_menus" not in inspector.get_table_names():
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_menus (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL,
+                    location VARCHAR(50) NOT NULL UNIQUE,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+    if "web_menu_items" not in inspector.get_table_names():
+        conn.execute(
+            text(
+                """
+                CREATE TABLE web_menu_items (
+                    id INTEGER PRIMARY KEY,
+                    menu_id INTEGER NOT NULL REFERENCES web_menus(id) ON DELETE CASCADE,
+                    parent_id INTEGER REFERENCES web_menu_items(id) ON DELETE CASCADE,
+                    label VARCHAR(200) NOT NULL,
+                    page_slug VARCHAR(200),
+                    url VARCHAR(500),
+                    position INTEGER NOT NULL DEFAULT 0,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+
+def _advanced_web_cms_schema(conn: Connection) -> None:
+    """Add the visual CMS draft/publication and theme schema.
+
+    The migration deliberately retains every legacy column.  Existing public
+    rows are copied to immutable revisions before their publication pointers
+    are set, so an upgraded public renderer never has to expose a mutable
+    draft.  Every operation is guarded to make recovery after partially
+    transactional DDL (notably MySQL/MariaDB) safe.
+    """
+    from . import models as _models  # noqa: F401 - register model tables
+    from .database import Base
+
+    def tables() -> set[str]:
+        return set(inspect(conn).get_table_names())
+
+    def columns(table: str) -> set[str]:
+        return {column["name"] for column in inspect(conn).get_columns(table)}
+
+    def add_column(table: str, name: str, ddl: str) -> None:
+        if table in tables() and name not in columns(table):
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+
+    def create_model_table(name: str) -> None:
+        if name not in tables():
+            Base.metadata.tables[name].create(bind=conn, checkfirst=True)
+
+    # Public event data is opt-in; authenticated audience alone is not enough.
+    add_column("scout_events", "is_public", "BOOLEAN NOT NULL DEFAULT 0")
+
+    # Tables referenced by new nullable pointer columns must exist first.
+    create_model_table("web_post_revisions")
+    create_model_table("web_menu_revisions")
+
+    page_columns = {
+        "path_segment": "VARCHAR(200)",
+        "path": "VARCHAR(500)",
+        "template_id": "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL",
+        "draft_version": "INTEGER NOT NULL DEFAULT 1",
+        "published_revision_id": "INTEGER REFERENCES web_page_revisions(id) ON DELETE SET NULL",
+        "seo_title": "VARCHAR(200)",
+        "canonical_url": "VARCHAR(500)",
+        "og_image_id": "INTEGER REFERENCES web_media(id) ON DELETE SET NULL",
+        "noindex": "BOOLEAN NOT NULL DEFAULT 0",
+        "sitemap_include": "BOOLEAN NOT NULL DEFAULT 1",
+        "updated_by_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    }
+    for name, ddl in page_columns.items():
+        add_column("web_pages", name, ddl)
+
+    revision_columns = {
+        "revision_number": "INTEGER",
+        "source_version": "INTEGER NOT NULL DEFAULT 1",
+        "title": "VARCHAR(200)",
+        "path_segment": "VARCHAR(200)",
+        "path": "VARCHAR(500)",
+        "template_key": "VARCHAR(100)",
+        "template_id": "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL",
+        "compiled_tree": "JSON",
+        "compiled_css": "TEXT",
+        "reason": "VARCHAR(32)",
+        "is_publication": "BOOLEAN NOT NULL DEFAULT 0",
+        "seo_title": "VARCHAR(200)",
+        "meta_description": "VARCHAR(300)",
+        "canonical_url": "VARCHAR(500)",
+        "og_image_id": "INTEGER REFERENCES web_media(id) ON DELETE SET NULL",
+        "noindex": "BOOLEAN NOT NULL DEFAULT 0",
+        "sitemap_include": "BOOLEAN NOT NULL DEFAULT 1",
+    }
+    for name, ddl in revision_columns.items():
+        add_column("web_page_revisions", name, ddl)
+
+    post_columns = {
+        "draft_version": "INTEGER NOT NULL DEFAULT 1",
+        "published_revision_id": "INTEGER REFERENCES web_post_revisions(id) ON DELETE SET NULL",
+        "deleted_at": "TIMESTAMP",
+        "seo_title": "VARCHAR(200)",
+        "meta_description": "VARCHAR(300)",
+        "canonical_url": "VARCHAR(500)",
+        "og_image_id": "INTEGER REFERENCES web_media(id) ON DELETE SET NULL",
+        "noindex": "BOOLEAN NOT NULL DEFAULT 0",
+        "sitemap_include": "BOOLEAN NOT NULL DEFAULT 1",
+        "updated_by_id": "INTEGER REFERENCES users(id) ON DELETE SET NULL",
+    }
+    for name, ddl in post_columns.items():
+        add_column("web_posts", name, ddl)
+
+    for name, ddl in {
+        "draft_version": "INTEGER NOT NULL DEFAULT 1",
+        "published_revision_id": "INTEGER REFERENCES web_menu_revisions(id) ON DELETE SET NULL",
+        "updated_at": "TIMESTAMP",
+    }.items():
+        add_column("web_menus", name, ddl)
+    conn.execute(text("UPDATE web_menus SET updated_at = created_at WHERE updated_at IS NULL"))
+
+    for name, ddl in {
+        "item_type": "VARCHAR(20) NOT NULL DEFAULT 'external'",
+        "page_id": "INTEGER REFERENCES web_pages(id) ON DELETE SET NULL",
+        "post_id": "INTEGER REFERENCES web_posts(id) ON DELETE SET NULL",
+        "target": "VARCHAR(16)",
+        "rel": "VARCHAR(100)",
+    }.items():
+        add_column("web_menu_items", name, ddl)
+    conn.execute(
+        text(
+            "UPDATE web_menu_items SET item_type = CASE "
+            "WHEN page_slug IS NOT NULL THEN 'page' ELSE 'external' END"
+        )
+    )
+    conn.execute(
+        text(
+            "UPDATE web_menu_items SET page_id = "
+            "(SELECT web_pages.id FROM web_pages WHERE web_pages.slug = web_menu_items.page_slug) "
+            "WHERE page_slug IS NOT NULL AND page_id IS NULL"
+        )
+    )
+
+    template_columns = {
+        "qualified_key": "VARCHAR(240)",
+        "template_kind": "VARCHAR(32) NOT NULL DEFAULT 'page'",
+        "project_data": "JSON",
+        "draft_version": "INTEGER NOT NULL DEFAULT 1",
+        "published_project_data": "JSON",
+        "published_css": "TEXT NOT NULL DEFAULT ''",
+        "published_version": "INTEGER NOT NULL DEFAULT 0",
+        "theme_version_id": "INTEGER REFERENCES web_theme_versions(id) ON DELETE RESTRICT",
+        "forked_from_id": "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL",
+    }
+    # Theme tables are created before adding the template theme FK.
+    for table_name in ("web_themes", "web_theme_versions", "web_theme_assets"):
+        create_model_table(table_name)
+    for name, ddl in template_columns.items():
+        add_column("web_templates", name, ddl)
+    conn.execute(
+        text(
+            "UPDATE web_templates SET qualified_key = key, published_css = css, "
+            "published_version = CASE WHEN published_version = 0 THEN 1 ELSE published_version END "
+            "WHERE qualified_key IS NULL"
+        )
+    )
+    conn.execute(
+        text(
+            "UPDATE web_pages SET template_id = "
+            "(SELECT web_templates.id FROM web_templates WHERE web_templates.key = web_pages.template) "
+            "WHERE template IS NOT NULL AND template_id IS NULL"
+        )
+    )
+
+    for table_name in (
+        "web_reusable_components",
+        "web_sections",
+        "web_patterns",
+        "web_template_parts",
+        "web_site_styles",
+        "web_redirects",
+    ):
+        create_model_table(table_name)
+
+    if conn.execute(text("SELECT 1 FROM web_site_styles WHERE id = 1")).fetchone() is None:
+        conn.execute(
+            text(
+                "INSERT INTO web_site_styles "
+                "(id, draft_tokens, draft_css, draft_version, published_tokens, "
+                "published_css, published_version, updated_at) "
+                "VALUES (1, :tokens, '', 1, :tokens, '', 1, CURRENT_TIMESTAMP)"
+            ),
+            {"tokens": json.dumps({})},
+        )
+
+    # Materialize deterministic nested paths from the legacy hierarchy.  Old
+    # slugs are globally unique, so the cycle fallback remains collision-free.
+    page_rows = conn.execute(text("SELECT id, slug, parent_id FROM web_pages")).mappings().all()
+    by_id = {row["id"]: row for row in page_rows}
+    resolved: dict[int, str] = {}
+
+    def resolve_path(page_id: int, visiting: set[int] | None = None) -> str:
+        if page_id in resolved:
+            return resolved[page_id]
+        visiting = set() if visiting is None else visiting
+        row = by_id[page_id]
+        segment = (row["slug"] or f"page-{page_id}").strip("/")
+        if page_id in visiting:
+            logger.warning("Cycle in legacy web page hierarchy at page %s", page_id)
+            return segment
+        visiting.add(page_id)
+        parent_id = row["parent_id"]
+        if parent_id in by_id and parent_id != page_id:
+            parent_path = resolve_path(parent_id, visiting)
+            value = f"/{segment}" if parent_path == "/" else f"{parent_path}/{segment}"
+        else:
+            value = "/" if segment == "main" else f"/{segment}"
+        visiting.remove(page_id)
+        resolved[page_id] = value
+        return value
+
+    for row in page_rows:
+        conn.execute(
+            text(
+                "UPDATE web_pages SET path_segment = COALESCE(path_segment, :segment), "
+                "path = :path WHERE id = :id"
+            ),
+            {"id": row["id"], "segment": row["slug"], "path": resolve_path(row["id"])},
+        )
+
+    # Number legacy revisions deterministically, then create one immutable
+    # publication snapshot for every legacy live page without a pointer.
+    for page_id in by_id:
+        revisions = conn.execute(
+            text(
+                "SELECT id FROM web_page_revisions WHERE page_id = :page_id "
+                "ORDER BY created_at, id"
+            ),
+            {"page_id": page_id},
+        ).fetchall()
+        for number, revision in enumerate(revisions, start=1):
+            conn.execute(
+                text(
+                    "UPDATE web_page_revisions SET revision_number = COALESCE(revision_number, :number) "
+                    "WHERE id = :id"
+                ),
+                {"number": number, "id": revision[0]},
+            )
+
+    live_pages = conn.execute(
+        text("SELECT * FROM web_pages WHERE published = 1 AND published_revision_id IS NULL")
+    ).mappings().all()
+    for page in live_pages:
+        next_number = conn.execute(
+            text("SELECT COALESCE(MAX(revision_number), 0) + 1 FROM web_page_revisions WHERE page_id = :id"),
+            {"id": page["id"]},
+        ).scalar_one()
+        conn.execute(
+            text(
+                "INSERT INTO web_page_revisions "
+                "(page_id, html, data, revision_number, source_version, title, path_segment, path, "
+                "template_key, template_id, reason, is_publication, seo_title, meta_description, canonical_url, "
+                "og_image_id, noindex, sitemap_include, created_by_id, created_at) "
+                "VALUES (:page_id, :html, :data, :number, :source_version, :title, :path_segment, :path, "
+                ":template_key, :template_id, 'migration', 1, :seo_title, :meta_description, :canonical_url, "
+                ":og_image_id, :noindex, :sitemap_include, :created_by_id, CURRENT_TIMESTAMP)"
+            ),
+            {
+                "page_id": page["id"], "html": page["html"], "data": page["data"],
+                "number": next_number, "source_version": page["draft_version"], "title": page["title"],
+                "path_segment": page["path_segment"], "path": page["path"], "template_key": page["template"],
+                "template_id": page["template_id"],
+                "seo_title": page["seo_title"], "meta_description": page["meta_description"],
+                "canonical_url": page["canonical_url"], "og_image_id": page["og_image_id"],
+                "noindex": page["noindex"], "sitemap_include": page["sitemap_include"],
+                "created_by_id": page["created_by_id"],
+            },
+        )
+        revision_id = conn.execute(
+            text("SELECT id FROM web_page_revisions WHERE page_id = :id AND revision_number = :number"),
+            {"id": page["id"], "number": next_number},
+        ).scalar_one()
+        conn.execute(
+            text("UPDATE web_pages SET published_revision_id = :revision_id WHERE id = :id"),
+            {"revision_id": revision_id, "id": page["id"]},
+        )
+
+    live_posts = conn.execute(
+        text("SELECT * FROM web_posts WHERE published = 1 AND published_revision_id IS NULL")
+    ).mappings().all()
+    for post in live_posts:
+        conn.execute(
+            text(
+                "INSERT INTO web_post_revisions "
+                "(post_id, revision_number, source_version, title, slug, excerpt, body, cover_media_id, "
+                "reason, is_publication, seo_title, meta_description, canonical_url, og_image_id, "
+                "noindex, sitemap_include, created_by_id, created_at) "
+                "VALUES (:post_id, 1, :source_version, :title, :slug, :excerpt, :body, :cover_media_id, "
+                "'migration', 1, :seo_title, :meta_description, :canonical_url, :og_image_id, "
+                ":noindex, :sitemap_include, :created_by_id, CURRENT_TIMESTAMP)"
+            ),
+            {
+                "post_id": post["id"], "source_version": post["draft_version"], "title": post["title"],
+                "slug": post["slug"], "excerpt": post["excerpt"], "body": post["body"],
+                "cover_media_id": post["cover_media_id"], "seo_title": post["seo_title"],
+                "meta_description": post["meta_description"], "canonical_url": post["canonical_url"],
+                "og_image_id": post["og_image_id"], "noindex": post["noindex"],
+                "sitemap_include": post["sitemap_include"], "created_by_id": post["created_by_id"],
+            },
+        )
+        revision_id = conn.execute(
+            text("SELECT id FROM web_post_revisions WHERE post_id = :id AND revision_number = 1"),
+            {"id": post["id"]},
+        ).scalar_one()
+        conn.execute(
+            text("UPDATE web_posts SET published_revision_id = :revision_id WHERE id = :id"),
+            {"revision_id": revision_id, "id": post["id"]},
+        )
+
+    # Menus had no draft state; preserve their hierarchy as the initial public
+    # snapshot. The publication is a real nested tree, not a flat ORM dump.
+    menu_rows = conn.execute(text("SELECT id FROM web_menus")).fetchall()
+    for (menu_id,) in menu_rows:
+        pointer = conn.execute(
+            text("SELECT published_revision_id FROM web_menus WHERE id = :id"), {"id": menu_id}
+        ).scalar_one_or_none()
+        if pointer is not None:
+            continue
+        items = [dict(row) for row in conn.execute(
+            text(
+                "SELECT id, parent_id, label, page_slug, url, position, item_type, page_id, post_id, target, rel "
+                "FROM web_menu_items WHERE menu_id = :id ORDER BY position, id"
+            ),
+            {"id": menu_id},
+        ).mappings()]
+        by_id = {item["id"]: {**item, "children": []} for item in items}
+        tree = []
+        for item in by_id.values():
+            parent_id = item.get("parent_id")
+            if parent_id in by_id and parent_id != item["id"]:
+                by_id[parent_id]["children"].append(item)
+            else:
+                tree.append(item)
+        conn.execute(
+            text(
+                "INSERT INTO web_menu_revisions "
+                "(menu_id, revision_number, source_version, tree, reason, created_at) "
+                "VALUES (:menu_id, 1, 1, :tree, 'migration', CURRENT_TIMESTAMP)"
+            ),
+            {"menu_id": menu_id, "tree": json.dumps(tree)},
+        )
+        revision_id = conn.execute(
+            text("SELECT id FROM web_menu_revisions WHERE menu_id = :id AND revision_number = 1"),
+            {"id": menu_id},
+        ).scalar_one()
+        conn.execute(
+            text("UPDATE web_menus SET published_revision_id = :revision_id WHERE id = :id"),
+            {"revision_id": revision_id, "id": menu_id},
+        )
+
+    # Alter-table constraints are limited on SQLite.  These indexes provide
+    # the cross-dialect invariants that can be added safely after backfill.
+    existing_indexes = {
+        index["name"]
+        for table_name in ("web_pages", "web_page_revisions", "web_templates")
+        for index in inspect(conn).get_indexes(table_name)
+    }
+    for name, ddl in (
+        ("uq_web_pages_path", "CREATE UNIQUE INDEX uq_web_pages_path ON web_pages(path)"),
+        ("ix_web_pages_template_id", "CREATE INDEX ix_web_pages_template_id ON web_pages(template_id)"),
+        (
+            "uq_web_page_revision_number",
+            "CREATE UNIQUE INDEX uq_web_page_revision_number ON web_page_revisions(page_id, revision_number)",
+        ),
+        (
+            "uq_web_templates_qualified_key",
+            "CREATE UNIQUE INDEX uq_web_templates_qualified_key ON web_templates(qualified_key)",
+        ),
+    ):
+        if name not in existing_indexes:
+            conn.execute(text(ddl))
+
+
+def _advanced_web_cms_template_reference(conn: Connection) -> None:
+    """Follow-up for databases that already recorded the initial CMS upgrade.
+
+    This deliberately performs only the additive template-reference change.
+    Re-entering the full data backfill would mutate menu kinds created after the
+    first migration and, worse, copy editable draft metadata into immutable
+    published revisions.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_pages" not in tables or "web_page_revisions" not in tables:
+        return
+    page_columns = {column["name"] for column in inspector.get_columns("web_pages")}
+    if "template_id" not in page_columns:
+        conn.execute(text(
+            "ALTER TABLE web_pages ADD COLUMN template_id "
+            "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL"
+        ))
+    revision_columns = {
+        column["name"] for column in inspect(conn).get_columns("web_page_revisions")
+    }
+    if "template_id" not in revision_columns:
+        conn.execute(text(
+            "ALTER TABLE web_page_revisions ADD COLUMN template_id "
+            "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL"
+        ))
+    conn.execute(text(
+        "UPDATE web_pages SET template_id = "
+        "(SELECT web_templates.id FROM web_templates WHERE web_templates.key = web_pages.template) "
+        "WHERE template_id IS NULL AND template IS NOT NULL"
+    ))
+    # A revision is backfilled from its own immutable legacy template key,
+    # never from the page's current editable template selection.
+    conn.execute(text(
+        "UPDATE web_page_revisions SET template_id = "
+        "(SELECT web_templates.id FROM web_templates "
+        " WHERE web_templates.key = web_page_revisions.template_key) "
+        "WHERE template_id IS NULL AND template_key IS NOT NULL"
+    ))
+
+
+def _web_media_public_visibility(conn: Connection) -> None:
+    """Add the opt-in public media boundary without exposing legacy uploads."""
+    inspector = inspect(conn)
+    if "web_media" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("web_media")}
+    if "is_public" not in columns:
+        conn.execute(text(
+            "ALTER TABLE web_media ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT 0"
+        ))
+
+
+def _web_media_tree_and_previews(conn: Connection) -> None:
+    """Add folder tree for web media and preview media references for design resources."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "web_media_folders" not in tables:
+        logger.info("Creating 'web_media_folders' table")
+        conn.execute(text("""
+            CREATE TABLE web_media_folders (
+                id INTEGER PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                parent_id INTEGER REFERENCES web_media_folders(id) ON DELETE CASCADE,
+                created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_media_folders_parent_id ON web_media_folders(parent_id)"))
+
+    if "web_media" in tables:
+        def _ensure_media_column(table, column, ddl):
+            cols = {c["name"] for c in inspector.get_columns(table)}
+            if column not in cols:
+                logger.info("Adding '%s' column to %s", column, table)
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
+
+        _ensure_media_column("web_media", "folder_id", "folder_id INTEGER")
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_media_folder_id ON web_media(folder_id)"))
+
+    preview_columns = {
+        "web_templates": "preview_media_id INTEGER",
+        "web_reusable_components": "preview_media_id INTEGER",
+        "web_sections": "preview_media_id INTEGER",
+        "web_patterns": "preview_media_id INTEGER",
+        "web_template_parts": "preview_media_id INTEGER",
+    }
+    for table, ddl in preview_columns.items():
+        if table not in tables:
+            continue
+        cols = {c["name"] for c in inspector.get_columns(table)}
+        if "preview_media_id" not in cols:
+            logger.info("Adding 'preview_media_id' column to %s", table)
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {ddl}"))
+
+
+def _web_media_note_and_metadata(conn: Connection) -> None:
+    """Add media note column; alt/caption/album are superseded by note."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_media" not in tables:
+        return
+    cols = {c["name"] for c in inspector.get_columns("web_media")}
+    if "note" not in cols:
+        logger.info("Adding 'note' column to web_media")
+        conn.execute(text("ALTER TABLE web_media ADD COLUMN note VARCHAR(1000)"))
+
+
+def _web_linked_resource_props(conn: Connection) -> None:
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    for table_name in ("web_reusable_components", "web_sections"):
+        if table_name not in tables:
+            continue
+        columns = {column["name"] for column in inspect(conn).get_columns(table_name)}
+        additions = {
+            "prop_schema": "JSON NOT NULL DEFAULT '[]'",
+            "default_props": "JSON NOT NULL DEFAULT '{}'",
+            "variants": "JSON NOT NULL DEFAULT '[]'",
+            "published_project_data": "JSON",
+            "published_css": "TEXT NOT NULL DEFAULT ''",
+            "published_prop_schema": "JSON NOT NULL DEFAULT '[]'",
+            "published_default_props": "JSON NOT NULL DEFAULT '{}'",
+            "published_variants": "JSON NOT NULL DEFAULT '[]'",
+            "published_version": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for column_name, definition in additions.items():
+            if column_name not in columns:
+                conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {definition}"))
+        conn.execute(text(
+            f"UPDATE {table_name} SET "
+            "published_project_data = COALESCE(published_project_data, project_data), "
+            "published_css = COALESCE(NULLIF(published_css, ''), css, ''), "
+            "published_prop_schema = COALESCE(published_prop_schema, prop_schema, '[]'), "
+            "published_default_props = COALESCE(published_default_props, default_props, '{}'), "
+            "published_variants = COALESCE(published_variants, variants, '[]'), "
+            "published_version = CASE WHEN published_version = 0 THEN 1 ELSE published_version END"
+        ))
+
+
+
+
+
+
+
+
+def _drop_legacy_design_tables(conn: Connection) -> None:
+    """Contract phase: drop tables merged into WebTemplate / WebSection."""
+    inspector = inspect(conn)
+    for table in ("web_page_templates", "web_global_parts", "web_template_parts"):
+        if table in inspector.get_table_names():
+            logger.info("Dropping legacy table: %s", table)
+            conn.execute(text(f"DROP TABLE IF EXISTS {table}"))
+
+
+def _create_preview_artifacts(conn: Connection) -> None:
+    """Create WebPreviewArtifact table for cached browser-rendered previews."""
+    inspector = inspect(conn)
+    if "web_preview_artifacts" in inspector.get_table_names():
+        return
+    logger.info("Creating 'web_preview_artifacts' table")
+    conn.execute(text("""
+        CREATE TABLE web_preview_artifacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            resource_kind VARCHAR(32) NOT NULL,
+            resource_id INTEGER NOT NULL,
+            source_hash VARCHAR(64) NOT NULL,
+            viewport VARCHAR(20) NOT NULL DEFAULT '1280x720',
+            format VARCHAR(10) NOT NULL DEFAULT 'png',
+            storage_path VARCHAR(500) NOT NULL,
+            mime VARCHAR(50) NOT NULL DEFAULT 'image/png',
+            width INTEGER,
+            height INTEGER,
+            status VARCHAR(16) NOT NULL DEFAULT 'building',
+            error TEXT,
+            retry_count INTEGER NOT NULL DEFAULT 0,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_preview_artifact_resource "
+        "ON web_preview_artifacts(resource_kind, resource_id)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_preview_artifact_source_hash "
+        "ON web_preview_artifacts(source_hash)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_preview_artifact_status "
+        "ON web_preview_artifacts(status)"
+    ))
+
+
+def _migrate_page_templates_into_web_templates(conn: Connection) -> None:
+    """Copy WebPageTemplate rows into WebTemplate with usage_mode=copy_on_create.
+
+    This is the expand phase of the consolidation. The old web_page_templates
+    and web_global_parts tables remain for now; future contract phase removes
+    them after all references are dual-written.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    has_usage_mode = ("web_templates" in tables and
+                      "usage_mode" in {c["name"] for c in inspector.get_columns("web_templates")})
+    if "web_page_templates" not in tables or not has_usage_mode:
+        return
+
+    # Copy page templates that are not theme-locked
+    rows = conn.execute(text(
+        "SELECT id, qualified_key, name, description, project_data, css, "
+        "draft_version, published_project_data, published_css, published_version, "
+        "preview_media_id, theme_version_id, is_locked, created_by_id "
+        "FROM web_page_templates "
+        "WHERE qualified_key NOT IN (SELECT COALESCE(qualified_key, '') FROM web_templates)"
+    )).mappings().all()
+
+    for row in rows:
+        key = row["qualified_key"].split(":")[-1] if row["qualified_key"] else f"pt-{row['id']}"
+        # Ensure unique key
+        legacy_key = key[:50] if len(key) > 50 else key
+        conn.execute(text(
+            "INSERT INTO web_templates "
+            "(key, qualified_key, name, description, project_data, css, "
+            "draft_version, published_project_data, published_css, published_version, "
+            "usage_mode, template_kind, preview_media_id, theme_version_id, is_system, is_locked, created_by_id) "
+            "VALUES (:key, :qualified_key, :name, :description, :project_data, :css, "
+            ":draft_version, :published_project_data, :published_css, :published_version, "
+            "'copy_on_create', 'layout', :preview_media_id, :theme_version_id, 0, :is_locked, :created_by_id)"
+        ), {
+            "key": legacy_key,
+            "qualified_key": row["qualified_key"],
+            "name": row["name"],
+            "description": row["description"],
+            "project_data": row["project_data"],
+            "css": row["css"],
+            "draft_version": row["draft_version"],
+            "published_project_data": row["published_project_data"],
+            "published_css": row["published_css"],
+            "published_version": row["published_version"],
+            "preview_media_id": row["preview_media_id"],
+            "theme_version_id": row["theme_version_id"],
+            "is_locked": row["is_locked"],
+            "created_by_id": row["created_by_id"],
+        })
+
+
+def _migrate_global_parts_into_sections(conn: Connection) -> None:
+    """Copy WebGlobalPart rows into WebSection.
+
+    Global Parts (site-owned shared content: headers, footers) become
+    Sections with empty prop_schema/default_props/variants. References
+    (sc-global-part) are migrated in the renderer via dual-read.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_global_parts" not in tables or "web_sections" not in tables:
+        return
+
+    rows = conn.execute(text(
+        "SELECT id, qualified_key, name, description, project_data, css, "
+        "draft_version, published_project_data, published_css, published_version, "
+        "preview_media_id, created_by_id "
+        "FROM web_global_parts "
+        "WHERE qualified_key NOT IN (SELECT COALESCE(qualified_key, '') FROM web_sections)"
+    )).mappings().all()
+
+    for row in rows:
+        conn.execute(text(
+            "INSERT INTO web_sections "
+            "(qualified_key, name, description, project_data, css, "
+            "draft_version, published_project_data, published_css, published_version, "
+            "prop_schema, default_props, variants, "
+            "published_prop_schema, published_default_props, published_variants, "
+            "preview_media_id, is_locked, created_by_id) "
+            "VALUES (:qualified_key, :name, :description, :project_data, :css, "
+            ":draft_version, :published_project_data, :published_css, :published_version, "
+            "'[]', '{}', '[]', '[]', '{}', '[]', "
+            ":preview_media_id, 0, :created_by_id)"
+        ), {
+            "qualified_key": row["qualified_key"],
+            "name": row["name"],
+            "description": row["description"],
+            "project_data": row["project_data"],
+            "css": row["css"],
+            "draft_version": row["draft_version"],
+            "published_project_data": row["published_project_data"],
+            "published_css": row["published_css"],
+            "published_version": row["published_version"],
+            "preview_media_id": row["preview_media_id"],
+            "created_by_id": row["created_by_id"],
+        })
+
+
+
+
+def _add_page_source_template_columns(conn: Connection) -> None:
+    """Add source_template_id + source_template_version provenance columns."""
+    inspector = inspect(conn)
+    if "web_pages" not in inspector.get_table_names():
+        return
+    columns = {c["name"] for c in inspector.get_columns("web_pages")}
+    if "source_template_id" not in columns:
+        conn.execute(text(
+            "ALTER TABLE web_pages ADD COLUMN source_template_id "
+            "INTEGER REFERENCES web_templates(id) ON DELETE SET NULL"
+        ))
+    if "source_template_version" not in columns:
+        conn.execute(text(
+            "ALTER TABLE web_pages ADD COLUMN source_template_version INTEGER"
+        ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_pages_source_template_id "
+        "ON web_pages(source_template_id)"
+    ))
+
+
+def _create_web_global_parts(conn: Connection) -> None:
+    """Create WebGlobalPart table for site-owned shared instances (headers, footers, etc.)."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_global_parts" in tables:
+        return
+    logger.info("Creating 'web_global_parts' table")
+    conn.execute(
+        text(
+            """
+            CREATE TABLE web_global_parts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                qualified_key VARCHAR(240) NOT NULL UNIQUE,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                project_data JSON NOT NULL,
+                css TEXT NOT NULL DEFAULT '',
+                draft_version INTEGER NOT NULL DEFAULT 1,
+                published_project_data JSON,
+                published_css TEXT NOT NULL DEFAULT '',
+                published_version INTEGER NOT NULL DEFAULT 0,
+                preview_media_id INTEGER REFERENCES web_media(id) ON DELETE SET NULL,
+                usage_count INTEGER NOT NULL DEFAULT 0,
+                created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_global_parts_qualified_key ON web_global_parts(qualified_key)"))
+
+
+
+def _add_template_usage_mode(conn: Connection) -> None:
+    """Add usage_mode column to web_templates (linked_layout vs copy_on_create)."""
+    inspector = inspect(conn)
+    if "web_templates" not in inspector.get_table_names():
+        return
+    columns = {c["name"] for c in inspector.get_columns("web_templates")}
+    if "usage_mode" not in columns:
+        logger.info("Adding 'usage_mode' column to web_templates")
+        conn.execute(text(
+            "ALTER TABLE web_templates ADD COLUMN usage_mode "
+            "VARCHAR(20) NOT NULL DEFAULT 'linked_layout'"
+        ))
+
+
+def _create_web_page_templates(conn: Connection) -> None:
+    """Add Page Templates and page provenance columns (Layout vs Page Template).
+
+    Forward-only and idempotent. Existing web_templates rows are treated as
+    Layouts (linked shells); page templates start as an explicit new collection.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "web_page_templates" not in tables:
+        logger.info("Creating 'web_page_templates' table")
+        conn.execute(text("""
+            CREATE TABLE web_page_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                qualified_key VARCHAR(240) NOT NULL UNIQUE,
+                name VARCHAR(200) NOT NULL,
+                description TEXT,
+                project_data JSON NOT NULL,
+                css TEXT NOT NULL DEFAULT '',
+                draft_version INTEGER NOT NULL DEFAULT 1,
+                published_project_data JSON,
+                published_css TEXT NOT NULL DEFAULT '',
+                published_version INTEGER NOT NULL DEFAULT 0,
+                preview_media_id INTEGER REFERENCES web_media(id) ON DELETE SET NULL,
+                theme_version_id INTEGER REFERENCES web_theme_versions(id) ON DELETE RESTRICT,
+                is_locked BOOLEAN NOT NULL DEFAULT 0,
+                created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_web_page_templates_qualified_key "
+            "ON web_page_templates(qualified_key)"
+        ))
+
+    # Provenance columns on web_pages: only a record of what was copied, never
+    # a live dependency. template_id remains the linked Layout reference.
+    if "web_pages" in tables:
+        page_cols = {c["name"] for c in inspector.get_columns("web_pages")}
+        if "page_template_id" not in page_cols:
+            conn.execute(text(
+                "ALTER TABLE web_pages ADD COLUMN page_template_id "
+                "INTEGER REFERENCES web_page_templates(id) ON DELETE SET NULL"
+            ))
+        if "page_template_version" not in page_cols:
+            conn.execute(text(
+                "ALTER TABLE web_pages ADD COLUMN page_template_version INTEGER"
+            ))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_pages_page_template_id ON web_pages(page_template_id)"))
+
+    # Normalize legacy template_kind='page' to 'layout' on existing Layout rows.
+    # 'page' remains a tolerated compatibility alias in read paths.
+    if "web_templates" in tables:
+        template_cols = {c["name"] for c in inspector.get_columns("web_templates")}
+        if "template_kind" in template_cols:
+            conn.execute(text(
+                "UPDATE web_templates SET template_kind = 'layout' "
+                "WHERE template_kind = 'page'"
+            ))
+
+
+
+def _create_member_tables(conn: Connection) -> None:
+    """Create member evidence (CRM) tables: profiles, tags, relationships, notes."""
+def _create_member_tables(conn: Connection) -> None:
+    """Create member evidence (CRM) tables: profiles, tags, relationships, notes."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+
+    if "member_profiles" not in tables:
+        logger.info("Creating 'member_profiles' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE member_profiles (
+                    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                    phone VARCHAR(32),
+                    birth_date DATE,
+                    gender VARCHAR(16),
+                    address VARCHAR(255),
+                    city VARCHAR(120),
+                    zip VARCHAR(16),
+                    parent_name VARCHAR(150),
+                    parent_phone VARCHAR(32),
+                    parent_email VARCHAR(255),
+                    emergency_name VARCHAR(150),
+                    emergency_phone VARCHAR(32),
+                    joined_at DATE,
+                    member_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+                    medical_note TEXT,
+                    uniform_size VARCHAR(32),
+                    scout_number VARCHAR(32),
+                    data_consent_at DATE,
+                    photo_consent_at DATE,
+                    notes TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+
+    if "member_tags" not in tables:
+        logger.info("Creating 'member_tags' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE member_tags (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    tag VARCHAR(50) NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_member_tag UNIQUE (user_id, tag)
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_tags_user_id ON member_tags(user_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_tags_tag ON member_tags(tag)"))
+
+    if "member_relationships" not in tables:
+        logger.info("Creating 'member_relationships' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE member_relationships (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    related_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    type VARCHAR(16) NOT NULL DEFAULT 'other',
+                    note VARCHAR(255),
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_relationships_user_id ON member_relationships(user_id)"))
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_relationships_related_user_id ON member_relationships(related_user_id)"))
+
+    if "member_notes" not in tables:
+        logger.info("Creating 'member_notes' table")
+        conn.execute(
+            text(
+                """
+                CREATE TABLE member_notes (
+                    id INTEGER PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    content TEXT NOT NULL,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+        )
+        conn.execute(text("CREATE INDEX IF NOT EXISTS ix_member_notes_user_id ON member_notes(user_id)"))
+
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -1000,6 +2252,146 @@ MIGRATIONS: List[Migration] = [
         "20260524_add_latex_template_column",
         _add_latex_template_column,
         "Add latex_template column to inventory label templates",
+    ),
+    Migration(
+        "20260809_extend_module_authorization_schema",
+        _extend_module_authorization_schema,
+        "Add installation state and scoped module permission grants",
+    ),
+    Migration(
+        "20260810_extend_module_dependency_columns",
+        _extend_module_dependency_columns,
+        "Add dependency and metadata columns for the module catalogue",
+    ),
+    Migration(
+        "20260810_rename_dashboard_messages_to_announcements",
+        _rename_dashboard_messages_to_announcements,
+        "Rename dashboard_messages table to announcements",
+    ),
+    Migration(
+        "20260810_add_receive_messages_preference",
+        _add_receive_messages_column,
+        "Add per-user receive_messages preference for private messaging",
+    ),
+    Migration(
+        "20260810_add_user_avatar",
+        _add_user_avatar_column,
+        "Add avatar (base64 data URL) column to users table",
+    ),
+    Migration(
+        "20260811_add_team_logo",
+        _add_team_logo_column,
+        "Add logo (base64 data URL) column to teams table",
+    ),
+    Migration(
+        "20260810_add_event_color",
+        _add_event_color_column,
+        "Add optional color override column to scout_events table",
+    ),
+    Migration(
+        "20260810_add_event_attendance_fields",
+        _add_event_attendance_fields,
+        "Add audience, requires_planned and planned_deadline columns to scout_events",
+    ),
+    Migration(
+        "20260810_add_attendance_mode",
+        _add_attendance_mode,
+        "Add planned/real mode to scout_attendances with composite unique constraint",
+    ),
+    Migration(
+        "20260810_add_attendance_created_at",
+        _add_attendance_created_at_column,
+        "Add created_at column to scout_attendances for registration date tracking",
+    ),
+    Migration(
+        "20260812_create_web_tables",
+        _create_web_tables,
+        "Create web_pages and web_media tables for the web page designer module",
+    ),
+    Migration(
+        "20260813_create_web_templates",
+        _create_web_templates_table,
+        "Create web_templates table and seed default page templates",
+    ),
+    Migration(
+        "20260813_web_cms",
+        _web_cms_extend,
+        "CMS upgrade: page hierarchy/trash/revisions, posts, menus, media albums",
+    ),
+    Migration(
+        "20260814_advanced_web_cms_schema",
+        _advanced_web_cms_schema,
+        "Advanced CMS drafts, immutable publications, design resources and themes",
+    ),
+    Migration(
+        "20260814_web_cms_template_reference",
+        _advanced_web_cms_template_reference,
+        "Add composable page template references",
+    ),
+    Migration(
+        "20260814_web_media_public_visibility",
+        _web_media_public_visibility,
+        "Add opt-in public visibility for website media",
+    ),
+    Migration(
+        "20260814_web_media_tree_and_previews",
+        _web_media_tree_and_previews,
+        "Add media folder tree and design resource preview media references",
+    ),
+    Migration(
+        "20260815_web_media_note",
+        _web_media_note_and_metadata,
+        "Add editor note and simplify web media metadata",
+    ),
+    Migration(
+        "20260815_web_linked_resource_props",
+        _web_linked_resource_props,
+        "Add typed props and published snapshots for linked components and sections",
+    ),
+    Migration(
+        "20260816_add_template_usage_mode",
+        _add_template_usage_mode,
+        "Add usage_mode to web_templates for linked_layout vs copy_on_create",
+    ),
+    Migration(
+        "20260816_create_web_page_templates",
+        _create_web_page_templates,
+        "Create Page Templates table and page provenance columns",
+    ),
+    Migration(
+        "20260816_drop_legacy_design_tables",
+        _drop_legacy_design_tables,
+        "Contract phase: drop legacy web_page_templates, web_global_parts, web_template_parts",
+    ),
+    Migration(
+        "20260816_create_preview_artifacts",
+        _create_preview_artifacts,
+        "Create WebPreviewArtifact table for cached browser previews",
+    ),
+    Migration(
+        "20260816_migrate_page_templates_into_web_templates",
+        _migrate_page_templates_into_web_templates,
+        "Migrate Page Templates into WebTemplate (copy_on_create mode)",
+    ),
+    Migration(
+        "20260816_migrate_global_parts_into_sections",
+        _migrate_global_parts_into_sections,
+        "Migrate Global Parts into WebSection",
+    ),
+    Migration(
+        "20260816_add_page_source_template_columns",
+        _add_page_source_template_columns,
+        "Add source_template_id + source_template_version provenance columns",
+    ),
+    Migration(
+        "20260816_create_web_global_parts",
+        _create_web_global_parts,
+        "Create WebGlobalPart table for site-owned shared parts",
+    ),
+    Migration(
+        "20260813_create_member_tables",
+        _create_member_tables,
+        "Create member evidence (CRM) tables: profiles, tags, relationships, notes",
     ),
 ]
 

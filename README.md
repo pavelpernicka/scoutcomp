@@ -1,4 +1,8 @@
-# ScoutComp - Open Source Scout Competition Platform
+# ScoutComp
+
+Modulární aplikace pro skautské oddíly. Jádro poskytuje účty, skupiny
+oprávnění, zprávy a nástěnku; soutěže, sklad a skautská činnost jsou samostatné
+moduly spravované v registru.
 
 A modern FastAPI + React web application for running scout competitions. Features include a progress dashboard, seasonal task completion, visual leaderboards, and comprehensive admin management tools.
 
@@ -44,26 +48,31 @@ Key admin features:
 - Node.js 20+
 - DB: SQLite (bundled) or PostgreSQL/MariaDB if configured
 
-## Quick Start for development
+## Rychlý start
 
-1. **Backend Setup:**
-   ```bash
-   cd backend
-   python -m venv .venv
-   source .venv/bin/activate
-   pip install -r requirements.txt
-   uvicorn app.main:app --reload --port 8001
-   ```
+Stačí Python 3.11+, Node.js 20+ a GNU Make (na Linuxu je obvykle předinstalovaný):
 
-2. **Frontend Setup:**
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
+```bash
+make dev
+```
 
-3. **Access the Application:**
+Spustí lokálně backend i frontend s automatickým načítáním změn, bez Dockeru.
+Při prvním běhu vytvoří `backend/.venv` a nainstaluje závislosti; při dalších
+spuštěních je znovu instaluje jen po změně `requirements.txt` nebo `package-lock.json`.
+Pokud v projektu zůstaly soubory vytvořené starší Docker instalací, spouštěč je
+automaticky odloží stranou a vytvoří čisté lokální `node_modules`.
+Testy obou částí spustíte jediným příkazem:
+
+```bash
+make test
+```
+
+Další běžné příkazy: `make start` (alias pro `make dev`), `make test`, `make docker-dev` (volitelná Docker varianta) a `make` pro nápovědu.
+
+Po spuštění je k dispozici:
+
    - Frontend: `http://localhost:5173`
+   - Veřejný web: `http://localhost:8090`
    - API Documentation (Swagger UI): `http://localhost:8001/docs` or `http://localhost:5173/api/docs`
    - Alternative API Docs (ReDoc): `http://localhost:8001/redoc` or `http://localhost:5173/api/redoc`
 
@@ -89,9 +98,9 @@ Administrators can configure the following settings on Global settings page:
 ## Development & Testing
 
 ### Testing
-- **Backend Testing:** `pytest backend/tests`
-- **Frontend Linting:** `npm run lint`
-- **Frontend Testing:** `npm test`
+
+Použijte `make test`; spustí backendové i frontendové testy ve správně
+připravených kontejnerech, bez lokální instalace Pythonu nebo Node.js.
 
 Continuous integration is defined in `.github/workflows/ci.yml` to run these checks on pushes and pull requests.
 
@@ -110,7 +119,7 @@ When making schema changes:
 ## Deployment
 
 ### Non-production use
-The included `docker-compose.yml` runs both services together, just launch:
+The included `docker-compose.yml` runs the API, public site, and editor frontend together, just launch:
 
 ```bash
 # First time setup
@@ -128,6 +137,8 @@ SCOUTCOMP_DB_URL="sqlite:///./data/database.db"
 SCOUTCOMP_DEVELOPER_MODE=false
 SCOUTCOMP_BACKEND_PORT=8001
 SCOUTCOMP_FRONTEND_PORT=3200
+SCOUTCOMP_SITE_PORT=8090
+SCOUTCOMP_SITE_PUBLIC_URL="https://site.some.address.tld"
 ```
 - Generate value of `SCOUTCOMP_SECRET_KEY` using f.e. `openssl rand -hex 32`
 - Test current setup using `docker compose -f docker-compose.prod.yml up -d --build`
@@ -151,6 +162,21 @@ SCOUTCOMP_FRONTEND_PORT=3200
     # Backend
     location /api/ {
       proxy_pass http://127.0.0.1:8001/;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    listen 80;
+  }
+
+  # Visitor-facing website uses a separate hostname and application.
+  server {
+    server_name site.some.address.tld;
+
+    location / {
+      proxy_pass http://127.0.0.1:8090;
       proxy_set_header Host $host;
       proxy_set_header X-Real-IP $remote_addr;
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

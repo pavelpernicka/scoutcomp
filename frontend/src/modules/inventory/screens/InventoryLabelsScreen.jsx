@@ -4,7 +4,7 @@ import PropTypes from "prop-types";
 import Card from "../../../components/Card";
 import { inventoryApi } from "../api";
 
-export default function InventoryLabelsScreen({ templates, selectedItemIds, items, teams, onCreateTemplate, onUpdateTemplate, onDeleteTemplate, onGenerateLabels }) {
+export default function InventoryLabelsScreen({ templates, selectedItemIds, teams, onCreateTemplate, onUpdateTemplate, onDeleteTemplate, onGenerateLabels }) {
   const [selectedTemplate, setSelectedTemplate] = useState(templates[0] || null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -19,16 +19,6 @@ export default function InventoryLabelsScreen({ templates, selectedItemIds, item
   const [previewMode, setPreviewMode] = useState("code"); // "code" or "preview"
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
-
-  // Realistic sample data
-  const sampleItem = {
-    name: "Turistický batoh Deuter Futura Pro 36",
-    category: "Turistika » Batohy",
-    current_location: "Sklad A » Regál 3 » Police 2",
-    default_location: "Sklad A » Regál 3 » Police 2",
-    status: "Dostupné",
-    qr_identifier: "SCT-2024-001"
-  };
 
   useEffect(() => {
     if (selectedTemplate) {
@@ -68,27 +58,6 @@ export default function InventoryLabelsScreen({ templates, selectedItemIds, item
       });
     }
   }, [selectedTemplate]);
-
-  const getPreviewLatex = () => {
-    let previewLatex = editForm.latex_template;
-
-    // Replace placeholders with sample data
-    const replacements = {
-      'name': sampleItem.name,
-      'category': sampleItem.category,
-      'current_location': sampleItem.current_location,
-      'default_location': sampleItem.default_location,
-      'status': sampleItem.status,
-      'qr_identifier': sampleItem.qr_identifier
-    };
-
-    Object.entries(replacements).forEach(([field, value]) => {
-      const regex = new RegExp(`\\{\\{${field}\\}\\}`, 'g');
-      previewLatex = previewLatex.replace(regex, value || '');
-    });
-
-    return previewLatex;
-  };
 
   const generatePreview = async () => {
     setIsGeneratingPreview(true);
@@ -400,7 +369,7 @@ export default function InventoryLabelsScreen({ templates, selectedItemIds, item
                         <div className="d-flex justify-content-center align-items-center h-100">
                           <div className="text-center">
                             <i className="fas fa-eye fa-3x text-muted mb-3"></i>
-                            <div className="text-muted">Klikněte na "Náhled" pro zobrazení</div>
+                            <div className="text-muted">Klikněte na „Náhled“ pro zobrazení</div>
                           </div>
                         </div>
                       )}
@@ -445,6 +414,7 @@ export default function InventoryLabelsScreen({ templates, selectedItemIds, item
 InventoryLabelsScreen.propTypes = {
   templates: PropTypes.array.isRequired,
   selectedItemIds: PropTypes.array.isRequired,
+  teams: PropTypes.array.isRequired,
   onCreateTemplate: PropTypes.func.isRequired,
   onUpdateTemplate: PropTypes.func.isRequired,
   onDeleteTemplate: PropTypes.func.isRequired,

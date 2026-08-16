@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session, joinedload
 from ..dependencies import (
     get_current_active_user,
     get_db,
-    get_managed_team_ids,
-    require_admin_or_group_admin,
+    require_action,
 )
-from ..models import Completion, CompletionStatus, Notification, RoleEnum, Task, TaskVariant, User
+from ..models import Completion, CompletionStatus, Notification, Task, TaskVariant, User
+from ..permissions import scoped_team_ids
 from ..schemas import (
     CompletionAdminCreate,
     CompletionAdminUpdate,
@@ -41,7 +41,7 @@ router = APIRouter(prefix="/completions", tags=["completions"])
 @router.get("/pending", response_model=List[CompletionPublic])
 def list_pending(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("competitions.approvals.audit")),
 ) -> List[Completion]:
     query = (
         db.query(Completion)
@@ -53,11 +53,11 @@ def list_pending(
         .filter(Completion.status == CompletionStatus.PENDING)
         .order_by(Completion.submitted_at.asc())
     )
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids:
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None:
+        if not allowed_team_ids:
             return []
-        query = query.join(User, Completion.member_id == User.id).filter(User.team_id.in_(managed_ids))
+        query = query.join(User, Completion.member_id == User.id).filter(User.team_id.in_(allowed_team_ids))
 
     completions = query.all()
     return [_populate_member_info(completion) for completion in completions]
@@ -68,7 +68,7 @@ def review_completion(
     completion_id: int,
     payload: CompletionReview,
     db: Session = Depends(get_db),
-    reviewer: User = Depends(require_admin_or_group_admin),
+    reviewer: User = Depends(require_action("competitions.approvals.audit")),
 ) -> Completion:
     completion = (
         db.query(Completion)
@@ -91,12 +91,9 @@ def review_completion(
             detail="Completion is missing related task or member",
         )
 
-    if reviewer.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(reviewer)
-        if not managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No managed teams configured")
-        if completion.member.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, reviewer, "competitions.approvals.audit")
+    if allowed_team_ids is not None and (not allowed_team_ids or completion.member.team_id not in allowed_team_ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
 
     original_status = completion.status
     completion.status = payload.status
@@ -175,16 +172,15 @@ def list_my_completions(
 def list_user_completions(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("competitions.approvals.audit")),
 ) -> List[Completion]:
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or user.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None and (not allowed_team_ids or user.team_id not in allowed_team_ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
 
     completions = (
         db.query(Completion)
@@ -205,25 +201,23 @@ def create_user_completion(
     user_id: int,
     payload: CompletionAdminCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("competitions.approvals.audit")),
 ) -> Completion:
     member = db.get(User, user_id)
     if not member:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or member.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None and (not allowed_team_ids or member.team_id not in allowed_team_ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User outside managed teams")
 
     task = db.get(Task, payload.task_id)
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if task.team_id is not None and task.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Task outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None and task.team_id is not None and task.team_id not in allowed_team_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Task outside managed teams")
 
     status_value = payload.status or CompletionStatus.APPROVED
     if status_value == CompletionStatus.PENDING:
@@ -314,7 +308,7 @@ def update_user_completion(
     completion_id: int,
     payload: CompletionAdminUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("competitions.approvals.audit")),
 ) -> Completion:
     completion = (
         db.query(Completion)
@@ -329,10 +323,9 @@ def update_user_completion(
     if not completion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Completion not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or completion.member.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None and (not allowed_team_ids or completion.member.team_id not in allowed_team_ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
 
     if payload.count is None and payload.status is None and payload.admin_note is None:
         return completion
@@ -391,7 +384,7 @@ def delete_user_completion(
     user_id: int,
     completion_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_admin_or_group_admin),
+    current_user: User = Depends(require_action("competitions.approvals.audit")),
 ) -> None:
     completion = (
         db.query(Completion)
@@ -405,10 +398,9 @@ def delete_user_completion(
     if not completion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Completion not found")
 
-    if current_user.role == RoleEnum.GROUP_ADMIN:
-        managed_ids = get_managed_team_ids(current_user)
-        if not managed_ids or completion.member.team_id not in managed_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
+    allowed_team_ids = scoped_team_ids(db, current_user, "competitions.approvals.audit")
+    if allowed_team_ids is not None and (not allowed_team_ids or completion.member.team_id not in allowed_team_ids):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Completion outside managed teams")
 
     db.delete(completion)
     db.commit()

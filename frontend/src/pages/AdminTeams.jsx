@@ -1,24 +1,102 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import HeroHeader from "../components/HeroHeader";
+import Button from "../components/Button";
 
-const emptyTeamForm = { name: "", description: "" };
+const LOGO_SIZE = 256;
+
+const processLogoFile = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const side = Math.min(image.width, image.height);
+          const sx = (image.width - side) / 2;
+          const sy = (image.height - side) / 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = LOGO_SIZE;
+          canvas.height = LOGO_SIZE;
+          const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(image, sx, sy, side, side, 0, 0, LOGO_SIZE, LOGO_SIZE);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      image.onerror = () => reject(new Error("image-load-failed"));
+      image.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("file-read-failed"));
+    reader.readAsDataURL(file);
+  });
+
+const teamInitials = (name) =>
+  (name || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join("")
+    .toUpperCase();
+
+function TeamLogo({ team, size = 56, className = "" }) {
+  const style = {
+    width: size,
+    height: size,
+    fontSize: Math.max(12, Math.round(size * 0.34)),
+    backgroundColor: "#0f766e",
+  };
+  if (team.logo) {
+    return (
+      <img
+        src={team.logo}
+        alt={team.name}
+        className={`rounded-circle object-fit-cover flex-shrink-0 ${className}`}
+        style={style}
+      />
+    );
+  }
+  return (
+    <span
+      className={`rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 text-white ${className}`}
+      style={style}
+    >
+      {teamInitials(team.name)}
+    </span>
+  );
+}
+TeamLogo.propTypes = {
+  team: PropTypes.object,
+  size: PropTypes.number,
+  className: PropTypes.string,
+};
+
+const emptyTeamForm = { name: "", description: "", logo: null };
 
 export default function AdminTeams() {
   const { t } = useTranslation();
-  const { isAdmin, canManageUsers, managedTeamIds, userId } = useAuth();
+  const { isAdmin, managedTeamIds, userId, can } = useAuth();
+  const canManageTeams = can("core.teams.manage");
   const queryClient = useQueryClient();
   const [teamForm, setTeamForm] = useState(emptyTeamForm);
   const [membersModalTeamId, setMembersModalTeamId] = useState(null);
   const [editingTeam, setEditingTeam] = useState(null);
-  const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "" });
+  const [editTeamForm, setEditTeamForm] = useState({ name: "", description: "", logo: null });
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [showCreateTeamModal, setShowCreateTeamModal] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberFilter, setMemberFilter] = useState("all");
+  const [logoError, setLogoError] = useState(null);
+  const createLogoInputRef = useRef(null);
+  const editLogoInputRef = useRef(null);
 
   const { data: teams = [], isLoading: teamsLoading, isError: teamsError, error: teamsErr } = useQuery({
     queryKey: ["admin", "teams"],
@@ -26,7 +104,7 @@ export default function AdminTeams() {
       const { data } = await api.get("/teams");
       return data;
     },
-    enabled: canManageUsers,
+    enabled: canManageTeams,
     staleTime: 30_000,
   });
 
@@ -36,7 +114,7 @@ export default function AdminTeams() {
       const { data } = await api.get("/users");
       return data;
     },
-    enabled: canManageUsers,
+    enabled: canManageTeams,
     staleTime: 15_000,
   });
 
@@ -225,12 +303,38 @@ export default function AdminTeams() {
   const handleOpenEditTeam = (team) => {
     if (!isAdmin) return;
     setEditingTeam(team);
-    setEditTeamForm({ name: team.name, description: team.description ?? "" });
+    setEditTeamForm({ name: team.name, description: team.description ?? "", logo: team.logo ?? null });
+    setLogoError(null);
   };
 
   const handleCloseEditTeam = () => {
     setEditingTeam(null);
-    setEditTeamForm({ name: "", description: "" });
+    setEditTeamForm({ name: "", description: "", logo: null });
+    setLogoError(null);
+  };
+
+  const handleLogoFile = (event, target) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setLogoError(t("adminTeams.logoTooLarge"));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setLogoError(t("adminTeams.logoInvalid"));
+      return;
+    }
+    processLogoFile(file)
+      .then((dataUrl) => {
+        if (target === "create") {
+          setTeamForm((prev) => ({ ...prev, logo: dataUrl }));
+        } else {
+          setEditTeamForm((prev) => ({ ...prev, logo: dataUrl }));
+        }
+        setLogoError(null);
+      })
+      .catch(() => setLogoError(t("adminTeams.logoInvalid")));
   };
 
   const handleSubmitTeamEdit = (event) => {
@@ -241,6 +345,7 @@ export default function AdminTeams() {
       payload: {
         name: editTeamForm.name,
         description: editTeamForm.description,
+        logo: editTeamForm.logo ?? null,
       },
     });
   };
@@ -288,12 +393,14 @@ export default function AdminTeams() {
   const openCreateTeamModal = () => {
     setTeamForm(emptyTeamForm);
     createTeamMutation.reset();
+    setLogoError(null);
     setShowCreateTeamModal(true);
   };
 
   const closeCreateTeamModal = () => {
     setTeamForm(emptyTeamForm);
     createTeamMutation.reset();
+    setLogoError(null);
     setShowCreateTeamModal(false);
   };
 
@@ -318,16 +425,21 @@ export default function AdminTeams() {
   };
 
   return (
-    <div className="container px-0">
-      <div className="card shadow-sm mt-4">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <span>{t('adminTeams.teams')}</span>
-          {isAdmin && (
-            <button type="button" className="btn btn-primary btn-sm" onClick={openCreateTeamModal}>
-              {t('adminTeams.addTeam')}
-            </button>
-          )}
-        </div>
+    <>
+      <HeroHeader
+        title={t("adminTeams.title")}
+        subtitle={t("adminTeams.subtitle")}
+        icon="👥"
+        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+      >
+        {isAdmin && (
+          <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={openCreateTeamModal}>
+            {t("adminTeams.addTeam")}
+          </Button>
+        )}
+      </HeroHeader>
+
+      <div className="card shadow-sm border-0 mt-4">
         <div className="card-body">
           {teamsLoading ? (
             <div className="text-center text-muted py-4">{t('adminTeams.loading')}</div>
@@ -349,7 +461,10 @@ export default function AdminTeams() {
                       <div className="card-body d-flex flex-column gap-3">
                         <div>
                           <div className="d-flex justify-content-between align-items-start">
-                            <h5 className="card-title mb-0">{team.name}</h5>
+                            <div className="d-flex align-items-center gap-2">
+                              <TeamLogo team={team} size={48} />
+                              <h5 className="card-title mb-0">{team.name}</h5>
+                            </div>
                             <span className="badge bg-secondary">{t('adminTeams.memberCount', { count: members.length })}</span>
                           </div>
                           {team.description && (
@@ -627,6 +742,41 @@ export default function AdminTeams() {
                 </div>
                 <form onSubmit={handleSubmitTeamEdit}>
                   <div className="modal-body">
+                    <div className="d-flex align-items-center gap-3 mb-3">
+                      <TeamLogo team={{ name: editTeamForm.name, logo: editTeamForm.logo }} size={72} />
+                      <div>
+                        <input
+                          ref={editLogoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="d-none"
+                          onChange={(event) => handleLogoFile(event, "edit")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline-success"
+                          size="sm"
+                          icon="fas fa-upload"
+                          onClick={() => editLogoInputRef.current?.click()}
+                        >
+                          {t("adminTeams.uploadLogo")}
+                        </Button>
+                        {editTeamForm.logo && (
+                          <Button
+                            type="button"
+                            variant="outline-danger"
+                            size="sm"
+                            icon="fas fa-trash"
+                            className="ms-2"
+                            onClick={() => setEditTeamForm((prev) => ({ ...prev, logo: null }))}
+                          >
+                            {t("adminTeams.removeLogo")}
+                          </Button>
+                        )}
+                        <div className="form-text">{t("adminTeams.logoHint")}</div>
+                        {logoError && <div className="alert alert-danger py-2 mt-2 mb-0">{logoError}</div>}
+                      </div>
+                    </div>
                     <div className="mb-3">
                       <label className="form-label" htmlFor="edit-team-name">
                         {t('adminTeams.name')}
@@ -711,6 +861,41 @@ export default function AdminTeams() {
                   }}
                 >
                   <div className="modal-body">
+                    <div className="d-flex align-items-center gap-3 mb-3">
+                      <TeamLogo team={{ name: teamForm.name, logo: teamForm.logo }} size={72} />
+                      <div>
+                        <input
+                          ref={createLogoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="d-none"
+                          onChange={(event) => handleLogoFile(event, "create")}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline-success"
+                          size="sm"
+                          icon="fas fa-upload"
+                          onClick={() => createLogoInputRef.current?.click()}
+                        >
+                          {t("adminTeams.uploadLogo")}
+                        </Button>
+                        {teamForm.logo && (
+                          <Button
+                            type="button"
+                            variant="outline-danger"
+                            size="sm"
+                            icon="fas fa-trash"
+                            className="ms-2"
+                            onClick={() => setTeamForm((prev) => ({ ...prev, logo: null }))}
+                          >
+                            {t("adminTeams.removeLogo")}
+                          </Button>
+                        )}
+                        <div className="form-text">{t("adminTeams.logoHint")}</div>
+                        {logoError && <div className="alert alert-danger py-2 mt-2 mb-0">{logoError}</div>}
+                      </div>
+                    </div>
                     <div className="mb-3">
                       <label className="form-label" htmlFor="create-team-name">
                         {t('adminTeams.name')}
@@ -769,6 +954,6 @@ export default function AdminTeams() {
           <div className="modal-backdrop fade show"></div>
         </>
       )}
-    </div>
+    </>
   );
 }

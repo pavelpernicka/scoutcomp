@@ -4,6 +4,7 @@ import { useRef } from "react";
 
 import Modal from "../../../components/Modal";
 import { getItemCurrentLocation, getItemFlagBadge } from "../helpers";
+import { parseServerDate } from "../../../utils/dateUtils";
 
 export default function InventoryItemDialog({
   isVisible,
@@ -27,7 +28,6 @@ export default function InventoryItemDialog({
   onOpenReturnEvent,
   onOpenLabelDialog,
 }) {
-  const hasOpenLoan = Boolean(item && (item.loans || []).some((loan) => !loan.returned_at));
   const fileInputRef = useRef(null);
   const editableFlags = flags.filter((flag) => !flag.is_system);
   const currentLocation = item ? getItemCurrentLocation(item) : { label: form.current_location || form.default_location || "Bez lokace", tone: "neutral" };
@@ -443,7 +443,7 @@ export default function InventoryItemDialog({
                   <div key={entry.id} className="inventory-activity-row align-items-start">
                     <div>
                       <strong>{entry.action}</strong>
-                      <div className="small text-muted">{new Date(entry.created_at).toLocaleString("cs-CZ")}</div>
+                      <div className="small text-muted">{parseServerDate(entry.created_at).toLocaleString("cs-CZ")}</div>
                     </div>
                     {entry.payload ? <code className="small">{JSON.stringify(entry.payload)}</code> : null}
                   </div>

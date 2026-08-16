@@ -1,0 +1,62 @@
+const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
+
+const serializableClone = (value) => JSON.parse(JSON.stringify(value));
+
+const withSchemaVersion = (project) => ({
+  ...project,
+  scoutcomp: {
+    ...(isObject(project.scoutcomp) ? project.scoutcomp : {}),
+    schemaVersion: 2,
+  },
+});
+
+/** Return canonical GrapesJS project data, or null for legacy/empty input. */
+export function normalizeProjectData(value) {
+  const candidate = isObject(value?.project_data)
+    ? value.project_data
+    : isObject(value?.projectData)
+      ? value.projectData
+      : isObject(value?.data)
+        ? value.data
+      : value;
+
+  if (!isObject(candidate) || !Array.isArray(candidate.pages)) return null;
+  return withSchemaVersion(serializableClone(candidate));
+}
+
+/** Build the one-page project used only to import legacy HTML/CSS content. */
+export function createLegacyProject(html = "", css = "") {
+  return withSchemaVersion({
+    pages: [
+      {
+        id: "scoutcomp-page",
+        component: typeof html === "string" ? html : "",
+        styles: typeof css === "string" ? css : "",
+      },
+    ],
+  });
+}
+
+/**
+ * Load canonical project JSON. HTML/CSS is accepted only as a compatibility
+ * path for records created before project-data persistence was introduced.
+ */
+export function loadEditorProject(editor, { projectData, legacyHtml = "", legacyCss = "" } = {}) {
+  const canonical = normalizeProjectData(projectData);
+  const project = canonical || createLegacyProject(legacyHtml, legacyCss);
+
+  editor.loadProjectData(project);
+  editor.UndoManager.clear();
+  editor.clearDirtyCount();
+  return { project, importedLegacy: !canonical };
+}
+
+/** Capture the canonical editor representation and derived output atomically. */
+export function getEditorSnapshot(editor) {
+  return {
+    projectData: withSchemaVersion(editor.getProjectData()),
+    html: editor.getHtml(),
+    css: editor.getCss(),
+    dirtyCount: editor.getDirtyCount(),
+  };
+}

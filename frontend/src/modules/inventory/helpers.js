@@ -1,3 +1,5 @@
+import { parseServerDate } from "../../utils/dateUtils";
+
 export const ITEM_PRESENCE_OPTIONS = [
   { value: "", label: "Vše" },
   { value: "available", label: "Dostupné" },
@@ -299,7 +301,7 @@ export function buildLoanGroups(items) {
       const group = groups.get(key);
       group.openLoanCount += 1;
       group.openQuantity += loan.quantity;
-      if (loan.due_at && new Date(loan.due_at).getTime() < Date.now()) {
+      if (loan.due_at && parseServerDate(loan.due_at).getTime() < Date.now()) {
         group.overdueCount += 1;
       }
       group.loans.push({

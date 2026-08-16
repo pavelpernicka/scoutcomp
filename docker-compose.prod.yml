@@ -1,5 +1,3 @@
-version: '3.3'
-
 services:
   backend:
     build:
@@ -14,6 +12,34 @@ services:
       - SCOUTCOMP_SECRET_KEY=${SCOUTCOMP_SECRET_KEY}
       - SCOUTCOMP_DB_URL=${SCOUTCOMP_DB_URL}
       - SCOUTCOMP_DEVELOPER_MODE=false
+      - SCOUTCOMP_WEB_MEDIA_DIR=/app/data/web-media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  site:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uvicorn app.site_app:app --host 0.0.0.0 --port 8090
+    ports:
+      - "127.0.0.1:${SCOUTCOMP_SITE_PORT}:8090"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    environment:
+      - SCOUTCOMP_SECRET_KEY=${SCOUTCOMP_SECRET_KEY}
+      - SCOUTCOMP_DB_URL=${SCOUTCOMP_DB_URL}
+      - SCOUTCOMP_DEVELOPER_MODE=false
+      - SCOUTCOMP_WEB_MEDIA_DIR=/app/data/web-media
+      - SCOUTCOMP_SITE_PUBLIC_URL=${SCOUTCOMP_SITE_PUBLIC_URL}
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -23,5 +49,6 @@ services:
     ports:
       - "127.0.0.1:${SCOUTCOMP_FRONTEND_PORT}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped

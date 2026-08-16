@@ -84,6 +84,10 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
         role=role,
         team_id=team_id,
     )
+    from ..modules import registry
+    member = registry.member_group(db)
+    if member:
+        user.permission_groups.append(member)
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -5,11 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from ..dependencies import get_current_active_user, get_db, require_admin
+from ..dependencies import get_current_active_user, get_db, require_action
 from ..models import (
     Completion,
     CompletionStatus,
-    RoleEnum,
     Task,
     TaskAutoCloseScope,
     TaskPeriodUnit,
@@ -17,6 +16,7 @@ from ..models import (
     Team,
     User,
 )
+from ..permissions import has_any_scope
 from ..schemas import (
     CompletionPublic,
     CompletionSubmission,
@@ -90,7 +90,7 @@ def _ensure_team_exists(db: Session, team_id: Optional[int]) -> None:
 
 
 def _assert_task_access(task: Task, user: User, db: Session) -> None:
-    if task.team_id and user.role != RoleEnum.ADMIN and task.team_id != user.team_id:
+    if task.team_id and not has_any_scope(db, user, "competitions.tasks.manage") and task.team_id != user.team_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Task restricted to another team")
     if task.is_archived:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Task archived")
@@ -213,7 +213,7 @@ def list_tasks(
         query = _apply_status_filter(query, status)
     if not include_archived:
         query = query.filter(Task.is_archived.is_(False))
-    if current_user.role != RoleEnum.ADMIN:
+    if not has_any_scope(db, current_user, "competitions.tasks.manage"):
         if current_user.team_id is not None:
             query = query.filter((Task.team_id == current_user.team_id) | (Task.team_id.is_(None)))
         else:
@@ -235,7 +235,7 @@ def list_tasks(
 def create_task(
     payload: TaskCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> Task:
     _validate_period_fields(payload.max_per_period, payload.period_unit, payload.period_count)
     _validate_auto_close_fields(payload.auto_close_after_completions, payload.auto_close_scope)
@@ -282,7 +282,7 @@ def update_task(
     task_id: int,
     payload: TaskUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> Task:
     task = db.get(Task, task_id)
     if not task:
@@ -329,7 +329,7 @@ def update_task(
 def archive_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> None:
     task = db.get(Task, task_id)
     if not task:
@@ -413,7 +413,7 @@ def submit_completion(
 def unarchive_task(
     task_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> Task:
     task = db.get(Task, task_id)
     if not task:
@@ -429,7 +429,7 @@ def unarchive_task(
 def reset_task_auto_close(
     task_id: int,
     db: Session = Depends(get_db),
-    admin_user: User = Depends(require_admin),
+    admin_user: User = Depends(require_action("competitions.tasks.manage")),
 ) -> Task:
     task = db.get(Task, task_id)
     if not task:
@@ -447,7 +447,7 @@ def reset_task_auto_close(
 def delete_task_permanently(
     task_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> None:
     task = db.get(Task, task_id)
     if not task:
@@ -471,7 +471,7 @@ def list_task_submissions(
     _assert_task_access(task, current_user, db)
 
     query = db.query(Completion).filter(Completion.task_id == task.id)
-    if current_user.role != RoleEnum.ADMIN:
+    if not has_any_scope(db, current_user, "competitions.tasks.manage"):
         query = query.filter(Completion.member_id == current_user.id)
     return query.order_by(Completion.submitted_at.desc()).all()
 
@@ -483,7 +483,7 @@ def create_task_variant(
     task_id: int,
     payload: TaskVariantCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> TaskVariant:
     task = db.get(Task, task_id)
     if not task:
@@ -552,7 +552,7 @@ def update_task_variant(
     variant_id: int,
     payload: TaskVariantUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> TaskVariant:
     task = db.get(Task, task_id)
     if not task:
@@ -610,7 +610,7 @@ def delete_task_variant(
     task_id: int,
     variant_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("competitions.tasks.manage")),
 ) -> None:
     task = db.get(Task, task_id)
     if not task:

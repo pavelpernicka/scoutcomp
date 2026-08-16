@@ -1,24 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal } from "../utils/dateUtils";
+import { renderMarkdown } from "../utils/markdown";
 import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
 import LoadingSpinner from "../components/LoadingSpinner";
 import DecoratedCard from "../components/DecoratedCard";
 import Textarea from "../components/Textarea";
-
-marked.setOptions({ breaks: true });
-
-const renderMarkdown = (markdown) => ({
-  __html: DOMPurify.sanitize(marked.parse(markdown || "")),
-});
 
 export default function RulesPage() {
   const { t } = useTranslation();

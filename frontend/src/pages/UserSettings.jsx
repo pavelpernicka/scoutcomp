@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
@@ -10,14 +10,49 @@ import Button from "../components/Button";
 import DecoratedCard from "../components/DecoratedCard";
 import Input from "../components/Input";
 import Select from "../components/Select";
+import UserAvatar from "../components/UserAvatar";
+
+const AVATAR_SIZE = 256;
+
+const processAvatarFile = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const side = Math.min(image.width, image.height);
+          const sx = (image.width - side) / 2;
+          const sy = (image.height - side) / 2;
+          const canvas = document.createElement("canvas");
+          canvas.width = AVATAR_SIZE;
+          canvas.height = AVATAR_SIZE;
+          const ctx = canvas.getContext("2d");
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(image, sx, sy, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        } catch (error) {
+          reject(error);
+        }
+      };
+      image.onerror = () => reject(new Error("image-load-failed"));
+      image.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("file-read-failed"));
+    reader.readAsDataURL(file);
+  });
 
 export default function UserSettingsPage() {
   const { t, i18n } = useTranslation();
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const queryClient = useQueryClient();
+  const receiveMessages = profile?.user?.receive_messages !== false;
+  const fileInputRef = useRef(null);
 
   const [feedback, setFeedback] = useState(null);
   const [passwordFeedback, setPasswordFeedback] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarError, setAvatarError] = useState(null);
   const [formData, setFormData] = useState({
     username: "",
     email: "",
@@ -66,6 +101,23 @@ export default function UserSettingsPage() {
     },
   });
 
+  const toggleMessagesMutation = useMutation({
+    mutationFn: async (value) => {
+      const { data } = await api.patch("/users/me", { receive_messages: value });
+      return data;
+    },
+    onSuccess: (data) => {
+      updateProfile({ receive_messages: data.user?.receive_messages });
+      setFeedback({ type: "success", message: t("userSettings.profileUpdated") });
+    },
+    onError: (error) => {
+      setFeedback({
+        type: "danger",
+        message: error?.response?.data?.detail || t("userSettings.updateFailed"),
+      });
+    },
+  });
+
   const changePasswordMutation = useMutation({
     mutationFn: async (data) => {
       // Use the same users endpoint but only send password
@@ -89,6 +141,51 @@ export default function UserSettingsPage() {
       });
     },
   });
+
+  const avatarMutation = useMutation({
+    mutationFn: async (avatar) => {
+      const { data } = await api.patch(`/users/${profile?.user?.id}`, { avatar });
+      return data;
+    },
+    onSuccess: (data) => {
+      updateProfile({ avatar: data.avatar });
+      setAvatarPreview(null);
+      setAvatarError(null);
+      setFeedback({ type: "success", message: t("userSettings.profileUpdated") });
+      queryClient.invalidateQueries(["users", "me"]);
+    },
+    onError: (error) => {
+      setFeedback({
+        type: "danger",
+        message: error?.response?.data?.detail || t("userSettings.updateFailed"),
+      });
+    },
+  });
+
+  const handleAvatarFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      setAvatarError(t("userSettings.photoTooLarge"));
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setAvatarError(t("userSettings.photoInvalid"));
+      return;
+    }
+    try {
+      const dataUrl = await processAvatarFile(file);
+      setAvatarPreview(dataUrl);
+      setAvatarError(null);
+    } catch (error) {
+      setAvatarError(t("userSettings.photoInvalid"));
+    }
+  };
+
+  const removeAvatar = () => {
+    avatarMutation.mutate(null);
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -165,6 +262,61 @@ export default function UserSettingsPage() {
                 </Alert>
               )}
 
+              <div className="d-flex align-items-center gap-3 mb-4">
+                <UserAvatar
+                  user={{ ...profile?.user, avatar: avatarPreview || profile?.user?.avatar }}
+                  size={96}
+                  fallbackClass="bg-success"
+                />
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="d-none"
+                    onChange={handleAvatarFile}
+                  />
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    icon="fas fa-upload"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    {t("userSettings.uploadPhoto")}
+                  </Button>
+                  {avatarPreview && (
+                    <Button
+                      variant="success"
+                      size="sm"
+                      icon="fas fa-check"
+                      className="ms-2"
+                      loading={avatarMutation.isLoading}
+                      onClick={() => avatarMutation.mutate(avatarPreview)}
+                    >
+                      {t("userSettings.savePhoto")}
+                    </Button>
+                  )}
+                  {!avatarPreview && profile?.user?.avatar && (
+                    <Button
+                      variant="outline-danger"
+                      size="sm"
+                      icon="fas fa-trash"
+                      className="ms-2"
+                      loading={avatarMutation.isLoading}
+                      onClick={removeAvatar}
+                    >
+                      {t("userSettings.removePhoto")}
+                    </Button>
+                  )}
+                  <div className="form-text mt-2">{t("userSettings.photoHint")}</div>
+                  {avatarError && (
+                    <Alert type="danger" className="shadow-sm border-0 mt-2" icon={<></>}>
+                      {avatarError}
+                    </Alert>
+                  )}
+                </div>
+              </div>
+
               <form onSubmit={handleProfileSubmit}>
                 <div className="row g-3">
                   <div className="col-md-6">
@@ -204,6 +356,23 @@ export default function UserSettingsPage() {
                       value={formData.preferredLanguage}
                       onChange={(e) => handleLanguageChange(e.target.value)}
                     />
+                  </div>
+                  <div className="col-md-6">
+                    <div className="form-check form-switch mt-1">
+                      <input
+                        className="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        id="receiveMessagesToggle"
+                        checked={receiveMessages}
+                        disabled={toggleMessagesMutation.isPending}
+                        onChange={(event) => toggleMessagesMutation.mutate(event.target.checked)}
+                      />
+                      <label className="form-check-label fw-medium" htmlFor="receiveMessagesToggle">
+                        {t("userSettings.receiveMessages")}
+                      </label>
+                      <div className="form-text">{t("userSettings.receiveMessagesHint")}</div>
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4">

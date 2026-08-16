@@ -2,6 +2,7 @@ import React from "react";
 import PropTypes from "prop-types";
 
 import { ITEM_STATUS_OPTIONS, getQrImageUrl } from "../helpers";
+import { parseServerDate } from "../../../utils/dateUtils";
 
 export default function InventoryDetailPanel({
   selectedItem,
@@ -146,8 +147,8 @@ export default function InventoryDetailPanel({
                   <div>
                     <div className="fw-semibold">{loan.borrower_name}</div>
                     <div className="small text-muted">
-                      {loan.quantity} ks • půjčeno {new Date(loan.borrowed_at).toLocaleString("cs-CZ")}
-                      {loan.due_at ? ` • vrátit ${new Date(loan.due_at).toLocaleString("cs-CZ")}` : ""}
+                      {loan.quantity} ks • půjčeno {parseServerDate(loan.borrowed_at).toLocaleString("cs-CZ")}
+                      {loan.due_at ? ` • vrátit ${parseServerDate(loan.due_at).toLocaleString("cs-CZ")}` : ""}
                     </div>
                   </div>
                   {!loan.returned_at ? (
@@ -168,7 +169,7 @@ export default function InventoryDetailPanel({
           {selectedItem.history_entries.map((entry) => (
             <div key={entry.id} className="list-group-item">
               <div className="fw-semibold">{entry.action}</div>
-              <div className="small text-muted">{new Date(entry.created_at).toLocaleString("cs-CZ")}</div>
+              <div className="small text-muted">{parseServerDate(entry.created_at).toLocaleString("cs-CZ")}</div>
               {entry.payload ? <pre className="inventory-history-payload mb-0">{JSON.stringify(entry.payload, null, 2)}</pre> : null}
             </div>
           ))}

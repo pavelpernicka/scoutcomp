@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db, require_admin
-from ..models import Config, User
+from ..dependencies import get_db, require_action
+from ..models import Config, RegisteredModule, User
 from ..schemas import ConfigResponse, ConfigUpdate
 
 router = APIRouter(tags=["config"])
@@ -20,6 +20,13 @@ DEFAULT_CONFIG = {
 
 def get_config_value(db: Session, key: str) -> str:
     """Get a config value from database, with fallback to default."""
+    # Competition preferences belong to the competitions module.  The legacy
+    # global config remains a migration fallback for existing installations.
+    if key in {"leaderboard_default_view", "leaderboard_show_only_default_mode"}:
+        module = db.query(RegisteredModule).filter_by(code="competitions", installed=True).one_or_none()
+        if module and key in (module.settings or {}):
+            value = module.settings[key]
+            return str(value).lower() if isinstance(value, bool) else str(value)
     config_record = db.query(Config).filter(Config.key == key).first()
     if config_record:
         return config_record.value
@@ -60,7 +67,7 @@ def get_public_config(
 @admin_router.get("", response_model=ConfigResponse)
 def get_config(
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("core.modules.manage")),
 ) -> ConfigResponse:
     """Get current configuration settings."""
     return ConfigResponse(
@@ -76,7 +83,7 @@ def get_config(
 def update_config(
     payload: ConfigUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_action("core.modules.manage")),
 ) -> ConfigResponse:
     """Update configuration settings."""
     # Update only provided values

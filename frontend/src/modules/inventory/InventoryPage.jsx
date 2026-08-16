@@ -1,14 +1,15 @@
 import React from "react";
 import { useEffect, useMemo, useState } from "react";
+import { useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { inventoryApi } from "./api";
+import { formatServerDateToInputValue } from "../../utils/dateUtils";
 import {
   buildOpenLoanEntries,
   buildCategoryOptions,
   buildLocationOptions,
   buildPathMetaMap,
-  collectLocationPaths,
   filterItems,
   flattenLocationTree,
   INVENTORY_SCREENS,
@@ -21,9 +22,7 @@ import InventoryEventReturnDialog from "./components/InventoryEventReturnDialog"
 import InventoryFlagDialog from "./components/InventoryFlagDialog";
 import InventoryItemDialog from "./components/InventoryItemDialog";
 import InventoryLabelGenerateDialog from "./components/InventoryLabelGenerateDialog";
-import InventoryLoanReturnDialog from "./components/InventoryLoanReturnDialog";
 import InventoryLocationDialog from "./components/InventoryLocationDialog";
-import InventorySidebar from "./components/InventorySidebar";
 import InventoryTemplateDialog from "./components/InventoryTemplateDialog";
 import InventoryCategoriesScreen from "./screens/InventoryCategoriesScreen";
 import InventoryEventsScreen from "./screens/InventoryEventsScreen";
@@ -83,9 +82,6 @@ const emptyEventReturnForm = {
   current_location: "",
   note: "",
 };
-const emptyLoanReturnForm = {
-  note: "",
-};
 
 function toIsoOrNull(value) {
   return value ? new Date(value).toISOString() : null;
@@ -93,7 +89,8 @@ function toIsoOrNull(value) {
 
 export default function InventoryPage() {
   const queryClient = useQueryClient();
-  const [activeScreen, setActiveScreen] = useState("items");
+  const { screen } = useParams();
+  const activeScreen = INVENTORY_SCREENS.some((entry) => entry.id === screen) ? screen : "items";
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [selectedEventId, setSelectedEventId] = useState(null);
@@ -121,8 +118,6 @@ export default function InventoryPage() {
   const [flagDialogVisible, setFlagDialogVisible] = useState(false);
   const [bulkDialogVisible, setBulkDialogVisible] = useState(false);
   const [eventReturnDialogVisible, setEventReturnDialogVisible] = useState(false);
-  const [loanReturnDialogVisible, setLoanReturnDialogVisible] = useState(false);
-  const [sidebarDrawerVisible, setSidebarDrawerVisible] = useState(false);
   const [bulkMode, setBulkMode] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
@@ -138,11 +133,8 @@ export default function InventoryPage() {
   const [eventReturnForm, setEventReturnForm] = useState(emptyEventReturnForm);
   const [photoForm, setPhotoForm] = useState(emptyPhotoForm);
   const [loanForm, setLoanForm] = useState(emptyLoanForm);
-  const [loanReturnForm, setLoanReturnForm] = useState(emptyLoanReturnForm);
   const [returningEventEntry, setReturningEventEntry] = useState(null);
   const [returningEventItem, setReturningEventItem] = useState(null);
-  const [returningLoan, setReturningLoan] = useState(null);
-  const [returningLoanItem, setReturningLoanItem] = useState(null);
 
   const { data: teams = [] } = useQuery({
     queryKey: ["inventory", "teams"],
@@ -192,7 +184,6 @@ export default function InventoryPage() {
       .map((value) => ({ value, label: `${value} (mimo strom)` }));
     return [...options, ...extra];
   }, [categoriesTree, items]);
-  const locationPaths = useMemo(() => collectLocationPaths(locations), [locations]);
   const openLoanEntries = useMemo(() => buildOpenLoanEntries(items), [items]);
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
   const selectedEvent = events.find((event) => event.id === selectedEventId) ?? null;
@@ -444,7 +435,7 @@ export default function InventoryPage() {
     setLoanForm(openLoan ? {
       borrower_name: openLoan.borrower_name || "",
       quantity: openLoan.quantity || 1,
-      due_at: openLoan.due_at ? openLoan.due_at.slice(0, 16) : "",
+      due_at: formatServerDateToInputValue(openLoan.due_at),
       note: openLoan.note || "",
     } : emptyLoanForm);
   };
@@ -495,8 +486,8 @@ export default function InventoryPage() {
     setEventForm({
       name: selectedEvent.name || "",
       team_id: selectedEvent.team_id || teams[0]?.id || "",
-      start_date: selectedEvent.start_date ? selectedEvent.start_date.slice(0, 16) : "",
-      end_date: selectedEvent.end_date ? selectedEvent.end_date.slice(0, 16) : "",
+      start_date: formatServerDateToInputValue(selectedEvent.start_date),
+      end_date: formatServerDateToInputValue(selectedEvent.end_date),
       note: selectedEvent.note || "",
       status: selectedEvent.status || "active",
     });
@@ -678,7 +669,7 @@ export default function InventoryPage() {
   };
 
   const handleSaveTemplate = () => {
-    createTemplateMutation.mutate({ ...templateForm, team_id: Number(templateForm.team_id) });
+    templateMutation.mutate({ ...templateForm, team_id: Number(templateForm.team_id) });
   };
 
   const handleSaveLocation = () => {
@@ -781,10 +772,7 @@ export default function InventoryPage() {
   };
 
   const openLoanReturnDialog = (loan, item) => {
-    setReturningLoan(loan);
-    setReturningLoanItem(item);
-    setLoanReturnForm(emptyLoanReturnForm);
-    setLoanReturnDialogVisible(true);
+    if (item) openEditItem(item);
   };
 
   const handleDeleteEvent = () => {
@@ -828,34 +816,6 @@ export default function InventoryPage() {
     }
   };
 
-  const handleSubmitLoanReturn = async (editAfterSave = false) => {
-    if (!returningLoan) return;
-    try {
-      // If this is a combined loan entry, return all individual loans
-      const loansToReturn = returningLoan.loans || [returningLoan];
-
-      for (const loan of loansToReturn) {
-        await returnLoanMutation.mutateAsync({
-          loanId: loan.id,
-          payload: {
-            note: loanReturnForm.note || null,
-          },
-        });
-      }
-
-      setLoanReturnDialogVisible(false);
-      setReturningLoan(null);
-      setReturningLoanItem(null);
-      setLoanReturnForm(emptyLoanReturnForm);
-      if (editAfterSave && returningLoanItem) {
-        const freshItem = await inventoryApi.getItem(returningLoanItem.id);
-        openEditItem(freshItem);
-      }
-    } catch {
-      return;
-    }
-  };
-
   if (isLoading) return <div className="loader">Načítám sklad…</div>;
   if (error) return <div className="alert alert-danger">Nepodařilo se načíst skladový modul.</div>;
 
@@ -868,29 +828,17 @@ export default function InventoryPage() {
 
   return (
     <>
-      <div className="inventory-shell">
+      <div className="inventory-content">
         <div className="inventory-mobile-topbar inventory-mobile-only">
-          <button type="button" className="btn btn-outline-primary" onClick={() => setSidebarDrawerVisible(true)}>
-            <i className="fas fa-bars me-2"></i>Menu
-          </button>
           <div className="inventory-mobile-topbar-title">Oddílový inventář</div>
           <button type="button" className="btn btn-primary" onClick={openCreateItem}>
             <i className="fas fa-plus"></i>
           </button>
         </div>
-
-        <InventorySidebar
-          screens={INVENTORY_SCREENS}
-          activeScreen={activeScreen}
-          onSelectScreen={setActiveScreen}
-          onCreateItem={openCreateItem}
-          stats={{ items: items.length, locations: locationPaths.length, events: events.length, categories: flatCategories.length }}
-        />
-
-        <div className="inventory-content">
           {activeScreen === "items" && (
             <InventoryItemsScreen
               items={filteredItems}
+              onCreateItem={openCreateItem}
               search={search}
               onSearchChange={setSearch}
               presenceFilter={presenceFilter}
@@ -964,7 +912,6 @@ export default function InventoryPage() {
             <InventoryLabelsScreen
               templates={templates}
               selectedItemIds={selectedItemIds}
-              items={items}
               teams={teams}
               onCreateTemplate={(templateData) => templateMutation.mutate(templateData)}
               onUpdateTemplate={(id, templateData) => templateMutation.mutate({ ...templateData, id })}
@@ -1002,23 +949,7 @@ export default function InventoryPage() {
               onDelete={handleDeleteFlag}
             />
           )}
-        </div>
       </div>
-
-      {sidebarDrawerVisible ? (
-        <>
-          <button type="button" className="inventory-drawer-backdrop inventory-mobile-only" onClick={() => setSidebarDrawerVisible(false)} aria-label="Zavřít menu" />
-          <InventorySidebar
-            screens={INVENTORY_SCREENS}
-            activeScreen={activeScreen}
-            onSelectScreen={setActiveScreen}
-            onCreateItem={openCreateItem}
-            stats={{ items: items.length, locations: locationPaths.length, events: events.length, categories: flatCategories.length }}
-            isDrawer
-            onClose={() => setSidebarDrawerVisible(false)}
-          />
-        </>
-      ) : null}
 
       <InventoryItemDialog
         isVisible={itemDialogVisible}

@@ -10,16 +10,55 @@ services:
     environment:
       SCOUTCOMP_SECRET_KEY: ${SCOUTCOMP_SECRET_KEY:-dev-secret}
       SCOUTCOMP_DB_URL: ${SCOUTCOMP_DB_URL:-sqlite:///./database.db}
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  site:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uvicorn app.site_app:app --host 0.0.0.0 --port 8090 --reload
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./backend:/app
+    environment:
+      SCOUTCOMP_SECRET_KEY: ${SCOUTCOMP_SECRET_KEY:-dev-secret}
+      SCOUTCOMP_DB_URL: ${SCOUTCOMP_DB_URL:-sqlite:///./database.db}
+    depends_on:
+      backend:
+        condition: service_healthy
 
   frontend:
     image: node:20
+    # Avoid creating root-owned files in the source checkout when Docker is
+    # used as an optional development environment.
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
     working_dir: /app
     volumes:
       - ./frontend:/app
+      # Keep dependencies outside the bind mount so they survive container
+      # recreation and do not have to be installed on every `make dev`.
+      - frontend_node_modules:/app/node_modules
+      - frontend_npm_cache:/tmp/npm-cache
     environment:
       DOCKER_ENV: "true"
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+      NPM_CONFIG_CACHE: /tmp/npm-cache
+    command: >-
+      sh -c 'lock=$$(cksum package-lock.json); saved=$$(cat node_modules/.scoutcomp-lock 2>/dev/null || true);
+      if [ "$$lock" != "$$saved" ]; then npm ci && printf "%s" "$$lock" > node_modules/.scoutcomp-lock; fi;
+      npm run dev -- --host 0.0.0.0 --port 5173'
     ports:
       - "5173:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+
+volumes:
+  frontend_node_modules:
+  frontend_npm_cache:

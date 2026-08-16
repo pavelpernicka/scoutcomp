@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from ..dependencies import get_db, require_admin
+from ..dependencies import get_db, require_action
 from ..models import StatCategory, StatCategoryComponent, StatMetricEnum, Task
 from ..schemas import (
     StatCategoryComponentCreate,
@@ -77,7 +77,7 @@ def list_stat_categories(db: Session = Depends(get_db)) -> List[StatCategorySumm
 @router.get("/manage", response_model=List[StatCategoryManage])
 def manage_stat_categories(
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> List[StatCategoryManage]:
     categories = (
         db.query(StatCategory)
@@ -93,7 +93,7 @@ def manage_stat_categories(
 def create_stat_category(
     payload: StatCategoryCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> StatCategoryManage:
     category = StatCategory(name=payload.name, description=payload.description, icon=payload.icon)
     db.add(category)
@@ -120,7 +120,7 @@ def update_stat_category(
     category_id: int,
     payload: StatCategoryUpdate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> StatCategoryManage:
     category = (
         db.query(StatCategory)
@@ -156,7 +156,7 @@ def update_stat_category(
 def delete_stat_category(
     category_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> None:
     category = db.get(StatCategory, category_id)
     if not category:
@@ -199,7 +199,7 @@ def create_component(
     category_id: int,
     payload: StatCategoryComponentCreate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> StatCategoryComponentPublic:
     category = db.get(StatCategory, category_id)
     if not category:
@@ -223,7 +223,7 @@ def update_component(
     component_id: int,
     payload: StatCategoryComponentUpdate,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> StatCategoryComponentPublic:
     component = (
         db.query(StatCategoryComponent)
@@ -269,7 +269,7 @@ def update_component(
 def delete_component(
     component_id: int,
     db: Session = Depends(get_db),
-    _: None = Depends(require_admin),
+    _: None = Depends(require_action("competitions.statistics.read")),
 ) -> None:
     component = db.get(StatCategoryComponent, component_id)
     if not component:

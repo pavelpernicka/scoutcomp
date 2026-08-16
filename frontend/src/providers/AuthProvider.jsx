@@ -135,6 +135,14 @@ export function AuthProvider({ children }) {
   const isAdmin = role === "admin";
   const isGroupAdmin = role === "group_admin";
   const canManageUsers = isAdmin || isGroupAdmin;
+  const permissions = profile?.user?.permissions ?? [];
+  const can = (permission) => isAdmin || permissions.includes(permission);
+
+  const updateProfile = (patch) => {
+    setProfile((prev) =>
+      prev ? { ...prev, user: { ...prev.user, ...patch } } : prev
+    );
+  };
 
   const value = {
     profile,
@@ -147,10 +155,13 @@ export function AuthProvider({ children }) {
     isGroupAdmin,
     canManageUsers,
     canReviewCompletions: canManageUsers,
+    permissions,
+    can,
     login,
     logout,
     register,
     changePassword,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

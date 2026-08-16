@@ -10,3 +10,5 @@ python-jose[cryptography]
 pytest
 httpx
 unidecode
+python-multipart
+playwright

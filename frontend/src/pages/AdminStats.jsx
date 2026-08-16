@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
+import HeroHeader from "../components/HeroHeader";
+import Button from "../components/Button";
 
 const ICON_FILE_ACCEPT = "image/png,image/jpeg,image/svg+xml,image/webp,image/gif";
 const MAX_ICON_BYTES = 150 * 1024;
@@ -112,10 +114,9 @@ export default function AdminStats() {
       setSelectedCategoryId(null);
       return;
     }
-    if (!selectedCategoryId || !categories.some((category) => category.id === selectedCategoryId)) {
-      setSelectedCategoryId(categories[0].id);
-    }
-  }, [categories, selectedCategoryId]);
+    if (selectedCategoryId != null && categories.some((category) => category.id === selectedCategoryId)) return;
+    setSelectedCategoryId(categories[0].id);
+  }, [categories]);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) || null,
@@ -126,10 +127,6 @@ export default function AdminStats() {
     if (!selectedCategory) {
       setCategoryEditForm({ ...emptyCategoryForm });
       setComponentDrafts({});
-      setComponentForm((prev) => ({
-        ...prev,
-        taskId: tasks.length > 0 ? String(tasks[0].id) : "",
-      }));
       return;
     }
     setCategoryEditForm({
@@ -151,11 +148,7 @@ export default function AdminStats() {
         };
       });
     setComponentDrafts(drafts);
-    setComponentForm((prev) => ({
-      ...prev,
-      taskId: tasks.length > 0 ? String(tasks[0].id) : "",
-    }));
-  }, [selectedCategory, tasks]);
+  }, [selectedCategory]);
 
   const createCategoryMutation = useMutation({
     mutationFn: async (payload) => api.post("/stats-categories", payload),
@@ -383,12 +376,12 @@ export default function AdminStats() {
   }
 
   const isWorking =
-    createCategoryMutation.isLoading ||
-    updateCategoryMutation.isLoading ||
-    deleteCategoryMutation.isLoading ||
-    createComponentMutation.isLoading ||
-    updateComponentMutation.isLoading ||
-    deleteComponentMutation.isLoading;
+    createCategoryMutation.isPending ||
+    updateCategoryMutation.isPending ||
+    deleteCategoryMutation.isPending ||
+    createComponentMutation.isPending ||
+    updateComponentMutation.isPending ||
+    deleteComponentMutation.isPending;
 
   const renderIconPreview = (icon, size = 40) => {
     if (!icon) return null;
@@ -467,7 +460,19 @@ export default function AdminStats() {
   };
 
   return (
-    <div className="container px-0">
+    <>
+      <HeroHeader
+        title={t("adminStats.title")}
+        subtitle={t("adminStats.subtitle")}
+        icon="📊"
+        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+      >
+        <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={() => setCreateForm({ name: "", description: "", icon: "" })}>
+          {t("adminStats.createCategory")}
+        </Button>
+      </HeroHeader>
+
+      <div className="container px-0">
       {feedback && (
         <div className={`alert alert-${feedback.type}`} role="alert">
           {feedback.message}
@@ -567,7 +572,7 @@ export default function AdminStats() {
                   <button
                     type="submit"
                     className="btn btn-primary"
-                    disabled={createCategoryMutation.isLoading}
+                    disabled={createCategoryMutation.isPending}
                   >
                     {t('adminStats.createCategory')}
                   </button>
@@ -627,7 +632,7 @@ export default function AdminStats() {
                   type="button"
                   className="btn btn-outline-danger btn-sm"
                   onClick={() => handleDeleteCategory(selectedCategory.id, selectedCategory.name)}
-                  disabled={deleteCategoryMutation.isLoading}
+                  disabled={deleteCategoryMutation.isPending}
                 >
                   {t('adminStats.delete')}
                 </button>
@@ -735,7 +740,7 @@ export default function AdminStats() {
                     <button
                       type="submit"
                       className="btn btn-primary"
-                      disabled={updateCategoryMutation.isLoading}
+                      disabled={updateCategoryMutation.isPending}
                     >
                       {t('adminStats.saveChanges')}
                     </button>
@@ -826,7 +831,7 @@ export default function AdminStats() {
                                         type="button"
                                         className="btn btn-outline-primary"
                                         onClick={() => handleUpdateComponent(component.id)}
-                                        disabled={updateComponentMutation.isLoading}
+                                        disabled={updateComponentMutation.isPending}
                                       >
                                         {t('adminStats.update')}
                                       </button>
@@ -834,7 +839,7 @@ export default function AdminStats() {
                                         type="button"
                                         className="btn btn-outline-danger"
                                         onClick={() => handleDeleteComponent(component.id)}
-                                        disabled={deleteComponentMutation.isLoading}
+                                        disabled={deleteComponentMutation.isPending}
                                       >
                                         {t('adminStats.delete')}
                                       </button>
@@ -940,5 +945,6 @@ export default function AdminStats() {
         </div>
       </div>
     </div>
+    </>
   );
 }

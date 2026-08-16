@@ -1,1210 +1,1535 @@
 {
+  "web": {
+    "nav": {
+      "posts": "Příspěvky",
+      "menus": "Menu",
+      "settings": "Nastavení",
+      "design": "Design",
+      "pages": "Stránky",
+      "media": "Média",
+      "themes": "Témata"
+    },
+    "pageViews": {
+      "all": "Vše",
+      "published": "Publikované",
+      "draft": "Koncepty",
+      "trash": "Koš"
+    },
+    "design": {
+      "templates": "Šablony",
+      "components": "Komponenty",
+      "sections": "Sekce",
+      "patterns": "Vzory",
+      "parts": "Globální části",
+      "pageTemplates": "Šablony stránek",
+      "styles": "Nastavení šablony"
+    },
+    "designDescriptions": {
+      "templates": "Znovupoužitelné šablony stránek.",
+      "components": "Znovupoužitelné stavební bloky.",
+      "sections": "Sekce stránky v plné šířce.",
+      "patterns": "Znovupoužitelné kompozice obsahu.",
+      "parts": "Sdílené části webu, například hlavní záhlaví a patička.",
+      "pageTemplates": "Výchozí obsah stránky – kopíruje se jednou při založení stránky.",
+      "styles": "Konfigurovatelné vlastnosti aktivní šablony – barvy, typografie a vlastní parametry."
+    },
+    "editor": {
+      "block": {
+        "article": "Článek",
+        "header": "Záhlaví",
+        "footer": "Patička",
+        "main": "Hlavní obsah",
+        "nav": "Navigace",
+        "aside": "Boční panel",
+        "container": "Kontejner",
+        "box": "Box / div",
+        "section": "Sekce",
+        "columns": "Sloupce",
+        "flex": "Flex kontejner",
+        "grid": "Grid kontejner",
+        "text": "Text",
+        "richText": "Formátovaný text",
+        "heading": "Nadpis",
+        "link": "Odkaz",
+        "image": "Obrázek",
+        "figure": "Obrázek s popiskem",
+        "button": "Tlačítko",
+        "divider": "Oddělovač",
+        "spacer": "Mezera",
+        "unorderedList": "Odrážkový seznam",
+        "orderedList": "Číslovaný seznam",
+        "listItem": "Položka seznamu",
+        "table": "Tabulka"
+      },
+      "catalog": {
+        "components": "Komponenty",
+        "sections": "Sekce",
+        "globalParts": "Globální části",
+        "data": "Data",
+        "structure": "Struktura",
+        "primitives": "Základní prvky"
+      },
+      "rail": {
+        "pages": "Stránky",
+        "insert": "Vkládání",
+        "layers": "Navigátor"
+      },
+      "devices": {
+        "desktop": "Desktop",
+        "tablet": "Tablet",
+        "mobile": "Mobil"
+      },
+      "saveStates": {
+        "saved": "Uloženo",
+        "unsaved": "Neuloženo",
+        "saving": "Ukládám…",
+        "conflict": "Konflikt",
+        "failed": "Selhalo"
+      },
+      "publish": "Publikovat",
+      "back": "Zpět na stránky",
+      "historyActions": "Historie úprav",
+      "viewport": "Náhled zařízení",
+      "insert": "Vložit",
+      "layers": "Navigátor",
+      "loadingCanvas": "Načítám editor…",
+      "inspectorLabel": "Inspektor prvku",
+      "inspectorTabs": {
+        "style": "Styl",
+        "content": "Obsah",
+        "data": "Data",
+        "code": "Kód",
+        "advanced": "Pokročilé"
+      },
+      "conflictTitle": "Koncept byl mezitím změněn",
+      "reloadLatest": "Načíst poslední verzi",
+      "breadcrumbs": "Cesta k prvku",
+      "component": {
+        "bind": "Vazba",
+        "repeat": "Opakování",
+        "condition": "Podmínka",
+        "emptyState": "Prázdný stav",
+        "templatePart": "Globální část",
+        "globalPart": "Globální část",
+        "linkedResource": "Propojený zdroj"
+      },
+      "inspector": {
+        "layout": "Rozvržení",
+        "spacing": "Mezery",
+        "grid": "Mřížka",
+        "typography": "Typografie",
+        "decoration": "Vzhled"
+      },
+      "noSelection": "Vyberte prvek na plátně nebo ve vrstvách.",
+      "advancedHelp": "HTML atributy vybraného prvku.",
+      "componentFallback": "Prvek",
+      "navigator": {
+        "title": "Navigátor",
+        "label": "DOM struktura stránky",
+        "help": "Dvojklik = vlastní název. Tag a třídy zůstávají viditelné.",
+        "loading": "Načítám strukturu stránky…",
+        "expand": "Rozbalit prvek",
+        "collapse": "Sbalit prvek",
+        "customName": "Vlastní název vrstvy",
+        "states": {
+          "global": "Sdílená globální část",
+          "linked": "Propojený zdroj",
+          "detached": "Odpojená instance",
+          "dynamic": "Dynamická data"
+        },
+        "tags": {
+          "body": "Tělo",
+          "main": "Hlavní obsah",
+          "header": "Záhlaví",
+          "footer": "Patička",
+          "nav": "Navigace",
+          "aside": "Boční panel",
+          "article": "Článek",
+          "section": "Sekce",
+          "div": "Box",
+          "paragraph": "Odstavec",
+          "span": "Textový prvek",
+          "button": "Tlačítko",
+          "heading": "Nadpis",
+          "link": "Odkaz",
+          "image": "Obrázek",
+          "unorderedList": "Odrážkový seznam",
+          "orderedList": "Číslovaný seznam",
+          "listItem": "Položka seznamu",
+          "figure": "Obrázek s popiskem",
+          "figcaption": "Popisek obrázku",
+          "table": "Tabulka",
+          "tableHead": "Záhlaví tabulky",
+          "tableBody": "Tělo tabulky",
+          "tableRow": "Řádek tabulky",
+          "tableHeaderCell": "Záhlaví buňky",
+          "tableCell": "Buňka tabulky",
+          "divider": "Oddělovač"
+        }
+      },
+      "advanced": {
+        "semantics": "Sémantika",
+        "tag": "HTML tag",
+        "fixedTag": "Tag tohoto speciálního prvku je pevně daný.",
+        "id": "ID",
+        "classes": "CSS třídy",
+        "classList": "Seznam tříd",
+        "classesHelp": "Třídy oddělte mezerou. Styly tříd spravuje GrapesJS Selector Manager.",
+        "attributes": "Základní atributy",
+        "accessibility": "Přístupnost",
+        "title": "Titulek",
+        "role": "ARIA role",
+        "ariaLabel": "Přístupný název (aria-label)",
+        "invalidId": "ID musí začínat písmenem a obsahovat jen bezpečné znaky.",
+        "invalidClass": "CSS třída „{{name}}“ není platná.",
+        "stateHelp": {
+          "global": "Změny této sdílené části mohou ovlivnit více stránek.",
+          "linked": "Struktura pochází z propojené definice.",
+          "detached": "Instance je lokální a není dále propojená.",
+          "dynamic": "Obsah je řízený veřejným datovým zdrojem."
+        }
+      },
+      "dataHelp": "Propojte bezpečné veřejné pole s obsahem nebo atributem vybraného prvku.",
+      "currentRecord": "Aktuální záznam",
+      "removeBinding": "Odebrat vazbu",
+      "bindingSource": "Zdroj",
+      "bindingField": "Pole",
+      "bindingTarget": "Cíl",
+      "addBinding": "Přidat vazbu",
+      "codeHelp": "Přímo upravte HTML a CSS vybraného prvku. Změny se aplikují do editoru.",
+      "html": "HTML",
+      "css": "CSS",
+      "applyCode": "Použít kód",
+      "codeParseError": "Nepodařilo se rozparsovat zadaný HTML. Zkontrolujte značky.",
+      "pageSettings": "Nastavení stránky",
+      "noTemplate": "Bez šablony",
+      "searchCatalog": "Hledat v katalogu…",
+      "tools": "Nástroje editoru",
+      "undo": "Zpět",
+      "redo": "Znovu",
+      "draftPreview": "Náhled konceptu",
+      "publishedNotice": "Stránka byla publikována.",
+      "wideScreenHint": "Editor rozvržení je nejpohodlnější na širší obrazovce",
+      "conflictBody": "Automatické ukládání je zastaveno, aby nedošlo k přepsání cizích změn.",
+      "placeholder": {
+        "column": "Sloupec",
+        "item": "Položka",
+        "text": "Text",
+        "richText": "Začněte psát formátovaný text…",
+        "heading": "Nadpis",
+        "link": "Odkaz",
+        "button": "Tlačítko",
+        "caption": "Popisek obrázku",
+        "listItem": "Položka seznamu",
+        "tableCell": "Buňka",
+        "repeat": "Položka",
+        "condition": "Podmínka",
+        "emptyState": "Prázdný stav",
+        "templatePart": "Část šablony",
+        "globalPart": "Globální část webu",
+        "linkedResource": "Propojená komponenta nebo sekce"
+      },
+      "data": {
+        "field": "Pole",
+        "format": "Formát",
+        "mode": "Režim",
+        "scope": "Zdroj hodnoty",
+        "scopeProps": "Vlastnosti zdroje",
+        "scopeContext": "Aktuální datový záznam",
+        "scopePage": "Stránka",
+        "scopeSite": "Web",
+        "scopeSource": "Veřejný zdroj dat",
+        "targetText": "Text",
+        "targetRichText": "Formátovaný text",
+        "source": "Zdroj",
+        "limit": "Limit",
+        "sort": "Řazení",
+        "operator": "Operátor",
+        "value": "Hodnota"
+      },
+      "condition": {
+        "equals": "rovná se",
+        "notEquals": "nerovná se",
+        "in": "je v",
+        "notIn": "není v",
+        "exists": "existuje",
+        "empty": "je prázdné",
+        "greaterThan": "větší než",
+        "greaterOrEqual": "větší nebo rovno",
+        "lessThan": "menší než",
+        "lessOrEqual": "menší nebo rovno"
+      },
+      "templatePart": {
+        "key": "Klíč části šablony"
+      },
+      "globalPart": {
+        "key": "Klíč globální části"
+      }
+    },
+    "cms": "Správa webu",
+    "adminTitle": "Webové stránky",
+    "publicSiteSeparate": "Veřejný web běží odděleně",
+    "adminNavigation": "Navigace správy webu",
+    "saveSuccess": "Stránka uložena",
+    "saveFailed": "Uložení stránky selhalo",
+    "deleteSuccess": "Stránka smazána",
+    "deleteFailed": "Smazání stránky selhalo",
+    "menuPublishSuccess": "Menu bylo publikováno",
+    "menuPublishFailed": "Publikování menu selhalo",
+    "menusTitle": "Menu",
+    "menusSubtitle": "Navigační menu pro veřejné stránky",
+    "menuName": "Název",
+    "menuNamePlaceholder": "např. Hlavní menu",
+    "menuLocation": "Umístění",
+    "newMenu": "Nové menu",
+    "menuLocationHint": "Klíč umístění používaný šablonou webu (např. „main\").",
+    "noMenus": "Zatím žádná menu.",
+    "menuItems": "Položek",
+    "published": "Zveřejněno",
+    "actions": "Akce",
+    "states": {
+      "published": "Publikováno",
+      "draft": "Koncept",
+      "publishing": "Publikuji…",
+      "fromTheme": "Z tématu",
+      "siteLocal": "Vlastní",
+      "saving": "Ukládám…",
+      "rendering": "Připravuji náhled…",
+      "uploading": "Nahrávám…",
+      "installing": "Instaluji…",
+      "active": "Aktivní",
+      "publishedVersion": "Publikovaná verze {{version}}",
+      "loading": "Načítám…"
+    },
+    "editItems": "Upravit položky",
+    "delete": "Smazat",
+    "noMenuItems": "Zatím žádné položky. Přidejte první položku.",
+    "menuAddItem": "Přidat položku",
+    "cancel": "Zrušit",
+    "save": "Uložit",
+    "menuItemLabel": "Popisek",
+    "menuItemTypes": {
+      "page": "Stránka",
+      "post": "Příspěvek",
+      "external": "Externí URL"
+    },
+    "menuItemUrl": "URL",
+    "menuNoParent": "— bez nadřazené",
+    "moveUp": "Nahoru",
+    "moveDown": "Dolů",
+    "addSubItem": "Přidat podpoložku",
+    "menuTargetSame": "Stejné okno",
+    "menuTargetNew": "Nové okno",
+    "menuRel": "Vztah odkazu (rel)",
+    "confirmDeleteMenu": "Smazat menu „{{name}}\"?",
+    "editMenuItems": "Položky menu „{{name}}\"",
+    "postsTitle": "Novinky",
+    "postsSubtitle": "Pište a publikujte novinky oddílu",
+    "newPost": "Nová novinka",
+    "noPosts": "Zatím žádné novinky. Napište první příspěvek.",
+    "title": "Nadpis",
+    "slug": "Adresa",
+    "postPublishedAt": "Publikováno",
+    "updated": "Aktualizováno",
+    "yes": "Ano",
+    "no": "Ne",
+    "edit": "Upravit",
+    "postLoadFailed": "Příspěvek se nepodařilo načíst.",
+    "editPost": "Upravit novinku",
+    "postExcerpt": "Úvod",
+    "postBody": "Text (Markdown)",
+    "postCover": "Titulní obrázek",
+    "confirmDeletePost": "Smazat novinku „{{title}}\"?",
+    "settingsTitle": "Nastavení",
+    "settingsSubtitle": "Obecná nastavení webu",
+    "settingsBasic": "Základní",
+    "settingsSiteTitle": "Název webu",
+    "settingsTagline": "Podtitulek",
+    "settingsFavicon": "Favicon",
+    "chooseFromMedia": "Vybrat z médií",
+    "settingsFaviconHint": "URL k favicon obrázku.",
+    "settingsLogo": "URL loga",
+    "settingsSeo": "SEO",
+    "settingsMetaDescription": "Meta popis",
+    "settingsSiteMeta": "Meta informace",
+    "settingsCanonical": "Kanonická URL",
+    "settingsOpenGraph": "Open Graph",
+    "settingsOgTitle": "OG titulek",
+    "settingsOgDescription": "OG popis",
+    "settingsOgType": "OG typ",
+    "settingsOgImage": "OG obrázek",
+    "restoreSuccess": "Stránka obnovena",
+    "restoreFailed": "Obnovení stránky selhalo",
+    "trashTitle": "Koš",
+    "trashSubtitle": "Smazané stránky lze obnovit nebo natrvalo odstranit",
+    "trashEmpty": "Koš je prázdný.",
+    "template": "Šablona",
+    "deletedAt": "Smazáno",
+    "restore": "Obnovit",
+    "purge": "Smazat natrvalo",
+    "confirmPurge": "Natrvalo smazat stránku „{{title}}\"?",
+    "resourceEditor": {
+      "contentSlot": "Místo pro obsah stránky",
+      "saveBeforePublish": "Před publikováním uložte nejnovější změny.",
+      "publishFailed": "Zdroj se nepodařilo publikovat.",
+      "notFound": "Designový zdroj se nepodařilo načíst.",
+      "back": "Zpět na designové zdroje",
+      "readOnly": "Zdroj instalovaného tématu",
+      "regeneratePreview": "Obnovit náhled",
+      "key": "Stabilní klíč",
+      "description": "Popis",
+      "error": "Chyba editoru"
+    },
+    "props": {
+      "tab": "Vlastnosti",
+      "schemaTitle": "Upravitelné vlastnosti",
+      "schemaHelp": "Definujte bezpečné hodnoty ukládané každou propojenou instancí.",
+      "schemaEmpty": "Tento zdroj zatím nemá upravitelné vlastnosti.",
+      "empty": "Tento propojený zdroj nemá upravitelné vlastnosti.",
+      "field": "Vlastnost",
+      "add": "Přidat vlastnost",
+      "remove": "Odebrat",
+      "id": "ID",
+      "label": "Popisek",
+      "type": "Typ",
+      "default": "Výchozí hodnota",
+      "options": "Možnosti (hodnota|popisek, jedna na řádek)",
+      "required": "Povinná",
+      "chooseMedia": "Vybrat médium",
+      "clear": "Vymazat",
+      "invalidJson": "Zadejte platný JSON.",
+      "missingDefinition": "Propojená definice není dostupná.",
+      "linkedComponent": "Propojená komponenta — změny vlastností zachovají sdílenou strukturu.",
+      "linkedSection": "Propojená sekce — změny vlastností zachovají sdílenou strukturu.",
+      "linkedStyleHelp": "Styly patří propojené definici. DOM a třídy viz Advanced tab; CSS patří zdrojovému editoru.",
+      "variant": "Varianta",
+      "defaultVariant": "(výchozí)",
+      "linkExternal": "Externí URL",
+      "linkPage": "Stránka",
+      "linkChoosePage": "Vyberte stránku…",
+      "pageChoose": "Vyberte stránku…",
+      "menuChoose": "Vyberte menu…",
+      "dataSourceChoose": "Vyberte zdroj dat…",
+      "dataFieldChoose": "Vyberte pole…",
+      "repeaterAdd": "Přidat položku",
+      "repeaterRemove": "Odebrat",
+      "cloneVariant": "Vytvořit vlastní variantu",
+      "detach": "Odpojit",
+      "detaching": "Odpajímám…",
+      "detachFailed": "Odpojení se nezdařilo. Definice může obsahovat dynamické prvky.",
+      "cssCascadeItem": "{{level}}. {{owner}}",
+      "cssCascadeLevel1": "Specifické styly zdrojové definice",
+      "cssCascadeLevel2": "Global Site Part, ve kterém je zdroj vložen",
+      "cssCascadeLevel3": "Layout stránky",
+      "cssCascadeLevel4": "Aktivní téma",
+      "cssCascadeLevel5": "Globální styly webu",
+      "cssCascadeLayout": "Layout",
+      "cssCascadeTheme": "Téma",
+      "cssCascadeGlobal": "Globální styly",
+      "cssCascadeHelp": "Při editaci zdroje upravujte jen styly patřící dané úrovni. Instance dědí styly ze zdroje, Global Partu, layoutu, tématu a globálních stylů ve stanoveném pořadí.",
+      "types": {
+        "text": "Text", "textarea": "Dlouhý text", "richtext": "Formátovaný text", "number": "Číslo", "boolean": "Ano/ne",
+        "select": "Výběr", "multiselect": "Vícenásobný výběr", "color": "Barva", "icon": "Ikona", "media": "Médium",
+        "link": "Odkaz", "page": "Stránka", "menu": "Menu", "data-source": "Zdroj dat", "data-field": "Datové pole",
+        "alignment": "Zarovnání", "spacing": "Odsazení", "group": "Skupina", "repeater": "Opakování"
+      }
+    },
+    "errors": {
+      "editorLoad": "Editor se nepodařilo spustit.",
+      "preview": "Náhled se nepodařilo vyrenderovat.",
+      "pageLoad": "Stránku se nepodařilo načíst.",
+      "createPage": "Stránku se nepodařilo vytvořit.",
+      "publish": "Stránku se nepodařilo publikovat",
+      "unpublish": "Publikování se nepodařilo zrušit",
+      "themeAction": "Operace s tématem selhala."
+    },
+    "fields": {
+      "name": "Název",
+      "pathSegment": "Část cesty",
+      "pageTitle": "Název stránky",
+      "pageFilter": "Filtr stránek",
+      "parentPage": "Nadřazená stránka",
+      "noParent": "Bez nadřazené stránky",
+      "position": "Pořadí"
+    },
+    "commands": {
+      "createResource": "Vytvořit",
+      "newFolderChild": "Nová podsložka",
+      "newFolder": "Nová složka",
+      "newPage": "Nová stránka",
+      "createAndEdit": "Vytvořit a upravit",
+      "installTheme": "Instalovat téma",
+      "activate": "Aktivovat",
+      "uninstall": "Odinstalovat"
+    },
+    "create": "Vytvořit",
+    "empty": {
+      "resourcesTitle": "Zatím žádné prostředky",
+      "resourcesBody": "Vytvořte vlastní prostředek nebo aktivujte téma, které ho obsahuje.",
+      "noResults": "Žádné výsledky",
+      "mediaTitle": "Knihovna je prázdná",
+      "mediaBody": "Nahrajte první obrázek nebo soubor.",
+      "pagesTitle": "Zatím žádné stránky",
+      "pagesBody": "Vytvořte první stránku a otevřete ji ve vizuálním editoru.",
+      "themesTitle": "Žádná nainstalovaná témata",
+      "themesBody": "Nainstalujte verzovaný ZIP balíček tématu."
+    },
+    "confirmDeleteResource": "Opravdu smazat tento prostředek?",
+    "templateSettings": {
+      "addCustom": "Přidat vlastní parametr",
+      "keyPlaceholder": "klíč",
+      "valuePlaceholder": "hodnota",
+      "add": "Přidat",
+      "addHint": "Vlastní key:value páry se propíší do proměnných šablony."
+    },
+    "duplicate": "Duplikovat",
+    "metaDescription": "Meta popis",
+    "revisions": "Historie",
+    "search": "Hledat",
+    "preview": "Náhled",
+    "close": "Zavřít",
+    "noRevisions": "Zatím žádná historie.",
+    "revision": "Revize",
+    "confirmRestoreRevision": "Obnovit tuto verzi?",
+    "mediaUploadFailed": "Nahrání selhalo",
+    "allMedia": "Všechna média",
+    "uploadMedia": "Nahrát médium",
+    "collapse": "Sbalit",
+    "expand": "Rozbalit",
+    "mediaDescription": "Jedna knihovna obrázků a souborů pro stránky, příspěvky i témata.",
+    "folders": "Složky",
+    "confirmDeleteFolder": "Smazat tuto složku? Složka musí být prázdná.",
+    "folder": "Složka",
+    "confirmDeleteMedia": "Opravdu smazat toto médium?",
+    "pagination": "Stránkování médií",
+    "prev": "Předchozí",
+    "mediaCount": "položek",
+    "next": "Další",
+    "renameFolder": "Přejmenovat složku",
+    "mediaFilename": "Název souboru",
+    "noFolder": "— bez složky —",
+    "mediaNote": "Poznámka",
+    "mediaMetadata": "Metadata",
+    "mediaMime": "Typ",
+    "mediaSize": "Velikost",
+    "mediaUploadedAt": "Nahráno",
+    "mediaUploadedBy": "Nahrál",
+    "pagesDescription": "Tvořte hierarchii stránek, upravujte koncepty a publikujte ověřené verze.",
+    "path": "Cesta",
+    "status": "Stav",
+    "actionsLabel": "Akce",
+    "unpublish": "Zrušit publikování",
+    "confirmDelete": "Smazat stránku „{{title}}\"?",
+    "themesDescription": "Instalujte deklarativní balíčky vzhledu a bezpečně přepínejte aktivní téma.",
+    "themePackagesDeclarative": "Témata neobsahují spustitelný kód.",
+    "themeSecurityDescription": " Archiv se před instalací kontroluje a jeho zdroje zůstávají ve vlastním jmenném prostoru.",
+    "noDescription": "Bez popisu",
+    "version": "Verze",
+    "author": "Autor",
+    "downloadTheme": "Stáhnout téma",
+    "duplicateTheme": "Duplikovat téma",
+    "confirmUninstallTheme": "Opravdu odinstalovat toto téma?"
+  },
+  "calendar": {
+    "attendance": "Docházka",
+    "plannedAttendance": "Plánovaná docházka",
+    "realAttendance": "Skutečná docházka",
+    "presentCount": "Přítomných",
+    "plannedCount": "Plánovaných",
+    "close": "Zavřít",
+    "deadlinePassed": "termín uplynul",
+    "searchMembers": "Hledat člena…",
+    "loading": "Načítám…",
+    "noMembers": "Pro tuto akci nejsou žádní členové k docházce.",
+    "notFilledYet": "Zatím nevyplněno",
+    "present": "Přítomen/na",
+    "absent": "Nepřítomen/na",
+    "excused": "Omluven/a",
+    "messageAttendees": "Napsat přítomným",
+    "messageAttendeesPlaceholder": "Zpráva pro přítomné…",
+    "send": "Odeslat",
+    "plannedDeadline": "Nahlášení do {date}",
+    "allGroups": "Všechny skupiny",
+    "registeredOn": "Přihlášen",
+    "unregister": "Odhlásit se",
+    "saveSuccess": "Akce uložena.",
+    "saveError": "Akci se nepodařilo uložit.",
+    "deleteSuccess": "Akce smazána.",
+    "deleteError": "Akci se nepodařilo smazat.",
+    "messageSent": "Zpráva odeslána přítomným.",
+    "confirmDelete": "Opravdu smazat tuto akci?",
+    "title": "Kalendář oddílu",
+    "subtitle": "Schůzky, výpravy, akce a vedená docházka.",
+    "addEvent": "Nová akce",
+    "monthView": "Měsíc",
+    "listView": "Seznam",
+    "allTeams": "Všechny družiny",
+    "teamsSelected": "vybráno",
+    "today": "Dnes",
+    "eventsCount": "akcí",
+    "more": "další",
+    "noEventsInMonth": "V tomto měsíci nejsou žádné akce.",
+    "upcoming": "Nadcházející",
+    "past": "Proběhlé",
+    "groupsSelected": "vybrané skupiny",
+    "page": "Stránka",
+    "edit": "Upravit",
+    "delete": "Smazat",
+    "myPlannedAttendance": "Moje plánovaná účast",
+    "forcedPreregistration": "Povinná přihláška",
+    "myPlannedOptional": "Můžeš si předem zapsat, jestli se akce zúčastníš.",
+    "manageAttendance": "Vést docházku",
+    "preregistration": "Předběžné přihlášky",
+    "yes": "Ano",
+    "no": "Ne",
+    "member": "Člen/ka",
+    "answer": "Odpověď",
+    "unknown": "Nejsem si jistý/á",
+    "editEvent": "Upravit akci",
+    "cancel": "Zrušit",
+    "save": "Uložit",
+    "titleField": "Název",
+    "kindField": "Typ",
+    "kindMeeting": "Schůzka",
+    "kindTrip": "Výprava",
+    "kindOther": "Akce",
+    "team": "Družina",
+    "unitWide": "Celý oddíl",
+    "audience": "Určeno pro",
+    "audienceAll": "Všichni členové",
+    "audienceLeaders": "Pro oddílovou radu",
+    "startsAt": "Začátek",
+    "endsAt": "Konec",
+    "location": "Místo",
+    "requiresPlanned": "Vyžadovat plánování docházky",
+    "plannedDeadlineField": "Termín nahlášení",
+    "plannedDeadlineHint": "Členové se hlásí do tohoto termínu; po něm se plánované záznamy uzamknou.",
+    "isPublic": "Zobrazit na veřejném webu",
+    "isPublicHint": "Zpřístupní akci veřejným datovým vazbám CMS. Docházka a údaje členů zůstanou neveřejné.",
+    "description": "Popis",
+    "markdownHint": "Podporuje formátování Markdown.",
+    "signupNeeded": "Přihlásit se",
+    "allKinds": "Všechny typy",
+    "events": "akcí",
+    "kind": "Typ",
+    "noGroup": "Bez družiny",
+    "members": "členů"
+  },
   "navigation": {
-    // EN: Dashboard
     "dashboard": "Přehled",
-    // EN: Tasks
-    "tasks": "Úkoly",
-    // EN: Leaderboard
-    "leaderboard": "Výsledky",
-    // EN: Rules
-    "rules": "Pravidla",
-    // EN: Administration
     "admin": "Admin",
-    // EN: Approvals
     "approvals": "Schválení",
-    // EN: Inventory
     "inventory": "Sklad",
-    // EN: Tasks admin
     "tasksAdmin": "Správa úkolů",
-    // EN: Stats admin
     "stats": "Statistiky",
-    // EN: Server settings
     "config": "Nastavení serveru",
-    // EN: Manage teams
     "teams": "Správa družin",
-    // EN: Manage users
     "users": "Správa uživatelů",
-    // EN: Announcements
     "announcements": "Ohlášky",
-    // EN: User settings
     "userSettings": "Uživatelská nastavení",
-    // EN: Log out
     "logout": "Odhlásit se",
-    // EN: Log in
     "login": "Přihlásit se"
   },
   "leaderboard": {
-    // EN: Task
     "taskColumn": "Úkol",
-    // EN: Task variant
     "variantsColumn": "Varianta úkolu",
-    // EN: Completions
     "completionsColumn": "Splnění",
-    // EN: Points
     "pointsColumn": "Body",
-    // EN: Total
     "totalRow": "Celkem",
-    // EN: Click for details
     "clickForDetails": "Klikni pro detaily",
-    // EN: Click for details about this team
     "clickForTeamDetails": "Klikni pro detaily o této družině",
-    // EN: I am so empty...
     "empty": "Fňuk, tabulka je smutná...",
-    // EN: Make me happy and be the first one to be here
     "beTheFirst": "Udělej jí radost a buď první, koho zobrazí",
-    // EN: Competition leaderboard
     "heroTitle": "Výsledky soutěže",
-    // EN: That’s exactly what the numbers say. So? Do you see yourself among the top ranks?
     "heroSubtitle": "Přesně tak hovoří čísla. Tak co, vidíš se na předních příčkách?",
-    // EN: Members
     "members": "Členi",
-    // EN: Best total result
     "topPerformers": "Nejlepší celkový výsledek",
-    // EN: Total approved points per member
-    "membersDescription": "Celkový počet schválených bodů na člena/ku",
-    // EN: There are no champions yet
     "noChampionsYet": "Zatím tu nejsou žádní šampioni",
-    // EN: Be the first!
     "startQuesting": "Buď první!",
-    // EN: Teams
     "teams": "Družiny",
-    // EN: Team score leaderboard
     "teamRankings": "Žebříček družin",
-    // EN: Total
     "totalBtn": "Celkem",
-    // EN: Average
     "averageBtn": "Průměr",
-    // EN: There are no teams yet
     "noTeamsYet": "Zatím tu nejsou žádné družiny",
-    // EN: When admin creates them, they will appear
     "teamsWillAppear": "Jakmile je admin vytvoří, objeví se zde",
-    // EN: Special statistics
     "customStatsHeading": "Speciální statistiky",
-    // EN: Categories defined by a combination of tasks
     "customStatsSubtitle": "Kategorie určené kombinací úkolů",
-    // EN: There are no special stats yet
     "noStats": "Zatím nejsou žádné speciální statistiky",
-    // EN: Tasks done by member
-    "taskDetails": "Úkoly splněné členem/kou",
-    // EN: Team members
     "teamMembers": "Členi družiny",
-    // EN: Rank
     "rankColumn": "Pořadí",
-    // EN: Name
     "memberColumn": "Jméno",
-    // EN: Total points
     "totalPointsColumn": "Celkový počet bodů",
-    // EN: Total: {{total}} • Members: {{count}}
-    "averageLine": "Celkem: {{total}} • Členi: {{count}}", // Variables: total, count
-    // EN: Members: {{count}}
-    "membersLine": "Členi: {{count}}" // Variables: count
+    "taskDetails": "Úkoly splněné členem/kou",
+    "membersDescription": "Celkový počet schválených bodů na člena/ku",
+    "averageLine": "Celkem: {{total}} • Členi: {{count}}",
+    "membersLine": "Členi: {{count}}"
   },
   "common": {
-    // EN: Close
     "close": "Zavřít",
-    // EN: Edit
-    "edit": "Upravit",
-    // EN: Delete
-    "delete": "Smazat",
-    // EN: Reset
     "reset": "Resetovat",
-    // EN: Saving...
-    "saving": "Ukládám...",
-    // EN: Save
     "save": "Uložit",
-    // EN: Cancel
-    "cancel": "Zrušit",
-    // EN: You
+    "delete": "Smazat",
     "you": "Ty",
-    // EN: Show all
+    "edit": "Upravit",
+    "saving": "Ukládám...",
+    "cancel": "Zrušit",
     "showAll": "Zobrazit vše",
-    // EN: Last updated
+    "loading": "Načítám…",
     "lastUpdated": "Naposledy aktualizováno"
   },
-  "adminAnnouncements": {
-    // EN: Announcement successfully published
-    "announcementPublished": "Ohláška byla úspěšně zveřejněna",
-    // EN: Failed to publish!
-    "failedToPublish": "Nepodařilo se zveřejnit!",
-    // EN: Announcement updated
-    "announcementUpdated": "Ohláška byla upravena",
-    // EN: Failed to update announcement
-    "failedToUpdate": "Nepodařilo se upravit ohlášku",
-    // EN: Announcement removed
-    "announcementRemoved": "Ohláška byla odstraněna",
-    // EN: Failed to remove announcement
-    "failedToRemove": "Nepodařilo se odstranit ohlášku",
-    // EN: You have no access to modify this
-    "noAccess": "Nemáš oprávnění to měnit",
-    // EN: Message body is mandatory
-    "messageBodyRequired": "Text zprávy je povinný",
-    // EN: Select team
-    "selectTeam": "Vyber družinu",
-    // EN: Nothing to update
-    "nothingToUpdate": "Není co aktualizovat",
-    // EN: Are you sure to delete this announcement?
-    "confirmDelete": "Opravdu chceš smazat tuto ohlášku?",
-    // EN: Global
-    "global": "Globální",
-    // EN: Team
-    "team": "Družina",
-    // EN: Create new announcement
-    "createAnnouncement": "Vytvořit novou ohlášku",
-    // EN: Title
-    "title": "Nadpis",
-    // EN: Announcement header (optional)
-    "optionalHeadline": "Záhlaví ohlášky (nepovinné)",
-    // EN: Message
-    "message": "Zpráva",
-    // EN: Who can see it:
-    "audience": "Kdo ji uvidí:",
-    // EN: All teams (global)
-    "globalAllTeams": "Všechny družiny (globální)",
-    // EN: Specific teams
-    "specificTeam": "Konkrétní družiny",
-    // EN: No available teams
-    "noAvailableTeams": "Žádné dostupné družiny",
-    // EN: Assign managed team
-    "assignManagedTeam": "Přiřadit spravovanou družinu",
-    // EN: Clear
-    "clear": "Vyčistit",
-    // EN: Publish
-    "publish": "Zveřejnit",
-    // EN: Edit announcement
-    "editAnnouncement": "Upravit ohlášku",
-    // EN: Cancel
-    "cancel": "Zrušit",
-    // EN: Save
-    "save": "Uložit",
-    // EN: Existing announcements
-    "announcements": "Existující ohlášky",
-    // EN: Loading...
+  "adminUsers": {
+    "unableToUpdateCompletion": "Nepodařilo se aktualizovat splnění úkolu",
+    "unableToDeleteCompletion": "Nepodařilo se odstranit splnění",
+    "unableToCreateCompletion": "Nepodařilo se vytvořit splnění",
+    "countMustBeBetween": "Počet musí být v povoleném rozsahu",
+    "confirmRemoveCompletion": "Opravdu odstranit toto splnění?",
+    "selectUserFirst": "Nejprve vyber uživatele",
+    "selectTask": "Vyber úkol",
+    "completionHistory": "Historie splnění",
+    "addCompletionBtn": "Přidat splnění",
+    "allTasks": "Všechny úkoly",
+    "dateFrom": "Od",
+    "dateTo": "Do",
+    "totalPoints": "Celkové body",
+    "pointsByTask": "Body podle úkolů",
     "loading": "Načítám...",
-    // EN: No announcements yet
-    "noAnnouncementsYet": "Zatím žádné ohlášky",
-    // EN: Type
+    "noCompletions": "Zatím žádná splnění",
+    "date": "Datum",
     "type": "Typ",
-    // EN: Content
+    "status": "Stav",
+    "count": "Počet",
+    "adminNote": "Poznámka admina",
+    "actions": "Akce",
+    "approved": "Schváleno",
+    "rejected": "Zamítnuto",
+    "users": "Uživatelé",
+    "noUsersYet": "Zatím tu nejsou žádní uživatelé",
+    "searchUsers": "Vyhledat člena",
+    "searchUsersPlaceholder": "Jméno, uživatelské jméno, e-mail",
+    "team": "Družina",
+    "allTeams": "Všechny družiny",
+    "role": "Role",
+    "allRoles": "Všechny role",
+    "roleMember": "Člen/ka",
+    "roleGroupAdmin": "Správce družiny",
+    "roleAdmin": "Admin",
+    "noUsersMatchFilters": "Žádný uživatel neodpovídá zvoleným filtrům",
+    "name": "Jméno",
+    "username": "Uživatelské jméno",
+    "email": "E-mail",
+    "usersShown": "Zobrazeno {{shown}} z {{total}} uživatelů",
+    "userCreated": "Uživatel byl úspěšně vytvořen",
+    "failedToCreateUser": "Nepodařilo se vytvořit uživatele",
+    "userUpdated": "Uživatel byl upraven",
+    "failedToUpdateUser": "Nepodařilo se upravit uživatele",
+    "userDeleted": "Uživatel byl smazán",
+    "failedToDeleteUser": "Nepodařilo se smazat uživatele",
+    "completionUpdated": "Splnění aktualizováno",
+    "completionRemoved": "Splnění odebráno",
+    "completionRecorded": "Splnění zaznamenáno",
+    "failedToCreateUsers": "Nepodařilo se vytvořit uživatele",
+    "messageSent": "Zpráva odeslána",
+    "failedToSendMessage": "Nepodařilo se odeslat zprávu",
+    "failedToGeneratePassword": "Nepodařilo se vygenerovat heslo",
+    "nothingToUpdate": "Není co aktualizovat",
+    "cannotDeleteOwnAccount": "Nemůžeš smazat svůj vlastní účet",
+    "confirmDeleteUser": "Opravdu smazat tohoto uživatele?",
+    "messageCannotBeEmpty": "Zpráva nesmí být prázdná",
+    "enterAtLeastOneName": "Zadej alespoň jedno jméno",
+    "noAccess": "Nemáš oprávnění k přístupu",
+    "title": "Správa uživatelů",
+    "subtitle": "Správa účtů, rolí a registrací",
+    "bulkRegister": {
+      "title": "Hromadná registrace",
+      "namesLabel": "Seznam jmen",
+      "namesPlaceholder": "První jméno\nDruhé jméno\nTřetí jméno",
+      "namesDescription": "Zadej úplná jména nových uživatelů – každé na nový řádek. Přihlašovací jména se vytvoří automaticky.",
+      "important": "Důležité",
+      "importantMessage": "Zkopíruj si přihlašovací údaje – po zavření okna už nebudou čitelné.",
+      "generatedPassword": "Vygenerované heslo",
+      "action": "Akce",
+      "downloadCSV": "Stáhnout CSV"
+    },
+    "addUser": "Přidat uživatele",
+    "realName": "Skutečné jméno",
+    "emailOptional": "E-mail (nepovinné)",
+    "preferredLanguage": "Preferovaný jazyk",
+    "noTeam": "Bez družiny",
+    "active": "Aktivní",
+    "managedTeams": "Spravované družiny",
+    "resetPassword": "Resetovat heslo",
+    "changePasswordPlaceholder": "Ponech prázdné, pokud chceš zachovat aktuální heslo",
+    "generate": "Vygenerovat",
+    "clearPassword": "Vymazat heslo",
+    "saveChanges": "Uložit změny",
+    "sendMessage": "Poslat zprávu uživateli",
+    "sendMessagePlaceholder": "Napiš krátkou zprávu pro tohoto uživatele",
+    "clear": "Vymazat",
+    "send": "Odeslat",
+    "deletingUserCannotBeUndone": "Smazání uživatele nelze vrátit zpět",
+    "deleteUser": "Smazat uživatele",
+    "createUser": "Vytvořit uživatele",
+    "password": "Heslo",
+    "bulkRegisterComplete": "Hromadná registrace dokončena",
+    "bulkRegistrationSuccess": "Úspěšně vytvořeno {{successCount}} uživatelů, u {{failedCount}} se to nepovedlo.",
+    "editUser": "Upravit uživatele '{{userName}}'"
+  },
+  "dashboard": {
+    "teamActivity": "Aktivita družiny",
+    "makeMagic": "Je čas něco podniknout!",
+    "completeTasksToSee": "Buď první z družiny, kdo splní úkol, a motivuj ostatní!",
+    "tasksDone": "Splněné úkoly",
+    "pointsEarned": "Získané body",
+    "activeHeroes": "Aktivní členové/ky",
+    "youCompleted": "Splnil/a jsi",
+    "completed": "splnil/a",
+    "moreAchievements": "A ještě {{count}} dalších úspěchů",
+    "announcements": "Ohlášky",
+    "stayInformed": "Zde najdeš všechny důležité informace k soutěži",
+    "noMessagesYet": "Zatím nemáš žádné zprávy.",
+    "infoTitle": "Informace",
+    "allTeams": "Všechny družiny",
+    "messages": "Zprávy",
+    "messagesSubtitle": "Soukromá komunikace mezi členy oddílu.",
+    "conversations": "Konverzace",
+    "noConversations": "Zatím nemáš žádné zprávy.",
+    "plannedEvents": "Plánované akce",
+    "plannedEventsSubtitle": "Nadcházející akce a účast",
+    "allEvents": "Všechny akce",
+    "noPlannedEvents": "Žádné plánované akce",
+    "yourJourney": "Jak se ti daří",
+    "readyToShine": "Připraven/a zazářit?",
+    "startCompleting": "Splň první úkol a ukaž, co v tobě je!",
+    "awaitingApproval": "Čeká na schválení",
+    "rejected": "Zamítnuto",
+    "reason": "Důvod",
+    "amazing": "Splněno, paráda! (+{{points}} bodů)",
+    "moreInHistory": "A {{count}} dalších v historii",
+    "totalPoints": "Celkové body",
+    "yourRank": "Tvoje pořadí",
+    "teamRank": "Pořadí družiny",
+    "welcomeNoGroup": "Nemáš přiřazenou družinu. Pokud si myslíš, že je to chyba, kontaktuj admina.",
+    "welcome": "Vítej, {{username}}",
+    "teamPride": "Hrdě reprezentuješ družinu {{teamName}}",
+    "timeAgo": {
+      "justNow": "Právě teď",
+      "minutesAgo": "před {{count}} minutami",
+      "hoursAgo": "před {{count}} hodinami",
+      "daysAgo": "před {{count}} dny"
+    }
+  },
+  "messages": {
+    "system": "Systém",
+    "sendFailed": "Zprávu se nepodařilo odeslat.",
+    "title": "Zprávy",
+    "subtitle": "Soukromá komunikace napříč oddílem.",
+    "yourMessagesDisabled": "Máš vypnuté přijímání zpráv. Zapni si ho v uživatelském nastavení.",
+    "searchPlaceholder": "Hledat uživatele…",
+    "noResults": "Nikdo nenalezen.",
+    "noNotifications": "Žádná oznámení.",
+    "noConversations": "Zatím nemáš žádné konverzace.",
+    "you": "Ty",
+    "startConversation": "Vyber konverzaci nebo vyhledej uživatele.",
+    "systemDescription": "Oznámení a zprávy od vedení oddílu",
+    "recipient": "Příjemce",
+    "blocked": "Tento uživatel nepřijímá zprávy.",
+    "directMessages": "Soukromá konverzace",
+    "emptyThread": "Žádné zprávy. Napiš první!",
+    "loadingOlder": "Načítám starší zprávy…",
+    "read": "přečteno",
+    "placeholder": "Napiš zprávu…"
+  },
+  "tasks": {
+    "loading": "Načítám...",
+    "pts": "bodů",
+    "submitSuccess": "Hotovo! Tvoje splnění bylo odesláno.",
+    "error": "Jejda... Něco se pokazilo. Zkus to později.",
+    "resetSoon": "brzy se obnoví",
+    "noDescription": "Bez popisu",
+    "noTasksYet": "Zatím tu nejsou žádné úkoly",
+    "noTasksMessage": "Možná soutěž ještě nezačala?",
+    "noLimitShort": "Bez limitu",
+    "resetsIn": "Limit se obnoví za",
+    "periodRange": "Aktuální období",
+    "autoCloseTitle": "Automatické uzavření",
+    "autoCloseApprovalInfo": "U úkolů se schválením se započítávají jen schválená splnění.",
+    "autoCloseExceeded": "Tímto by byl překročen maximální limit splnění pro tento úkol. Zkus zvolit menší počet.",
+    "sending": "Odesílám...",
+    "questComplete": "Splněno",
+    "cooldownActive": "Počkej chvíli",
+    "submit": "Odeslat úkol",
+    "questDetails": "Detaily úkolu",
+    "questDescription": "Popis úkolu",
+    "noVariantDescription": "Tato varianta nemá popis",
+    "logCompletion": "Zapsat splnění",
+    "countLabel": "Počet splnění",
+    "noLimit": "Bez omezení",
+    "noteLabel": "Poznámka ke kontrole",
+    "notePlaceholder": "Napiš krátkou poznámku, která pomůže adminům ověřit splnění (nepovinné, pokud úkol nevyžaduje schválení)",
+    "limitReached": "Dosažen limit pro toto období!",
+    "cooldown": "Počkej",
+    "heroTitle": "Přehled úkolů",
+    "ready": "Připraveno ke splnění",
+    "requiresApproval": "Vyžaduje schválení",
+    "completed": "splněno",
+    "showLess": "Zobrazit méně",
+    "showMore": "Zobrazit více",
+    "questStatus": "Stav úkolu",
+    "ends": "Končí",
+    "limitReachedShort": "Dosáhl/a jsi limitu",
+    "cooldownShort": "Počkej",
+    "startQuest": "Pojď na to!",
+    "completedPeriodDetail": "Splněno v tomto období: {{current}}/{{limit}}",
+    "remainingLabel": "Ještě můžeš splnit: {{count}}x",
+    "lifetimeTotal": "Celkem splněno tebou: {{count}}×",
+    "autoCloseDone": "Zatím splněno {{current}}/{{limit}}",
+    "heroSubtitle": "{{count}} úkolů, za které můžeš získat body"
+  },
+  "members": {
+    "saveSuccess": "Profil byl uložen.",
+    "saveFailed": "Uložení se nezdařilo.",
+    "accountSaved": "Účet byl uložen.",
+    "accountSaveFailed": "Uložení účtu se nezdařilo.",
+    "passwordGenerated": "Heslo bylo vygenerováno.",
+    "passwordGenerateFailed": "Vygenerování hesla se nezdařilo.",
+    "deleteFailed": "Smazání se nezdařilo.",
+    "nothingToUpdate": "Není co aktualizovat.",
+    "cannotDeleteOwn": "Nemůžete smazat svůj vlastní účet.",
+    "notFound": "Člen nebyl nalezen.",
+    "attendanceCount": "Účastí",
+    "completionCount": "Splněných úkolů",
+    "totalPoints": "Získaných bodů",
+    "backToDirectory": "Zpět na adresář",
+    "noTeam": "Bez družiny",
+    "account": "Účet",
+    "accountLoadFailed": "Nepodařilo se načíst účet.",
+    "parentName": "Jméno",
+    "username": "Uživatelské jméno",
+    "email": "E-mail",
+    "isActive": "Aktivní účet",
+    "credentialsRestricted": "Přihlašovací údaje spravuje administrátor.",
+    "team": "Družina",
+    "language": "Jazyk",
+    "role": "Role",
+    "managedTeams": "Vedené družiny",
+    "needsPasswordChange": "Při příštím přihlášení si změní heslo.",
+    "generatePassword": "Vygenerovat heslo",
+    "generatedPassword": "Vygenerované heslo",
+    "saveAccount": "Uložit účet",
+    "memberProfile": "Profil člena",
+    "phone": "Telefon",
+    "birthDate": "Datum narození",
+    "gender": "Pohlaví",
+    "genderMale": "Muž",
+    "genderFemale": "Žena",
+    "genderOther": "Jiné",
+    "uniformSize": "Velikost kroje",
+    "scoutNumber": "Registrační číslo",
+    "memberStatus": "Stav členství",
+    "statusActive": "Aktivní",
+    "statusInactive": "Neaktivní",
+    "statusAlumni": "Absolvent",
+    "joinedAt": "Členem od",
+    "address": "Adresa",
+    "city": "Město",
+    "zip": "PSČ",
+    "parent": "Rodiče / kontaktní osoba",
+    "parentPhone": "Telefon",
+    "parentEmail": "E-mail",
+    "emergency": "Nouzový kontakt",
+    "emergencyName": "Jméno",
+    "emergencyPhone": "Telefon",
+    "medicalNote": "Zdravotní omezení",
+    "consents": "Souhlasy",
+    "dataConsentAt": "Souhlas s osobními údaji",
+    "photoConsentAt": "Souhlas s fotografiemi",
+    "notes": "Interní poznámky",
+    "save": "Uložit",
+    "dangerZone": "Nebezpečná zóna",
+    "deleteAccountHint": "Trvale odstraní člena i jeho účet.",
+    "deleteAccount": "Smazat člena",
+    "tags": "Značky",
+    "deleteTag": "Odebrat značku",
+    "noTags": "Zatím žádné značky.",
+    "tagPlaceholder": "Nová značka…",
+    "relationships": "Rodinné vazby",
+    "deleteRelationshipConfirm": "Smazat tuto vazbu?",
+    "noRelationships": "Zatím žádné vazby.",
+    "selectMember": "Vyberte člena…",
+    "relParent": "Rodič",
+    "relGuardian": "Zákonný zástupce",
+    "relSibling": "Sourozenec",
+    "relOther": "Jiné",
+    "relationshipNote": "Poznámka",
+    "addRelationship": "Přidat vazbu",
+    "memberNotes": "Poznámky",
+    "deleteNoteConfirm": "Smazat tuto poznámku?",
+    "noNotes": "Zatím žádné poznámky.",
+    "notePlaceholder": "Nová poznámka…",
+    "deleteAccountConfirm": "Smazat člena {{name}}? Tato akce je nevratná.",
+    "createSuccess": "Člen byl vytvořen.",
+    "createFailed": "Vytvoření se nezdařilo.",
+    "bulkFailed": "Hromadná registrace se nezdařila.",
+    "bulkNoNames": "Nebyla zadána žádná jména.",
+    "exportFailed": "Export se nezdařil.",
+    "total": "Celkem",
+    "title": "Členská evidence",
+    "subtitle": "Adresář členů, kontaktů a rodinných vazeb",
+    "bulkRegisterTitle": "Hromadná registrace",
+    "newMember": "Nový člen",
+    "export": "Export CSV",
+    "search": "Hledat",
+    "searchPlaceholder": "Hledat jméno, e-mail…",
+    "allTeams": "Všechny družiny",
+    "status": "Stav",
+    "allStatuses": "Všechny stavy",
+    "resetFilters": "Zrušit filtry",
+    "noMembers": "Žádní členové nenalezeni.",
+    "name": "Jméno",
+    "age": "Věk",
+    "memberSince": "Členem od",
+    "prev": "Předchozí",
+    "next": "Další",
+    "createMemberTitle": "Založit nového člena",
+    "password": "Heslo",
+    "cancel": "Zrušit",
+    "createMember": "Vytvořit",
+    "bulkRegisterHint": "Každé jméno na samostatném řádku",
+    "bulkNames": "Jména",
+    "bulkNamesPlaceholder": "Jana Nováková\nPetr Svoboda\n…",
+    "bulkRegister": "Zaregistrovat",
+    "bulkResultsTitle": "Výsledky registrace",
+    "close": "Zavřít",
+    "showing": "Zobrazeno {{count}} z {{total}}",
+    "page": "Stránka {{page}} z {{pages}}",
+    "bulkSuccess": "Registrováno: {{created}} úspěšně, {{failed}} chyb."
+  },
+  "adminAccess": {
+    "updateSuccess": "Skupina uložena.",
+    "createSuccess": "Skupina vytvořena.",
+    "saveError": "Skupinu se nepodařilo uložit.",
+    "deleteSuccess": "Skupina smazána.",
+    "deleteError": "Skupinu se nepodařilo smazat.",
+    "userRemoved": "Uživatel byl odebrán ze skupiny.",
+    "membersError": "Při správě členů došlo k chybě.",
+    "userAdded": "Uživatel byl přidán do skupiny.",
+    "title": "Skupiny a oprávnění",
+    "subtitle": "Spravuj skupiny oprávnění, jejich uživatele a rozsah.",
+    "addGroup": "Nová skupina",
+    "systemGroup": "systémová",
+    "permissionsCount": "oprávnění",
+    "membersCount": "uživatelů",
+    "edit": "Upravit",
+    "addUser": "Přidat uživatele",
+    "delete": "Smazat",
+    "members": "Členové",
+    "noMembers": "Skupina zatím nemá žádné členy.",
+    "removeMember": "Odebrat ze skupiny",
+    "emptyGroups": "Zatím nebyly vytvořeny žádné skupiny.",
+    "editGroup": "Upravit skupinu",
+    "createGroup": "Vytvořit skupinu",
+    "cancel": "Zrušit",
+    "saveGroup": "Uložit skupinu",
+    "name": "Název",
+    "namePlaceholder": "Např. družinkový vedoucí",
+    "description": "Popis",
+    "descriptionPlaceholder": "Co skupina umožňuje",
+    "searchPermissions": "Hledat oprávnění…",
+    "scopeHint": "own = jen vlastní data, team = vlastní a svěřené družiny, any = celý oddíl",
+    "noPermissionsFound": "Nic nenalezeno.",
+    "searchUsers": "Hledat uživatele…",
+    "noUsersFound": "Nikdo nenalezen.",
+    "confirmDelete": "Opravdu smazat skupinu „{{name}}“?",
+    "confirmRemoveUser": "Odebrat uživatele „{{name}}“ ze skupiny?"
+  },
+  "adminAnnouncements": {
+    "announcementPublished": "Ohláška byla úspěšně zveřejněna",
+    "failedToPublish": "Nepodařilo se zveřejnit!",
+    "announcementUpdated": "Ohláška byla upravena",
+    "failedToUpdate": "Nepodařilo se upravit ohlášku",
+    "announcementRemoved": "Ohláška byla odstraněna",
+    "failedToRemove": "Nepodařilo se odstranit ohlášku",
+    "noAccess": "Nemáš oprávnění to měnit",
+    "messageBodyRequired": "Text zprávy je povinný",
+    "selectTeam": "Vyber družinu",
+    "nothingToUpdate": "Není co aktualizovat",
+    "confirmDelete": "Opravdu chceš smazat tuto ohlášku?",
+    "global": "Globální",
+    "team": "Družina",
+    "title": "Nadpis",
+    "subtitle": "Zveřejňování a správa ohlášek",
+    "createAnnouncement": "Vytvořit novou ohlášku",
+    "optionalHeadline": "Záhlaví ohlášky (nepovinné)",
+    "message": "Zpráva",
+    "audience": "Kdo ji uvidí:",
+    "globalAllTeams": "Všechny družiny (globální)",
+    "specificTeam": "Konkrétní družiny",
+    "noAvailableTeams": "Žádné dostupné družiny",
+    "assignManagedTeam": "Přiřadit spravovanou družinu",
+    "clear": "Vyčistit",
+    "publish": "Zveřejnit",
+    "editAnnouncement": "Upravit ohlášku",
+    "cancel": "Zrušit",
+    "save": "Uložit",
+    "announcements": "Existující ohlášky",
+    "loading": "Načítám...",
+    "noAnnouncementsYet": "Zatím žádné ohlášky",
+    "type": "Typ",
     "body": "Obsah",
-    // EN: Created at
     "created": "Vytvořeno",
-    // EN: All
     "all": "Vše"
   },
   "approvals": {
-    // EN: Completion approved!
     "approvedMessage": "Splnění bylo schváleno!",
-    // EN: Completion rejected
     "rejectedMessage": "Splnění bylo zamítnuto",
-    // EN: Error occured
     "error": "Došlo k chybě",
-    // EN: When rejecting, reason is required
     "reasonRequired": "Při zamítnutí je potřeba uvést důvod",
-    // EN: Loading...
     "loading": "Načítám...",
-    // EN: Approvals
     "title": "Schválení",
-    // EN: Approve or reject members completions
     "subtitle": "Schvaluj nebo zamítej splnění úkolů",
-    // EN: Pending
     "pending": "Čeká na schválení",
-    // EN: Possible states:
     "infoTitle": "Možné stavy:",
-    // EN: Pending review
     "pendingStatus": "Čeká na kontrolu",
-    // EN: Task appears as 'Awaiting approval' in user's dashboard
     "pendingDescription": "Úkol se u uživatele zobrazí jako „Čeká na schválení“",
-    // EN: Approved
     "approvedStatus": "Schváleno",
-    // EN: Points added to score, task marked as completed
     "approvedDescription": "Body byly přidány a úkol označen jako splněný",
-    // EN: Rejected
     "rejectedStatus": "Zamítnuto",
-    // EN: User sees feedback and can resubmit
     "rejectedDescription": "Člen/ka vidí zpětnou vazbu a může to zkusit znovu",
-    // EN: Everything is done
     "empty": "Všechno je hotovo",
-    // EN: There are no pending completions
     "emptyDescription": "Žádné úkoly nečekají na schválení",
-    // EN: Count
     "count": "Počet",
-    // EN: Awaiting review
     "awaitingReview": "Čeká na kontrolu",
-    // EN: Member's note
     "memberNote": "Poznámka člena/ky",
-    // EN: No note provided
     "noNote": "Bez poznámky",
-    // EN: Admin feedback
     "adminFeedback": "Zpětná vazba od admina",
-    // EN: Optional feedback (required for rejection)
     "feedbackPlaceholder": "Nepovinná zpětná vazba (povinná při zamítnutí)",
-    // EN: Processing...
     "processing": "Zpracovávám...",
-    // EN: Approve
     "approve": "Schválit",
-    // EN: Reject
     "reject": "Zamítnout"
   },
+  "admin": {
+    "attendance": {
+      "exportSuccess": "Účast exportována",
+      "clickToChange": "Kliknutím změníte",
+      "title": "Docházka",
+      "subtitle": "Přehled docházky na akcích",
+      "tabByEvent": "Podle akcí",
+      "tabByPeople": "Podle členů",
+      "filters": "Filtry",
+      "dateFrom": "Od",
+      "dateTo": "Do",
+      "kind": "Typ akce",
+      "clearFilters": "Zrušit filtry",
+      "notRecorded": "Nezapsáno",
+      "matrixTitle": "Matice účasti",
+      "percentCol": "%",
+      "memberOverview": "Přehled člena",
+      "memberSearch": "Hledat",
+      "memberSearchPlaceholder": "Hledat členy...",
+      "show": "Zobrazit",
+      "selectMemberHint": "Vyberte člena pro zobrazení přehledu.",
+      "memberStats": "Statistiky člena",
+      "statEvents": "akcí",
+      "statPresent": "Přítomno",
+      "statAttending": "Zapsaní",
+      "noMemberEvents": "Žádné akce pro tohoto člena."
+    },
+    "export": "Export",
+    "audit": {
+      "title": "Audit splnění",
+      "subtitle": "Přehled soutěžní historie členů",
+      "intro": "Přehled změn a akcí v soutěži"
+    }
+  },
   "adminConfig": {
-    // EN: Config update successfull
     "updateSuccess": "Nastavení bylo úspěšně aktualizováno",
-    // EN: Config update failed
     "updateFailed": "Aktualizace nastavení selhala",
-    // EN: Server settings
     "title": "Nastavení serveru",
-    // EN: Global server-side settings
     "subtitle": "Globální nastavení aplikace",
-    // EN: General settings
     "generalSettings": "Obecná nastavení",
-    // EN: Configure basic application settings
     "generalDescription": "Uprav základní parametry aplikace",
-    // EN: Application name
     "appName": "Název aplikace",
-    // EN: This name will appear in the navigation bar and page titles
     "appNameHelp": "Tento název se zobrazí v horní liště a titulcích stránek",
-    // EN: Application icon
     "appIcon": "Ikona aplikace",
-    // EN: Upload a custom icon for your application. Recommended: SVG, PNG, or JPG (max 1MB, square format recommended)
     "appIconHelp": "Nahraj vlastní ikonu (doporučeno: SVG, PNG nebo JPG, max 1 MB, čtvercový formát)",
-    // EN: Preview
     "iconPreview": "Náhled ikony",
-    // EN: Leaderboard default view
-    "leaderboardDefault": "Výchozí zobrazení výsledků",
-    // EN: Total points
-    "totalPoints": "Celkové body",
-    // EN: Average points
-    "averagePoints": "Průměrné body",
-    // EN: Choose which view users see by default when opening the leaderboard
-    "leaderboardHelp": "Vyber, jaké zobrazení se uživatelům otevře jako první",
-    // EN: Show only this mode
-    "showOnlyDefaultMode": "Zobrazovat jen tento režim",
-    // EN: Hide the Total/Average switch on leaderboard and always show only the selected default mode
-    "showOnlyDefaultModeHelp": "Skryje přepínač Celkem/Průměr ve výsledcích a vždy zobrazí jen vybraný výchozí režim",
-    // EN: Allow self registration with team code
     "allowSelfRegistration": "Povolit samoregistraci pomocí kódu družiny",
-    // EN: When enabled, users can register themselves using a team join code without admin approval
     "selfRegistrationHelp": "Pokud je povoleno, mohou se členové sami registrovat pomocí kódu družiny bez schválení admina",
-    // EN: Only administrators can modify these settings
     "adminOnly": "Tato nastavení může měnit pouze admin"
   },
+  "adminModules": {
+    "statusCore": "Povinné jádro",
+    "statusActive": "Aktivní",
+    "statusDisabled": "Vypnuto",
+    "statusNotInstalled": "Nenainstalováno",
+    "statusUnknown": "Mimo katalog",
+    "title": "Katalog modulů",
+    "subtitle": "Vyhledejte, nainstalujte a aktivujte funkční celky. Každý modul může záviset na jiných modulech; aktivní závislost je nutnou podmínkou pro zapnutí. Core je povinný.",
+    "searchPlaceholder": "Hledat modul, kód nebo funkci…",
+    "columnModule": "Modul",
+    "columnStatus": "Stav",
+    "columnDependencies": "Závislosti",
+    "columnDependents": "Používají",
+    "columnVersion": "Verze",
+    "columnActions": "Akce",
+    "uninstall": "Odinstalovat",
+    "install": "Nainstalovat",
+    "disable": "Vypnout",
+    "enable": "Zapnout",
+    "details": "Detaily",
+    "settings": "Nastavení",
+    "detailStatus": "Stav",
+    "inCatalog": "V katalogu",
+    "detailMetadata": "Metadata",
+    "route": "Trasa",
+    "routers": "Routerů",
+    "apiPrefixes": "API prefixů",
+    "menuItems": "Menu",
+    "adminMenuItems": "Admin menu",
+    "widgets": "Widgetů",
+    "detailDependencies": "Závislosti",
+    "statusInactive": "neaktivní",
+    "none": "Žádné",
+    "detailDependents": "Moduly, které na něm závisí",
+    "permissionAction": "Akce",
+    "permissionName": "Název",
+    "permissionDescription": "Popis",
+    "permissionScope": "Scope",
+    "noPermissions": "Žádná oprávnění",
+    "close": "Zavřít",
+    "versionLabel": "Verze {{version}}",
+    "detailPermissions": "Oprávnění modulu ({{count}})",
+    "unknownModule": "Modul neznámý.",
+    "invalidJson": "Neplatný JSON",
+    "saveSuccess": "Nastavení modulu uloženo.",
+    "saveFailed": "Uložení se nezdařilo.",
+    "moduleSettings": "Konfigurace modulu",
+    "moduleSettingsHelp": "Nastavení patří modulu, nikoli globální konfiguraci serveru.",
+    "defaultLeaderboardView": "Výchozí zobrazení výsledků",
+    "leaderboardTotal": "Celkové body",
+    "leaderboardAverage": "Průměr bodů",
+    "showOnlyDefaultMode": "Zobrazovat jen tento režim výsledků",
+    "jsonSettings": "Nastavení JSON",
+    "saveModuleSettings": "Uložit nastavení modulu"
+  },
   "adminStats": {
-    // EN: Category created
     "categoryCreated": "Kategorie byla vytvořena",
-    // EN: Failed to create category
     "failedToCreateCategory": "Nepodařilo se vytvořit kategorii",
-    // EN: Category updated
     "categoryUpdated": "Kategorie byla aktualizována",
-    // EN: Failed to update category
     "failedToUpdateCategory": "Nepodařilo se aktualizovat kategorii",
-    // EN: Category deleted
     "categoryDeleted": "Kategorie byla smazána",
-    // EN: Failed to delete category
     "failedToDeleteCategory": "Nepodařilo se smazat kategorii",
-    // EN: Component added
     "componentAdded": "Komponenta byla přidána",
-    // EN: Failed to add component
     "failedToAddComponent": "Nepodařilo se přidat komponentu",
-    // EN: Component updated
     "componentUpdated": "Komponenta byla aktualizována",
-    // EN: Failed to update component
     "failedToUpdateComponent": "Nepodařilo se aktualizovat komponentu",
-    // EN: Component removed
     "componentRemoved": "Komponenta byla odstraněna",
-    // EN: Failed to remove component
     "failedToRemoveComponent": "Nepodařilo se odstranit komponentu",
-    // EN: Name is required
     "nameRequired": "Je nutné zadat název",
-    // EN: Nothing to update
     "nothingToUpdate": "Není co aktualizovat",
-    // EN: Select task
     "selectTask": "Vyber úkol",
-    // EN: Weight must be number
     "weightMustBeNumber": "Váha musí být číslo",
-    // EN: Position must be positive
     "positionMustBeNonNegative": "Pozice musí být nezáporná hodnota",
-    // EN: Component not found
     "componentNotFound": "Komponenta nenalezena",
-    // EN: Really remove this component?
     "confirmRemoveComponent": "Opravdu odstranit tuto komponentu?",
-    // EN: You have no access
     "noAccess": "Nemáš oprávnění k přístupu",
-    // EN: Icon must be image
     "iconMustBeImage": "Ikona musí být obrázek",
-    // EN: Failed to read icon
     "failedToReadIcon": "Nepodařilo se načíst ikonu",
-    // EN: Create custom category
+    "title": "Statistiky",
+    "subtitle": "Konfigurace kategorií a komponent statistik",
     "createCategory": "Vytvořit vlastní kategorii",
-    // EN: Name
     "name": "Název",
-    // EN: Description
     "description": "Popis",
-    // EN: Icon
     "icon": "Ikona",
-    // EN: Emoji or paste URL
     "iconPlaceholder": "Emoji nebo URL obrázku",
-    // EN: Upload file
     "uploadFile": "Nahrát soubor",
-    // EN: Clear
     "clear": "Vymazat",
-    // EN: Uploaded image
     "uploadedImage": "Nahraný obrázek",
-    // EN: Text or emoji icon
     "textOrEmojiIcon": "Textová nebo emoji ikona",
-    // EN: PNG, JPG, SVG, GIF or WEBP up to 150 KB. You can also use an emoji.
     "iconFormats": "PNG, JPG, SVG, GIF nebo WEBP do 150 KB. Můžeš použít i emoji.",
-    // EN: Categories
     "categories": "Kategorie",
-    // EN: Loading...
     "loading": "Načítám...",
-    // EN: No categories yet
     "noCategoriesYet": "Zatím nejsou žádné kategorie",
-    // EN: Select category to manage
     "selectCategoryToManage": "Vyber kategorii pro správu",
-    // EN: Category detail
     "categoryDetail": "Detail kategorie",
-    // EN: Delete
     "delete": "Smazat",
-    // EN: Component count
     "componentCount": "Počet komponent",
-    // EN: Make sure to click save to apply changes.
     "uploadedImageSaveToApply": "Pro uplatnění změn klikni na Uložit",
-    // EN: Leave empty to remove the icon. Changes apply after saving.
     "leaveEmptyToRemoveIcon": "Ponech prázdné pro odstranění ikony. Změna se projeví po uložení.",
-    // EN: Save changes
     "saveChanges": "Uložit změny",
-    // EN: Components
     "components": "Komponenty",
-    // EN: No components yet
     "noComponentsYet": "Zatím nejsou žádné komponenty",
-    // EN: Task
     "task": "Úkol",
-    // EN: Metric
     "metric": "Metrika",
-    // EN: Weight
     "weight": "Váha",
-    // EN: Position
     "position": "Pozice",
-    // EN: Actions
     "actions": "Akce",
-    // EN: Points
     "points": "Body",
-    // EN: Completions
     "completions": "Splnění",
-    // EN: Update
     "update": "Aktualizovat",
-    // EN: Add component
     "addComponent": "Přidat komponentu",
-    // EN: Auto
     "auto": "Automaticky",
-    // EN: Define heuristics by combining task metrics. Positive weights add points, negative weights subtract. If only one task is used, choose between points or completions via the metric selector.
     "defineHeuristics": "Definuj vlastní kombinace metrik úkolů. Kladné váhy přidávají body, záporné je odečítají. Pokud použiješ jen jeden úkol, můžeš zvolit metriky podle bodů nebo počtu splnění.",
-    // EN: Are you sure to delete category?
     "confirmDeleteCategory": "Opravdu smazat kategorii?",
-    // EN: Icon is too large. Maximum size is {{maxSize}} KB.
-    "iconTooLarge": "Ikona je příliš velká. Maximální velikost je {{maxSize}} KB." // Variables: maxSize
+    "iconTooLarge": "Ikona je příliš velká. Maximální velikost je {{maxSize}} KB."
   },
   "adminTasks": {
     "periodUnits": {
-      // EN: hour
       "hour": "hodina",
-      // EN: day
       "day": "den",
-      // EN: week
       "week": "týden",
-      // EN: month
       "month": "měsíc"
     },
-    "status": {
-      // EN: archived
-      "archived": "archivováno",
-      // EN: epired
-      "expired": "vypršelo",
-      // EN: Limit
-      "limit": "Limit",
-      // EN: active
-      "active": "aktivní",
-      // EN: label
-      "label": "stav"
-    },
-    // EN: Really delete this variant?
-    "confirmDeleteVariant": "Opravdu smazat tuto variantu?",
-    // EN: Create task
-    "createTask": "Vytvořit úkol",
-    // EN: Name
-    "name": "Název",
-    // EN: Points per completion
-    "pointsPerCompletion": "Body za splnění",
-    // EN: Description
-    "description": "Popis",
-    // EN: Supports Markdown
-    "markdownPlaceholder": "Podporuje Markdown",
-    // EN: Preview
-    "preview": "Náhled",
-    // EN: No description yet
-    "noDescriptionYet": "Zatím bez popisu",
-    // EN: Team (optional)
-    "teamOptional": "Družina (nepovinné)",
-    // EN: All teams
-    "allTeams": "Všechny družiny",
-    // EN: Requires approval
-    "requiresApproval": "Vyžaduje schválení",
-    // EN: Hot deal
-    "hotDeal": "Speciální úkol",
-    // EN: Max per period
-    "maxPerPeriod": "Maximálně za období",
-    // EN: Period count
-    "periodCount": "Počet období",
-    // EN: Period unit
-    "periodUnit": "Jednotka období",
-    // EN: Set no limit
-    "resetLimit": "Nastavit bez limitu",
-    // EN: Close after completion count
-    "autoCloseAfterCompletions": "Uzavřít po počtu splnění",
-    // EN: Count scope
-    "autoCloseScopeLabel": "Počítat v rámci",
     "autoCloseScope": {
-      // EN: All completions
       "global": "Všechna splnění",
-      // EN: Completions in team
       "team": "Splnění ve družině"
     },
-    // EN: Reset completion counts
-    "resetAutoCloseCounts": "Resetovat počty splnění",
-    // EN: Reset completion counts for this task auto-close?
-    "confirmResetAutoCloseCounts": "Resetovat počty splnění pro automatické uzavření tohoto úkolu?",
-    // EN: Start time
-    "startTime": "Začátek",
-    // EN: End time
-    "endTime": "Konec",
-    // EN: Failed to create task
-    "failedToCreate": "Nepodařilo se vytvořit úkol",
-    // EN: Existing tasks
-    "existingTasks": "Existující úkoly",
-    // EN: Loading...
-    "loading": "Načítám...",
-    // EN: Failed to load tasks
-    "failedToLoad": "Nepodařilo se načíst úkoly",
-    // EN: Points/Variants
-    "pointsVariants": "Body / varianty",
-    // EN: Period limit
-    "periodLimit": "Limit období",
-    // EN: Team
-    "team": "Družina",
-    // EN: Actions
-    "actions": "Akce",
-    // EN: Edit
-    "edit": "Upravit",
-    // EN: Unarchive
-    "unarchive": "Obnovit",
-    // EN: Archive
-    "archive": "Archivovat",
-    // EN: Failed to update
-    "failedToUpdate": "Nepodařilo se aktualizovat",
-    // EN: Delete task
-    "deleteTask": "Smazat úkol",
-    // EN: Cancel
-    "cancel": "Zrušit",
-    // EN: Save changes
-    "saveChanges": "Uložit změny",
-    // EN: Add new variant
-    "addNewVariant": "Přidat novou variantu",
-    // EN: Variant name
-    "variantName": "Název varianty",
-    // EN: Points
-    "points": "Body",
-    // EN: Position (optional)
-    "positionOptional": "Pozice (nepovinné)",
-    // EN: Description (optional)
-    "descriptionOptional": "Popis (nepovinné)",
-    // EN: Supports Markdown
-    "supportsMarkdown": "Podporuje Markdown",
-    // EN: Add variant
-    "addVariant": "Přidat variantu",
-    // EN: Failed to create variant
-    "failedToCreateVariant": "Nepodařilo se vytvořit variantu",
-    // EN: Existing variants
-    "existingVariants": "Existující varianty",
-    // EN: There are no variants of this task yet
-    "noVariantsYet": "Zatím žádné varianty tohoto úkolu",
-    // EN: Position
-    "position": "Pozice",
-    // EN: No description
-    "noDescription": "Bez popisu",
-    // EN: Delete
-    "delete": "Smazat",
-    // EN: Close
-    "close": "Zavřít",
-    // EN: Are you sure to delete {{taskName}}?
-    "confirmDeleteTask": "Opravdu smazat úkol {{taskName}}?", // Variables: taskName
-    // EN: {{count}} variants
-    "variantCount": "{{count}} variant", // Variables: count
-    // EN: Variants ({{count}})
-    "variants": "Varianty ({{count}})", // Variables: count
-    // EN: Edit {{taskName}}
-    "editTask": "Upravit úkol {{taskName}}", // Variables: taskName
-    // EN: Manage variants of {{taskName}}
-    "manageVariants": "Spravovat varianty úkolu {{taskName}}" // Variables: taskName
-  },
-  "tasks": {
-    // EN: pts.
-    "pts": "bodů",
-    // EN: Loading...
-    "loading": "Načítám...",
-    // EN: Well done! Your completion was successfully submited.
-    "submitSuccess": "Hotovo! Tvoje splnění bylo odesláno.",
-    // EN: Oh no... Something went wrong. Try to submit it later.
-    "error": "Jejda... Něco se pokazilo. Zkus to později.",
-    // EN: This submission would exceed the maximum completion limit for this task.
-    "autoCloseExceeded": "Tímto by byl překročen maximální limit splnění pro tento úkol. Zkus zvolit menší počet.",
-    // EN: soon
-    "resetSoon": "brzy se obnoví",
-    // EN: No description given
-    "noDescription": "Bez popisu",
-    // EN: There are no tasks yet
-    "noTasksYet": "Zatím tu nejsou žádné úkoly",
-    // EN: Maybe the competition did not started yet?
-    "noTasksMessage": "Možná soutěž ještě nezačala?",
-    // EN: No limit
-    "noLimitShort": "Bez limitu",
-    // EN: Auto close
-    "autoCloseTitle": "Automatické uzavření",
-    "autoCloseScopeText": {
-      // EN: After {{count}} completions in all teams
-      "global": "Po {{count}} dokončeních napříč všemi družinami", // Variables: count
-      // EN: After {{count}} completions in your team
-      "team": "Po {{count}} dokončeních v tvojí družině" // Variables: count
+    "status": {
+      "archived": "archivováno",
+      "limit": "Limit",
+      "expired": "vypršelo",
+      "active": "aktivní",
+      "label": "stav"
     },
-    // EN: Completed {{current}}/{{limit}}
-    "autoCloseDone": "Zatím splněno {{current}}/{{limit}}", // Variables: current, limit
-    // EN: For tasks requiring approval, only approved completions count.
-    "autoCloseApprovalInfo": "U úkolů se schválením se započítávají jen schválená splnění.",
-    // EN: Limit resets
-    "resetsIn": "Limit se obnoví za",
-    // EN: Current period
-    "periodRange": "Aktuální období",
-    // EN: Sending...
-    "sending": "Odesílám...",
-    // EN: Already completed
-    "questComplete": "Splněno",
-    // EN: Wait
-    "cooldownActive": "Počkej chvíli",
-    // EN: Submit task
-    "submit": "Odeslat úkol",
-    // EN: Task details
-    "questDetails": "Detaily úkolu",
-    // EN: Task description
-    "questDescription": "Popis úkolu",
-    // EN: No description for this variant
-    "noVariantDescription": "Tato varianta nemá popis",
-    // EN: Log your completion
-    "logCompletion": "Zapsat splnění",
-    // EN: Number of completions
-    "countLabel": "Počet splnění",
-    // EN: No limit
-    "noLimit": "Bez omezení",
-    // EN: Note for review
-    "noteLabel": "Poznámka ke kontrole",
-    // EN: Note to help reviewers to check you really did it. Not mandatoy for tasks without Requires approval)
-    "notePlaceholder": "Napiš krátkou poznámku, která pomůže adminům ověřit splnění (nepovinné, pokud úkol nevyžaduje schválení)",
-    // EN: Limit for current period reached!
-    "limitReached": "Dosažen limit pro toto období!",
-    // EN: Wait
-    "cooldown": "Počkej",
-    // EN: Overview of tasks
-    "heroTitle": "Přehled úkolů",
-    // EN: Ready to complete
-    "ready": "Připraveno ke splnění",
-    // EN: Requires approval
+    "confirmDeleteVariant": "Opravdu smazat tuto variantu?",
+    "title": "Úkoly",
+    "subtitle": "Správa úkolů, variant a automatického uzavírání",
+    "createTask": "Vytvořit úkol",
+    "name": "Název",
+    "pointsPerCompletion": "Body za splnění",
+    "description": "Popis",
+    "markdownPlaceholder": "Podporuje Markdown",
+    "preview": "Náhled",
+    "noDescriptionYet": "Zatím bez popisu",
+    "teamOptional": "Družina (nepovinné)",
+    "allTeams": "Všechny družiny",
     "requiresApproval": "Vyžaduje schválení",
-    // EN: completed
-    "completed": "splněno",
-    // EN: Show lesss
-    "showLess": "Zobrazit méně",
-    // EN: Show more
-    "showMore": "Zobrazit více",
-    // EN: Task status
-    "questStatus": "Stav úkolu",
-    // EN: Ends
-    "ends": "Končí",
-    // EN: Limit reached
-    "limitReachedShort": "Dosáhl/a jsi limitu",
-    // EN: Wait
-    "cooldownShort": "Počkej",
-    // EN: Lets do it
-    "startQuest": "Pojď na to!",
-    // EN: Done in this period: {{current}}/{{limit}}
-    "completedPeriodDetail": "Splněno v tomto období: {{current}}/{{limit}}", // Variables: current, limit
-    // EN: You still can submit: {{count}}x
-    "remainingLabel": "Ještě můžeš splnit: {{count}}x", // Variables: count
-    // EN: Done in total: {{current}}
-    "completedPeriodUnlimited": "Splněno celkem: {{current}}", // Variables: current
-    // EN: Completed in total: {{count}} times
-    "lifetimeTotal": "Celkem splněno tebou: {{count}}×", // Variables: count
-    // EN: {{count}} magnificent task for you to earn some points
-    "heroSubtitle": "{{count}} úkolů, za které můžeš získat body" // Variables: count
+    "hotDeal": "Speciální úkol",
+    "maxPerPeriod": "Maximálně za období",
+    "resetLimit": "Nastavit bez limitu",
+    "periodCount": "Počet období",
+    "periodUnit": "Jednotka období",
+    "autoCloseAfterCompletions": "Uzavřít po počtu splnění",
+    "autoCloseScopeLabel": "Počítat v rámci",
+    "startTime": "Začátek",
+    "endTime": "Konec",
+    "failedToCreate": "Nepodařilo se vytvořit úkol",
+    "existingTasks": "Existující úkoly",
+    "loading": "Načítám...",
+    "failedToLoad": "Nepodařilo se načíst úkoly",
+    "pointsVariants": "Body / varianty",
+    "periodLimit": "Limit období",
+    "team": "Družina",
+    "actions": "Akce",
+    "edit": "Upravit",
+    "unarchive": "Obnovit",
+    "archive": "Archivovat",
+    "confirmResetAutoCloseCounts": "Resetovat počty splnění pro automatické uzavření tohoto úkolu?",
+    "resetAutoCloseCounts": "Resetovat počty splnění",
+    "failedToUpdate": "Nepodařilo se aktualizovat",
+    "deleteTask": "Smazat úkol",
+    "cancel": "Zrušit",
+    "saveChanges": "Uložit změny",
+    "addNewVariant": "Přidat novou variantu",
+    "variantName": "Název varianty",
+    "points": "Body",
+    "positionOptional": "Pozice (nepovinné)",
+    "descriptionOptional": "Popis (nepovinné)",
+    "supportsMarkdown": "Podporuje Markdown",
+    "addVariant": "Přidat variantu",
+    "failedToCreateVariant": "Nepodařilo se vytvořit variantu",
+    "existingVariants": "Existující varianty",
+    "noVariantsYet": "Zatím žádné varianty tohoto úkolu",
+    "position": "Pozice",
+    "noDescription": "Bez popisu",
+    "delete": "Smazat",
+    "close": "Zavřít",
+    "confirmDeleteTask": "Opravdu smazat úkol {{taskName}}?",
+    "variantCount": "{{count}} variant",
+    "variants": "Varianty ({{count}})",
+    "editTask": "Upravit úkol {{taskName}}",
+    "manageVariants": "Spravovat varianty úkolu {{taskName}}"
   },
   "adminTeams": {
-    // EN: Member added successfully
     "memberAdded": "Člen/ka byl/a úspěšně přidán/a",
-    // EN: Member removed successfully
     "memberRemoved": "Člen/ka byl/a úspěšně odebrán/a",
-    // EN: unable to update member
     "unableToUpdateMember": "Nepodařilo se upravit člena/ku",
-    // EN: Are you sure to remove this member?
+    "logoTooLarge": "Logo je příliš velké (maximum 1 MB)",
+    "logoInvalid": "Neplatný soubor loga",
     "confirmRemoveMember": "Opravdu chceš odebrat tohoto člena/ku?",
-    // EN: Admin
     "roleAdmin": "Admin",
-    // EN: Group admin
     "roleGroupAdmin": "Správce družiny",
-    // EN: Member
     "roleMember": "Člen/ka",
-    // EN: You can not remove admin role to yourself
     "cannotRemoveOwnAdminRole": "Nemůžeš si odebrat vlastní roli admina",
-    // EN: Teams
-    "teams": "Družiny",
-    // EN: Add team
+    "title": "Družiny",
+    "subtitle": "Správa družin a jejich členů",
     "addTeam": "Přidat družinu",
-    // EN: Loading...
     "loading": "Načítám...",
-    // EN: Unable to load teams
     "unableToLoadTeams": "Nepodařilo se načíst družiny",
-    // EN: There are no teams yet
     "noTeamsYet": "Zatím tu nejsou žádné družiny",
-    // EN: No teams assigned
     "noTeamsAssigned": "Zatím nejsou přiřazeny žádné družiny",
-    // EN: Join code
     "joinCode": "Kód pro připojení",
-    // EN: Generate new
     "rotate": "Vygenerovat nový",
-    // EN: Edit members
     "editMembers": "Upravit členy",
-    // EN: Edit details
     "editDetails": "Upravit detaily",
-    // EN: Delete
     "delete": "Smazat",
-    // EN: Unassigned users
     "unassignedUsers": "Nepřiřazení uživatelé",
-    // EN: No team
     "noTeam": "Bez družiny",
-    // EN: Search
     "search": "Hledat",
-    // EN: Name or e-mail
     "usernameOrEmail": "Jméno nebo e-mail",
-    // EN: Filter
     "filter": "Filtrovat",
-    // EN: All users
     "allUsers": "Všichni uživatelé",
-    // EN: Unassigned
     "withoutTeam": "Bez družiny",
-    // EN: Other teams
     "otherTeams": "Ostatní družiny",
-    // EN: No users available
     "noUsersAvailable": "Žádní dostupní uživatelé",
-    // EN: Select user
     "selectUser": "Vyber uživatele",
-    // EN: Other team
     "otherTeam": "Jiná družina",
-    // EN: Add
     "add": "Přidat",
-    // EN: There are no members in this group yet
     "noMembersYet": "Zatím tu nejsou žádní členové/ky",
-    // EN: Member
     "member": "Člen/ka",
     "email": "E-mail",
     "role": "Role",
-    // EN: Action
     "actions": "Akce",
-    // EN: Remove from team
     "removeFromTeam": "Odebrat z družiny",
-    // EN: Name
+    "uploadLogo": "Nahrát logo",
+    "removeLogo": "Odebrat logo",
+    "logoHint": "PNG, JPG nebo SVG do 1 MB",
     "name": "Název",
-    // EN: Description
     "description": "Popis",
-    // EN: Failed to update team
     "failedToUpdateTeam": "Nepodařilo se upravit družinu",
-    // EN: Failed to create team
     "failedToCreateTeam": "Nepodařilo se vytvořit družinu",
-    // EN: Cancel
     "cancel": "Zrušit",
-    // EN: Create team
     "createTeam": "Vytvořit družinu",
-    // EN: Are you sure to delete team '{{teamName}}'?
-    "confirmDeleteTeam": "Opravdu smazat družinu '{{teamName}}'?", // Variables: teamName
-    // EN: Rotate code for '{{teamName}}'? Old one will stop working!
-    "confirmRotateCode": "Opravdu změnit kód pro '{{teamName}}'? Starý přestane platit!", // Variables: teamName
-    // EN: {{count}} members
-    "memberCount": "{{count}} členů", // Variables: count
-    // EN: Manage members of {{teamName}}
-    "manageMembers": "Spravovat členy družiny {{teamName}}", // Variables: teamName
-    // EN: Edit team {{teamName}}
-    "editTeam": "Upravit družinu {{teamName}}" // Variables: teamName
+    "confirmDeleteTeam": "Opravdu smazat družinu '{{teamName}}'?",
+    "confirmRotateCode": "Opravdu změnit kód pro '{{teamName}}'? Starý přestane platit!",
+    "memberCount": "{{count}} členů",
+    "manageMembers": "Spravovat členy družiny {{teamName}}",
+    "editTeam": "Upravit družinu {{teamName}}"
   },
-  "adminUsers": {
-    // EN: User created successfully
-    "userCreated": "Uživatel byl úspěšně vytvořen",
-    // EN: Failed to create user
-    "failedToCreateUser": "Nepodařilo se vytvořit uživatele",
-    // EN: User updated
-    "userUpdated": "Uživatel byl upraven",
-    // EN: Failed to update user
-    "failedToUpdateUser": "Nepodařilo se upravit uživatele",
-    // EN: User deleted
-    "userDeleted": "Uživatel byl smazán",
-    // EN: Failed to delete user
-    "failedToDeleteUser": "Nepodařilo se smazat uživatele",
-    // EN: User's completion updated
-    "completionUpdated": "Splnění úkolu bylo aktualizováno",
-    // EN: Unable to update completion
-    "unableToUpdateCompletion": "Nepodařilo se aktualizovat splnění úkolu",
-    // EN: User's completion removed
-    "completionRemoved": "Splnění bylo odstraněno",
-    // EN: Unable to delete completion
-    "unableToDeleteCompletion": "Nepodařilo se odstranit splnění",
-    // EN: Completion recorded
-    "completionRecorded": "Splnění bylo zapsáno",
-    // EN: Unable to create completion
-    "unableToCreateCompletion": "Nepodařilo se vytvořit splnění",
-    // EN: Failed to create users
-    "failedToCreateUsers": "Nepodařilo se vytvořit uživatele",
-    // EN: Message sent
-    "messageSent": "Zpráva odeslána",
-    // EN: Failed to send message
-    "failedToSendMessage": "Nepodařilo se odeslat zprávu",
-    // EN: Failed to generate password
-    "failedToGeneratePassword": "Nepodařilo se vygenerovat heslo",
-    // EN: Nothing to update
-    "nothingToUpdate": "Není co aktualizovat",
-    // EN: You can not delete your own account
-    "cannotDeleteOwnAccount": "Nemůžeš smazat svůj vlastní účet",
-    // EN: Are you sure to delete this user?
-    "confirmDeleteUser": "Opravdu smazat tohoto uživatele?",
-    // EN: Count must be in range
-    "countMustBeBetween": "Počet musí být v povoleném rozsahu",
-    // EN: Are you sure to remove completion
-    "confirmRemoveCompletion": "Opravdu odstranit toto splnění?",
-    // EN: Select an user first?
-    "selectUserFirst": "Nejprve vyber uživatele",
-    // EN: Select task
-    "selectTask": "Vyber úkol",
-    // EN: Message cannot be empty
-    "messageCannotBeEmpty": "Zpráva nesmí být prázdná",
-    // EN: Enter at least one name
-    "enterAtLeastOneName": "Zadej alespoň jedno jméno",
-    // EN: You have no access
-    "noAccess": "Nemáš oprávnění k přístupu",
-    // EN: Users
-    "users": "Uživatelé",
-    "bulkRegister": {
-      // EN: Bulk register
-      "title": "Hromadná registrace",
-      // EN: Names list
-      "namesLabel": "Seznam jmen",
-      // EN: First name\nSecond Name\nThird Name
-      "namesPlaceholder": "První jméno\nDruhé jméno\nTřetí jméno",
-      // EN: Enter full names of new users each on new line. Usernames will be created automatically
-      "namesDescription": "Zadej úplná jména nových uživatelů – každé na nový řádek. Přihlašovací jména se vytvoří automaticky.",
-      // EN: Important
-      "important": "Důležité",
-      // EN: Copy the login details, they will not be in readable format after you close this modal.
-      "importantMessage": "Zkopíruj si přihlašovací údaje – po zavření okna už nebudou čitelné.",
-      // EN: Generated password
-      "generatedPassword": "Vygenerované heslo",
-      // EN: Action
-      "action": "Akce",
-      // EN: Download CSV
-      "downloadCSV": "Stáhnout CSV"
-    },
-    // EN: Add user
-    "addUser": "Přidat uživatele",
-    // EN: Loading...
-    "loading": "Načítám...",
-    // EN: No users yet
-    "noUsersYet": "Zatím tu nejsou žádní uživatelé",
-    // EN: Search member
-    "searchUsers": "Vyhledat člena",
-    // EN: Name, username, e-mail
-    "searchUsersPlaceholder": "Jméno, uživatelské jméno, e-mail",
-    // EN: All teams
-    "allTeams": "Všechny družiny",
-    // EN: All roles
-    "allRoles": "Všechny role",
-    // EN: Showing {{shown}} of {{total}} users
-    "usersShown": "Zobrazeno {{shown}} z {{total}} uživatelů", // Variables: shown, total
-    // EN: No users match selected filters
-    "noUsersMatchFilters": "Žádný uživatel neodpovídá zvoleným filtrům",
-    // EN: Name
-    "name": "Jméno",
-    // EN: Username
-    "username": "Uživatelské jméno",
-    "email": "E-mail",
-    "role": "Role",
-    // EN: Team
-    "team": "Družina",
-    // EN: Manage
-    "manage": "Spravovat",
-    // EN: Real name
-    "realName": "Skutečné jméno",
-    // EN: E-mail (optional)
-    "emailOptional": "E-mail (nepovinné)",
-    // EN: Prefered language
-    "preferredLanguage": "Preferovaný jazyk",
-    // EN: No team
-    "noTeam": "Bez družiny",
-    // EN: Member
-    "roleMember": "Člen/ka",
-    // EN: Group admin
-    "roleGroupAdmin": "Správce družiny",
-    // EN: Admin
-    "roleAdmin": "Admin",
-    // EN: Active
-    "active": "Aktivní",
-    // EN: Managed teams
-    "managedTeams": "Spravované družiny",
-    // EN: Reset password
-    "resetPassword": "Resetovat heslo",
-    // EN: Leave blank to keep current password
-    "changePasswordPlaceholder": "Ponech prázdné, pokud chceš zachovat aktuální heslo",
-    // EN: Generate
-    "generate": "Vygenerovat",
-    // EN: Clear password
-    "clearPassword": "Vymazat heslo",
-    // EN: Save changes
-    "saveChanges": "Uložit změny",
-    // EN: Send message to user
-    "sendMessage": "Poslat zprávu uživateli",
-    // EN: Write a short message for this user
-    "sendMessagePlaceholder": "Napiš krátkou zprávu pro tohoto uživatele",
-    // EN: Clear
-    "clear": "Vymazat",
-    // EN: Send
-    "send": "Odeslat",
-    // EN: Deleting an user cannot be undone
-    "deletingUserCannotBeUndone": "Smazání uživatele nelze vrátit zpět",
-    // EN: Delete user
-    "deleteUser": "Smazat uživatele",
-    // EN: Completion history
-    "completionHistory": "Historie splnění",
-    // EN: Add completion
-    "addCompletionBtn": "Přidat splnění",
-    // EN: All tasks
-    "allTasks": "Všechny úkoly",
-    // EN: From
-    "dateFrom": "Od",
-    // EN: To
-    "dateTo": "Do",
-    // EN: Total points
-    "totalPoints": "Celkové body",
-    // EN: Points by task
-    "pointsByTask": "Body podle úkolů",
-    // EN: No completions yet
-    "noCompletions": "Zatím žádná splnění",
-    // EN: Date
-    "date": "Datum",
-    // EN: Type
+  "adminWidgets": {
+    "updateSuccess": "Nastavení nástěnky bylo uloženo",
+    "updateFailed": "Uložení nastavení nástěnky selhalo",
+    "loading": "Načítám widgety…",
+    "title": "Nástěnka",
+    "subtitle": "Vyber, které widgety se zobrazí na nástěnce",
+    "empty": "Zatím nejsou zaregistrovány žádné widgety.",
+    "widget": "Widget",
     "type": "Typ",
-    // EN: Status
-    "status": "Stav",
-    // EN: Count
-    "count": "Počet",
-    // EN: Admin note
-    "adminNote": "Poznámka admina",
-    // EN: Actions
-    "actions": "Akce",
-    // EN: Approved
-    "approved": "Schváleno",
-    // EN: Rejected
-    "rejected": "Zamítnuto",
-    // EN: Create user
-    "createUser": "Vytvořit uživatele",
-    // EN: Password
-    "password": "Heslo",
-    // EN: Bulk registration completed
-    "bulkRegisterComplete": "Hromadná registrace dokončena",
-    // EN: Successfully created {{successCount}} users, {{failedCount}} users failed.
-    "bulkRegistrationSuccess": "Úspěšně vytvořeno {{successCount}} uživatelů, u {{failedCount}} se to nepovedlo.", // Variables: successCount, failedCount
-    // EN: Edit user '{{userName}}'
-    "editUser": "Upravit uživatele '{{userName}}'" // Variables: userName
-  },
-  "dashboard": {
-    "timeAgo": {
-      // EN: Just now
-      "justNow": "Právě teď",
-      // EN: {{count}} minutes ago
-      "minutesAgo": "před {{count}} minutami", // Variables: count
-      // EN: {{count}} hours ago
-      "hoursAgo": "před {{count}} hodinami", // Variables: count
-      // EN: {{count}} days ago
-      "daysAgo": "před {{count}} dny" // Variables: count
-    },
-    // EN: You have no team assigned. If you think it is weird, contact admin
-    "welcomeNoGroup": "Nemáš přiřazenou družinu. Pokud si myslíš, že je to chyba, kontaktuj admina.",
-    // EN: Total points
-    "totalPoints": "Celkové body",
-    // EN: Your rank
-    "yourRank": "Tvoje pořadí",
-    // EN: Your team's rank
-    "teamRank": "Pořadí družiny",
-    // EN: Announcements
-    "announcements": "Ohlášky",
-    // EN: There will be averything necessary for this competition
-    "stayInformed": "Zde najdeš všechny důležité informace k soutěži",
-    // EN: Information
-    "infoTitle": "Informace",
-    // EN: For all teams
-    "allTeams": "Všechny družiny",
-    // EN: Team activity
-    "teamActivity": "Aktivita družiny",
-    // EN: Time to start doing something
-    "makeMagic": "Je čas něco podniknout!",
-    // EN: Be the first from your team to finish task and motivate others
-    "completeTasksToSee": "Buď první z družiny, kdo splní úkol, a motivuj ostatní!",
-    // EN: Tasks done
-    "tasksDone": "Splněné úkoly",
-    // EN: Points earned
-    "pointsEarned": "Získané body",
-    // EN: Active heroes
-    "activeHeroes": "Aktivní členové/ky",
-    // EN: You completed
-    "youCompleted": "Splnil/a jsi",
-    // EN: completed
-    "completed": "splnil/a",
-    // EN: Your messages
-    "notifications": "Tvoje zprávy",
-    // EN: You have no messages yet.
-    "noMessagesYet": "Zatím nemáš žádné zprávy.",
-    // EN: Maybe some will appear if you finish some tasks
-    "messagesWillAppear": "Možná se něco objeví, jakmile splníš pár úkolů!",
-    // EN: Recent messages
-    "recentMessages": "Nedávné zprávy",
-    // EN: System
-    "system": "Systém",
-    // EN: Your progress
-    "yourJourney": "Jak se ti daří",
-    // EN: Want to shine like a star?
-    "readyToShine": "Připraven/a zazářit?",
-    // EN: Complete your first task and tell the world you are worth it
-    "startCompleting": "Splň první úkol a ukaž, co v tobě je!",
-    // EN: Awaiting approval
-    "awaitingApproval": "Čeká na schválení",
-    // EN: Rejected
-    "rejected": "Zamítnuto",
-    // EN: Reason
-    "reason": "Důvod",
-    // EN: Team leaderboard
-    "teamChampions": "Výsledky družiny",
-    // EN: Heroes
-    "heroes": "Hrdinů",
-    // EN: Rank
-    "rank": "Pořadí",
-    // EN: Name
-    "champion": "Jméno",
-    // EN: Completed
-    "victories": "Splnění",
-    // EN: Earned points
-    "glory": "Získané body",
-    // EN: See details
-    "seeDetails": "Zobrazit detaily",
-    // EN: View tasks table
-    "viewTasks": "Zobrazit přehled úkolů",
-    // EN: Keep pushing forward, team! Every completed task counts!
-    "keepPushing": "Jen tak dál, družino! Každý splněný úkol se počítá!",
-    // EN: Task details
-    "taskDetails": "Detaily úkolů",
-    // EN: Welcome, {{username}}
-    "welcome": "Vítej, {{username}}", // Variables: username
-    // EN: Proudly representing team {{teamName}}
-    "teamPride": "Hrdě reprezentuješ družinu {{teamName}}", // Variables: teamName
-    // EN: And {{count}} more achievements
-    "moreAchievements": "A ještě {{count}} dalších úspěchů", // Variables: count
-    // EN: Scroll to see more
-    "scrollForMore": "Posuň dolů pro víc", // Variables: count
-    // EN: Completed, amazing! (+{{points}} pts.)
-    "amazing": "Splněno, paráda! (+{{points}} bodů)", // Variables: points
-    // EN: And {{count}} more in history
-    "moreInHistory": "A {{count}} dalších v historii" // Variables: count
+    "visible": "Viditelný",
+    "editConfig": "Upravit widget",
+    "help": "Změny se projeví na nástěnce pro všechny uživatele.",
+    "configTitle": "Nadpis",
+    "configText": "Text",
+    "configIcon": "Ikona",
+    "configIconHint": "Třída ikony FontAwesome, např. fa-house-user",
+    "moduleWidgets": "Widgety modulu {{module}}"
   },
   "login": {
-    // EN: Cannot log in
-    "error": "Nelze se přihlásit",
-    // EN: Invalid credentials
     "invalidCredentials": "Neplatné přihlašovací údaje",
+    "passwordChange": {
+      "invalidCurrentPassword": "Neplatné současné heslo",
+      "passwordsDoNotMatch": "Hesla se neshodují",
+      "changePasswordFailed": "Nepodařilo se změnit heslo",
+      "title": "Je vyžadována změna hesla",
+      "subtitle": "Než budeš pokračovat, musíš změnit své heslo.",
+      "username": "Uživatelské jméno",
+      "currentPassword": "Aktuální heslo",
+      "newPassword": "Nové heslo",
+      "newPasswordPlaceholder": "Zadej své nové heslo",
+      "confirmPassword": "Potvrď nové heslo",
+      "confirmPasswordPlaceholder": "Potvrď své nové heslo",
+      "submitting": "Měním heslo...",
+      "button": "Změnit heslo",
+      "backToLogin": "Zpět na přihlášení"
+    },
+    "error": "Nelze se přihlásit",
     "tabs": {
-      // EN: Log in
       "login": "Přihlásit se",
-      // EN: Member registration
       "registerMember": "Registrace člena/ky",
-      // EN: Admin registration
       "registerAdmin": "Registrace admina"
     },
-    // EN: Welcome to ScoutComp
     "welcome": "Vítej v aplikaci ScoutComp",
-    // EN: Your username
     "username": "Uživatelské jméno",
-    // EN: Enter your username
     "usernamePlaceholder": "Zadej své uživatelské jméno",
-    // EN: Password
     "password": "Heslo",
-    // EN: Enter your password
     "passwordPlaceholder": "Zadej své heslo",
-    // EN: Signing in...
     "signingIn": "Přihlašuji...",
-    // EN: Log in
-    "button": "Přihlásit se",
-    "passwordChange": {
-      // EN: Password Change Required
-      "title": "Je vyžadována změna hesla",
-      // EN: Your password needs to be changed before you can continue.
-      "subtitle": "Než budeš pokračovat, musíš změnit své heslo.",
-      // EN: Username
-      "username": "Uživatelské jméno",
-      // EN: Current Password
-      "currentPassword": "Aktuální heslo",
-      // EN: New Password
-      "newPassword": "Nové heslo",
-      // EN: Enter your new password
-      "newPasswordPlaceholder": "Zadej své nové heslo",
-      // EN: Confirm New Password
-      "confirmPassword": "Potvrď nové heslo",
-      // EN: Confirm your new password
-      "confirmPasswordPlaceholder": "Potvrď své nové heslo",
-      // EN: Changing Password...
-      "submitting": "Měním heslo...",
-      // EN: Change Password
-      "button": "Změnit heslo",
-      // EN: Back to Login
-      "backToLogin": "Zpět na přihlášení",
-      // EN: Passwords do not match
-      "passwordsDoNotMatch": "Hesla se neshodují",
-      // EN: Failed to change password
-      "changePasswordFailed": "Nepodařilo se změnit heslo",
-      // EN: Invalid current password
-      "invalidCurrentPassword": "Neplatné současné heslo"
-    }
+    "button": "Přihlásit se"
   },
   "register": {
-    // EN: Real name
     "realName": "Skutečné jméno",
-    // EN: Enter your full name + nickname
     "realNamePlaceholder": "Zadej celé jméno + přezdívku",
-    // EN: User name
     "username": "Uživatelské jméno",
-    // EN: your_user_name
     "usernamePlaceholder": "tvoje_uzivatelske_jmeno",
     "email": "E-mail",
-    // EN: optional
     "optional": "nepovinné",
-    // EN: your@email.com
     "emailPlaceholder": "tvoje@email.cz",
-    // EN: Password
     "password": "Heslo",
-    // EN: Create a secure password (8+ chars)
     "passwordPlaceholder": "Zadej silné heslo (min. 8 znaků)",
-    // EN: Join code
     "joinCode": "Kód družiny",
-    // EN: Enter the team join code
     "joinCodePlaceholder": "Zadej kód pro připojení k družině",
-    // EN: Prefered language
     "language": "Jazyk",
     "languageCs": "Česky",
-    // EN: English
     "languageEn": "Anglicky",
-    // EN: Error
     "error": "Chyba",
-    // EN: Registering...
     "registering": "Registruji...",
-    // EN: Register
     "button": "Registrovat se",
-    // EN: Admin account shall be created only on first start or in development mode
     "adminHint": "Admin účet lze vytvořit pouze při prvním spuštění nebo v režimu vývoje",
-    // EN: Creating admin...
     "creatingAdmin": "Vytvářím admina...",
-    // EN: Create admin
     "adminButton": "Vytvořit admina"
   },
   "rules": {
-    // EN: Rules updated
     "updated": "Pravidla byla aktualizována",
-    // EN: Update failed
     "updateFailed": "Nepodařilo se aktualizovat pravidla",
-    // EN: Loading...
     "loading": "Načítám...",
-    // EN: Rules
     "title": "Pravidla",
-    // EN: Competition rules for fair-play
     "subtitle": "Soutěžní pravidla fair-play",
-    // EN: Official rules
     "officialRules": "Oficiální pravidla",
-    // EN: Unsaved changes!
     "unsavedChanges": "Neuložené změny!",
-    // EN: Edit rules
     "editRules": "Upravit pravidla",
-    // EN: Markdown content
     "markdownContent": "Obsah v Markdownu",
-    // EN: Enter your rules in Markdown format
     "markdownPlaceholder": "Zadej pravidla ve formátu Markdown",
-    // EN: Live preview
     "livePreview": "Živý náhled",
-    // EN: No rules yet
     "comingSoon": "Zatím žádná pravidla",
-    // EN: They will come soon
     "comingSoonMessage": "Brzy budou doplněna"
   },
   "userSettings": {
-    // EN: Profile updated
     "profileUpdated": "Profil byl aktualizován",
-    // EN: User information update failed
     "updateFailed": "Nepodařilo se upravit uživatelská data",
-    // EN: Password changed successfully
     "passwordChanged": "Heslo bylo úspěšně změněno",
-    // EN: Password change failed
     "passwordChangeFailed": "Změna hesla se nezdařila",
-    // EN: Passwords are not the same
+    "photoTooLarge": "Fotografie je příliš velká (max 8 MB).",
+    "photoInvalid": "Fotografii se nepodařilo zpracovat. Použij obrázek (JPG/PNG/WebP).",
     "passwordMismatch": "Hesla se neshodují",
-    // EN: Password must be at least 8 characters long
     "passwordTooShort": "Heslo musí mít alespoň 8 znaků",
-    // EN: User settings
     "title": "Uživatelská nastavení",
-    // EN: Manage your user information
     "subtitle": "Spravuj své uživatelské údaje",
-    // EN: Profile settings
     "profileSettings": "Nastavení profilu",
-    // EN: Basic information
     "profileDescription": "Základní informace o tobě",
-    // EN: Log-in name
+    "uploadPhoto": "Nahrát fotografii",
+    "savePhoto": "Uložit fotografii",
+    "removePhoto": "Odebrat fotografii",
+    "photoHint": "Fotografie se automaticky ořízne a upraví do čtverce.",
     "username": "Přihlašovací jméno",
     "email": "E-mail",
-    // EN: Language
     "language": "Jazyk",
-    // EN: Saving...
+    "receiveMessages": "Přijímat zprávy od ostatních",
+    "receiveMessagesHint": "Pokud vypneš, ostatní ti nebudou moci psát. Vedení oddílu může psát vždy.",
     "saving": "Ukládám...",
-    // EN: Save profile
     "saveProfile": "Uložit profil",
-    // EN: Account info
     "accountInfo": "Informace o účtu",
-    // EN: Immutable fields
     "accountDescription": "Pole, která nelze měnit",
-    // EN: Full name
     "currentUsername": "Celé jméno",
     "role": "Role",
-    // EN: Team
     "team": "Družina",
-    // EN: Password settings
     "passwordSettings": "Nastavení hesla",
-    // EN: Be carefull here
     "passwordDescription": "Buď opatrný/á – měníš přístup do systému",
-    // EN: Password minimal requirements
     "passwordRequirements": "Požadavky na heslo",
-    // EN: Password must be at least 8 chars long
     "minLength": "Minimálně 8 znaků",
-    // EN: Must be different than the previous
     "noCurrentPassword": "Musí se lišit od původního hesla",
-    // EN: New password
     "newPassword": "Nové heslo",
-    // EN: Confirm password
     "confirmPassword": "Potvrzení hesla",
-    // EN: Changing password...
     "changingPassword": "Měním heslo...",
-    // EN: Change password
     "changePassword": "Změnit heslo"
   }
 }

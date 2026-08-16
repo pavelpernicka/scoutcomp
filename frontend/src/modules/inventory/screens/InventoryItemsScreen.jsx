@@ -15,6 +15,7 @@ import InventoryFilterTree from "../components/InventoryFilterTree";
 
 export default function InventoryItemsScreen({
   items,
+  onCreateItem,
   search,
   onSearchChange,
   presenceFilter,
@@ -137,6 +138,9 @@ export default function InventoryItemsScreen({
       <section className="inventory-main-panel">
         <div className="inventory-table-hero">
           <div className="inventory-table-eyebrow">Všechny skladové zásoby</div>
+          <button type="button" className="btn btn-primary" onClick={onCreateItem}>
+            <i className="fas fa-plus me-2"></i>Nová věc
+          </button>
         </div>
 
         <div className="inventory-mobile-filterbar">
@@ -250,6 +254,7 @@ export default function InventoryItemsScreen({
 
 InventoryItemsScreen.propTypes = {
   items: PropTypes.array.isRequired,
+  onCreateItem: PropTypes.func.isRequired,
   search: PropTypes.string.isRequired,
   onSearchChange: PropTypes.func.isRequired,
   presenceFilter: PropTypes.string.isRequired,

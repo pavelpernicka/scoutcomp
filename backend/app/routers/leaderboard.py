@@ -17,9 +17,81 @@ from ..models import (
     Team,
     User,
 )
-from ..schemas import LeaderboardEntry
+from ..schemas import LeaderboardEntry, ScoreSummary
 
 router = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
+
+
+@router.get("/me", response_model=ScoreSummary)
+def my_leaderboard_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> ScoreSummary:
+    total_points = (
+        db.query(func.coalesce(func.sum(Completion.points_awarded), 0))
+        .filter(Completion.member_id == current_user.id, Completion.status == CompletionStatus.APPROVED)
+        .scalar()
+    )
+
+    member_scores = (
+        db.query(
+            Completion.member_id.label("member_id"),
+            func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
+        )
+        .filter(Completion.status == CompletionStatus.APPROVED)
+        .group_by(Completion.member_id)
+        .subquery()
+    )
+
+    member_rank = None
+    member_score_row = (
+        db.query(member_scores.c.score)
+        .filter(member_scores.c.member_id == current_user.id)
+        .one_or_none()
+    )
+    if member_score_row:
+        higher = (
+            db.query(func.count())
+            .select_from(member_scores)
+            .filter(member_scores.c.score > member_score_row.score)
+            .scalar()
+        )
+        member_rank = (higher or 0) + 1
+
+    team_rank = None
+    if current_user.team_id:
+        team_scores = (
+            db.query(
+                Team.id.label("team_id"),
+                func.coalesce(func.sum(Completion.points_awarded), 0).label("score"),
+            )
+            .join(User, User.team_id == Team.id)
+            .outerjoin(
+                Completion,
+                (Completion.member_id == User.id) & (Completion.status == CompletionStatus.APPROVED),
+            )
+            .group_by(Team.id)
+            .subquery()
+        )
+        team_score_row = (
+            db.query(team_scores.c.score)
+            .filter(team_scores.c.team_id == current_user.team_id)
+            .one_or_none()
+        )
+        if team_score_row:
+            higher_teams = (
+                db.query(func.count())
+                .select_from(team_scores)
+                .filter(team_scores.c.score > team_score_row.score)
+                .scalar()
+            )
+            team_rank = (higher_teams or 0) + 1
+
+    return ScoreSummary(
+        total_points=float(total_points or 0),
+        member_rank=member_rank,
+        team_rank=team_rank,
+    )
 
 
 @router.get("/members", response_model=List[LeaderboardEntry])

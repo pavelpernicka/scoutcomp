@@ -14,6 +14,12 @@ database:
   engine: "sqlite"
   url: "sqlite:///./database.db"
 
+site:
+  host: "0.0.0.0"
+  port: 8090
+  # Public address of the hosted site (used for links from the app, e.g. behind nginx).
+  # public_url: "https://web.oddil.cz"
+
   # sample config for PostgreSQL:
   # engine: "postgresql"
   # url: "postgresql://scout:scout123@db:5432/competition"

@@ -23,7 +23,9 @@ function extractKeysFromContent(content) {
     // t("key")
     { pattern: /\bt\s*\(\s*["']([a-zA-Z][a-zA-Z0-9_.]*?)["']\s*\)/g, hasParams: false },
     // t("key", { params })
-    { pattern: /\bt\s*\(\s*["']([a-zA-Z][a-zA-Z0-9_.]*?)["']\s*,\s*\{([^}]*)\}\s*\)/g, hasParams: true }
+    { pattern: /\bt\s*\(\s*["']([a-zA-Z][a-zA-Z0-9_.]*?)["']\s*,\s*\{([^}]*)\}\s*\)/g, hasParams: true },
+    // translate("key") — GrapesJS editor shell uses translate() instead of t()
+    { pattern: /translate\(\s*["']([a-zA-Z][a-zA-Z0-9_.]*?)["']\s*\)/g, hasParams: false }
   ];
 
   patterns.forEach(({ pattern, hasParams }) => {
@@ -81,11 +83,58 @@ function getAllSourceFiles() {
   return files;
 }
 
+// Dynamically-composed translation keys that the static scanner cannot
+// see because the suffix is a template variable (e.g. t(`web.nav.${key}`),
+// t(`web.design.${kind}`), t(`web.pageViews.${key}`)). Keep this list in
+// sync with the components that build keys at runtime.
+const DYNAMIC_KEYS = [
+  "web.nav.posts",
+  "web.nav.menus",
+  "web.nav.settings",
+  "web.pageViews.all",
+  "web.pageViews.published",
+  "web.pageViews.draft",
+  "web.pageViews.trash",
+  "web.design.templates",
+  "web.design.components",
+  "web.design.sections",
+  "web.design.patterns",
+  "web.design.parts",
+  "web.designDescriptions.templates",
+  "web.designDescriptions.components",
+  "web.designDescriptions.sections",
+  "web.designDescriptions.patterns",
+  "web.designDescriptions.parts",
+  "web.editor.block.article",
+  "web.editor.block.header",
+  "web.editor.block.footer",
+  "web.editor.block.main",
+  "web.editor.block.nav",
+  "web.editor.block.aside",
+  "web.editor.catalog.components",
+  "web.editor.catalog.sections",
+  "web.editor.catalog.data",
+  "web.editor.rail.pages",
+  "web.editor.rail.insert",
+  "web.editor.rail.layers",
+  "web.editor.devices.desktop",
+  "web.editor.devices.tablet",
+  "web.editor.devices.mobile",
+  "web.editor.saveStates.saved",
+  "web.editor.saveStates.unsaved",
+  "web.editor.saveStates.saving",
+  "web.editor.saveStates.conflict",
+  "web.editor.saveStates.failed",
+];
+
 function extractAllKeys() {
   const files = getAllSourceFiles();
   const allKeys = new Map(); // Changed to Map to store variables
 
   console.log(`Scanning ${files.length} files for translation keys...`);
+
+  // Seed dynamic keys first so they always survive regeneration.
+  DYNAMIC_KEYS.forEach((key) => allKeys.set(key, []));
 
   files.forEach(file => {
     try {
@@ -167,7 +216,8 @@ function generateJSONCContent(obj, englishTranslations, language, sourceVariable
 
         // Add comment with English translation before the key
         if (englishValue && englishValue !== value && !englishValue.startsWith('[EN]') && !englishValue.startsWith('[')) {
-          content += `${spaces}// EN: ${englishValue}\n`;
+          const commentValue = String(englishValue).replace(/[\r\n]+/g, ' ');
+          content += `${spaces}// EN: ${commentValue}\n`;
         }
 
         content += `${spaces}"${key}": ${JSON.stringify(value)}${isLast ? '' : ','}`;
@@ -289,17 +339,36 @@ function updateTranslationFiles(keys) {
 function main() {
   console.log('Starting translation key extraction...\n');
 
+  const args = process.argv.slice(2);
+  const checkOnly = args.includes('--check');
+
   const keys = extractAllKeys();
 
   console.log(`\nFound ${keys.size} unique translation keys`);
 
   if (keys.size > 0) {
-    console.log('\nUpdating translation files...');
-    updateTranslationFiles(keys);
-
-    console.log('\nTranslation extraction completed!');
-    console.log(`\nTranslation files location: ${path.relative(process.cwd(), TRANSLATIONS_DIR)}`);
-    console.log(`Supported languages: ${SUPPORTED_LANGUAGES.join(', ')}`);
+    if (checkOnly) {
+      let allPresent = true;
+      SUPPORTED_LANGUAGES.forEach((language) => {
+        const existing = readTranslationFile(language);
+        keys.forEach((_variables, key) => {
+          if (!getNestedValue(existing, key)) {
+            console.log(`Missing key in ${language}: ${key}`);
+            allPresent = false;
+          }
+        });
+      });
+      if (allPresent) {
+        console.log('All translation keys are present.');
+      }
+      console.log('\nTranslation check completed (no files were modified).');
+    } else {
+      console.log('\nUpdating translation files...');
+      updateTranslationFiles(keys);
+      console.log('\nTranslation extraction completed!');
+      console.log(`\nTranslation files location: ${path.relative(process.cwd(), TRANSLATIONS_DIR)}`);
+      console.log(`Supported languages: ${SUPPORTED_LANGUAGES.join(', ')}`);
+    }
   } else {
     console.log('\nNo translation keys found');
   }

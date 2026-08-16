@@ -1,7 +1,7 @@
 from . import (
+    announcements,
     auth,
     completions,
-    dashboard_messages,
     leaderboard,
     notifications,
     stat_categories,
@@ -12,9 +12,9 @@ from . import (
 )
 
 __all__ = [
+    "announcements",
     "auth",
     "completions",
-    "dashboard_messages",
     "leaderboard",
     "notifications",
     "stat_categories",

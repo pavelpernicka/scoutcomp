@@ -6,7 +6,9 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import { convertLocalToUTC, isDateExpired } from "../utils/dateUtils";
+import { convertLocalToUTC, formatServerDateToInputValue, isDateExpired, parseServerDate } from "../utils/dateUtils";
+import HeroHeader from "../components/HeroHeader";
+import Button from "../components/Button";
 
 const getPeriodUnits = (t) => [
   { value: "hour", label: t("adminTasks.periodUnits.hour") },
@@ -51,8 +53,8 @@ const mapTaskToForm = (task) => ({
     ? String(task.auto_close_after_completions)
     : "",
   auto_close_scope: task.auto_close_scope || "global",
-  start_time: task.start_time ? task.start_time.slice(0, 16) : "",
-  end_time: task.end_time ? task.end_time.slice(0, 16) : "",
+  start_time: formatServerDateToInputValue(task.start_time),
+  end_time: formatServerDateToInputValue(task.end_time),
   team_id: task.team_id ? String(task.team_id) : "",
 });
 
@@ -292,7 +294,7 @@ export default function AdminTasks() {
   });
 
   const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return [...tasks].sort((a, b) => parseServerDate(b.created_at) - parseServerDate(a.created_at));
   }, [tasks]);
 
   const activeEditingTask = editingTaskId
@@ -308,7 +310,19 @@ export default function AdminTasks() {
   };
 
   return (
-    <div className="container px-0">
+    <>
+      <HeroHeader
+        title={t("adminTasks.title")}
+        subtitle={t("adminTasks.subtitle")}
+        icon="📋"
+        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+      >
+        <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={() => setCreateForm(emptyTaskForm)}>
+          {t("adminTasks.createTask")}
+        </Button>
+      </HeroHeader>
+
+      <div className="container px-0">
       <div className="row g-4">
         <div className="col-12 col-xl-5">
           <div className="card shadow-sm h-100">
@@ -1236,5 +1250,6 @@ export default function AdminTasks() {
       )}
 
     </div>
+    </>
   );
 }

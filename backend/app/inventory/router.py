@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from ..dependencies import get_db, require_admin_or_group_admin
+from ..dependencies import get_current_active_user, get_db
 from ..models import (
     InventoryCategory,
     InventoryEvent,
@@ -23,6 +23,7 @@ from ..models import (
     InventoryPhoto,
     User,
 )
+from ..permissions import permission_scopes
 from ..schemas import (
     InventoryEventCreate,
     InventoryEventDetail,
@@ -89,6 +90,19 @@ from .service import (
 )
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+def require_inventory_access(
+    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
+) -> User:
+    if not (permission_scopes(db, current_user, "inventory.read") or permission_scopes(db, current_user, "inventory.manage")):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing inventory permission")
+    return current_user
+
+
+# Existing handlers share this dependency name; bind it to the module policy so
+# their signatures remain stable while legacy role checks are removed.
+require_admin_or_group_admin = require_inventory_access
 
 
 def sync_system_quantity_flag(db: Session, item: InventoryItem) -> None:
