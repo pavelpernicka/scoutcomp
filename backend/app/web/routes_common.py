@@ -49,6 +49,8 @@ from ..routers.config import get_config_value, set_config_value
 from ..web_defaults import DEFAULT_PAGES, DEFAULT_TEMPLATES
 from ..web.pages import (
     _project_root_component,
+    _project_assets,
+    _project_styles,
     build_path,
     compile_draft,
     project_data as canonical_project_data,

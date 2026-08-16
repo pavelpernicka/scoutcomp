@@ -345,8 +345,32 @@ def _merged_editor_project(page: WebPage, db: Session) -> dict | None:
         return canonical_project_data(page)
 
     merged = deepcopy(template.project_data)
-    page_root = _project_root_component(canonical_project_data(page))
+    page_project = canonical_project_data(page)
+    page_root = _project_root_component(page_project)
     page_content = page_root.get("components", []) if page_root else []
+    page_styles = _project_styles(page_project)
+    page_assets = _project_assets(page_project)
+    merged["assets"] = [*_project_assets(merged), *deepcopy(page_assets)]
+
+    def _mark_template_owned(node, depth=0):
+        if not isinstance(node, dict) or depth > 40:
+            return
+        attributes = dict(node.get("attributes") or {})
+        attributes["data-sc-template-owner"] = str(template.id)
+        node["attributes"] = attributes
+        is_content_slot = node.get("type") == "sc-slot" and node.get("name") == "content"
+        node["removable"] = False
+        node["copyable"] = False
+        if not is_content_slot:
+            # The page editor displays linked layout structure for context, but
+            # the page draft owns only the content-slot children. Locking the
+            # shell prevents edits that would otherwise be discarded on save.
+            node["editable"] = False
+            node["stylable"] = False
+            node["draggable"] = False
+            node["droppable"] = False
+        for child in node.get("components", []):
+            _mark_template_owned(child, depth + 1)
 
     def _inject_into_slot(node, depth=0):
         if not isinstance(node, dict) or depth > 40:
@@ -360,10 +384,25 @@ def _merged_editor_project(page: WebPage, db: Session) -> dict | None:
         return False
 
     for tpl_page in merged.get("pages", []):
-        for frame in tpl_page.get("frames", []):
+        frames = tpl_page.get("frames", [])
+        for frame in frames:
             root = frame.get("component")
             if root and isinstance(root, dict):
+                _mark_template_owned(root)
                 _inject_into_slot(root)
+            existing_styles = frame.get("styles")
+            if not isinstance(existing_styles, list):
+                existing_styles = []
+            frame["styles"] = [*existing_styles, *deepcopy(page_styles)]
+        if not frames:
+            root = tpl_page.get("component")
+            if root and isinstance(root, dict):
+                _mark_template_owned(root)
+                _inject_into_slot(root)
+            existing_styles = tpl_page.get("styles")
+            if not isinstance(existing_styles, list):
+                existing_styles = []
+            tpl_page["styles"] = [*existing_styles, *deepcopy(page_styles)]
 
     return merged
 

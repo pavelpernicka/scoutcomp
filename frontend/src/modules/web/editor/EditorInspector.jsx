@@ -8,26 +8,51 @@ import { ResourcePropsEditor } from "../props/PropEditorRegistry";
 
 const tabs = ["content", "style", "data", "code", "advanced"];
 
-export default function EditorInspector({ selected, dataSources, resources, onDuplicate, onDelete, onClone, onDetach }) {
+export const getTemplateOwnerId = (selected) => {
+  let node = selected;
+  while (node) {
+    if (node !== selected && node.get?.("type") === "sc-slot" && node.get?.("name") === "content") return null;
+    const owner = node.getAttributes?.()?.["data-sc-template-owner"];
+    if (owner) return Number(owner) || owner;
+    node = node.parent?.();
+  }
+  return null;
+};
+
+export default function EditorInspector({ selected, dataSources, resources, onDuplicate, onDelete, onClone, onDetach, onEditDefinition, onEditTemplate, onContentChange }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState("content");
   const type = selected?.get?.("type") || selected?.get?.("tagName") || "component";
   const linked = selected?.get?.("type") === "sc-resource-instance";
+  const templateOwnerId = selected ? getTemplateOwnerId(selected) : null;
   return <aside id="web-editor-inspector" className="web-editor-inspector" aria-label={t("web.editor.inspectorLabel")}>
-    <div className="web-editor-selection-heading"><span><i className="fas fa-cube" /><strong>{selected ? getComponentDisplayName(selected, t) : t("web.editor.componentFallback")}</strong><small>{selected ? getComponentTechnicalName(selected) : type}</small></span>{selected && <div><button type="button" title={t("web.duplicate")} onClick={onDuplicate}><i className="fas fa-copy" /></button><button type="button" title={t("web.delete")} onClick={onDelete}><i className="fas fa-trash" /></button></div>}</div>
+    <div className="web-editor-selection-heading"><span><i className="fas fa-cube" /><strong>{selected ? getComponentDisplayName(selected, t) : t("web.editor.componentFallback")}</strong><small>{selected ? getComponentTechnicalName(selected) : type}</small></span>{selected && !templateOwnerId && <div><button type="button" title={t("web.duplicate")} onClick={onDuplicate}><i className="fas fa-copy" /></button><button type="button" title={t("web.delete")} onClick={onDelete}><i className="fas fa-trash" /></button></div>}</div>
     <div className="web-editor-inspector-tabs" role="tablist">{tabs.map((key) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{t(`web.editor.inspectorTabs.${key}`)}</button>)}</div>
     {!selected && <div className="web-editor-inspector-empty"><i className="fas fa-arrow-pointer" /><p>{t("web.editor.noSelection")}</p></div>}
     <div className={`web-editor-inspector-body ${selected ? "" : "web-editor-mounts-only"}`}>
-      <div className={selected && tab === "content" ? "" : "d-none"}>{linked ? <LinkedResourceProps key={selected.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} /> : <div className="web-editor-trait-manager" />}</div>
-      <div className={selected && tab === "style" ? "" : "d-none"}>{linked ? <LinkedStyleInfo selected={selected} resources={resources} /> : <div className="web-editor-style-manager" />}</div>
-      {selected && tab === "data" && <DataBindings selected={selected} dataSources={dataSources} />}
-      {selected && tab === "code" && <CodePanel selected={selected} />}
-      {selected && tab === "advanced" && <AdvancedInspector selected={selected} />}
+      {selected && templateOwnerId ? <TemplateOwnedInfo templateId={templateOwnerId} onEdit={onEditTemplate} /> : <>
+        <div className={selected && tab === "content" ? "" : "d-none"}>{linked ? <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} /> : <div className="web-editor-trait-manager" />}</div>
+        <div className={selected && tab === "style" ? "" : "d-none"}>{linked ? <LinkedStyleInfo selected={selected} resources={resources} /> : <div className="web-editor-style-manager" />}</div>
+        {selected && tab === "data" && <DataBindings selected={selected} dataSources={dataSources} />}
+        <div className={selected && tab === "code" ? "" : "d-none"}>{selected && <CodePanel key={selected.cid} selected={selected} onApplied={onContentChange} />}</div>
+        {selected && tab === "advanced" && <AdvancedInspector selected={selected} />}
+      </>}
     </div>
   </aside>;
 }
 
-EditorInspector.propTypes = { selected: PropTypes.object, dataSources: PropTypes.array.isRequired, resources: PropTypes.object.isRequired, onDuplicate: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func };
+EditorInspector.propTypes = { selected: PropTypes.object, dataSources: PropTypes.array.isRequired, resources: PropTypes.object.isRequired, onDuplicate: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onEditTemplate: PropTypes.func, onContentChange: PropTypes.func };
+
+function TemplateOwnedInfo({ templateId, onEdit }) {
+  const { t } = useTranslation();
+  return <div className="web-editor-linked-help web-editor-template-owned">
+    <i className="fas fa-link" />
+    <div><p>{t("web.props.templateOwnedHelp")}</p><small>{t("web.props.templateOwnedDetail")}</small>
+      <button type="button" className="btn btn-sm btn-outline-light mt-2" onClick={() => onEdit?.(templateId)}><i className="fas fa-pen me-1" />{t("web.props.editTemplate")}</button>
+    </div>
+  </div>;
+}
+TemplateOwnedInfo.propTypes = { templateId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]).isRequired, onEdit: PropTypes.func };
 
 /* ── Linked resource content panel (props + variant selector) ────── */
 
@@ -43,7 +68,7 @@ const normalizeVariantId = (variant) => {
   return variant.id || variant.label || "";
 };
 
-function LinkedResourceProps({ selected, resources, onClone, onDetach }) {
+function LinkedResourceProps({ selected, resources, onClone, onDetach, onEditDefinition, onContentChange }) {
   const { t } = useTranslation();
   const kind = selected.get("resourceKind") === "section" ? "sections" : "components";
   const resourceId = String(selected.get("resourceId") || "");
@@ -68,9 +93,10 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach }) {
   return <div className="web-editor-linked-props">
     <div className="web-editor-resource-state state-linked"><i className="fas fa-link" /><span><strong>{definition.name}</strong><small>{t(kind === "sections" ? "web.props.linkedSection" : "web.props.linkedComponent")}</small></span></div>
     <div className="web-editor-linked-actions">
-      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={cloning} onClick={() => { setCloning(true); Promise.resolve(onClone?.(kind, definition)).catch(() => {}).finally(() => setCloning(false)); }}>
+      <button type="button" className="btn btn-sm btn-outline-secondary" disabled={cloning} onClick={() => { setCloning(true); Promise.resolve(onClone?.(selected, kind, definition)).catch(() => {}).finally(() => setCloning(false)); }}>
         <i className="fas fa-clone me-1" />{t("web.props.cloneVariant")}
       </button>
+      <button type="button" className="btn btn-sm btn-outline-light" onClick={() => onEditDefinition?.(selected, kind, definition)}><i className="fas fa-pen me-1" />{t("web.props.editDefinition")}</button>
       <button type="button" className="btn btn-sm btn-outline-danger" disabled={detaching} onClick={async () => {
         setDetaching(true);
         setDetachError("");
@@ -88,6 +114,7 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach }) {
           const id = e.target.value;
           setVariant(id);
           selected.set("variant", id || null);
+          onContentChange?.();
         }}>
           <option value="">{t("web.props.defaultVariant")}</option>
           {variants.map((v) => {
@@ -97,11 +124,11 @@ function LinkedResourceProps({ selected, resources, onClone, onDetach }) {
         </select>
       </label>
     </div>}
-    <ResourcePropsEditor schema={schema} value={values} onChange={(next) => { setValues(next); selected.set("props", next); }} />
+    <ResourcePropsEditor schema={schema} value={values} onChange={(next) => { setValues(next); selected.set("props", next); onContentChange?.(); }} />
   </div>;
 }
 
-LinkedResourceProps.propTypes = { selected: PropTypes.object.isRequired, resources: PropTypes.object.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func };
+LinkedResourceProps.propTypes = { selected: PropTypes.object.isRequired, resources: PropTypes.object.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onContentChange: PropTypes.func };
 
 /* ── Linked resource style panel (CSS ownership info) ────────────── */
 
@@ -117,7 +144,7 @@ function LinkedStyleInfo({ selected, resources }) {
     <div className="web-editor-css-cascade-info">
       <ol>
         <li><strong>{t("web.props.cssCascadeItem", { level: 1, owner: name })}</strong> — {t("web.props.cssCascadeLevel1")}</li>
-        <li><strong>{t("web.props.cssCascadeItem", { level: 2, owner: "sc-global-part" })}</strong> — {t("web.props.cssCascadeLevel2")}</li>
+        <li><strong>{t("web.props.cssCascadeItem", { level: 2, owner: t("web.props.cssCascadeSection") })}</strong> — {t("web.props.cssCascadeLevel2")}</li>
         <li><strong>{t("web.props.cssCascadeItem", { level: 3, owner: t("web.props.cssCascadeLayout") })}</strong> — {t("web.props.cssCascadeLevel3")}</li>
         <li><strong>{t("web.props.cssCascadeItem", { level: 4, owner: t("web.props.cssCascadeTheme") })}</strong> — {t("web.props.cssCascadeLevel4")}</li>
         <li><strong>{t("web.props.cssCascadeItem", { level: 5, owner: t("web.props.cssCascadeGlobal") })}</strong> — {t("web.props.cssCascadeLevel5")}</li>
@@ -269,10 +296,37 @@ const componentCss = (editor, component) => {
   }
 };
 
-function CodePanel({ selected }) {
+const cssDefinitionSelector = (definition = {}) => {
+  const selectors = (definition.selectors || []).map((name) => (
+    String(name).startsWith("#") ? String(name) : `.${name}`
+  )).join("");
+  const state = definition.state ? `:${definition.state}` : "";
+  const additional = definition.selectorsAdd || "";
+  return [selectors ? `${selectors}${state}` : "", additional].filter(Boolean).join(", ");
+};
+
+export const replaceComponentCss = (editor, previousCss, nextCss) => {
+  const parser = editor?.Parser;
+  const composer = editor?.Css;
+  if (!composer) return;
+  const definitions = parser?.parseCss?.(previousCss || "") || [];
+  const rules = composer.getAll?.();
+  const currentRules = Array.isArray(rules) ? rules : rules?.models || [];
+  const remove = currentRules.filter((rule) => definitions.some((definition) => (
+    rule.getSelectorsString?.() === cssDefinitionSelector(definition)
+    && (rule.get?.("state") || "") === (definition.state || "")
+    && (rule.get?.("mediaText") || "") === (definition.mediaText || "")
+    && (rule.get?.("atRuleType") || "") === (definition.atRuleType || "")
+  )));
+  if (remove.length) composer.remove?.(remove);
+  if (nextCss.trim()) composer.addRules?.(nextCss);
+};
+
+function CodePanel({ selected, onApplied }) {
   const { t } = useTranslation();
   const [html, setHtml] = useState("");
   const [css, setCss] = useState("");
+  const [loadedCss, setLoadedCss] = useState("");
   const [parseError, setParseError] = useState("");
   const [revision, setRevision] = useState(0);
 
@@ -282,7 +336,9 @@ function CodePanel({ selected }) {
     if (!selected || !editor) return;
     try {
       setHtml(componentHtml(editor, selected));
-      setCss(componentCss(editor, selected));
+      const currentCss = componentCss(editor, selected);
+      setCss(currentCss);
+      setLoadedCss(currentCss);
       setParseError("");
     } catch { /* component may not expose code */ }
   }, [selected, editor, revision]);
@@ -295,7 +351,9 @@ function CodePanel({ selected }) {
       const parsed = editor.Parser.parseHtml(cleanHtml);
       const componentElement = parsed?.html;
       if (!componentElement) throw new Error(t("web.editor.codeParseError"));
-      selected.replaceWith(componentElement, { silent: false });
+      const replacements = selected.replaceWith(componentElement, { silent: false });
+      const replacement = Array.isArray(replacements) ? replacements[0] : replacements;
+      if (replacement) editor.select?.(replacement);
     } catch (error) {
       console.warn("CodePanel replaceWith failed", error);
       setParseError(t("web.editor.codeParseError"));
@@ -303,17 +361,18 @@ function CodePanel({ selected }) {
     }
     setParseError("");
     try {
-      editor.setStyle(css);
+      replaceComponentCss(editor, loadedCss, css);
     } catch { /* style parse error */ }
+    onApplied?.();
     setRevision((v) => v + 1);
-  }, [selected, editor, html, css, t]);
+  }, [selected, editor, html, css, loadedCss, onApplied, t]);
 
   return <div className="web-editor-code-panel">
-    <p className="text-muted small">{t("web.editor.codeHelp")}</p>
-    <label><span>{t("web.editor.html")}</span><textarea rows="8" value={html} onChange={(e) => setHtml(e.target.value)} spellCheck={false} /></label>
-    <label><span>{t("web.editor.css")}</span><textarea rows="8" value={css} onChange={(e) => setCss(e.target.value)} spellCheck={false} /></label>
+    <p>{t("web.editor.codeHelp")}</p>
+    <label><span>{t("web.editor.html")}</span><textarea className="is-html" rows="10" value={html} onChange={(e) => setHtml(e.target.value)} spellCheck={false} aria-invalid={Boolean(parseError)} /></label>
+    <label><span>{t("web.editor.css")}</span><textarea rows="7" value={css} onChange={(e) => setCss(e.target.value)} spellCheck={false} /></label>
     {parseError && <p className="web-editor-field-error" role="alert">{parseError}</p>}
-    <button type="button" className="btn btn-sm btn-primary w-100" onClick={apply} disabled={!html.trim()}>{t("web.editor.applyCode")}</button>
+    <div className="web-editor-code-actions"><button type="button" className="btn btn-sm btn-primary" onClick={apply} disabled={!html.trim()}>{t("web.editor.applyCode")}</button></div>
   </div>;
 }
-CodePanel.propTypes = { selected: PropTypes.object.isRequired };
+CodePanel.propTypes = { selected: PropTypes.object.isRequired, onApplied: PropTypes.func };

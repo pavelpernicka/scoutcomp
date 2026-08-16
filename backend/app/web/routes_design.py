@@ -2,11 +2,17 @@
 import re
 
 from .routes_common import *  # noqa: F403
+from ..models import WebPreviewArtifact
 
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload
-from .previews import project_preview_svg, build_preview as build_resource_preview
+from .previews import (
+    build_preview as build_resource_preview,
+    get_current_preview,
+    project_preview_svg,
+    stored_preview_path,
+)
 from .routes_content import _serialize_menus
 from .linked_resources import validate_linked_resource_instances
 from .resource_props import (
@@ -85,9 +91,13 @@ class DesignResourcePayload(BaseModel):
     part_kind: str | None = None
 
 
-def _design_out(item) -> dict:
+def _design_out(db: Session, item) -> dict:
     preview_media_id = getattr(item, "preview_media_id", None)
-    if preview_media_id:
+    kind = {WebReusableComponent: "components", WebSection: "sections"}.get(type(item), "components")
+    current_preview = get_current_preview(db, kind, item.id)
+    if current_preview:
+        preview_url = current_preview["url"]
+    elif preview_media_id:
         preview_url = f"/api/web/media/{preview_media_id}/file"
     else:
         # Derive a structural wireframe when the theme/package did not ship a
@@ -97,7 +107,6 @@ def _design_out(item) -> dict:
             getattr(item, "project_data", None),
             title=getattr(item, "name", "") or "",
         )
-    kind = {WebReusableComponent: "components", WebSection: "sections"}.get(type(item), "components")
     result = {
         "id": item.id, "qualified_key": item.qualified_key, "name": item.name,
         "description": item.description, "project_data": item.project_data,
@@ -111,7 +120,6 @@ def _design_out(item) -> dict:
         "published_variants": item.published_variants or [],
         "preview_media_id": preview_media_id,
         "preview_url": preview_url,
-        "preview_html_url": f"/api/web/design/{kind}/{item.id}/preview-html",
         "theme_version_id": item.theme_version_id, "is_locked": item.is_locked,
         "part_kind": getattr(item, "part_kind", None),
         "published_version": getattr(item, "published_version", None),
@@ -298,7 +306,7 @@ def list_design_resources(
     query = db.query(model)
     if theme_version_id is not None:
         query = query.filter(model.theme_version_id == theme_version_id)
-    return [_design_out(item) for item in query.order_by(model.name.asc()).all()]
+    return [_design_out(db, item) for item in query.order_by(model.name.asc()).all()]
 
 
 @router.post("/design/{kind}", status_code=201)
@@ -324,8 +332,15 @@ def create_design_resource(kind: str, payload: DesignResourcePayload, db: Sessio
         preview_media_id=payload.preview_media_id,
         draft_version=1, created_by_id=current_user.id,
     )
-    item = model(**values); db.add(item); db.commit(); db.refresh(item)
-    return _design_out(item)
+    item = model(**values)
+    db.add(item)
+    db.flush()
+    build_resource_preview(
+        db, kind, item.id, item.project_data or {}, item.css or "", title=item.name,
+    )
+    db.commit()
+    db.refresh(item)
+    return _design_out(db, item)
 
 
 @router.put("/design/{kind}/{resource_id}")
@@ -344,6 +359,8 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
     expected = payload.expected_version
     if expected != item.draft_version:
         raise HTTPException(409, "Resource was changed by another editor")
+    if payload.qualified_key != item.qualified_key:
+        raise HTTPException(409, "Resource qualified_key is immutable")
     compile_project(payload.project_data)
     try:
         validate_linked_resource_instances(db, payload.project_data, published=False)
@@ -352,11 +369,8 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
     _validate_custom_css(payload.css)
     _validate_preview_media(db, payload.preview_media_id)
     schema, defaults, variants = _normalise_resource_definition(payload)
-    conflict = db.query(model).filter(model.qualified_key == payload.qualified_key, model.id != resource_id).first()
-    if conflict:
-        raise HTTPException(409, "Resource key is already used")
     updated = db.query(model).filter(model.id == resource_id, model.draft_version == expected).update({
-        model.qualified_key: payload.qualified_key, model.name: payload.name.strip(),
+        model.name: payload.name.strip(),
         model.description: payload.description, model.project_data: payload.project_data,
         model.css: payload.css, model.prop_schema: schema,
         model.default_props: defaults, model.variants: variants,
@@ -365,8 +379,11 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
     }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Resource was changed by another editor")
+    build_resource_preview(
+        db, kind, resource_id, payload.project_data or {}, payload.css or "", title=payload.name.strip(),
+    )
     db.commit(); db.refresh(item)
-    return _design_out(item)
+    return _design_out(db, item)
 
 
 @router.post("/design/{kind}/{resource_id}/publish")
@@ -411,9 +428,12 @@ def publish_design_resource(
     if updated != 1:
         db.rollback()
         raise HTTPException(409, "Resource was changed by another editor")
+    build_resource_preview(
+        db, kind, item.id, item.project_data or {}, item.css or "", title=item.name,
+    )
     db.commit()
     db.refresh(item)
-    return _design_out(item)
+    return _design_out(db, item)
 
 
 @router.post("/design/{kind}/{resource_id}/clone", status_code=201)
@@ -469,9 +489,13 @@ def clone_design_resource(kind: str, resource_id: int, payload: DesignResourceCl
         created_by_id=current_user.id,
     )
     db.add(clone)
+    db.flush()
+    build_resource_preview(
+        db, kind, clone.id, clone.project_data or {}, clone.css or "", title=clone.name,
+    )
     db.commit()
     db.refresh(clone)
-    return _design_out(clone)
+    return _design_out(db, clone)
 
 
 @router.post("/design/{kind}/{resource_id}/materialize")
@@ -492,20 +516,19 @@ def materialize_design_resource(kind: str, resource_id: int, payload: Materializ
     if payload.expected_version != item.draft_version:
         raise HTTPException(409, "Resource was changed by another editor")
 
-    from .linked_resources import render_resource_fragment, resource_snapshot
+    from .linked_resources import render_resource_fragment, resource_has_runtime_bindings, resource_snapshot
     from .resource_props import ResourcePropsError
-    from .renderer import CompileError, compile_project, has_runtime_bindings
+    from .renderer import CompileError
 
     try:
         singular = kind.rstrip('s') if kind.endswith('s') else kind
         snapshot = resource_snapshot(db, singular, resource_id, published=False)
-        compiled = compile_project(snapshot.project_data)
     except CompileError as exc:
         raise HTTPException(422, str(exc)) from exc
     except ResourcePropsError as exc:
         raise HTTPException(422, str(exc)) from exc
 
-    if has_runtime_bindings(compiled.tree):
+    if resource_has_runtime_bindings(db, snapshot):
         raise HTTPException(422, "Resource contains runtime bindings and cannot be detached as HTML")
 
     try:
@@ -539,8 +562,52 @@ def regenerate_design_preview(kind: str, resource_id: int, db: Session = Depends
         db, kind, resource_id,
         getattr(item, "project_data", {}) or {},
         getattr(item, "css", "") or "",
+        title=getattr(item, "name", "") or "",
+        force=True,
     )
-    return _design_out(item)
+    db.commit()
+    return _design_out(db, item)
+
+
+@router.get("/preview-artifacts/{artifact_id}/file")
+def serve_preview_artifact(
+    artifact_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    artifact = db.query(WebPreviewArtifact).filter_by(id=artifact_id).one_or_none()
+    if not artifact:
+        raise HTTPException(404, "Preview artifact not found")
+    permission = {
+        "components": "web.design.manage",
+        "sections": "web.design.manage",
+        "templates": "web.templates.manage",
+    }.get(artifact.resource_kind)
+    if permission is None:
+        raise HTTPException(404, "Preview artifact not found")
+    _require_action(db, current_user, permission)
+
+    allowed_types = {
+        ("png", "image/png"): ".png",
+        ("svg", "image/svg+xml"): ".svg",
+    }
+    expected_suffix = allowed_types.get((artifact.format, artifact.mime))
+    if expected_suffix is None:
+        raise HTTPException(404, "Preview artifact file is invalid")
+    try:
+        path = stored_preview_path(artifact.storage_path)
+    except ValueError as exc:
+        raise HTTPException(404, "Preview artifact file is missing") from exc
+    if path.suffix.lower() != expected_suffix or not path.is_file():
+        raise HTTPException(404, "Preview artifact file is missing")
+    return FileResponse(
+        path,
+        media_type=artifact.mime,
+        headers={
+            "Content-Disposition": f'inline; filename="preview-{artifact.id}{expected_suffix}"',
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.delete("/design/{kind}/{resource_id}", status_code=204)

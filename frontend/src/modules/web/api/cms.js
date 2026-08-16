@@ -58,6 +58,7 @@ export const cmsApi = {
   updateTemplate: (id, payload) => api.put(`/web/templates/${id}`, payload).then(unwrap),
   publishTemplate: (id, expectedVersion) =>
     api.post(`/web/templates/${id}/publish`, { expected_version: expectedVersion }).then(unwrap),
+  regenerateTemplatePreview: (id) => api.post(`/web/templates/${id}/preview`).then(unwrap),
   deleteTemplate: (id) => api.delete(`/web/templates/${id}`).then(unwrap),
   listDesignResources: (kind, params) => api.get(`/web/design/${kind}`, { params }).then(unwrap),
   createDesignResource: (kind, payload) => api.post(`/web/design/${kind}`, payload).then(unwrap),

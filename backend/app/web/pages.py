@@ -1,15 +1,17 @@
 """Page draft, revision and publishing services."""
 from __future__ import annotations
 
+from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
+import json
+import re
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from unidecode import unidecode
-import re
 
 from ..models import WebPage, WebPageRevision, WebTemplate
 from .linked_resources import validate_linked_resource_instances
@@ -190,6 +192,15 @@ def _find_content_slot(node: dict[str, Any], depth: int = 0) -> dict[str, Any] |
     return None
 
 
+def _content_slots(node: dict[str, Any], depth: int = 0) -> list[dict[str, Any]]:
+    if not isinstance(node, dict) or depth > 40:
+        return []
+    found = [node] if node.get("type") == "sc-slot" and node.get("name") == "content" else []
+    for child in node.get("components", []):
+        found.extend(_content_slots(child, depth + 1))
+    return found
+
+
 def _project_root_component(project: dict[str, Any]) -> dict[str, Any] | None:
     pages = project.get("pages")
     if isinstance(pages, list) and pages:
@@ -199,6 +210,43 @@ def _project_root_component(project: dict[str, Any]) -> dict[str, Any] | None:
             return frames[0].get("component")
         return page.get("component")
     return project.get("component")
+
+
+def _project_styles(project: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(project, dict):
+        return []
+    pages = project.get("pages")
+    if isinstance(pages, list) and pages and isinstance(pages[0], dict):
+        frames = pages[0].get("frames")
+        if isinstance(frames, list) and frames and isinstance(frames[0], dict):
+            styles = frames[0].get("styles")
+            if isinstance(styles, list):
+                return deepcopy(styles)
+        styles = pages[0].get("styles")
+        if isinstance(styles, list):
+            return deepcopy(styles)
+    styles = project.get("styles")
+    return deepcopy(styles) if isinstance(styles, list) else []
+
+
+def _project_assets(project: dict[str, Any] | None) -> list[Any]:
+    assets = project.get("assets") if isinstance(project, dict) else None
+    return deepcopy(assets) if isinstance(assets, list) else []
+
+
+def _without_template_items(items: list[Any], template_items: list[Any]) -> list[Any]:
+    template_counts = Counter(
+        json.dumps(rule, sort_keys=True, default=str, separators=(",", ":"))
+        for rule in template_items
+    )
+    result = []
+    for rule in items:
+        marker = json.dumps(rule, sort_keys=True, default=str, separators=(",", ":"))
+        if template_counts[marker] > 0:
+            template_counts[marker] -= 1
+        else:
+            result.append(deepcopy(rule))
+    return result
 
 
 def _extract_page_content(project: dict[str, Any], template: dict[str, Any] | None) -> dict[str, Any]:
@@ -220,12 +268,16 @@ def _extract_page_content(project: dict[str, Any], template: dict[str, Any] | No
     root = _project_root_component(project)
     if not isinstance(root, dict):
         return deepcopy(project)
-    slot = _find_content_slot(root)
-    if slot is None:
-        return deepcopy(project)
+    slots = _content_slots(root)
+    if len(slots) != 1:
+        raise HTTPException(422, "Linked layout must contain exactly one content slot")
+    slot = slots[0]
 
     content = slot.get("components", [])
+    page_styles = _without_template_items(_project_styles(project), _project_styles(template))
+    page_assets = _without_template_items(_project_assets(project), _project_assets(template))
     return {
+        "assets": page_assets,
         "scoutcomp": {"schemaVersion": 2},
         "pages": [{
             "frames": [{
@@ -233,7 +285,7 @@ def _extract_page_content(project: dict[str, Any], template: dict[str, Any] | No
                     "type": "wrapper",
                     "components": deepcopy(content),
                 },
-                "styles": [],
+                "styles": page_styles,
             }],
         }],
     }
@@ -256,6 +308,22 @@ def save_draft(
         metadata.get("template_id", page.template_id),
         "linked_layout",
     )
+    # The submitted editor snapshot is composed with the template that was
+    # active when the editor loaded, not necessarily the newly selected one.
+    # Split against that current shell first; the next editor-data request will
+    # compose the stored page content with ``selected_template``.
+    editor_template = None
+    if "editor_template_id" in metadata:
+        editor_template = validate_template_usage(
+            db,
+            metadata.get("editor_template_id"),
+            "linked_layout",
+            label="Editor template",
+        )
+    elif page.template_id:
+        editor_template = db.query(WebTemplate).filter_by(id=page.template_id).one_or_none()
+    elif page.template:
+        editor_template = db.query(WebTemplate).filter_by(key=page.template).one_or_none()
     # Validate the whole project at the trust boundary even though dynamic data
     # is intentionally not resolved until preview/public rendering.
     compile_project(project)
@@ -297,17 +365,13 @@ def save_draft(
     page.template = metadata.get("template", page.template)
     if "template_id" in metadata:
         page.template_id = metadata.get("template_id")
+        page.template = selected_template.key if selected_template is not None else None
 
     # The editor sends the merged template+page project. Persist only the
     # page-owned content (slot children); otherwise the next editor load would
     # nest the template shell inside itself. When the page has no template the
     # project is stored verbatim.
-    template_project = None
-    if selected_template is not None:
-        template_project = selected_template.project_data
-    elif page.template:
-        template_row = db.query(WebTemplate).filter_by(key=page.template).one_or_none()
-        template_project = template_row.project_data if template_row else None
+    template_project = editor_template.project_data if editor_template is not None else None
     page.data = _extract_page_content(project, template_project)
     page.html = None
     page.meta_description = metadata.get("meta_description", page.meta_description)

@@ -115,6 +115,46 @@ class MaterializedResourceFragment:
     css: str
 
 
+def resource_has_runtime_bindings(
+    db: Session,
+    snapshot: LinkedResourceSnapshot,
+    *,
+    stack: tuple[tuple[str, str], ...] = (),
+) -> bool:
+    """Inspect a definition and every nested linked definition before detach.
+
+    A linked node has no local children in the compiled tree, so the renderer's
+    structural guard alone cannot see runtime bindings owned by its definition.
+    Detach must reject the entire transitive graph rather than materializing a
+    request-time value as permanent HTML.
+    """
+    from .renderer import compile_project, has_runtime_bindings
+
+    marker = (snapshot.kind, snapshot.key)
+    if marker in stack or len(stack) >= 12:
+        raise ResourcePropsError("Linked resource cycle is not allowed")
+    compiled = compile_project(snapshot.project_data)
+    if has_runtime_bindings(compiled.tree):
+        return True
+
+    nodes = [compiled.tree]
+    while nodes:
+        node = nodes.pop()
+        if not isinstance(node, dict):
+            continue
+        if str(node.get("type", "")).casefold() == "sc-resource-instance":
+            nested = resource_snapshot(
+                db,
+                node.get("resourceKind", node.get("resource_kind", "component")),
+                node.get("resourceId", node.get("resource_id")),
+                published=False,
+            )
+            if resource_has_runtime_bindings(db, nested, stack=(*stack, marker)):
+                return True
+        nodes.extend(node.get("components", []))
+    return False
+
+
 def render_resource_fragment(
     db: Session,
     snapshot: LinkedResourceSnapshot,

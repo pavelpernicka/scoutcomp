@@ -18,6 +18,7 @@ export default function EditorLeftPanel({
   selected,
   onOpenPage,
   onPageFormChange,
+  onEditTemplate,
   onRevisions,
   onInsert,
   onSelect,
@@ -55,6 +56,7 @@ export default function EditorLeftPanel({
           <option value="">{t("web.editor.noTemplate")}</option>
           {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
         </select></label>
+        {pageForm.template_id && <button type="button" className="btn btn-sm btn-outline-light w-100 mb-2" onClick={() => onEditTemplate(pageForm.template_id)}><i className="fas fa-pen me-2" />{t("web.props.editTemplate")}</button>}
         <label><span>{t("web.metaDescription")}</span><textarea rows="3" value={pageForm.meta_description} onChange={(event) => onPageFormChange({ meta_description: event.target.value })} /></label>
         <button type="button" className="btn btn-sm btn-outline-light w-100" onClick={onRevisions}><i className="fas fa-clock-rotate-left me-2" />{t("web.revisions")}</button>
       </div>
@@ -93,6 +95,7 @@ EditorLeftPanel.propTypes = {
   selected: PropTypes.object,
   onOpenPage: PropTypes.func.isRequired,
   onPageFormChange: PropTypes.func.isRequired,
+  onEditTemplate: PropTypes.func.isRequired,
   onRevisions: PropTypes.func.isRequired,
   onInsert: PropTypes.func.isRequired,
   onSelect: PropTypes.func.isRequired,

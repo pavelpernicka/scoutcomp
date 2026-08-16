@@ -6,32 +6,93 @@ renders a styled HTML fragment suitable for an iframe preview.
 from __future__ import annotations
 
 import hashlib
+import html as html_lib
 import json
 import logging
-from dataclasses import dataclass
+import os
+import uuid
 from pathlib import Path
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models import WebPreviewArtifact, WebMedia
+from ..config import settings
+from ..models import WebPreviewArtifact
 
 logger = logging.getLogger(__name__)
 
-PREVIEW_DATA_DIR = Path("data/previews")
+PREVIEW_DATA_DIR = Path(settings.app.web_media_dir).expanduser().resolve().parent / "previews"
 PREVIEW_VIEWPORT = "1280x720"
 PREVIEW_FORMAT = "png"
 MAX_RETRIES = 3
 
 
-def _source_hash(project_data: dict[str, Any] | None, css: str = "") -> str:
+def _source_hash(
+    project_data: dict[str, Any] | None,
+    css: str = "",
+    *,
+    base_css: str = "",
+    tokens: dict[str, Any] | None = None,
+    title: str = "",
+) -> str:
     """Deterministic hash of project data + CSS for cache validation."""
-    payload = json.dumps({"project": project_data, "css": css}, sort_keys=True, default=str)
+    payload = json.dumps(
+        {
+            "project": project_data,
+            "css": css,
+            "base_css": base_css,
+            "tokens": tokens or {},
+            "title": title,
+        },
+        sort_keys=True,
+        default=str,
+    )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _preview_storage_path(resource_kind: str, resource_id: int, hash_value: str) -> str:
-    return f"previews/{resource_kind}/{resource_id}/{hash_value}.png"
+def _preview_storage_path(
+    resource_kind: str,
+    resource_id: int,
+    hash_value: str,
+    extension: str,
+) -> str:
+    return f"{resource_kind}/{resource_id}/{hash_value}.{extension}"
+
+
+def stored_preview_path(storage_path: str, *, create_parent: bool = False) -> Path:
+    """Resolve an artifact path inside the dedicated preview storage root."""
+    relative = Path(storage_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("Preview artifact path escapes its storage root")
+    root = PREVIEW_DATA_DIR.expanduser().resolve()
+    candidate = (root / relative).resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError("Preview artifact path escapes its storage root")
+    if create_parent:
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+    return candidate
+
+
+def _persist_preview(storage_path: str, content: bytes) -> Path:
+    """Atomically persist preview bytes before exposing the DB artifact."""
+    path = stored_preview_path(storage_path, create_parent=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_bytes(content)
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path
+
+
+def _artifact_out(artifact: WebPreviewArtifact) -> dict[str, Any]:
+    return {
+        "url": f"/api/web/preview-artifacts/{artifact.id}/file",
+        "width": artifact.width,
+        "height": artifact.height,
+        "mime": artifact.mime,
+        "status": artifact.status,
+    }
 
 
 def get_current_preview(
@@ -52,35 +113,41 @@ def get_current_preview(
     artifact = query.order_by(WebPreviewArtifact.created_at.desc()).first()
     if artifact is None:
         return None
-    return {
-        "url": f"/api/web/preview-artifacts/{artifact.id}/file",
-        "width": artifact.width,
-        "height": artifact.height,
-        "mime": artifact.mime,
-        "status": artifact.status,
-    }
+    try:
+        path = stored_preview_path(artifact.storage_path)
+    except ValueError:
+        return None
+    if not path.is_file():
+        return None
+    return _artifact_out(artifact)
 
 
 def render_html_preview(
+    db: Session,
     project_data: dict[str, Any],
     css: str = "",
     *,
     base_css: str = "",
     tokens: dict[str, Any] | None = None,
+    title: str = "Preview",
 ) -> str:
     """Generate a self-contained HTML document suitable for iframe preview."""
     from .renderer import compile_project, render_document, render_project
 
     compiled = compile_project(project_data)
+    linked_css: list[str] = []
     body = render_project(
-        db=None,  # no DB for preview; linked resources render as empty
+        db=db,
         compiled_tree=compiled.tree,
+        css_layers=linked_css,
         published_resources=False,
     )
+    linked_css_text = "\n".join(linked_css)
     return render_document(
         body,
-        title="Preview",
-        css=f"{base_css}\n{css}\n{compiled.css}",
+        title=title,
+        css=f"{css}\n{compiled.css}\n{linked_css_text}",
+        base_css=base_css,
         tokens=tokens or {},
     )
 
@@ -94,83 +161,87 @@ def build_preview(
     *,
     base_css: str = "",
     tokens: dict[str, Any] | None = None,
+    title: str = "",
+    force: bool = False,
 ) -> dict[str, Any]:
-    """Build a new preview artifact synchronously (HTML-only; no Playwright yet).
+    """Build and persist a preview artifact synchronously.
 
-    Atomically marks old artifacts as stale, creates a new one, and returns
-    its metadata. Callers should handle the structural SVG fallback when this
-    returns None or the artifact has status=failed.
+    A browser-rendered PNG is preferred. When Playwright is unavailable, a
+    structural SVG is persisted instead, so every returned artifact URL is
+    physically servable. The caller owns the surrounding database transaction.
     """
-    target_hash = _source_hash(project_data, css)
+    target_hash = _source_hash(
+        project_data, css, base_css=base_css, tokens=tokens, title=title,
+    )
 
-    # Mark existing current as stale
+    # Cache lookup must happen before current artifacts are invalidated.
+    if not force:
+        existing = db.query(WebPreviewArtifact).filter(
+            WebPreviewArtifact.resource_kind == resource_kind,
+            WebPreviewArtifact.resource_id == resource_id,
+            WebPreviewArtifact.source_hash == target_hash,
+            WebPreviewArtifact.status == "current",
+        ).order_by(WebPreviewArtifact.created_at.desc()).first()
+        if existing is not None:
+            try:
+                existing_path = stored_preview_path(existing.storage_path)
+            except ValueError:
+                existing_path = None
+            if existing_path is not None and existing_path.is_file():
+                return _artifact_out(existing)
+
+    # Attempt real PNG screenshot via Playwright; fall back to SVG marker.
+    try:
+        preview_html = render_html_preview(
+            db, project_data, css, base_css=base_css, tokens=tokens, title=title or "Preview",
+        )
+        png_bytes = render_png_preview(preview_html)
+    except Exception as exc:  # noqa: BLE001 - structural SVG remains available
+        logger.warning("HTML preview rendering failed, using SVG fallback: %s", exc)
+        png_bytes = None
+    if png_bytes:
+        content = png_bytes
+        extension = "png"
+        mime = "image/png"
+        width, height = 1280, 720
+    else:
+        content = _project_preview_svg(project_data, title=title).encode("utf-8")
+        extension = "svg"
+        mime = "image/svg+xml"
+        width, height = 400, 300
+
+    storage_path = _preview_storage_path(resource_kind, resource_id, target_hash, extension)
+    _persist_preview(storage_path, content)
+
+    # Only invalidate the old pointer once a replacement file exists.
     db.query(WebPreviewArtifact).filter(
         WebPreviewArtifact.resource_kind == resource_kind,
         WebPreviewArtifact.resource_id == resource_id,
         WebPreviewArtifact.status == "current",
     ).update({"status": "stale"}, synchronize_session=False)
 
-    # Check if a current artifact with this hash already exists
-    existing = db.query(WebPreviewArtifact).filter(
-        WebPreviewArtifact.resource_kind == resource_kind,
-        WebPreviewArtifact.resource_id == resource_id,
-        WebPreviewArtifact.source_hash == target_hash,
-        WebPreviewArtifact.status == "current",
-    ).first()
-    if existing:
-        return {
-            "url": f"/api/web/preview-artifacts/{existing.id}/file",
-            "width": existing.width,
-            "height": existing.height,
-            "mime": existing.mime,
-            "status": "current",
-        }
-
-    # Attempt real PNG screenshot via Playwright; fall back to SVG marker.
-    html = render_html_preview(project_data, css, base_css=base_css, tokens=tokens)
-    png_bytes = render_png_preview(html)
-    mime = "image/png" if png_bytes else "image/svg+xml"
-    storage_path = _preview_storage_path(resource_kind, resource_id, target_hash)
-
-    if png_bytes:
-        path = Path(storage_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(png_bytes)
-
     artifact = WebPreviewArtifact(
         resource_kind=resource_kind,
         resource_id=resource_id,
         source_hash=target_hash,
         viewport=PREVIEW_VIEWPORT,
-        format=PREVIEW_FORMAT if png_bytes else "svg",
+        format=extension,
         storage_path=storage_path,
         mime=mime,
         status="current",
-        width=1280 if png_bytes else None,
-        height=720 if png_bytes else None,
+        width=width,
+        height=height,
     )
     db.add(artifact)
     db.flush()
 
-    return {
-        "url": f"/api/web/preview-artifacts/{artifact.id}/file",
-        "width": artifact.width,
-        "height": artifact.height,
-        "mime": artifact.mime,
-        "status": "current",
-    }
+    return _artifact_out(artifact)
 
 
-def project_preview_svg(project_data, *, title="", width=400, height=300):
-    """Structural SVG wireframe fallback for a single project/document.
-
-    Returns a data-URI SVG. This is a synchronous placeholder only; real
-    browser-rendered previews are produced by the preview artifact pipeline.
-    """
-    from urllib.parse import quote
-
-    label = (title or "Preview").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-    svg = (
+def _project_preview_svg(project_data, *, title="", width=400, height=300) -> str:
+    del project_data  # Reserved for a richer structural renderer.
+    label = html_lib.escape(title or "Preview")
+    return (
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
         f'width="{width}" height="{height}">'
         f'<rect width="100%" height="100%" fill="#f3f4f6"/>'
@@ -182,6 +253,17 @@ def project_preview_svg(project_data, *, title="", width=400, height=300):
         f'<rect x="208" y="208" width="176" height="64" rx="4" fill="#d1d5db"/>'
         f'</svg>'
     )
+
+
+def project_preview_svg(project_data, *, title="", width=400, height=300):
+    """Structural SVG wireframe fallback for a single project/document.
+
+    Returns a data-URI SVG. This is a synchronous placeholder only; real
+    browser-rendered previews are produced by the preview artifact pipeline.
+    """
+    from urllib.parse import quote
+
+    svg = _project_preview_svg(project_data, title=title, width=width, height=height)
     return "data:image/svg+xml;charset=utf-8," + quote(svg)
 
 

@@ -8,7 +8,7 @@ router = APIRouter(prefix="/web", tags=["web"])
 from .routes_pages import PublishPayload, _empty_project
 from .routes_design import _validate_custom_css
 from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
-from .previews import project_preview_svg
+from .previews import build_preview, get_current_preview, project_preview_svg
 # ---------------------------------------------------------------- components & templates
 
 
@@ -25,8 +25,11 @@ _DEFAULT_TEMPLATE_SVG = (
 )
 
 
-def _serialize_template(template: WebTemplate) -> dict:
-    if template.preview_media_id:
+def _serialize_template(db: Session, template: WebTemplate) -> dict:
+    current_preview = get_current_preview(db, "templates", template.id)
+    if current_preview:
+        preview_url = current_preview["url"]
+    elif template.preview_media_id:
         preview_url = f"/api/web/media/{template.preview_media_id}/file"
     else:
         # Derive a structural wireframe so every template has a preview even
@@ -330,7 +333,7 @@ def list_templates(db: Session = Depends(get_db), current_user: User = Depends(g
     _require_action(db, current_user, "web.templates.manage")
     seed_default_templates(db)
     templates = db.query(WebTemplate).order_by(WebTemplate.name.asc()).all()
-    return [_serialize_template(t) for t in templates]
+    return [_serialize_template(db, t) for t in templates]
 
 
 @router.get("/templates/{template_id}")
@@ -339,7 +342,7 @@ def get_template(template_id: int, db: Session = Depends(get_db), current_user: 
     template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
     if not template:
         raise HTTPException(404, "Template not found")
-    return _serialize_template(template)
+    return _serialize_template(db, template)
 
 
 @router.post("/templates", status_code=201)
@@ -375,9 +378,13 @@ def create_template(payload: TemplatePayload, db: Session = Depends(get_db), cur
         created_by_id=current_user.id,
     )
     db.add(template)
+    db.flush()
+    build_preview(
+        db, "templates", template.id, template.project_data or {}, template.css or "", title=template.name,
+    )
     db.commit()
     db.refresh(template)
-    return _serialize_template(template)
+    return _serialize_template(db, template)
 
 
 @router.put("/templates/{template_id}")
@@ -418,9 +425,12 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
     ).update(values, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Template was changed by another editor")
+    build_preview(
+        db, "templates", template_id, project, payload.css or "", title=payload.name.strip(),
+    )
     db.commit()
     db.refresh(template)
-    return _serialize_template(template)
+    return _serialize_template(db, template)
 
 
 @router.post("/templates/{template_id}/clone", status_code=201)
@@ -468,9 +478,13 @@ def clone_template(template_id: int, payload: TemplateClonePayload, db: Session 
         created_by_id=current_user.id,
     )
     db.add(clone)
+    db.flush()
+    build_preview(
+        db, "templates", clone.id, clone.project_data or {}, clone.css or "", title=clone.name,
+    )
     db.commit()
     db.refresh(clone)
-    return _serialize_template(clone)
+    return _serialize_template(db, clone)
 
 
 @router.post("/templates/{template_id}/publish")
@@ -498,8 +512,33 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
     }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Template was changed by another editor")
+    build_preview(
+        db, "templates", template.id,
+        template.project_data or _empty_project(), template.css or "", title=template.name,
+    )
     db.commit(); db.refresh(template)
-    return _serialize_template(template)
+    return _serialize_template(db, template)
+
+
+@router.post("/templates/{template_id}/preview")
+def regenerate_template_preview(
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    _require_action(db, current_user, "web.templates.manage")
+    template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
+    if not template:
+        raise HTTPException(404, "Template not found")
+    build_preview(
+        db, "templates", template.id,
+        template.project_data or template.published_project_data or _empty_project(),
+        template.css or template.published_css or "",
+        title=template.name,
+        force=True,
+    )
+    db.commit()
+    return _serialize_template(db, template)
 
 
 @router.delete("/templates/{template_id}", status_code=204)

@@ -34,6 +34,7 @@ export default function WebEditorPage() {
   const [canvasElement, setCanvasElement] = useState(null);
   const containerRef = useMemo(() => ({ current: canvasElement }), [canvasElement]);
   const pageRef = useRef(null);
+  const editorTemplateIdRef = useRef(null);
   const autosaveRef = useRef(null);
   const savedDirtyCountRef = useRef(undefined);
   const [mode, setMode] = useState("insert");
@@ -59,7 +60,13 @@ export default function WebEditorPage() {
   const page = pageQuery.data;
   pageRef.current = pageForm;
 
-  useEffect(() => { if (page) setPageForm({ title: page.title || "", path_segment: page.path_segment || page.slug || "", meta_description: page.meta_description || "", template_id: page.template_id || null }); }, [page]);
+  useEffect(() => {
+    if (!page) return;
+    const next = { title: page.title || "", path_segment: page.path_segment || page.slug || "", meta_description: page.meta_description || "", template_id: page.template_id || null };
+    pageRef.current = next;
+    editorTemplateIdRef.current = page.template_id || null;
+    setPageForm(next);
+  }, [page]);
 
   const activeThemeVersionId = canvasStylesQuery.data?.active_theme_version_id ?? null;
   const sections = filterCatalogResources(sectionsQuery.data, activeThemeVersionId);
@@ -87,7 +94,7 @@ export default function WebEditorPage() {
     blocks: EMPTY,
     translate: t,
     language: i18n.language,
-    loadKey: page?.id,
+    loadKey: page ? `${page.id}:${page.draft_version}:${page.template_id || "none"}` : undefined,
     canvasStyles: templateCSSQuery.data ? [...canvasStyles, { href: "", css: templateCSSQuery.data }] : canvasStyles,
     onDirtyChange: handleDirty,
     onSelectionChange: setSelected,
@@ -97,7 +104,7 @@ export default function WebEditorPage() {
   const getPayload = useCallback(() => {
     const snapshot = editor.getSnapshot();
     savedDirtyCountRef.current = snapshot?.dirtyCount;
-    return { project_data: snapshot?.projectData, draft_css: snapshot?.css || "", title: pageRef.current.title.trim(), path_segment: pageRef.current.path_segment, meta_description: pageRef.current.meta_description || null, template_id: pageRef.current.template_id };
+    return { project_data: snapshot?.projectData, draft_css: snapshot?.css || "", title: pageRef.current.title.trim(), path_segment: pageRef.current.path_segment, meta_description: pageRef.current.meta_description || null, template_id: pageRef.current.template_id, editor_template_id: editorTemplateIdRef.current };
   }, [editor]);
   const saveDraft = useCallback((payload) => cmsApi.saveDraft(pageId, payload).then((result) => {
     editor.markSaved(savedDirtyCountRef.current);
@@ -146,20 +153,30 @@ export default function WebEditorPage() {
   }, [autosave.hasPendingChanges]);
 
   const previewMutation = useMutation({
-    mutationFn: () => cmsApi.previewPage(pageId, { ...getPayload(), expected_version: autosave.version }),
+    mutationFn: async () => {
+      const savedVersion = await autosave.saveNow();
+      return cmsApi.previewPage(pageId, { ...getPayload(), expected_version: savedVersion });
+    },
     onMutate: () => { setPreview(""); setPreviewError(""); },
     onSuccess: (result) => setPreview(result.html || ""),
     onError: (error) => setPreviewError(error?.response?.data?.detail || t("web.errors.preview")),
   });
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const savedVersion = autosave.status === "saved" ? autosave.version : await autosave.saveNow();
-      return cmsApi.publishPage(pageId, savedVersion ?? autosave.version);
+      // Always persist a fresh GrapesJS snapshot. Some commands (notably raw
+      // code replacement and plugin actions) can bypass generic update events.
+      const savedVersion = await autosave.saveNow();
+      return cmsApi.publishPage(pageId, savedVersion);
     },
     onSuccess: () => { setPublishedNotice(t("web.editor.publishedNotice")); queryClient.invalidateQueries({ queryKey: ["web", "pages"] }); queryClient.invalidateQueries({ queryKey: ["web", "page", pageId] }); },
   });
 
-  const changeTitle = (title) => { setPageForm((current) => ({ ...current, title })); autosave.schedule(); };
+  const changeTitle = (title) => {
+    const next = { ...pageRef.current, title };
+    pageRef.current = next;
+    setPageForm(next);
+    autosave.schedule();
+  };
   const handleMediaSelect = useCallback(async (mediaItem) => {
     setMediaPickerOpen(false);
     const instance = editor.editorRef.current;
@@ -187,15 +204,35 @@ export default function WebEditorPage() {
       });
     }
   }, [editor.editorRef]);
-  const changePageForm = (patch) => { setPageForm((current) => ({ ...current, ...patch })); autosave.schedule(); };
+  const changePageForm = (patch) => {
+    const next = { ...pageRef.current, ...patch };
+    pageRef.current = next;
+    setPageForm(next);
+    autosave.schedule();
+    if (Object.prototype.hasOwnProperty.call(patch, "template_id")) {
+      // The current GrapesJS document still contains the old linked shell.
+      // Save its page-owned slot content first, then ask the backend for a
+      // freshly composed document using the newly selected template.
+      void autosaveRef.current?.saveNow()
+        .then(() => pageQuery.refetch())
+        .catch(() => {});
+    }
+  };
   const selectedComponent = selected ? editor.editorRef.current?.getSelected() : null;
   const selectComponent = (component) => editor.editorRef.current?.select(component);
   const duplicateSelected = () => { if (!selectedComponent) return; const clone = selectedComponent.clone(); selectedComponent.parent()?.append(clone, { at: selectedComponent.index() + 1 }); };
   const deleteSelected = () => selectedComponent?.remove?.();
-  const handleClone = useCallback(async (kind, definition) => {
+  const handleClone = useCallback(async (component, kind, definition) => {
     const apiKind = kind === "sections" ? "sections" : "components";
     try {
       const cloned = await cmsApi.cloneDesignResource(apiKind, definition.id);
+      component?.set?.({
+        resourceKind: apiKind === "sections" ? "section" : "component",
+        resourceId: cloned.qualified_key || String(cloned.id),
+        resourceName: cloned.name,
+        props: { ...(component.get?.("props") || cloned.default_props || {}) },
+      });
+      autosaveRef.current?.schedule();
       queryClient.invalidateQueries({ queryKey: ["web", "design", apiKind] });
       return cloned;
     } catch (error) {
@@ -203,6 +240,36 @@ export default function WebEditorPage() {
       return null;
     }
   }, [queryClient]);
+  const handleEditDefinition = useCallback(async (component, kind, definition) => {
+    const apiKind = kind === "sections" ? "sections" : "components";
+    let editable = definition;
+    if (definition.is_locked || definition.theme_version_id) {
+      editable = await handleClone(component, kind, definition);
+    }
+    if (!editable) return;
+    try { await autosaveRef.current?.saveNow(); } catch { return; }
+    navigate(`/admin/web/design/${apiKind}/${editable.id}/editor`);
+  }, [handleClone, navigate]);
+  const handleEditTemplate = useCallback(async (templateId) => {
+    const definition = templates.find((item) => String(item.id) === String(templateId));
+    if (!definition) return;
+    let editable = definition;
+    if (definition.theme_version_id || definition.is_system) {
+      try {
+        editable = await cmsApi.cloneTemplate(definition.id);
+        queryClient.invalidateQueries({ queryKey: ["web", "templates"] });
+        const next = { ...pageRef.current, template_id: editable.id };
+        pageRef.current = next;
+        setPageForm(next);
+        autosaveRef.current?.schedule();
+      } catch (error) {
+        console.error("template clone failed", error);
+        return;
+      }
+    }
+    try { await autosaveRef.current?.saveNow(); } catch { return; }
+    navigate(`/admin/web/design/templates/${editable.id}/editor`);
+  }, [navigate, queryClient, templates]);
   const handleDetach = useCallback(async (component, definition) => {
     if (!component || !editor.editorRef.current || !definition) return;
     const kind = component.get("resourceKind") === "section" ? "sections" : "components";
@@ -213,8 +280,10 @@ export default function WebEditorPage() {
         expected_version: definition.draft_version,
       });
       detachLinkedResource(component, materialized, definition);
+      autosaveRef.current?.schedule();
     } catch (error) {
       console.error("detach materialization failed", error);
+      throw error;
     }
   }, [editor.editorRef]);
   const insertCatalogItem = (catalog, item) => {
@@ -230,6 +299,10 @@ export default function WebEditorPage() {
     }
     navigate(destination);
   };
+  const closePreview = useCallback(() => {
+    setPreview(null);
+    setPreviewError("");
+  }, []);
 
   if (pageQuery.isLoading) return <div className="web-editor-loading"><LoadingSpinner /></div>;
   if (pageQuery.isError || !page) return <div className="web-editor-load-error"><h1>{t("web.errors.pageLoad")}</h1><button className="btn btn-primary" onClick={() => navigate("/admin/web/pages")}>{t("web.editor.back")}</button></div>;
@@ -242,13 +315,13 @@ export default function WebEditorPage() {
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
     <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={() => setInspectorOpen((current) => !current)} onMedia={() => setMediaPickerOpen(true)} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} />
-    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
+    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
-    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} />
+    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>
     <div className="visually-hidden" aria-live="polite">{publishedNotice || t(`web.editor.saveStates.${autosave.status}`)}</div>
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}
-    {(preview !== null || previewMutation.isPending || previewError) && <PreviewDialog html={preview || ""} loading={previewMutation.isPending} error={previewError} device={device} onClose={() => { setPreview(null); setPreviewError(""); }} />}
+    {(preview !== null || previewMutation.isPending || previewError) && <PreviewDialog html={preview || ""} loading={previewMutation.isPending} error={previewError} device={device} onClose={closePreview} />}
     {revisionsOpen && <RevisionsDialog pageId={pageId} onClose={() => setRevisionsOpen(false)} />}
     {mediaPickerOpen && <MediaPickerModal onSelect={handleMediaSelect} onClose={() => setMediaPickerOpen(false)} />}
   </div>;

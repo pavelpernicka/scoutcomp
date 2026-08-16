@@ -38,6 +38,12 @@ describe("CMS design resource API", () => {
     expect(http.post).toHaveBeenCalledWith("/web/templates/4/publish", { expected_version: 7 });
   });
 
+  it("regenerates template previews through the template contract", async () => {
+    await cmsApi.regenerateTemplatePreview(4);
+
+    expect(http.post).toHaveBeenCalledWith("/web/templates/4/preview");
+  });
+
   it("clones a template through the consolidated templates endpoint", async () => {
     await cmsApi.cloneTemplate(4, { name: "Homepage copy" });
 

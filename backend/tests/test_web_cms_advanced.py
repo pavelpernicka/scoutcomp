@@ -14,7 +14,7 @@ from app.models import (
 )
 from app.modules import registry
 from app.web.data_sources import DataSourceUnavailableError, list_data_sources, resolve_public_source
-from app.web.pages import publish_page, save_draft, validate_parent
+from app.web.pages import _extract_page_content, publish_page, save_draft, validate_parent
 from app.web.linked_resources import validate_linked_resource_instances
 from app.web.renderer import CompileError, compile_project, render_document, render_project
 from app.web.resource_props import ResourcePropsError
@@ -602,6 +602,36 @@ def test_materialize_rejects_context_bindings(db_session):
     compiled = compile_project(definition)
     assert has_runtime_bindings(compiled.tree)
 
+
+def test_materialize_rejects_runtime_bindings_in_nested_linked_definition(db_session):
+    from app.web.linked_resources import resource_has_runtime_bindings, resource_snapshot
+
+    nested = WebReusableComponent(
+        qualified_key="site:nested-runtime",
+        name="Nested runtime",
+        project_data=project({
+            "type": "sc-bind",
+            "binding": {"scope": "context", "field": "title"},
+        }),
+    )
+    db_session.add(nested)
+    db_session.flush()
+    parent = WebSection(
+        qualified_key="site:parent-static-looking",
+        name="Parent",
+        project_data=project({
+            "type": "sc-resource-instance",
+            "resourceKind": "component",
+            "resourceId": nested.qualified_key,
+            "props": {},
+        }),
+    )
+    db_session.add(parent)
+    db_session.commit()
+
+    snapshot = resource_snapshot(db_session, "section", parent.qualified_key, published=False)
+    assert resource_has_runtime_bindings(db_session, snapshot) is True
+
 def test_template_slot_composes_page_tree(db_session):
     template = compile_project(project(
         {"type": "text", "tagName": "header", "content": "Header"},
@@ -978,3 +1008,197 @@ def test_preview_merged_project_does_not_double_layout(db_session):
     assert "Header" in body
     assert "Page body" in body
     assert "Footer" in body
+
+
+def test_editor_data_marks_linked_layout_shell_but_not_page_content(db_session):
+    from app.web.routes_pages import _merged_editor_project
+
+    template_style = {"selectors": [{"name": "layout"}], "style": {"color": "navy"}}
+    page_style = {"selectors": [{"name": "page-card"}], "style": {"color": "red"}}
+    template_asset = {"src": "/theme-logo.png", "name": "Theme logo"}
+    page_asset = {"src": "/page-photo.png", "name": "Page photo"}
+
+    layout = WebTemplate(
+        key="locked-layout",
+        qualified_key="site:template:locked-layout",
+        name="Locked layout",
+        html="",
+        usage_mode="linked_layout",
+        project_data={**project(
+            {"type": "text", "tagName": "header", "content": "Header"},
+            {"type": "sc-slot", "name": "content", "components": []},
+            styles=[template_style],
+        ), "assets": [template_asset]},
+    )
+    page = WebPage(
+        slug="locked-layout-page",
+        path_segment="locked-layout-page",
+        path="/locked-layout-page",
+        title="Locked layout page",
+        data={**project(text("Editable page body"), styles=[page_style]), "assets": [page_asset]},
+        template_id=None,
+    )
+    db_session.add_all([layout, page])
+    db_session.flush()
+    page.template_id = layout.id
+    db_session.commit()
+
+    merged = _merged_editor_project(page, db_session)
+    root = merged["pages"][0]["frames"][0]["component"]
+    header, slot = root["components"]
+    page_body = slot["components"][0]
+
+    assert header["attributes"]["data-sc-template-owner"] == str(layout.id)
+    assert header["editable"] is False
+    assert slot["attributes"]["data-sc-template-owner"] == str(layout.id)
+    assert "data-sc-template-owner" not in page_body.get("attributes", {})
+    assert page_body.get("editable") is not False
+    assert root is not None
+    assert merged["pages"][0]["frames"][0]["styles"] == [template_style, page_style]
+    assert merged["assets"] == [template_asset, page_asset]
+
+    extracted = _extract_page_content(merged, layout.project_data)
+    assert extracted["pages"][0]["frames"][0]["styles"] == [page_style]
+    assert extracted["assets"] == [page_asset]
+
+
+@pytest.mark.parametrize(
+    "layout_components",
+    [
+        [text("Layout without a slot")],
+        [
+            {"type": "sc-slot", "name": "content", "components": []},
+            {"type": "sc-slot", "name": "content", "components": []},
+        ],
+    ],
+)
+def test_extract_page_content_requires_one_unambiguous_content_slot(layout_components):
+    layout = project(*layout_components)
+    with pytest.raises(HTTPException) as caught:
+        _extract_page_content(deepcopy(layout), layout)
+    assert caught.value.status_code == 422
+
+
+def test_linked_layout_save_reload_publish_preserves_page_css(db_session):
+    from app.web.routes_pages import _merged_editor_project
+
+    template_style = {"selectors": [{"name": "layout"}], "style": {"color": "navy"}}
+    page_style = {"selectors": [{"name": "page-card"}], "style": {"color": "red"}}
+    layout_project = project(
+        {"type": "text", "tagName": "header", "content": "Header"},
+        {"type": "sc-slot", "name": "content", "components": []},
+        styles=[template_style],
+    )
+    layout = WebTemplate(
+        key="roundtrip-layout",
+        qualified_key="site:template:roundtrip-layout",
+        name="Roundtrip layout",
+        html="",
+        usage_mode="linked_layout",
+        project_data=layout_project,
+        published_project_data=deepcopy(layout_project),
+        published_css=".layout{color:navy}",
+        published_version=1,
+    )
+    page = WebPage(
+        slug="roundtrip-page",
+        path_segment="roundtrip-page",
+        path="/roundtrip-page",
+        title="Roundtrip page",
+        data=project(text("Before")),
+        draft_version=1,
+    )
+    db_session.add_all([layout, page])
+    db_session.flush()
+    page.template_id = layout.id
+    db_session.commit()
+
+    merged = _merged_editor_project(page, db_session)
+    frame = merged["pages"][0]["frames"][0]
+    slot = frame["component"]["components"][1]
+    slot["components"] = [{
+        "type": "text",
+        "tagName": "p",
+        "classes": ["page-card"],
+        "content": "After",
+    }]
+    frame["styles"].append(page_style)
+
+    save_draft(
+        db_session,
+        page,
+        expected_version=1,
+        project=merged,
+        user_id=1,
+        metadata={"title": page.title, "slug": page.slug, "template_id": layout.id},
+    )
+    assert page.data["pages"][0]["frames"][0]["styles"] == [page_style]
+
+    reloaded = _merged_editor_project(page, db_session)
+    reloaded_frame = reloaded["pages"][0]["frames"][0]
+    assert reloaded_frame["styles"] == [template_style, page_style]
+    assert reloaded_frame["component"]["components"][1]["components"][0]["content"] == "After"
+
+    revision = publish_page(db_session, page, expected_version=2, user_id=1)
+    assert ".page-card{color:red}" in revision.compiled_css
+    assert "After" in render_project(db_session, revision.compiled_tree)
+
+
+def test_switching_linked_layout_splits_against_the_editor_shell(db_session):
+    from app.web.routes_pages import _merged_editor_project
+
+    first_project = project(
+        {"type": "text", "tagName": "header", "content": "First"},
+        {"type": "sc-slot", "name": "content", "components": []},
+    )
+    second_project = project(
+        {"type": "text", "tagName": "header", "content": "Second"},
+        {"type": "sc-slot", "name": "content", "components": []},
+    )
+    first = WebTemplate(
+        key="switch-first", qualified_key="site:template:switch-first",
+        name="First", html="", usage_mode="linked_layout", project_data=first_project,
+    )
+    second = WebTemplate(
+        key="switch-second", qualified_key="site:template:switch-second",
+        name="Second", html="", usage_mode="linked_layout", project_data=second_project,
+    )
+    page = WebPage(
+        slug="switch-layout", path_segment="switch-layout", path="/switch-layout",
+        title="Switch layout", data=project(text("Body")), draft_version=1,
+    )
+    db_session.add_all([first, second, page])
+    db_session.flush()
+    page.template_id = first.id
+    db_session.commit()
+
+    first_merged = _merged_editor_project(page, db_session)
+    save_draft(
+        db_session, page, expected_version=1, project=first_merged, user_id=1,
+        metadata={
+            "title": page.title,
+            "slug": page.slug,
+            "template_id": second.id,
+            "editor_template_id": first.id,
+        },
+    )
+    assert page.template_id == second.id
+    assert page.template == second.key
+    assert page.data["pages"][0]["frames"][0]["component"]["components"][0]["content"] == "Body"
+    second_merged = _merged_editor_project(page, db_session)
+    second_root = second_merged["pages"][0]["frames"][0]["component"]
+    assert second_root["components"][0]["content"] == "Second"
+    assert second_root["components"][1]["components"][0]["content"] == "Body"
+
+    save_draft(
+        db_session, page, expected_version=2, project=second_merged, user_id=1,
+        metadata={
+            "title": page.title,
+            "slug": page.slug,
+            "template_id": None,
+            "editor_template_id": second.id,
+        },
+    )
+    assert page.template_id is None
+    assert page.template is None
+    assert page.data["pages"][0]["frames"][0]["component"]["components"][0]["content"] == "Body"

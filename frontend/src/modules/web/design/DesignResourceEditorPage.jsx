@@ -9,6 +9,7 @@ import { useAuth } from "../../../providers/AuthProvider";
 import { cmsApi } from "../api/cms";
 import { filterCatalogResources, linkedResourceInstance } from "../editor/resourceBlocks";
 import useGrapesEditor from "../editor/useGrapesEditor";
+import MediaPreview from "../media/MediaPreview";
 import { getTemplateUsageMode, TEMPLATE_USAGE_MODES, templatePersistenceFields } from "../templateContracts";
 import ResourcePropSchemaEditor from "./ResourcePropSchemaEditor";
 import "../styles/editor.css";
@@ -120,6 +121,7 @@ export default function DesignResourceEditorPage({ kind }) {
           id: `sc-section-${section.id}`,
           label: section.name,
           category: t("web.editor.catalog.sections"),
+          attributes: { class: "web-resource-native-preview-block" },
           content: linkedResourceInstance(section, "section"),
         });
       });
@@ -131,6 +133,7 @@ export default function DesignResourceEditorPage({ kind }) {
           id: `sc-component-${component.id}`,
           label: component.name,
           category: t("web.editor.catalog.components"),
+          attributes: { class: "web-resource-native-preview-block" },
           content: linkedResourceInstance(component, "component"),
         });
       });
@@ -166,7 +169,7 @@ export default function DesignResourceEditorPage({ kind }) {
         name: current.name.trim(),
         description: current.description.trim() || null,
         project_data: snapshot.projectData,
-        css: snapshot.css || resource?.css || "",
+        css: snapshot.css ?? resource?.css ?? "",
         prop_schema: current.prop_schema || [],
         default_props: current.default_props || {},
         variants: current.variants || [],
@@ -215,9 +218,10 @@ export default function DesignResourceEditorPage({ kind }) {
 
   const publishMutation = useMutation({
     mutationFn: async () => {
-      const saved = status === "saved"
-        ? { version: versionRef.current, clean: true }
-        : await save();
+      // Always persist a fresh editor snapshot before publishing. GrapesJS
+      // commands and raw code edits are not guaranteed to emit the same event
+      // sequence as canvas interactions.
+      const saved = await save();
       if (!saved.clean) throw new Error(t("web.resourceEditor.saveBeforePublish"));
       return kind === "templates"
         ? cmsApi.publishTemplate(resourceId, saved.version)
@@ -233,7 +237,9 @@ export default function DesignResourceEditorPage({ kind }) {
   });
 
   const regeneratePreview = useMutation({
-    mutationFn: () => cmsApi.regenerateDesignPreview(endpointKind, resourceId),
+    mutationFn: () => kind === "templates"
+      ? cmsApi.regenerateTemplatePreview(resourceId)
+      : cmsApi.regenerateDesignPreview(endpointKind, resourceId),
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKey, (current) => Array.isArray(current)
         ? current.map((item) => item.id === resourceId ? updated : item)
@@ -277,10 +283,22 @@ export default function DesignResourceEditorPage({ kind }) {
 
     <aside className="web-resource-editor-left">
       <div className="web-editor-catalog-tabs"><button type="button" className={leftPanel === "insert" ? "active" : ""} onClick={() => setLeftPanel("insert")}>{t("web.editor.insert")}</button><button type="button" className={leftPanel === "layers" ? "active" : ""} onClick={() => setLeftPanel("layers")}>{t("web.editor.layers")}</button></div>
-      <div className={`web-editor-block-manager ${leftPanel === "insert" ? "" : "d-none"}`} />
+      <div className={leftPanel === "insert" ? "" : "d-none"}>
+        {(catalogSections.length > 0 || catalogComponents.length > 0) && <div className="web-resource-preview-catalog">
+          {catalogSections.map((section) => <button key={`section-${section.id}`} type="button" disabled={!editor.isReady} onClick={() => editor.addBlock(`sc-section-${section.id}`)}>
+            <span>{section.preview_url ? <MediaPreview src={section.preview_url} alt="" /> : <i className="fas fa-layer-group" />}</span>
+            <strong>{section.name}</strong>
+          </button>)}
+          {catalogComponents.map((component) => <button key={`component-${component.id}`} type="button" disabled={!editor.isReady} onClick={() => editor.addBlock(`sc-component-${component.id}`)}>
+            <span>{component.preview_url ? <MediaPreview src={component.preview_url} alt="" /> : <i className="fas fa-cube" />}</span>
+            <strong>{component.name}</strong>
+          </button>)}
+        </div>}
+        <div className="web-editor-block-manager" />
+      </div>
       <div className={`web-editor-layer-manager ${leftPanel === "layers" ? "" : "d-none"}`} />
       <div className="web-resource-fields">
-        <label><span>{t("web.resourceEditor.key")}</span><input value={form.qualified_key} disabled={readOnly} onChange={(event) => changeForm("qualified_key", event.target.value)} /></label>
+        <label><span>{t("web.resourceEditor.key")}</span><input value={form.qualified_key} disabled title={t("web.resourceEditor.keyImmutable")} /></label>
         <label><span>{t("web.resourceEditor.description")}</span><textarea rows="3" value={form.description} disabled={readOnly} onChange={(event) => changeForm("description", event.target.value)} /></label>
         
       </div>

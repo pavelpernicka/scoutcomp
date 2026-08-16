@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cloneResourceComponents, filterCatalogResources, getResourceComponent, insertLinkedResource, insertResource, linkedResourceInstance } from "./resourceBlocks";
+import { cloneResourceComponents, detachLinkedResource, filterCatalogResources, getResourceComponent, insertLinkedResource, insertResource, linkedResourceInstance } from "./resourceBlocks";
 
 describe("builder resource insertion", () => {
   it("reads the canonical Grapes frame component before legacy page.component", () => {
@@ -79,5 +79,34 @@ describe("builder resource insertion", () => {
 
     expect(filterCatalogResources(resources, 8).map((item) => item.id)).toEqual([1, 2]);
     expect(filterCatalogResources({ items: resources }, null).map((item) => item.id)).toEqual([1]);
+  });
+
+  it("explicitly detaches into local DOM, CSS, and provenance metadata", () => {
+    const set = vi.fn();
+    const addRules = vi.fn();
+    const component = {
+      em: { Editor: { Css: { addRules } } },
+      get: vi.fn((key) => ({
+        resourceKind: "component",
+        resourceId: "site:card",
+        resourceName: "Card",
+      })[key]),
+      replaceWith: vi.fn(() => [{ set }]),
+    };
+
+    const detached = detachLinkedResource(
+      component,
+      { html: '<article class="card">Local</article>', css: ".card{color:red}" },
+      { name: "Card" },
+    );
+
+    expect(component.replaceWith).toHaveBeenCalledWith('<article class="card">Local</article>');
+    expect(addRules).toHaveBeenCalledWith(".card{color:red}");
+    expect(set).toHaveBeenCalledWith("detachedFrom", expect.objectContaining({
+      resourceKind: "component",
+      resourceId: "site:card",
+      resourceName: "Card",
+    }));
+    expect(detached).toHaveLength(1);
   });
 });

@@ -1,18 +1,21 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import EditorInspector from "./EditorInspector";
+import EditorInspector, { replaceComponentCss } from "./EditorInspector";
 
 class FakeSelected {
   constructor(values) {
     this.values = values;
     this.listeners = new Map();
     this.cid = "linked-1";
+    this.em = values.editor ? { Editor: values.editor } : undefined;
+    this.parentNode = values.parent || null;
   }
 
   get(key) { return this.values[key]; }
-  getAttributes() { return {}; }
+  getAttributes() { return this.values.attributes || {}; }
   getClasses() { return []; }
+  parent() { return this.parentNode; }
   on(event, handler) {
     const handlers = this.listeners.get(event) || new Set();
     handlers.add(handler);
@@ -23,6 +26,7 @@ class FakeSelected {
     this.values[key] = value;
     this.listeners.get(`change:${key}`)?.forEach((handler) => handler());
   }
+  replaceWith(value) { return this.values.replaceWith?.(value) || []; }
 }
 
 describe("EditorInspector linked props", () => {
@@ -45,5 +49,78 @@ describe("EditorInspector linked props", () => {
     expect(screen.getByLabelText("Title")).toHaveValue("Current");
     act(() => selected.set("props", { title: "Restored by undo" }));
     expect(screen.getByLabelText("Title")).toHaveValue("Restored by undo");
+  });
+
+  it("keeps linked template shell read-only and routes editing to its definition", () => {
+    const onEditTemplate = vi.fn();
+    const selected = new FakeSelected({
+      type: "default",
+      attributes: { "data-sc-template-owner": "42" },
+    });
+    render(<EditorInspector
+      selected={selected}
+      dataSources={[]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+      onEditTemplate={onEditTemplate}
+    />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Upravit šablonu|Edit template/ }));
+    expect(onEditTemplate).toHaveBeenCalledWith(42);
+  });
+
+  it("applies raw component code through GrapesJS and reports a persistence change", () => {
+    const replacement = {};
+    const editor = {
+      getHtml: () => "<div>Old</div>",
+      getCss: () => ".old{color:red}",
+      Parser: {
+        parseHtml: vi.fn(() => ({ html: [{ type: "text", content: "New" }] })),
+        parseCss: vi.fn(() => []),
+      },
+      Css: { addRules: vi.fn() },
+      select: vi.fn(),
+    };
+    const replaceWith = vi.fn(() => [replacement]);
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "div", editor, replaceWith });
+    render(<EditorInspector
+      selected={selected}
+      dataSources={[]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+      onContentChange={onContentChange}
+    />);
+
+    fireEvent.click(screen.getAllByRole("tab")[3]);
+    const [htmlInput, cssInput] = screen.getAllByRole("textbox");
+    fireEvent.change(htmlInput, { target: { value: "<section>Changed</section>" } });
+    fireEvent.change(cssInput, { target: { value: ".changed{color:blue}" } });
+    fireEvent.click(screen.getByRole("button", { name: /Použít kód|Apply code/ }));
+
+    expect(replaceWith).toHaveBeenCalled();
+    expect(editor.Css.addRules).toHaveBeenCalledWith(".changed{color:blue}");
+    expect(editor.select).toHaveBeenCalledWith(replacement);
+    expect(onContentChange).toHaveBeenCalled();
+  });
+
+  it("removes component CSS rules when raw CSS is cleared", () => {
+    const oldRule = {
+      getSelectorsString: () => ".old",
+      get: (key) => ({ state: "", mediaText: "", atRuleType: "" })[key],
+    };
+    const remove = vi.fn();
+    const addRules = vi.fn();
+    const editor = {
+      Parser: { parseCss: vi.fn(() => [{ selectors: ["old"], style: { color: "red" } }]) },
+      Css: { getAll: () => ({ models: [oldRule] }), remove, addRules },
+    };
+
+    replaceComponentCss(editor, ".old{color:red}", "");
+
+    expect(remove).toHaveBeenCalledWith([oldRule]);
+    expect(addRules).not.toHaveBeenCalled();
   });
 });
