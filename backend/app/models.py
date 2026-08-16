@@ -4,6 +4,7 @@ from enum import Enum
 from sqlalchemy import (
     Boolean,
     Column,
+    Date,
     DateTime,
     Enum as SAEnum,
     Float,
@@ -92,6 +93,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     team_id = Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     first_login_at = Column(DateTime, nullable=True)  # Track first login for password change prompt
+    receive_messages = Column(Boolean, default=True, nullable=False)
+    avatar = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -148,6 +151,22 @@ class User(Base):
         back_populates="actor",
         foreign_keys="InventoryEventScan.actor_id",
     )
+    permission_groups = relationship(
+        "PermissionGroup",
+        secondary="user_permission_groups",
+        back_populates="members",
+    )
+    member_profile = relationship(
+        "MemberProfile",
+        back_populates="user",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
+    member_tags = relationship(
+        "MemberTag",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class Team(Base):
@@ -157,6 +176,7 @@ class Team(Base):
     name = Column(String(150), unique=True, nullable=False)
     join_code = Column(String(32), unique=True, nullable=False)
     description = Column(Text, nullable=True)
+    logo = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -641,6 +661,683 @@ class InventoryFlag(Base):
 
     team = relationship("Team", back_populates="inventory_flags")
     items = relationship("InventoryItem", back_populates="flag")
+
+
+class PermissionDefinition(Base):
+    __tablename__ = "permission_definitions"
+    __table_args__ = (
+        UniqueConstraint("module_code", "code", name="uq_permission_module_code"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    module_code = Column(String(80), nullable=False, index=True)
+    code = Column(String(100), nullable=False)
+    name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    default_for_member = Column(Boolean, nullable=False, default=False)
+    scopes = Column(JSON, nullable=True)
+
+
+class DirectUserPermission(Base):
+    __tablename__ = "direct_user_permissions"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    permission_id = Column(
+        Integer,
+        ForeignKey("permission_definitions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    permission = relationship("PermissionDefinition")
+
+
+class DirectUserPermissionDeny(Base):
+    __tablename__ = "direct_user_permission_denies"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    permission_id = Column(
+        Integer,
+        ForeignKey("permission_definitions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+
+    permission = relationship("PermissionDefinition")
+
+
+class PermissionGroup(Base):
+    __tablename__ = "permission_groups"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(120), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    is_system = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    grants = relationship(
+        "PermissionGroupPermission",
+        back_populates="group",
+        cascade="all, delete-orphan",
+    )
+    permissions = relationship(
+        "PermissionDefinition",
+        secondary="permission_group_permissions",
+        viewonly=True,
+    )
+    members = relationship(
+        "User",
+        secondary="user_permission_groups",
+        back_populates="permission_groups",
+    )
+
+
+class PermissionGroupPermission(Base):
+    __tablename__ = "permission_group_permissions"
+
+    group_id = Column(
+        Integer,
+        ForeignKey("permission_groups.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    permission_id = Column(
+        Integer,
+        ForeignKey("permission_definitions.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    scope = Column(String(32), nullable=False, default="any")
+
+    group = relationship("PermissionGroup", back_populates="grants")
+    permission = relationship("PermissionDefinition")
+
+
+class UserPermissionGroup(Base):
+    __tablename__ = "user_permission_groups"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    group_id = Column(Integer, ForeignKey("permission_groups.id", ondelete="CASCADE"), primary_key=True)
+
+
+class RegisteredModule(Base):
+    __tablename__ = "registered_modules"
+
+    id = Column(Integer, primary_key=True)
+    code = Column(String(80), nullable=False, unique=True, index=True)
+    name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    version = Column(String(32), nullable=False, default="1.0.0")
+    enabled = Column(Boolean, nullable=False, default=True)
+    settings = Column(JSON, nullable=False, default=dict)
+    installed = Column(Boolean, nullable=False, default=True)
+    dependencies = Column(JSON, nullable=False, default=list)
+    module_metadata = Column("metadata", JSON, nullable=False, default=dict)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class ScoutEvent(Base):
+    __tablename__ = "scout_events"
+
+    id = Column(Integer, primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True, index=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    kind = Column(String(30), nullable=False, default="meeting")
+    starts_at = Column(DateTime, nullable=False)
+    ends_at = Column(DateTime, nullable=True)
+    location = Column(String(200), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    color = Column(String(16), nullable=True)
+    audience = Column(String(20), nullable=False, default="members")
+    requires_planned = Column(Boolean, nullable=False, default=False)
+    planned_deadline = Column(DateTime, nullable=True)
+    is_public = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    team = relationship("Team")
+    attendances = relationship(
+        "ScoutAttendance",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )
+
+
+class ScoutAttendance(Base):
+    __tablename__ = "scout_attendances"
+
+    id = Column(Integer, primary_key=True)
+    event_id = Column(Integer, ForeignKey("scout_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    mode = Column(String(20), nullable=False, default="real")
+    status = Column(String(20), nullable=False, default="present")
+    note = Column(Text, nullable=True)
+    marked_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    marked_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "user_id", "mode", name="uq_scout_event_user"),
+    )
+
+    event = relationship("ScoutEvent", back_populates="attendances")
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(150), nullable=True)
+    body = Column(Text, nullable=False)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    team = relationship("Team")
+    creator = relationship("User", foreign_keys=[created_by_id])
+
+
+
+class DirectMessage(Base):
+    __tablename__ = "direct_messages"
+
+    id = Column(Integer, primary_key=True)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    recipient_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    body = Column(Text, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    sender = relationship("User", foreign_keys=[sender_id])
+    recipient = relationship("User", foreign_keys=[recipient_id])
+
+
+class MemberStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    ALUMNI = "alumni"
+
+
+class MemberGender(str, Enum):
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
+class MemberRelationshipType(str, Enum):
+    PARENT = "parent"
+    GUARDIAN = "guardian"
+    SIBLING = "sibling"
+    OTHER = "other"
+
+
+class MemberTag(Base):
+    __tablename__ = "member_tags"
+    __table_args__ = (
+        UniqueConstraint("user_id", "tag", name="uq_member_tag"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    tag = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="member_tags")
+
+
+class MemberProfile(Base):
+    __tablename__ = "member_profiles"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    phone = Column(String(32), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    gender = Column(SAEnum(MemberGender), nullable=True)
+    address = Column(String(255), nullable=True)
+    city = Column(String(120), nullable=True)
+    zip = Column(String(16), nullable=True)
+    parent_name = Column(String(150), nullable=True)
+    parent_phone = Column(String(32), nullable=True)
+    parent_email = Column(String(255), nullable=True)
+    emergency_name = Column(String(150), nullable=True)
+    emergency_phone = Column(String(32), nullable=True)
+    joined_at = Column(Date, nullable=True)
+    member_status = Column(SAEnum(MemberStatus), nullable=False, default=MemberStatus.ACTIVE)
+    medical_note = Column(Text, nullable=True)
+    uniform_size = Column(String(32), nullable=True)
+    scout_number = Column(String(32), nullable=True)
+    data_consent_at = Column(Date, nullable=True)
+    photo_consent_at = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="member_profile")
+
+
+class MemberRelationship(Base):
+    __tablename__ = "member_relationships"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    related_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(SAEnum(MemberRelationshipType), nullable=False, default=MemberRelationshipType.OTHER)
+    note = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    related_user = relationship("User", foreign_keys=[related_user_id])
+
+
+class MemberNote(Base):
+    __tablename__ = "member_notes"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    author_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    author = relationship("User", foreign_keys=[author_id])
+
+
+class WebPage(Base):
+    __tablename__ = "web_pages"
+
+    id = Column(Integer, primary_key=True)
+    slug = Column(String(200), nullable=False, unique=True, index=True)
+    path_segment = Column(String(200), nullable=True)
+    path = Column(String(500), nullable=True, unique=True, index=True)
+    title = Column(String(200), nullable=False)
+    template = Column(String(50), nullable=True)
+    template_id = Column(Integer, ForeignKey("web_templates.id", ondelete="SET NULL"), nullable=True, index=True)
+    source_template_id = Column(Integer, ForeignKey("web_templates.id", ondelete="SET NULL"), nullable=True, index=True)
+    source_template_version = Column(Integer, nullable=True)
+    data = Column(JSON, nullable=True)
+    html = Column(Text, nullable=True)
+    published = Column(Boolean, nullable=False, default=False)
+    draft_version = Column(Integer, nullable=False, default=1)
+    published_revision_id = Column(
+        Integer, ForeignKey("web_page_revisions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    position = Column(Integer, nullable=False, default=0)
+    parent_id = Column(Integer, ForeignKey("web_pages.id", ondelete="SET NULL"), nullable=True, index=True)
+    meta_description = Column(String(300), nullable=True)
+    seo_title = Column(String(200), nullable=True)
+    canonical_url = Column(String(500), nullable=True)
+    og_image_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    noindex = Column(Boolean, nullable=False, default=False)
+    sitemap_include = Column(Boolean, nullable=False, default=True)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class WebPageRevision(Base):
+    __tablename__ = "web_page_revisions"
+    __table_args__ = (
+        UniqueConstraint("page_id", "revision_number", name="uq_web_page_revision_number"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    page_id = Column(Integer, ForeignKey("web_pages.id", ondelete="CASCADE"), nullable=False, index=True)
+    html = Column(Text, nullable=True)
+    data = Column(JSON, nullable=True)
+    revision_number = Column(Integer, nullable=True)
+    source_version = Column(Integer, nullable=False, default=1)
+    title = Column(String(200), nullable=True)
+    path_segment = Column(String(200), nullable=True)
+    path = Column(String(500), nullable=True)
+    template_key = Column(String(100), nullable=True)
+    template_id = Column(Integer, ForeignKey("web_templates.id", ondelete="SET NULL"), nullable=True)
+    compiled_tree = Column(JSON, nullable=True)
+    compiled_css = Column(Text, nullable=True)
+    reason = Column(String(32), nullable=True)
+    is_publication = Column(Boolean, nullable=False, default=False)
+    seo_title = Column(String(200), nullable=True)
+    meta_description = Column(String(300), nullable=True)
+    canonical_url = Column(String(500), nullable=True)
+    og_image_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    noindex = Column(Boolean, nullable=False, default=False)
+    sitemap_include = Column(Boolean, nullable=False, default=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class WebPost(Base):
+    __tablename__ = "web_posts"
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    slug = Column(String(200), nullable=False, unique=True, index=True)
+    excerpt = Column(String(500), nullable=True)
+    body = Column(Text, nullable=True)
+    cover_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    published = Column(Boolean, nullable=False, default=False)
+    draft_version = Column(Integer, nullable=False, default=1)
+    published_revision_id = Column(
+        Integer, ForeignKey("web_post_revisions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    published_at = Column(DateTime, nullable=True)
+    deleted_at = Column(DateTime, nullable=True, index=True)
+    seo_title = Column(String(200), nullable=True)
+    meta_description = Column(String(300), nullable=True)
+    canonical_url = Column(String(500), nullable=True)
+    og_image_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    noindex = Column(Boolean, nullable=False, default=False)
+    sitemap_include = Column(Boolean, nullable=False, default=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    cover = relationship("WebMedia", foreign_keys=[cover_media_id])
+
+
+class WebPostRevision(Base):
+    __tablename__ = "web_post_revisions"
+    __table_args__ = (
+        UniqueConstraint("post_id", "revision_number", name="uq_web_post_revision_number"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    post_id = Column(Integer, ForeignKey("web_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    title = Column(String(200), nullable=True)
+    slug = Column(String(200), nullable=True)
+    excerpt = Column(String(500), nullable=True)
+    body = Column(Text, nullable=True)
+    cover_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    compiled_html = Column(Text, nullable=True)
+    revision_number = Column(Integer, nullable=True)
+    source_version = Column(Integer, nullable=False, default=1)
+    reason = Column(String(32), nullable=True)
+    is_publication = Column(Boolean, nullable=False, default=False)
+    seo_title = Column(String(200), nullable=True)
+    meta_description = Column(String(300), nullable=True)
+    canonical_url = Column(String(500), nullable=True)
+    og_image_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    noindex = Column(Boolean, nullable=False, default=False)
+    sitemap_include = Column(Boolean, nullable=False, default=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    created_by = relationship("User", foreign_keys=[created_by_id])
+
+
+class WebMenu(Base):
+    __tablename__ = "web_menus"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    location = Column(String(50), nullable=False)
+    draft_version = Column(Integer, nullable=False, default=1)
+    published_revision_id = Column(Integer, ForeignKey("web_menu_revisions.id", ondelete="SET NULL"), nullable=True, index=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebMenuItem(Base):
+    __tablename__ = "web_menu_items"
+
+    id = Column(Integer, primary_key=True)
+    menu_id = Column(Integer, ForeignKey("web_menus.id", ondelete="CASCADE"), nullable=False, index=True)
+    label = Column(String(100), nullable=False)
+    page_slug = Column(String(200), nullable=True)
+    url = Column(String(500), nullable=True)
+    parent_id = Column(Integer, ForeignKey("web_menu_items.id", ondelete="CASCADE"), nullable=True, index=True)
+    position = Column(Integer, nullable=False, default=0)
+    item_type = Column(String(32), nullable=False, default="external")
+    page_id = Column(Integer, ForeignKey("web_pages.id", ondelete="SET NULL"), nullable=True)
+    post_id = Column(Integer, ForeignKey("web_posts.id", ondelete="SET NULL"), nullable=True)
+    target = Column(String(32), nullable=True)
+    rel = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebMenuRevision(Base):
+    __tablename__ = "web_menu_revisions"
+    __table_args__ = (
+        UniqueConstraint("menu_id", "revision_number", name="uq_web_menu_revision_number"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    menu_id = Column(Integer, ForeignKey("web_menus.id", ondelete="CASCADE"), nullable=False, index=True)
+    revision_number = Column(Integer, nullable=False)
+    source_version = Column(Integer, nullable=False, default=1)
+    tree = Column(JSON, nullable=False, default=list)
+    reason = Column(String(32), nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebTheme(Base):
+    __tablename__ = "web_themes"
+
+    id = Column(Integer, primary_key=True)
+    stable_key = Column(String(120), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False)
+    author = Column(String(200), nullable=True)
+    description = Column(Text, nullable=True)
+    license = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebThemeVersion(Base):
+    __tablename__ = "web_theme_versions"
+    __table_args__ = (
+        UniqueConstraint("theme_id", "version", name="uq_web_theme_version"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    theme_id = Column(Integer, ForeignKey("web_themes.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(String(50), nullable=False)
+    schema_version = Column(Integer, nullable=False)
+    manifest = Column(JSON, nullable=False, default=dict)
+    default_tokens = Column(JSON, nullable=True)
+    base_css = Column(Text, nullable=False, default="")
+    package_hash = Column(String(64), nullable=False, unique=True)
+    install_path = Column(String(500), nullable=False)
+    installed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    installed_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebThemeAsset(Base):
+    __tablename__ = "web_theme_assets"
+    __table_args__ = (
+        UniqueConstraint("theme_version_id", "relative_path", name="uq_web_theme_asset_path"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    theme_version_id = Column(Integer, ForeignKey("web_theme_versions.id", ondelete="CASCADE"), nullable=False, index=True)
+    relative_path = Column(String(500), nullable=False)
+    mime = Column(String(100), nullable=False)
+    size = Column(Integer, nullable=False)
+    sha256 = Column(String(64), nullable=False)
+
+
+class WebSiteStyle(Base):
+    __tablename__ = "web_site_styles"
+
+    id = Column(Integer, primary_key=True, default=1)
+    active_theme_version_id = Column(
+        Integer, ForeignKey("web_theme_versions.id", ondelete="RESTRICT"), nullable=True
+    )
+    draft_tokens = Column(JSON, nullable=False, default=dict)
+    draft_css = Column(Text, nullable=False, default="")
+    draft_version = Column(Integer, nullable=False, default=1)
+    published_tokens = Column(JSON, nullable=False, default=dict)
+    published_css = Column(Text, nullable=False, default="")
+    published_version = Column(Integer, nullable=False, default=1)
+    updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebTemplate(Base):
+    __tablename__ = "web_templates"
+
+    id = Column(Integer, primary_key=True)
+    key = Column(String(50), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(String(500), nullable=True)
+    html = Column(Text, nullable=False)
+    css = Column(Text, nullable=False, default="")
+    qualified_key = Column(String(240), nullable=True, unique=True, index=True)
+    template_kind = Column(String(32), nullable=False, default="layout", server_default="page")
+    usage_mode = Column(String(20), nullable=False, default="linked_layout", server_default="linked_layout")
+    project_data = Column(JSON, nullable=True)
+    draft_version = Column(Integer, nullable=False, default=1, server_default="1")
+    published_project_data = Column(JSON, nullable=True)
+    published_css = Column(Text, nullable=False, default="", server_default="")
+    published_version = Column(Integer, nullable=False, default=0, server_default="0")
+    theme_version_id = Column(Integer, ForeignKey("web_theme_versions.id", ondelete="RESTRICT"), nullable=True)
+    preview_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    forked_from_id = Column(Integer, ForeignKey("web_templates.id", ondelete="SET NULL"), nullable=True)
+    is_system = Column(Boolean, nullable=False, default=False)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebReusableComponent(Base):
+    __tablename__ = "web_reusable_components"
+
+    id = Column(Integer, primary_key=True)
+    qualified_key = Column(String(240), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    project_data = Column(JSON, nullable=False)
+    css = Column(Text, nullable=False, default="")
+    prop_schema = Column(JSON, nullable=False, default=list)
+    default_props = Column(JSON, nullable=False, default=dict)
+    variants = Column(JSON, nullable=False, default=list)
+    published_project_data = Column(JSON, nullable=True)
+    published_css = Column(Text, nullable=False, default="")
+    published_prop_schema = Column(JSON, nullable=False, default=list)
+    published_default_props = Column(JSON, nullable=False, default=dict)
+    published_variants = Column(JSON, nullable=False, default=list)
+    published_version = Column(Integer, nullable=False, default=0)
+    theme_version_id = Column(Integer, ForeignKey("web_theme_versions.id", ondelete="RESTRICT"), nullable=True)
+    preview_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    origin_resource_id = Column(Integer, ForeignKey("web_reusable_components.id", ondelete="SET NULL"), nullable=True)
+    draft_version = Column(Integer, nullable=False, default=1)
+    is_locked = Column(Boolean, nullable=False, default=False)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebSection(Base):
+    __tablename__ = "web_sections"
+
+    id = Column(Integer, primary_key=True)
+    qualified_key = Column(String(240), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    project_data = Column(JSON, nullable=False)
+    css = Column(Text, nullable=False, default="")
+    prop_schema = Column(JSON, nullable=False, default=list)
+    default_props = Column(JSON, nullable=False, default=dict)
+    variants = Column(JSON, nullable=False, default=list)
+    published_project_data = Column(JSON, nullable=True)
+    published_css = Column(Text, nullable=False, default="")
+    published_prop_schema = Column(JSON, nullable=False, default=list)
+    published_default_props = Column(JSON, nullable=False, default=dict)
+    published_variants = Column(JSON, nullable=False, default=list)
+    published_version = Column(Integer, nullable=False, default=0)
+    theme_version_id = Column(Integer, ForeignKey("web_theme_versions.id", ondelete="RESTRICT"), nullable=True)
+    preview_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    origin_resource_id = Column(Integer, ForeignKey("web_sections.id", ondelete="SET NULL"), nullable=True)
+    draft_version = Column(Integer, nullable=False, default=1)
+    is_locked = Column(Boolean, nullable=False, default=False)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebPattern(Base):
+    __tablename__ = "web_patterns"
+
+    id = Column(Integer, primary_key=True)
+    qualified_key = Column(String(240), nullable=False, unique=True, index=True)
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    project_data = Column(JSON, nullable=False)
+    css = Column(Text, nullable=False, default="")
+    theme_version_id = Column(Integer, ForeignKey("web_theme_versions.id", ondelete="RESTRICT"), nullable=True)
+    preview_media_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
+    origin_resource_id = Column(Integer, ForeignKey("web_patterns.id", ondelete="SET NULL"), nullable=True)
+    draft_version = Column(Integer, nullable=False, default=1)
+    is_locked = Column(Boolean, nullable=False, default=False)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebRedirect(Base):
+    __tablename__ = "web_redirects"
+
+    id = Column(Integer, primary_key=True)
+    from_path = Column(String(500), nullable=False, unique=True, index=True)
+    target_page_id = Column(Integer, ForeignKey("web_pages.id", ondelete="CASCADE"), nullable=False, index=True)
+    status_code = Column(Integer, nullable=False, default=301)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebMediaFolder(Base):
+    __tablename__ = "web_media_folders"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(200), nullable=False)
+    parent_id = Column(Integer, ForeignKey("web_media_folders.id", ondelete="CASCADE"), nullable=True, index=True)
+    created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebMedia(Base):
+    __tablename__ = "web_media"
+
+    id = Column(Integer, primary_key=True)
+    filename = Column(String(255), nullable=False)
+    path = Column(String(500), nullable=False)
+    mime = Column(String(100), nullable=True)
+    size = Column(Integer, nullable=False, default=0)
+    album = Column(String(100), nullable=True, index=True)
+    folder_id = Column(Integer, ForeignKey("web_media_folders.id", ondelete="SET NULL"), nullable=True, index=True)
+    alt = Column(String(300), nullable=True)
+    caption = Column(String(500), nullable=True)
+    is_public = Column(Boolean, nullable=False, default=False, index=True)
+    note = Column(String(1000), nullable=True)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+
+class WebPreviewArtifact(Base):
+    __tablename__ = "web_preview_artifacts"
+
+    id = Column(Integer, primary_key=True)
+    resource_kind = Column(String(32), nullable=False)
+    resource_id = Column(Integer, nullable=False)
+    source_hash = Column(String(64), nullable=False, index=True)
+    viewport = Column(String(20), nullable=False, default="1280x720")
+    format = Column(String(10), nullable=False, default="png")
+    storage_path = Column(String(500), nullable=False)
+    mime = Column(String(50), nullable=False, default="image/png")
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    status = Column(String(16), nullable=False, default="building", index=True)
+    error = Column(Text, nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_web_preview_artifact_resource", "resource_kind", "resource_id"),
+    )
 
 
 class Config(Base):

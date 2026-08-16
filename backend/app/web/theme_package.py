@@ -89,7 +89,11 @@ _DESIGN_KINDS = {
     "sections": WebSection,
     "patterns": WebPattern,
 }
-_RESOURCE_ALIASES = {"template_parts": "sections", "parts": "sections"}
+_RESOURCE_ALIASES = {
+    "template_parts": "sections",
+    "parts": "sections",
+    "page-templates": "templates",
+}
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif"}
 _ALLOWED_PREFIX_EXTENSIONS = {
@@ -116,7 +120,7 @@ _MANIFEST_KEYS = {
 }
 _CONFIG_TYPES = {"text", "color", "number", "select"}
 _THEME_KEYS = {"schema_version", "package_schema_version", "tokens", "default_tokens", "styles"}
-_RESOURCE_ENTRY_KEYS = {"id", "file", "name", "description", "kind", "css"}
+_RESOURCE_ENTRY_KEYS = {"id", "file", "name", "description", "kind", "css", "usage_mode"}
 
 
 class ThemePackageError(ValueError):
@@ -356,6 +360,8 @@ def _resource_entries(manifest: dict[str, Any]) -> dict[str, list[dict[str, Any]
             entry = {"file": value} if isinstance(value, str) else dict(value) if isinstance(value, dict) else None
             if entry is None or not isinstance(entry.get("file"), str):
                 _fail(f"Invalid {kind} resource entry")
+            if original_kind == "page-templates":
+                entry.setdefault("usage_mode", "copy_on_create")
             if set(entry) - _RESOURCE_ENTRY_KEYS:
                 _fail(f"{kind} resource entry contains unknown fields")
             path = _normalise_member_name(entry["file"])
@@ -442,6 +448,11 @@ def _resource_payload(entry: dict[str, Any], content: bytes, kind: str, archive_
             _fail(f"{entry['file']} references a missing CSS file")
     if not isinstance(css, str):
         _fail(f"{entry['file']} CSS must be a string")
+    usage_mode = "linked_layout"
+    if kind == "templates":
+        usage_mode = entry.get("usage_mode", document.get("usage_mode", "linked_layout"))
+        if usage_mode not in {"linked_layout", "copy_on_create"}:
+            _fail(f"{entry['file']} has an invalid template usage mode")
     prop_schema: list[dict[str, Any]] = []
     default_props: dict[str, Any] = {}
     variants: list[dict[str, Any]] = []
@@ -461,6 +472,7 @@ def _resource_payload(entry: dict[str, Any], content: bytes, kind: str, archive_
         "prop_schema": prop_schema,
         "default_props": default_props,
         "variants": variants,
+        "usage_mode": usage_mode,
     }
 
 
@@ -493,7 +505,7 @@ def _namespace_linked_resources(value: Any, qualified_resources: dict[str, dict[
     if component_type in {"sc-template-part", "sc-global-part"}:
         resource_map = qualified_resources.get("section", {})
     elif component_type == "sc-resource-instance":
-        resource_kind = str(result.get("resourceKind", result.get("resource_kind", ""))).casefold()
+        resource_kind = str(result.get("resourceKind", result.get("resource_kind", "component"))).casefold()
         resource_map = qualified_resources.get(resource_kind, {})
     if isinstance(resource_id, str) and resource_id in resource_map:
         if "resourceId" in result:
@@ -789,6 +801,7 @@ def install_theme(
                         qualified_key=qualified,
                         html="",
                         template_kind=entry.get("kind", "layout"),
+                        usage_mode=payload["usage_mode"],
                         published_project_data=namespaced_project,
                         published_css=payload["css"],
                         published_version=1,
@@ -1198,7 +1211,8 @@ def export_theme_archive(db: Session, theme_version_id: int) -> bytes:
                     f"templates/{key}.json",
                     json.dumps({
                         "name": tpl.name,
-                        "kind": "layout",
+                        "kind": tpl.template_kind or "layout",
+                        "usage_mode": tpl.usage_mode or "linked_layout",
                         "project_data": tpl.published_project_data or tpl.project_data or {},
                         "css": tpl.published_css or tpl.css or "",
                     }, indent=2, ensure_ascii=False),
@@ -1276,7 +1290,8 @@ def duplicate_theme(db: Session, theme_version_id: int, *, new_name: str, instal
                 html="",
                 css=project_data.get("css", ""),
                 qualified_key=key,
-                template_kind="layout",
+                template_kind=project_data.get("template_kind", "layout"),
+                usage_mode=project_data.get("usage_mode", "linked_layout"),
                 project_data=project_data["project_data"],
                 published_project_data=project_data["project_data"],
                 published_css=project_data.get("css", ""),
@@ -1382,6 +1397,8 @@ def _copy_design_resources(db: Session, source_version_id: int, target_version_i
                 "prop_schema": getattr(row, "prop_schema", None) or [],
                 "default_props": getattr(row, "default_props", None) or {},
                 "variants": getattr(row, "variants", None) or [],
+                "template_kind": getattr(row, "template_kind", None) or "layout",
+                "usage_mode": getattr(row, "usage_mode", None) or "linked_layout",
             }))
     return result
 

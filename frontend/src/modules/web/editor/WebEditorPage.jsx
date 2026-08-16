@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../providers/AuthProvider";
 import { cmsApi, normalizePage } from "../api/cms";
+import { TEMPLATE_USAGE_MODES, templatesForUsage } from "../templateContracts";
 import EditorBreadcrumbs from "./EditorBreadcrumbs";
 import EditorInspector from "./EditorInspector";
 import EditorLeftPanel from "./EditorLeftPanel";
@@ -13,7 +14,7 @@ import EditorRail from "./EditorRail";
 import EditorTopbar from "./EditorTopbar";
 import PreviewDialog from "./PreviewDialog";
 import RevisionsDialog from "./RevisionsDialog";
-import { detachLinkedResource, insertLinkedResource, insertLinkedGlobalPart } from "./resourceBlocks";
+import { detachLinkedResource, filterCatalogResources, insertLinkedResource } from "./resourceBlocks";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
 import MediaPickerModal from "../media/MediaPickerModal";
@@ -54,18 +55,20 @@ export default function WebEditorPage() {
   const componentsQuery = useQuery({ queryKey: ["web", "design", "components"], queryFn: () => cmsApi.listDesignResources("components"), retry: 1 });
   const mediaQuery = useQuery({ queryKey: ["web", "media"], queryFn: () => cmsApi.listMedia({ limit: 100, offset: 0 }), retry: 1 });
   const templatesQuery = useQuery({ queryKey: ["web", "templates"], queryFn: cmsApi.listTemplates, retry: 1 });
-  const globalPartsQuery = useQuery({ queryKey: ["web", "global-parts"], queryFn: cmsApi.listGlobalParts, retry: 1 });
   const canvasStylesQuery = useQuery({ queryKey: ["web", "canvas-styles"], queryFn: cmsApi.getCanvasStyles, retry: 1 });
   const page = pageQuery.data;
   pageRef.current = pageForm;
 
   useEffect(() => { if (page) setPageForm({ title: page.title || "", path_segment: page.path_segment || page.slug || "", meta_description: page.meta_description || "", template_id: page.template_id || null }); }, [page]);
 
-  const sections = Array.isArray(sectionsQuery.data) ? sectionsQuery.data : sectionsQuery.data?.items || EMPTY;
+  const activeThemeVersionId = canvasStylesQuery.data?.active_theme_version_id ?? null;
+  const sections = filterCatalogResources(sectionsQuery.data, activeThemeVersionId);
   const dataSources = Array.isArray(sourcesQuery.data) ? sourcesQuery.data : sourcesQuery.data?.items || EMPTY;
-  const components = Array.isArray(componentsQuery.data) ? componentsQuery.data : componentsQuery.data?.items || EMPTY;
-  const templates = Array.isArray(templatesQuery.data) ? templatesQuery.data : templatesQuery.data?.items || EMPTY;
-  const globalParts = Array.isArray(globalPartsQuery.data) ? globalPartsQuery.data : globalPartsQuery.data?.items || EMPTY;
+  const components = filterCatalogResources(componentsQuery.data, activeThemeVersionId);
+  const templates = templatesForUsage(
+    filterCatalogResources(templatesQuery.data, activeThemeVersionId),
+    TEMPLATE_USAGE_MODES.linkedLayout,
+  );
   const canvasStyles = canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [];
   const templateCSSQuery = useQuery({
     queryKey: ["web", "template", page?.template_id],
@@ -218,7 +221,6 @@ export default function WebEditorPage() {
     if (catalog === "data") return editor.addBlock(`sc-data-${safeId(item.id)}`);
     const instance = editor.editorRef.current;
     if (!instance) return [];
-    if (catalog === "globalParts") return insertLinkedGlobalPart(instance, item);
     return insertLinkedResource(instance, item, catalog);
   };
   const navigateAfterSave = async (destination) => {
@@ -240,7 +242,7 @@ export default function WebEditorPage() {
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
     <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={() => setInspectorOpen((current) => !current)} onMedia={() => setMediaPickerOpen(true)} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} />
-    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} globalParts={globalParts} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
+    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
     <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>

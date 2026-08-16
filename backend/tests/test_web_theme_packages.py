@@ -113,7 +113,6 @@ def _files_with_linked_component(version="1.0.0"):
                 "id": "page",
                 "component": {"type": "main", "components": [{
                     "type": "sc-resource-instance",
-                    "resourceKind": "component",
                     "resourceId": "event-card",
                     "props": {"title": "Camp event"},
                 }]},
@@ -177,6 +176,28 @@ def test_install_namespaces_linked_component_and_persists_typed_props(db_session
     assert component.published_prop_schema == [{"id": "title", "type": "text", "required": True}]
     assert component.published_default_props == {"title": "Event"}
     assert "Camp event" in render_project(db_session, compile_project(template.project_data).tree)
+
+
+def test_install_preserves_template_usage_and_legacy_page_template_alias(db_session, tmp_path):
+    files = _valid_files()
+    manifest = json.loads(files["manifest.json"])
+    manifest["resources"].pop("templates")
+    manifest["resources"]["page-templates"] = [{
+        "id": "starter",
+        "file": "page-templates/starter.json",
+        "name": "Starter",
+    }]
+    files["manifest.json"] = json.dumps(manifest).encode()
+    del files["templates/page.json"]
+    files["page-templates/starter.json"] = json.dumps({
+        "project_data": {"pages": [{"id": "page", "component": {"type": "main", "components": []}}]},
+    }).encode()
+
+    installed = _install(db_session, tmp_path, files=files)
+    template = db_session.query(WebTemplate).filter_by(theme_version_id=installed.id).one()
+
+    assert template.qualified_key == "org.scoutcomp.camp@1.0.0:templates:starter"
+    assert template.usage_mode == "copy_on_create"
 
 
 def test_identical_install_is_idempotent_but_version_is_immutable(db_session, tmp_path):
@@ -426,5 +447,3 @@ def test_uninstall_preserves_user_clone_and_removes_package_files(db_session, tm
     assert clone.project_data["components"][0]["content"] == "Local"
     assert not old_path.exists()
     assert db_session.get(WebThemeVersion, new.id) is not None
-
-

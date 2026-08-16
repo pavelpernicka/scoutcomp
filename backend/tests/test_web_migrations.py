@@ -14,6 +14,18 @@ from app.migrations import (
 )
 
 
+def test_current_web_model_metadata_uses_consolidated_design_resources():
+    tables = Base.metadata.tables
+    assert {"web_templates", "web_reusable_components", "web_sections"}.issubset(tables)
+    assert {"web_page_templates", "web_global_parts", "web_template_parts"}.isdisjoint(tables)
+
+    page_columns = tables["web_pages"].columns
+    assert "source_template_id" in page_columns
+    assert "source_template_version" in page_columns
+    assert "page_template_id" not in page_columns
+    assert "page_template_version" not in page_columns
+
+
 LEGACY_SCHEMA = """
 CREATE TABLE users (id INTEGER PRIMARY KEY);
 CREATE TABLE teams (id INTEGER PRIMARY KEY);
@@ -139,7 +151,6 @@ def test_advanced_web_schema_upgrades_legacy_data_idempotently(tmp_path):
         "web_reusable_components",
         "web_sections",
         "web_patterns",
-        "web_template_parts",
         "web_site_styles",
         "web_redirects",
     }.issubset(inspector.get_table_names())

@@ -4,6 +4,13 @@ export const getResourceComponent = (resource = {}) => {
   return page.frames?.[0]?.component ?? page.component ?? resource.component ?? [];
 };
 
+export const filterCatalogResources = (value, activeThemeVersionId) => {
+  const items = Array.isArray(value) ? value : value?.items || [];
+  return items.filter((resource) => resource.theme_version_id == null
+    || (activeThemeVersionId != null
+      && String(resource.theme_version_id) === String(activeThemeVersionId)));
+};
+
 export const cloneResourceComponents = (resource) => {
   const root = getResourceComponent(resource);
   const insertable = root?.type === "wrapper" && Array.isArray(root.components)
@@ -53,10 +60,6 @@ export const insertLinkedResource = (editor, resource, kind) => (
   editor.addComponents(linkedResourceInstance(resource, kind))
 );
 
-export const insertLinkedGlobalPart = (editor, resource) => (
-  editor.addComponents(linkedGlobalPart(resource))
-);
-
 
 /**
  * Detach a linked resource instance in the editor: materialize its DOM and
@@ -88,13 +91,3 @@ export const detachLinkedResource = (component, materialized, definition) => {
   });
   return detached;
 };
-
-export const linkedTemplatePart = (resource) => ({
-  type: "sc-template-part",
-  resourceId: resource.qualified_key || String(resource.id),
-});
-
-export const linkedGlobalPart = (resource) => ({
-  type: "sc-global-part",
-  resourceId: resource.qualified_key || String(resource.id),
-});

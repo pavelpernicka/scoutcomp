@@ -1,4 +1,6 @@
 """Authenticated CMS templates routes."""
+from copy import deepcopy
+
 from .routes_common import *  # noqa: F403
 
 router = APIRouter(prefix="/web", tags=["web"])
@@ -52,6 +54,7 @@ def _serialize_template(template: WebTemplate) -> dict:
         "preview_media_id": template.preview_media_id,
         "preview_url": preview_url,
         "is_system": template.is_system,
+        "forked_from_id": template.forked_from_id,
     }
 
 
@@ -316,6 +319,12 @@ class TemplatePayload(BaseModel):
     expected_version: int | None = Field(default=None, ge=1)
 
 
+class TemplateClonePayload(BaseModel):
+    name: str | None = Field(default=None, max_length=200)
+    key: str | None = Field(default=None, max_length=50)
+    qualified_key: str | None = Field(default=None, max_length=240)
+
+
 @router.get("/templates")
 def list_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.templates.manage")
@@ -414,6 +423,56 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
     return _serialize_template(template)
 
 
+@router.post("/templates/{template_id}/clone", status_code=201)
+def clone_template(template_id: int, payload: TemplateClonePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    _require_action(db, current_user, "web.templates.manage")
+    origin = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
+    if not origin:
+        raise HTTPException(404, "Template not found")
+
+    requested_name = (payload.name or "").strip()
+    name = requested_name or f"{origin.name} (copy)"
+    base_key = _slugify(payload.key or f"{origin.key}-copy")
+    key = base_key
+    suffix = 2
+    while db.query(WebTemplate.id).filter(WebTemplate.key == key).first():
+        key = f"{base_key[:45]}-{suffix}"
+        suffix += 1
+
+    base_qualified_key = (payload.qualified_key or "").strip() or f"site:template:{key}"
+    qualified_key = base_qualified_key
+    suffix = 2
+    while db.query(WebTemplate.id).filter(WebTemplate.qualified_key == qualified_key).first():
+        qualified_key = f"{base_qualified_key[:235]}-{suffix}"
+        suffix += 1
+
+    project = deepcopy(origin.project_data or origin.published_project_data or _empty_project())
+    clone = WebTemplate(
+        key=key,
+        qualified_key=qualified_key,
+        name=name,
+        description=origin.description,
+        html=origin.html or "",
+        css=origin.css or "",
+        template_kind=origin.template_kind or "layout",
+        usage_mode=origin.usage_mode or "linked_layout",
+        project_data=project,
+        draft_version=1,
+        published_project_data=None,
+        published_css="",
+        published_version=0,
+        theme_version_id=None,
+        preview_media_id=origin.preview_media_id,
+        forked_from_id=origin.id,
+        is_system=False,
+        created_by_id=current_user.id,
+    )
+    db.add(clone)
+    db.commit()
+    db.refresh(clone)
+    return _serialize_template(clone)
+
+
 @router.post("/templates/{template_id}/publish")
 def publish_template(template_id: int, payload: PublishPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.templates.manage")
@@ -449,8 +508,8 @@ def delete_template(template_id: int, db: Session = Depends(get_db), current_use
     template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
     if not template:
         raise HTTPException(404, "Template not found")
-    if template.is_system:
-        raise HTTPException(400, "System templates cannot be deleted")
+    if template.is_system or template.theme_version_id is not None:
+        raise HTTPException(409, "Installed theme templates cannot be deleted")
     draft_reference = db.query(WebPage.id).filter(
         (WebPage.template_id == template.id) | (WebPage.template == template.key)
     ).first()
@@ -464,4 +523,3 @@ def delete_template(template_id: int, db: Session = Depends(get_db), current_use
         raise HTTPException(400, "Template is used by existing pages")
     db.delete(template)
     db.commit()
-

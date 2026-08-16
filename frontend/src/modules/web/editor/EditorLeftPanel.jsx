@@ -13,7 +13,6 @@ export default function EditorLeftPanel({
   templates,
   components,
   sections,
-  globalParts,
   dataSources,
   editor,
   selected,
@@ -31,9 +30,8 @@ export default function EditorLeftPanel({
   const catalogItems = useMemo(() => ({
     components: filter(components),
     sections: filter(sections),
-    globalParts: filter(globalParts),
     data: filter(dataSources),
-  }), [components, sections, globalParts, dataSources, search]);
+  }), [components, sections, dataSources, search]);
 
   useEffect(() => {
     document.querySelectorAll(".web-editor-block-manager .gjs-block").forEach((block) => {
@@ -63,13 +61,13 @@ export default function EditorLeftPanel({
     </div>
     <div className={mode === "insert" ? "" : "d-none"}>
       <div className="web-editor-panel-heading"><h2>{t("web.editor.insert")}</h2></div>
-      <div className="web-editor-catalog-tabs" role="tablist">{["components", "sections", "globalParts", "data"].map((key) => <button key={key} type="button" role="tab" aria-selected={catalog === key} className={catalog === key ? "active" : ""} onClick={() => setCatalog(key)}>{t(`web.editor.catalog.${key}`)}</button>)}</div>
+      <div className="web-editor-catalog-tabs" role="tablist">{["components", "sections", "data"].map((key) => <button key={key} type="button" role="tab" aria-selected={catalog === key} className={catalog === key ? "active" : ""} onClick={() => setCatalog(key)}>{t(`web.editor.catalog.${key}`)}</button>)}</div>
       <label className="web-editor-search"><i className="fas fa-magnifying-glass" /><span className="visually-hidden">{t("web.search")}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("web.editor.searchCatalog")} /></label>
       <div className={catalog === "components" ? "web-editor-block-manager" : "web-editor-block-manager d-none"} />
       <div className="web-editor-catalog-list">{catalogItems[catalog]?.map((item) => {
         const preview = item.preview_url || (item.preview_media_id ? `/api/web/media/${item.preview_media_id}/file` : null);
         return <button key={item.id} type="button" onClick={() => onInsert(catalog, item)}>
-          <span className="web-editor-catalog-icon">{preview ? <MediaPreview src={preview} alt="" /> : <i className={`fas ${catalog === "data" ? "fa-database" : catalog === "globalParts" ? "fa-earth-europe" : "fa-layer-group"}`} />}</span>
+          <span className="web-editor-catalog-icon">{preview ? <MediaPreview src={preview} alt="" /> : <i className={`fas ${catalog === "data" ? "fa-database" : "fa-layer-group"}`} />}</span>
           <span><strong>{item.name || item.label || item.id}</strong><small>{item.description || item.id}</small></span>
         </button>;
       })}{catalog !== "components" && catalogItems[catalog]?.length === 0 && <p className="web-editor-panel-empty">{t("web.empty.noResults")}</p>}</div>
@@ -90,7 +88,6 @@ EditorLeftPanel.propTypes = {
   templates: PropTypes.array.isRequired,
   components: PropTypes.array.isRequired,
   sections: PropTypes.array.isRequired,
-  globalParts: PropTypes.array.isRequired,
   dataSources: PropTypes.array.isRequired,
   editor: PropTypes.object,
   selected: PropTypes.object,

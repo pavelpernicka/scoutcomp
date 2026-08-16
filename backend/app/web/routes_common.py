@@ -61,6 +61,7 @@ from ..web.pages import (
     unique_legacy_slug,
     unique_segment,
     validate_parent,
+    validate_template_usage,
 )
 from ..web.renderer import CompileError, compile_project, render_document, render_project
 from ..web_render import render_markdown

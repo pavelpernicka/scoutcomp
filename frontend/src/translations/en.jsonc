@@ -20,17 +20,13 @@
       "components": "Components",
       "sections": "Sections",
       "patterns": "Patterns",
-      "parts": "Global parts",
-      "pageTemplates": "Page templates",
       "styles": "Template settings"
     },
     "designDescriptions": {
-      "templates": "Reusable page templates.",
+      "templates": "New-page templates and linked layouts from the active theme.",
       "components": "Reusable building blocks.",
       "sections": "Full-width page sections.",
       "patterns": "Reusable content compositions.",
-      "parts": "Shared site parts such as the main header and footer.",
-      "pageTemplates": "Default page content – copied once when a page is created.",
       "styles": "Configurable properties of the active template – colors, typography, and custom parameters."
     },
     "editor": {
@@ -412,6 +408,7 @@
       "preview": "The preview could not be rendered.",
       "pageLoad": "The page could not be loaded.",
       "createPage": "The page could not be created.",
+      "templatesLoad": "Page templates could not be loaded.",
       "publish": "Failed to publish page",
       "unpublish": "Failed to unpublish page",
       "themeAction": "The theme operation failed."
@@ -423,7 +420,13 @@
       "pageFilter": "Page filter",
       "parentPage": "Parent page",
       "noParent": "No parent page",
+      "sourceTemplate": "Page template",
+      "blankPage": "Blank page",
       "position": "Position"
+    },
+    "templateUsage": {
+      "copyOnCreate": "New-page template",
+      "linkedLayout": "Linked layout"
     },
     "commands": {
       "createResource": "Create",

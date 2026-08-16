@@ -37,4 +37,17 @@ describe("CMS design resource API", () => {
 
     expect(http.post).toHaveBeenCalledWith("/web/templates/4/publish", { expected_version: 7 });
   });
+
+  it("clones a template through the consolidated templates endpoint", async () => {
+    await cmsApi.cloneTemplate(4, { name: "Homepage copy" });
+
+    expect(http.post).toHaveBeenCalledWith("/web/templates/4/clone", { name: "Homepage copy" });
+  });
+
+  it("exposes only the consolidated template and section contracts", () => {
+    expect(cmsApi.listPageTemplates).toBeUndefined();
+    expect(cmsApi.listGlobalParts).toBeUndefined();
+    expect(cmsApi.listTemplates).toBeTypeOf("function");
+    expect(cmsApi.listDesignResources).toBeTypeOf("function");
+  });
 });

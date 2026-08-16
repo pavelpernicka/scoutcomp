@@ -2,17 +2,21 @@
 from .routes_common import *  # noqa: F403
 from copy import deepcopy
 
+from .resource_props import ResourcePropsError
+
 router = APIRouter(prefix="/web", tags=["web"])
 
 # ---------------------------------------------------------------- pages
 
 
 class PagePayload(BaseModel):
+    model_config = {"extra": "forbid"}
+
     title: str = Field(min_length=1, max_length=200)
     slug: str | None = None
     template: str | None = None
     template_id: int | None = None  # Layout reference (linked page shell)
-    page_template_id: int | None = None  # Page Template reference (copy-on-create only)
+    source_template_id: int | None = None  # copy_on_create template provenance
     data: dict | None = None
     html: str | None = None
     published: bool = False
@@ -59,8 +63,6 @@ def list_pages(db: Session = Depends(get_db), current_user: User = Depends(get_c
             "parent_id": p.parent_id,
             "position": p.position,
             "team_id": p.team_id,
-            "page_template_id": p.page_template_id,
-            "page_template_version": p.page_template_version,
             "source_template_id": p.source_template_id,
             "source_template_version": p.source_template_version,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
@@ -81,18 +83,17 @@ def list_trash_pages(db: Session = Depends(get_db), current_user: User = Depends
     return [_serialize_page(p) for p in pages]
 
 
-def _copy_page_template_project(db: Session, page_template_id: int | None) -> dict | None:
-    """Deep-copy the published snapshot of a Page Template, if available.
+def _copy_source_template_project(db: Session, source_template_id: int | None) -> dict | None:
+    """Deep-copy the published snapshot of a copy-on-create template.
 
     Accepts the consolidated WebTemplate
     with usage_mode='copy_on_create'. The copy is detached; later template
     edits never propagate to existing pages.
     """
-    if page_template_id is None:
+    if source_template_id is None:
         return None
 
-    # Consolidated path: WebTemplate with usage_mode=copy_on_create
-    template = db.query(WebTemplate).filter_by(id=page_template_id).one_or_none()
+    template = db.query(WebTemplate).filter_by(id=source_template_id).one_or_none()
     if template is not None and getattr(template, "usage_mode", "linked_layout") == "copy_on_create":
         source = template.published_project_data
         if source and isinstance(source, dict) and source.get("pages"):
@@ -109,23 +110,26 @@ def create_page(payload: PagePayload, db: Session = Depends(get_db), current_use
     parent = validate_parent(db, None, payload.parent_id)
     unique_segment(db, segment, payload.parent_id)
     slug = unique_legacy_slug(db, segment)
+    validate_template_usage(db, payload.template_id, "linked_layout")
 
-    # Precedence: explicit project data -> published Page Template -> empty project.
+    # Precedence: explicit project data -> published copy-on-create template -> empty project.
     project = None
-    page_template_id = None
-    page_template_version = None
+    source_template_id = None
+    source_template_version = None
     if isinstance(payload.data, dict) and payload.data.get("pages"):
         project = payload.data
-    else:
-        # Try Page Template first, then Layout.
-        project = _copy_page_template_project(db, payload.page_template_id)
-        if project is not None:
-            page_template_id = payload.page_template_id
-            page_template_version = (
-                db.query(WebTemplate.published_version)
-                .filter(WebTemplate.id == page_template_id)
-                .scalar()
-            )
+    elif payload.source_template_id is not None:
+        source_template = validate_template_usage(
+            db,
+            payload.source_template_id,
+            "copy_on_create",
+            label="Source template",
+        )
+        project = _copy_source_template_project(db, payload.source_template_id)
+        if project is None:
+            raise HTTPException(422, "Source template must be published before use")
+        source_template_id = source_template.id
+        source_template_version = source_template.published_version
 
     if project is None:
         project = _empty_project()
@@ -137,10 +141,8 @@ def create_page(payload: PagePayload, db: Session = Depends(get_db), current_use
         title=payload.title.strip(),
         template=payload.template,
         template_id=payload.template_id,
-        page_template_id=page_template_id or payload.page_template_id,
-        page_template_version=page_template_version,
-        source_template_id=page_template_id or payload.page_template_id,
-        source_template_version=page_template_version,
+        source_template_id=source_template_id,
+        source_template_version=source_template_version,
         data=project,
         html=payload.html if payload.data is None else None,
         published=False,
@@ -408,7 +410,6 @@ def preview_page_draft(page_id: int, payload: PreviewPayload, db: Session = Depe
     try:
         compiled = compile_draft(page, payload.project_data)
         from .linked_resources import validate_linked_resource_instances
-        from .resource_props import ResourcePropsError
         validate_linked_resource_instances(db, payload.project_data, published=False)
         document = _render_compiled_page(
             db, page, compiled, published=False, metadata=payload.metadata,

@@ -54,6 +54,7 @@ export const cmsApi = {
   listTemplates: () => api.get("/web/templates").then(unwrap),
   getTemplate: (id) => api.get(`/web/templates/${id}`).then(unwrap),
   createTemplate: (payload) => api.post("/web/templates", payload).then(unwrap),
+  cloneTemplate: (id, payload = {}) => api.post(`/web/templates/${id}/clone`, payload).then(unwrap),
   updateTemplate: (id, payload) => api.put(`/web/templates/${id}`, payload).then(unwrap),
   publishTemplate: (id, expectedVersion) =>
     api.post(`/web/templates/${id}/publish`, { expected_version: expectedVersion }).then(unwrap),
@@ -86,21 +87,6 @@ export const cmsApi = {
   downloadTheme: (id) => api.get(`/web/themes/${id}/download`, { responseType: "blob" }).then((response) => response.data),
   duplicateTheme: (id, name) => api.post(`/web/themes/${id}/duplicate`, { name }).then(unwrap),
   uninstallTheme: (id) => api.delete(`/web/themes/${id}`).then(unwrap),
-
-  listPageTemplates: () => api.get("/web/page-templates").then(unwrap),
-  getPageTemplate: (id) => api.get(`/web/page-templates/${id}`).then(unwrap),
-  createPageTemplate: (payload) => api.post("/web/page-templates", payload).then(unwrap),
-  updatePageTemplate: (id, payload) => api.put(`/web/page-templates/${id}`, payload).then(unwrap),
-  publishPageTemplate: (id, expectedVersion) =>
-    api.post(`/web/page-templates/${id}/publish`, { expected_version: expectedVersion }).then(unwrap),
-  deletePageTemplate: (id) => api.delete(`/web/page-templates/${id}`).then(unwrap),
-
-  listGlobalParts: () => api.get("/web/global-parts").then(unwrap),
-  createGlobalPart: (payload) => api.post("/web/global-parts", payload).then(unwrap),
-  updateGlobalPart: (id, payload) => api.put(`/web/global-parts/${id}`, payload).then(unwrap),
-  publishGlobalPart: (id, expectedVersion) =>
-    api.post(`/web/global-parts/${id}/publish`, { expected_version: expectedVersion }).then(unwrap),
-  deleteGlobalPart: (id) => api.delete(`/web/global-parts/${id}`).then(unwrap),
 };
 
 

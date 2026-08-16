@@ -6,6 +6,8 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import AdminPageHeader from "../admin/AdminPageHeader";
 import { cmsApi, displayPagePath } from "../api/cms";
+import { filterCatalogResources } from "../editor/resourceBlocks";
+import { TEMPLATE_USAGE_MODES, templatesForUsage } from "../templateContracts";
 
 const slugify = (value) => (value || "")
   .toLowerCase().normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
@@ -18,16 +20,36 @@ export default function PagesPage() {
   const [creating, setCreating] = useState(false);
   const [title, setTitle] = useState("");
   const [parentId, setParentId] = useState("");
+  const [sourceTemplateId, setSourceTemplateId] = useState("");
   const [position, setPosition] = useState(0);
   const [error, setError] = useState("");
   const [view, setView] = useState("all");
 
   const pagesQuery = useQuery({ queryKey: ["web", "pages"], queryFn: cmsApi.listPages });
   const trashQuery = useQuery({ queryKey: ["web", "pages", "trash"], queryFn: cmsApi.listTrash, enabled: view === "trash" });
+  const templatesQuery = useQuery({
+    queryKey: ["web", "templates"],
+    queryFn: cmsApi.listTemplates,
+    enabled: creating,
+    retry: 1,
+  });
+  const canvasStylesQuery = useQuery({
+    queryKey: ["web", "canvas-styles"],
+    queryFn: cmsApi.getCanvasStyles,
+    enabled: creating,
+    retry: 1,
+  });
   const invalidate = () => { queryClient.invalidateQueries({ queryKey: ["web", "pages"] }); queryClient.invalidateQueries({ queryKey: ["web", "pages", "trash"] }); };
 
   const create = useMutation({
-    mutationFn: () => cmsApi.createPage({ title: title.trim(), slug: slugify(title), parent_id: parentId ? Number(parentId) : null, position: Number(position) || 0, data: null }),
+    mutationFn: () => cmsApi.createPage({
+      title: title.trim(),
+      slug: slugify(title),
+      parent_id: parentId ? Number(parentId) : null,
+      position: Number(position) || 0,
+      source_template_id: sourceTemplateId ? Number(sourceTemplateId) : null,
+      data: null,
+    }),
     onSuccess: (page) => { invalidate(); navigate(`/admin/web/pages/${page.id}/editor`); },
     onError: (requestError) => setError(requestError?.response?.data?.detail || t("web.errors.createPage")),
   });
@@ -42,6 +64,13 @@ export default function PagesPage() {
   const restore = useMutation({ mutationFn: cmsApi.restorePage, onSuccess: invalidate });
   const purge = useMutation({ mutationFn: cmsApi.purgePage, onSuccess: invalidate });
   const pages = pagesQuery.data || [];
+  const sourceTemplates = templatesForUsage(
+    filterCatalogResources(templatesQuery.data, canvasStylesQuery.data?.active_theme_version_id ?? null),
+    TEMPLATE_USAGE_MODES.copyOnCreate,
+  )
+    .filter((template) => Number(template.published_version) > 0);
+  const templatesLoading = templatesQuery.isLoading || canvasStylesQuery.isLoading;
+  const templatesError = templatesQuery.isError || canvasStylesQuery.isError;
   const displayedPages = view === "trash" ? (trashQuery.data || []) : pages.filter((page) => view === "all" || (view === "published" ? page.published_revision_id || page.published : !(page.published_revision_id || page.published)));
 
   return (
@@ -57,9 +86,10 @@ export default function PagesPage() {
         <form className="web-inline-create" onSubmit={(event) => { event.preventDefault(); if (title.trim()) create.mutate(); }}>
           <label><span>{t("web.fields.pageTitle")}</span><input id="new-page-title" autoFocus className="form-control" value={title} onChange={(event) => setTitle(event.target.value)} /></label>
           <label><span>{t("web.fields.parentPage")}</span><select id="new-page-parent" className="form-select" value={parentId} onChange={(event) => setParentId(event.target.value)}><option value="">{t("web.fields.noParent")}</option>{pages.map((page) => <option key={page.id} value={page.id}>{page.title} ({displayPagePath(page)})</option>)}</select></label>
+          <label><span>{t("web.fields.sourceTemplate")}</span><select id="new-page-template" className="form-select" value={sourceTemplateId} disabled={templatesLoading} onChange={(event) => setSourceTemplateId(event.target.value)}><option value="">{templatesLoading ? t("web.states.loading") : t("web.fields.blankPage")}</option>{sourceTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}</select>{templatesError && <small className="text-danger">{t("web.errors.templatesLoad")}</small>}</label>
           <label><span>{t("web.fields.position")}</span><input id="new-page-position" type="number" className="form-control" min="0" value={position} onChange={(event) => setPosition(event.target.value)} /></label>
           <div className="web-inline-create-actions"><button type="submit" className="btn btn-primary" disabled={!title.trim() || create.isPending}>{t("web.commands.createAndEdit")}</button>
-          <button type="button" className="btn btn-link" onClick={() => setCreating(false)}>{t("web.cancel")}</button>
+          <button type="button" className="btn btn-link" onClick={() => { setCreating(false); setSourceTemplateId(""); }}>{t("web.cancel")}</button>
           </div>
         </form>
       )}

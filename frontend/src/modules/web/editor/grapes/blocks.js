@@ -204,18 +204,6 @@ export function createPrimitiveBlocks(translate = (key) => key) {
       category: translate(BLOCK_CATEGORIES.data),
       content: { type: SC_COMPONENT_TYPES.empty },
     },
-    {
-      id: "sc-template-part",
-      label: translate("web.editor.component.templatePart"),
-      category: structure,
-      content: { type: SC_COMPONENT_TYPES.templatePart, resourceId: "" },
-    },
-    {
-      id: "sc-global-part",
-      label: translate("web.editor.component.globalPart"),
-      category: structure,
-      content: { type: SC_COMPONENT_TYPES.globalPart, resourceId: "" },
-    },
   ];
 }
 

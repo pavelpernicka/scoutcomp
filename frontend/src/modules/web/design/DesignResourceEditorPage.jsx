@@ -7,8 +7,9 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../providers/AuthProvider";
 import { cmsApi } from "../api/cms";
-import { linkedResourceInstance } from "../editor/resourceBlocks";
+import { filterCatalogResources, linkedResourceInstance } from "../editor/resourceBlocks";
 import useGrapesEditor from "../editor/useGrapesEditor";
+import { getTemplateUsageMode, TEMPLATE_USAGE_MODES, templatePersistenceFields } from "../templateContracts";
 import ResourcePropSchemaEditor from "./ResourcePropSchemaEditor";
 import "../styles/editor.css";
 import "./resource-editor.css";
@@ -70,6 +71,15 @@ export default function DesignResourceEditorPage({ kind }) {
     retry: 1,
   });
   const resource = itemsFrom(resourcesQuery.data).find((item) => item.id === resourceId);
+  const activeThemeVersionId = canvasStylesQuery.data?.active_theme_version_id ?? null;
+  const catalogSections = useMemo(
+    () => filterCatalogResources(sectionsQuery.data, activeThemeVersionId),
+    [activeThemeVersionId, sectionsQuery.data],
+  );
+  const catalogComponents = useMemo(
+    () => filterCatalogResources(componentsQuery.data, activeThemeVersionId),
+    [activeThemeVersionId, componentsQuery.data],
+  );
   const readOnly = Boolean(resource?.is_locked || resource?.theme_version_id);
   const canPublish = can("web.publish") || can("web.manage");
 
@@ -95,7 +105,7 @@ export default function DesignResourceEditorPage({ kind }) {
 
   const editorBlocks = useMemo(() => {
     const blocks = [];
-    if (kind === "templates") {
+    if (kind === "templates" && getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.linkedLayout) {
       blocks.push({
         id: "sc-template-content-slot",
         label: t("web.resourceEditor.contentSlot"),
@@ -105,7 +115,7 @@ export default function DesignResourceEditorPage({ kind }) {
     }
     // Insert reusable sections into templates.
     if (kind === "templates") {
-      itemsFrom(sectionsQuery.data).forEach((section) => {
+      catalogSections.forEach((section) => {
         blocks.push({
           id: `sc-section-${section.id}`,
           label: section.name,
@@ -116,7 +126,7 @@ export default function DesignResourceEditorPage({ kind }) {
     }
     // Insert reusable components into templates and sections.
     if (kind === "templates" || kind === "sections") {
-      itemsFrom(componentsQuery.data).forEach((component) => {
+      catalogComponents.forEach((component) => {
         blocks.push({
           id: `sc-component-${component.id}`,
           label: component.name,
@@ -126,7 +136,7 @@ export default function DesignResourceEditorPage({ kind }) {
       });
     }
     return blocks;
-  }, [kind, t, sectionsQuery.data, componentsQuery.data]);
+  }, [catalogComponents, catalogSections, kind, resource, t]);
 
   const editor = useGrapesEditor({
     containerRef,
@@ -163,7 +173,12 @@ export default function DesignResourceEditorPage({ kind }) {
         expected_version: versionRef.current,
       };
       return kind === "templates"
-        ? cmsApi.updateTemplate(resourceId, { ...common, key: current.qualified_key, qualified_key: current.qualified_key, template_kind: resource?.template_kind || "layout" })
+        ? cmsApi.updateTemplate(resourceId, {
+          ...common,
+          key: current.qualified_key,
+          qualified_key: current.qualified_key,
+          ...templatePersistenceFields(resource),
+        })
         : cmsApi.updateDesignResource(endpointKind, resourceId, { ...common, qualified_key: current.qualified_key, part_kind: current.part_kind });
     },
     onMutate: () => { setStatus("saving"); setError(""); },

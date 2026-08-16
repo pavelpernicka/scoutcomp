@@ -228,7 +228,11 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         if component_type == "sc-global-part":
             result["type"] = "sc-global-part"
     elif component_type == "sc-resource-instance":
-        kind = str(node.get("resourceKind", node.get("resource_kind", ""))).casefold()
+        # GrapesJS omits model properties that match their defaults from
+        # project JSON. Component instances therefore legitimately arrive
+        # without resourceKind; sections always serialize their non-default
+        # value explicitly.
+        kind = str(node.get("resourceKind", node.get("resource_kind", "component"))).casefold()
         resource = node.get("resourceId", node.get("resource_id"))
         props = node.get("props") or {}
         variant = node.get("variant")

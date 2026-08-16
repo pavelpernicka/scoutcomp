@@ -1394,7 +1394,6 @@ def _advanced_web_cms_schema(conn: Connection) -> None:
         "web_reusable_components",
         "web_sections",
         "web_patterns",
-        "web_template_parts",
         "web_site_styles",
         "web_redirects",
     ):

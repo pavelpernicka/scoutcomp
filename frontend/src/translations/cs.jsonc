@@ -20,17 +20,13 @@
       "components": "Komponenty",
       "sections": "Sekce",
       "patterns": "Vzory",
-      "parts": "Globální části",
-      "pageTemplates": "Šablony stránek",
       "styles": "Nastavení šablony"
     },
     "designDescriptions": {
-      "templates": "Znovupoužitelné šablony stránek.",
+      "templates": "Předlohy nových stránek a propojená rozvržení aktivního tématu.",
       "components": "Znovupoužitelné stavební bloky.",
       "sections": "Sekce stránky v plné šířce.",
       "patterns": "Znovupoužitelné kompozice obsahu.",
-      "parts": "Sdílené části webu, například hlavní záhlaví a patička.",
-      "pageTemplates": "Výchozí obsah stránky – kopíruje se jednou při založení stránky.",
       "styles": "Konfigurovatelné vlastnosti aktivní šablony – barvy, typografie a vlastní parametry."
     },
     "editor": {
@@ -64,7 +60,6 @@
       "catalog": {
         "components": "Komponenty",
         "sections": "Sekce",
-        "globalParts": "Globální části",
         "data": "Data",
         "structure": "Struktura",
         "primitives": "Základní prvky"
@@ -439,6 +434,7 @@
       "preview": "Náhled se nepodařilo vyrenderovat.",
       "pageLoad": "Stránku se nepodařilo načíst.",
       "createPage": "Stránku se nepodařilo vytvořit.",
+      "templatesLoad": "Předlohy stránek se nepodařilo načíst.",
       "publish": "Stránku se nepodařilo publikovat",
       "unpublish": "Publikování se nepodařilo zrušit",
       "themeAction": "Operace s tématem selhala."
@@ -450,7 +446,13 @@
       "pageFilter": "Filtr stránek",
       "parentPage": "Nadřazená stránka",
       "noParent": "Bez nadřazené stránky",
+      "sourceTemplate": "Předloha stránky",
+      "blankPage": "Prázdná stránka",
       "position": "Pořadí"
+    },
+    "templateUsage": {
+      "copyOnCreate": "Předloha nové stránky",
+      "linkedLayout": "Propojené rozvržení"
     },
     "commands": {
       "createResource": "Vytvořit",

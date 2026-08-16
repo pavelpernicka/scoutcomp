@@ -23,6 +23,17 @@ const selectedSummary = (component) => {
 
 const report = (callback, value) => callback?.(value);
 
+export const subscribeToEditorChanges = (editor, onChange) => {
+  const model = editor.getModel?.();
+  editor.on("update", onChange);
+  model?.on?.("change:changesCount", onChange);
+
+  return () => {
+    editor.off("update", onChange);
+    model?.off?.("change:changesCount", onChange);
+  };
+};
+
 /**
  * Owns one GrapesJS 0.21.9 instance for a mounted editor shell.
  *
@@ -142,8 +153,8 @@ export function useGrapesEditor({
         report(callbacksRef.current.onSelectionChange, null);
       };
       const onHistory = () => updateHistoryState(editor);
+      const unsubscribeChanges = subscribeToEditorChanges(editor, onUpdate);
 
-      editor.on("update", onUpdate);
       editor.on("component:selected", onSelection);
       editor.on("component:deselected", onDeselection);
       editor.on("undo", onHistory);
@@ -161,7 +172,7 @@ export function useGrapesEditor({
 
       return () => {
         active = false;
-        editor.off("update", onUpdate);
+        unsubscribeChanges();
         editor.off("component:selected", onSelection);
         editor.off("component:deselected", onDeselection);
         editor.off("undo", onHistory);

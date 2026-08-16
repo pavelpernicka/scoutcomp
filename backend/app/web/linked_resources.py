@@ -175,7 +175,7 @@ def validate_linked_resource_instances(
     if str(value.get("type", "")).casefold() == "sc-resource-instance":
         snapshot = resource_snapshot(
             db,
-            value.get("resourceKind", value.get("resource_kind")),
+            value.get("resourceKind", value.get("resource_kind", "component")),
             value.get("resourceId", value.get("resource_id")),
             published=published,
         )

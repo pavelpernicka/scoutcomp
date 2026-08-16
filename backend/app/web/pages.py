@@ -73,8 +73,6 @@ def serialize_page(page: WebPage) -> dict[str, Any]:
         "noindex": page.noindex,
         "sitemap_include": page.sitemap_include,
         "deleted_at": page.deleted_at.isoformat() if page.deleted_at else None,
-        "page_template_id": page.page_template_id,
-        "page_template_version": page.page_template_version,
         "source_template_id": page.source_template_id,
         "source_template_version": page.source_template_version,
         "team_id": page.team_id,
@@ -102,6 +100,25 @@ def validate_parent(db: Session, page: WebPage | None, parent_id: int | None) ->
     if page and (parent.id == page.id or parent.id in _descendant_ids(db, page.id)):
         raise HTTPException(400, "Page hierarchy cannot contain a cycle")
     return parent
+
+
+def validate_template_usage(
+    db: Session,
+    template_id: int | None,
+    expected_usage_mode: str,
+    *,
+    label: str = "Template",
+) -> WebTemplate | None:
+    """Resolve a template and enforce whether it is a layout or a starter."""
+    if template_id is None:
+        return None
+    template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
+    if template is None:
+        raise HTTPException(404, f"{label} not found")
+    if template.usage_mode != expected_usage_mode:
+        expected_label = "linked layout" if expected_usage_mode == "linked_layout" else "page starter"
+        raise HTTPException(422, f"{label} is not a {expected_label}")
+    return template
 
 
 def unique_segment(db: Session, segment: str, parent_id: int | None, page_id: int | None = None) -> None:
@@ -234,6 +251,11 @@ def save_draft(
     if expected_version != (page.draft_version or 1):
         raise HTTPException(409, "Draft was changed by another editor")
     metadata = metadata or {}
+    selected_template = validate_template_usage(
+        db,
+        metadata.get("template_id", page.template_id),
+        "linked_layout",
+    )
     # Validate the whole project at the trust boundary even though dynamic data
     # is intentionally not resolved until preview/public rendering.
     compile_project(project)
@@ -281,9 +303,8 @@ def save_draft(
     # nest the template shell inside itself. When the page has no template the
     # project is stored verbatim.
     template_project = None
-    if page.template_id:
-        template_row = db.query(WebTemplate).filter_by(id=page.template_id).one_or_none()
-        template_project = template_row.project_data if template_row else None
+    if selected_template is not None:
+        template_project = selected_template.project_data
     elif page.template:
         template_row = db.query(WebTemplate).filter_by(key=page.template).one_or_none()
         template_project = template_row.project_data if template_row else None

@@ -62,7 +62,9 @@ export function createEditorConfig({
     // This is the native mechanism for injecting tokens + theme CSS + global
     // CSS into the editor iframe; no manual DOM surgery needed.
     baseCss,
-    selectorManager: { componentFirst: true, escapeName: true },
+    // Leave escapeName unset so GrapesJS uses its built-in selector escaping.
+    // The option accepts a function; passing a boolean breaks CssComposer.
+    selectorManager: { componentFirst: true },
     canvas: {
       // URL-based external stylesheets (if any).
       styles: canvasStyles

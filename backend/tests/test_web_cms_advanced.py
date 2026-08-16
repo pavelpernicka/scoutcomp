@@ -10,7 +10,7 @@ from app.models import (
     DirectUserPermission, DirectUserPermissionDeny, PermissionDefinition,
     RegisteredModule, RoleEnum, User, WebMedia, WebMenu, WebMenuRevision,
     WebPage, WebPageRevision, WebPost, WebPostRevision, WebReusableComponent,
-    WebTemplate, WebSection,
+    WebTemplate, WebSection, WebTheme, WebThemeVersion,
 )
 from app.modules import registry
 from app.web.data_sources import DataSourceUnavailableError, list_data_sources, resolve_public_source
@@ -317,6 +317,100 @@ def test_linked_component_draft_preview_and_prop_validation(db_session):
     raw["pages"][0]["frames"][0]["component"]["components"][0]["props"] = {"unknown": "x"}
     with pytest.raises(ResourcePropsError, match="Unknown resource prop"):
         validate_linked_resource_instances(db_session, raw, published=False)
+
+
+def test_linked_component_defaults_kind_when_grapesjs_omits_default(db_session):
+    component = WebReusableComponent(
+        qualified_key="site:grapes-default-card",
+        name="Grapes default card",
+        project_data=project({"type": "text", "tagName": "article", "content": "Card"}),
+        published_project_data=project({"type": "text", "tagName": "article", "content": "Card"}),
+        published_version=1,
+    )
+    db_session.add(component)
+    db_session.commit()
+
+    # GrapesJS 0.21 omits resourceKind because "component" is the custom
+    # component model's default value.
+    raw = project({
+        "type": "sc-resource-instance",
+        "resourceId": component.qualified_key,
+        "props": {},
+    })
+
+    validate_linked_resource_instances(db_session, raw, published=False)
+    compiled = compile_project(raw)
+    assert compiled.tree["components"][0]["resourceKind"] == "component"
+    assert "Card" in render_project(db_session, compiled.tree)
+
+
+def test_grapes_default_component_survives_draft_preview_and_publish_routes(db_session):
+    from app.web.routes_pages import (
+        DraftPayload,
+        PreviewPayload,
+        PublishPayload,
+        preview_page_draft,
+        publish_page_draft,
+        save_page_draft,
+    )
+
+    user = User(
+        username="linked-card-editor",
+        real_name="Linked card editor",
+        password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    component = WebReusableComponent(
+        qualified_key="site:route-card",
+        name="Route card",
+        project_data=project({"type": "text", "tagName": "article", "content": "Linked Card"}),
+        published_project_data=project({"type": "text", "tagName": "article", "content": "Linked Card"}),
+        published_version=1,
+    )
+    page = WebPage(
+        slug="linked-card-page",
+        path_segment="linked-card-page",
+        path="/linked-card-page",
+        title="Linked card page",
+        data=project(),
+        draft_version=1,
+        created_by_id=None,
+    )
+    db_session.add_all([user, component, page])
+    db_session.commit()
+
+    payload_project = project({
+        "type": "sc-resource-instance",
+        "name": "Route card",
+        "content": "◇ component: Route card",
+        "attributes": {"data-sc-type": "resource-instance"},
+        "resourceId": component.qualified_key,
+        "resourceName": component.name,
+        "props": {},
+    })
+    saved = save_page_draft(
+        page.id,
+        DraftPayload(project_data=payload_project, expected_version=1),
+        db_session,
+        user,
+    )
+    assert saved["draft_version"] == 2
+
+    preview = preview_page_draft(
+        page.id,
+        PreviewPayload(project_data=payload_project, expected_version=2),
+        db_session,
+        user,
+    )
+    assert "Linked Card" in preview["html"]
+
+    published = publish_page_draft(
+        page.id,
+        PublishPayload(expected_version=2),
+        db_session,
+        user,
+    )
+    assert published["published_revision_id"] is not None
 
 
 def test_linked_component_variants_merge_order(db_session):
@@ -704,7 +798,7 @@ def test_disabled_module_hides_public_data_sources(db_session):
         resolve_public_source(db_session, "core.events", {})
 
 
-def test_page_template_copy_on_create(db_session):
+def test_template_copy_on_create(db_session):
     pt = WebTemplate(
         key="starter", name="Starter",
         project_data=project(text("starter-content")),
@@ -714,8 +808,8 @@ def test_page_template_copy_on_create(db_session):
     )
     db_session.add(pt); db_session.commit(); db_session.refresh(pt)
 
-    from app.web.routes_pages import _copy_page_template_project
-    copied = _copy_page_template_project(db_session, pt.id)
+    from app.web.routes_pages import _copy_source_template_project
+    copied = _copy_source_template_project(db_session, pt.id)
     assert copied is not None
     root = copied["pages"][0]["frames"][0]["component"] if "frames" in copied["pages"][0] else copied["pages"][0]["component"]
     assert root["components"][0]["content"] == "Published Start"
@@ -728,14 +822,122 @@ def test_page_template_copy_on_create(db_session):
         usage_mode="copy_on_create", published_version=0,
     )
     db_session.add(pt2); db_session.commit()
-    assert _copy_page_template_project(db_session, pt2.id) is None
+    assert _copy_source_template_project(db_session, pt2.id) is None
 
     # Non-existent id returns None
-    assert _copy_page_template_project(db_session, 99999) is None
+    assert _copy_source_template_project(db_session, 99999) is None
+
+
+def test_page_creation_rejects_invalid_source_template_contract(db_session):
+    from app.web.routes_pages import PagePayload, create_page
+
+    with pytest.raises(ValueError):
+        PagePayload(title="Legacy template field", page_template_id=123)
+
+    user = User(
+        username="page-template-user", real_name="Page template user", password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    linked_layout = WebTemplate(
+        key="linked-layout", qualified_key="site:template:linked-layout", name="Layout",
+        html="", css="", project_data=project(), published_project_data=project(),
+        published_version=1, usage_mode="linked_layout",
+    )
+    unpublished_starter = WebTemplate(
+        key="unpublished-starter", qualified_key="site:template:unpublished-starter", name="Draft starter",
+        html="", css="", project_data=project(), published_version=0,
+        usage_mode="copy_on_create",
+    )
+    db_session.add_all([user, linked_layout, unpublished_starter]); db_session.commit()
+
+    with pytest.raises(HTTPException) as linked_error:
+        create_page(PagePayload(title="Invalid linked", source_template_id=linked_layout.id), db_session, user)
+    assert linked_error.value.status_code == 422
+
+    with pytest.raises(HTTPException) as unpublished_error:
+        create_page(PagePayload(title="Invalid unpublished", source_template_id=unpublished_starter.id), db_session, user)
+    assert unpublished_error.value.status_code == 422
+
+    with pytest.raises(HTTPException) as starter_as_layout_error:
+        create_page(PagePayload(title="Starter as layout", template_id=unpublished_starter.id), db_session, user)
+    assert starter_as_layout_error.value.status_code == 422
+
+    with pytest.raises(HTTPException) as missing_layout_error:
+        create_page(PagePayload(title="Missing layout", template_id=99999), db_session, user)
+    assert missing_layout_error.value.status_code == 404
+
+
+def test_template_clone_creates_editable_site_owned_variant(db_session):
+    from app.web.routes_templates import TemplateClonePayload, clone_template
+
+    user = User(
+        username="template-cloner", real_name="Template cloner", password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    origin = WebTemplate(
+        key="theme-starter", qualified_key="theme:templates:starter", name="Starter",
+        html="", css=".starter{color:green}", project_data=project(text("Starter")),
+        published_project_data=project(text("Published")), published_version=1,
+        usage_mode="copy_on_create", is_system=True,
+    )
+    db_session.add_all([user, origin]); db_session.commit()
+
+    clone = clone_template(origin.id, TemplateClonePayload(), db_session, user)
+
+    assert clone["id"] != origin.id
+    assert clone["forked_from_id"] == origin.id
+    assert clone["usage_mode"] == "copy_on_create"
+    assert clone["published_version"] == 0
+    assert clone["is_system"] is False
+    cloned_model = db_session.get(WebTemplate, clone["id"])
+    assert cloned_model.theme_version_id is None
+    assert cloned_model.project_data == origin.project_data
+    assert cloned_model.project_data is not origin.project_data
+
+
+def test_installed_theme_template_cannot_be_deleted_directly(db_session):
+    from app.web.routes_templates import delete_template
+
+    user = User(
+        username="theme-template-deleter",
+        real_name="Theme template deleter",
+        password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    theme = WebTheme(stable_key="immutable-theme", name="Immutable theme")
+    db_session.add_all([user, theme])
+    db_session.flush()
+    version = WebThemeVersion(
+        theme_id=theme.id,
+        version="1.0.0",
+        schema_version=1,
+        manifest={},
+        default_tokens={},
+        base_css="",
+        package_hash="a" * 64,
+        install_path="immutable-theme/1.0.0",
+    )
+    db_session.add(version)
+    db_session.flush()
+    template = WebTemplate(
+        key="immutable-layout",
+        qualified_key="immutable-theme@1.0.0:templates:layout",
+        name="Immutable layout",
+        html="",
+        project_data=project(),
+        theme_version_id=version.id,
+        is_system=False,
+    )
+    db_session.add(template)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as caught:
+        delete_template(template.id, db_session, user)
+    assert caught.value.status_code == 409
+    assert db_session.get(WebTemplate, template.id) is not None
 
 
 def test_template_kind_normalized_to_layout(db_session):
-    from app.migrations import _create_web_page_templates
     from sqlalchemy import create_engine, inspect, text
 
     # Set up a template with legacy kind='page'

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cloneResourceComponents, getResourceComponent, insertResource, linkedResourceInstance, linkedTemplatePart, linkedGlobalPart } from "./resourceBlocks";
+import { cloneResourceComponents, filterCatalogResources, getResourceComponent, insertLinkedResource, insertResource, linkedResourceInstance } from "./resourceBlocks";
 
 describe("builder resource insertion", () => {
   it("reads the canonical Grapes frame component before legacy page.component", () => {
@@ -7,13 +7,11 @@ describe("builder resource insertion", () => {
     expect(getResourceComponent(resource)).toEqual({ tagName: "main" });
   });
 
-  it("clones patterns but keeps template parts linked", () => {
+  it("clones reusable resource components without mutating their definition", () => {
     const pattern = { project_data: { pages: [{ frames: [{ component: { type: "wrapper", components: [{ type: "text", content: "Hello" }] } }] }] } };
     const clone = cloneResourceComponents(pattern);
     clone[0].content = "Changed";
     expect(getResourceComponent(pattern).components[0].content).toBe("Hello");
-    expect(linkedTemplatePart({ qualified_key: "theme:header", id: 4 })).toEqual({ type: "sc-template-part", resourceId: "theme:header" });
-    expect(linkedGlobalPart({ qualified_key: "site.footer", id: 7 })).toEqual({ type: "sc-global-part", resourceId: "site.footer" });
   });
 
   it("merges reusable resource styles into the destination project", () => {
@@ -50,5 +48,36 @@ describe("builder resource insertion", () => {
       previewUrl: "",
       props: { title: "Contact" },
     });
+  });
+
+  it("inserts sections through the canonical linked WebSection contract", () => {
+    const addComponents = vi.fn(() => ["section"]);
+    const section = {
+      id: 12,
+      qualified_key: "site:hero",
+      name: "Hero",
+      default_props: { heading: "Welcome" },
+    };
+
+    expect(insertLinkedResource({ addComponents }, section, "sections")).toEqual(["section"]);
+    expect(addComponents).toHaveBeenCalledWith({
+      type: "sc-resource-instance",
+      resourceKind: "section",
+      resourceId: "site:hero",
+      resourceName: "Hero",
+      previewUrl: "",
+      props: { heading: "Welcome" },
+    });
+  });
+
+  it("keeps site-owned resources and only the active theme version", () => {
+    const resources = [
+      { id: 1, name: "Site card", theme_version_id: null },
+      { id: 2, name: "Active card", theme_version_id: 8 },
+      { id: 3, name: "Old card", theme_version_id: 5 },
+    ];
+
+    expect(filterCatalogResources(resources, 8).map((item) => item.id)).toEqual([1, 2]);
+    expect(filterCatalogResources({ items: resources }, null).map((item) => item.id)).toEqual([1]);
   });
 });
