@@ -50,7 +50,10 @@ KIND_ICONS = {
 
 SITE_CSS = THEME_CSS
 
-_LEGACY_DROP_CONTENT = {"script", "style", "iframe", "object", "embed", "svg", "math", "template"}
+_LEGACY_DROP_CONTENT = {"script", "style", "object", "embed", "svg", "math", "template"}
+_RICH_TEXT_TAGS = {"iframe", "video"}
+_RICH_TEXT_VOID_TAGS = {"source"}
+_EMBED_HOSTS = {"www.youtube.com", "www.youtube-nocookie.com", "player.vimeo.com"}
 
 
 def _safe_legacy_url(value: str, *, image: bool = False) -> str:
@@ -62,6 +65,20 @@ def _safe_legacy_url(value: str, *, image: bool = False) -> str:
     if parsed.scheme and parsed.scheme.lower() not in allowed:
         return ""
     return text
+
+
+def _safe_embed_url(value: str) -> str:
+    """Allow only standard HTTPS YouTube/Vimeo player URLs in rich text."""
+    safe_url = _safe_legacy_url(value, image=True)
+    parsed = urlparse(safe_url)
+    host = (parsed.hostname or "").lower()
+    if parsed.scheme != "https" or host not in _EMBED_HOSTS:
+        return ""
+    if host in {"www.youtube.com", "www.youtube-nocookie.com"} and parsed.path.startswith("/embed/"):
+        return safe_url
+    if host == "player.vimeo.com" and parsed.path.startswith("/video/"):
+        return safe_url
+    return ""
 
 
 def _safe_legacy_style(value: str) -> str:
@@ -84,16 +101,21 @@ class _LegacyHTMLSanitizer(HTMLParser):
     def __init__(self):
         super().__init__(convert_charrefs=True)
         self.output: list[str] = []
-        self.suppressed = 0
+        self.suppressed_tags: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
         if tag in _LEGACY_DROP_CONTENT:
-            self.suppressed += 1
+            self.suppressed_tags.append(tag)
             return
-        if self.suppressed:
+        if self.suppressed_tags:
             return
-        if tag not in SAFE_TAGS and tag != COMPONENT_TAG:
+        if tag == "iframe":
+            src = next((value or "" for key, value in attrs if key.lower() == "src"), "")
+            if not _safe_embed_url(src):
+                self.suppressed_tags.append(tag)
+                return
+        if tag not in SAFE_TAGS and tag not in _RICH_TEXT_TAGS and tag != COMPONENT_TAG:
             return
         clean = []
         for raw_key, raw_value in attrs:
@@ -105,7 +127,11 @@ class _LegacyHTMLSanitizer(HTMLParser):
                 if re.fullmatch(r"data-[a-z0-9_-]{1,80}", key):
                     clean.append((key, value[:1000]))
                 continue
-            if key in {"href", "src"}:
+            if tag == "iframe" and key == "src":
+                safe_url = _safe_embed_url(value)
+                if safe_url:
+                    clean.append((key, safe_url))
+            elif key in {"href", "src"}:
                 safe_url = _safe_legacy_url(value, image=key == "src")
                 if safe_url:
                     clean.append((key, safe_url))
@@ -113,7 +139,7 @@ class _LegacyHTMLSanitizer(HTMLParser):
                 style = _safe_legacy_style(value)
                 if style:
                     clean.append((key, style))
-            elif key in SAFE_ATTRS or key.startswith("aria-"):
+            elif key in SAFE_ATTRS or key in {"allow", "allowfullscreen", "controls", "data-media-id", "frameborder", "loop", "muted", "playsinline", "poster", "preload", "referrerpolicy"} or key.startswith("aria-"):
                 clean.append((key, value[:1000]))
         attr_html = "".join(f' {key}="{escape(value, quote=True)}"' for key, value in clean)
         self.output.append(f"<{tag}{attr_html}>")
@@ -123,15 +149,15 @@ class _LegacyHTMLSanitizer(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
-        if tag in _LEGACY_DROP_CONTENT:
-            if self.suppressed:
-                self.suppressed -= 1
+        if self.suppressed_tags:
+            if tag == self.suppressed_tags[-1]:
+                self.suppressed_tags.pop()
             return
-        if not self.suppressed and (tag in SAFE_TAGS or tag == COMPONENT_TAG) and tag not in VOID_TAGS:
+        if (tag in SAFE_TAGS or tag in _RICH_TEXT_TAGS or tag == COMPONENT_TAG) and tag not in (VOID_TAGS | _RICH_TEXT_VOID_TAGS):
             self.output.append(f"</{tag}>")
 
     def handle_data(self, data: str) -> None:
-        if not self.suppressed:
+        if not self.suppressed_tags:
             self.output.append(escape(data))
 
 
@@ -480,7 +506,7 @@ def render_article_body(value: str | None) -> str:
     """Render legacy Markdown and rich-editor HTML through a safe boundary."""
     content = (value or "").strip()
     if content.startswith("<"):
-        return sanitize_legacy_html(content)
+        return _rewrite_media_urls(sanitize_legacy_html(content))
     return render_markdown(content)
 
 

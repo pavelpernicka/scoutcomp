@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
 
@@ -9,6 +7,7 @@ import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { convertLocalToUTC, formatServerDateToInputValue, isDateExpired, parseServerDate } from "../utils/dateUtils";
 import Button from "../components/Button";
+import RichTextContent from "../components/RichTextContent";
 import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 import ArticleEditBox from "../modules/web/admin/ArticleEditBox";
 
@@ -23,8 +22,6 @@ const getAutoCloseScopes = (t) => [
   { value: "global", label: t("adminTasks.autoCloseScope.global") },
   { value: "team", label: t("adminTasks.autoCloseScope.team") },
 ];
-
-marked.setOptions({ breaks: true });
 
 const emptyTaskForm = {
   name: "",
@@ -119,10 +116,6 @@ const formatStatus = (task, t) => {
   if (task.end_time && isDateExpired(task.end_time)) return t("adminTasks.status.expired");
   return t("adminTasks.status.active");
 };
-
-const renderMarkdown = (markdown) => ({
-  __html: DOMPurify.sanitize(marked.parse(markdown || "")),
-});
 
 function TaskActionButtons({ task, t, onEdit, onVariants, onArchive, onUnarchive, className = "" }) {
   return (
@@ -598,7 +591,7 @@ export default function AdminTasks() {
                       <article key={task.id} className="admin-task-mobile-card">
                         <button type="button" className="admin-task-mobile-card__main" onClick={() => handleOpenEditModal(task)}>
                           <strong>{task.name}</strong>
-                          {task.description && <span className="admin-task-mobile-card__description" dangerouslySetInnerHTML={renderMarkdown(task.description)} />}
+                          {task.description && <RichTextContent as="span" className="admin-task-mobile-card__description" value={task.description} />}
                         </button>
                         <div className="admin-task-mobile-card__meta">
                           <span>{pointsLabel}</span>
@@ -636,10 +629,7 @@ export default function AdminTasks() {
                           <td>
                             <div className="fw-semibold">{task.name}</div>
                             {task.description && (
-                              <div
-                                className="text-muted small"
-                                dangerouslySetInnerHTML={renderMarkdown(task.description)}
-                              />
+                              <RichTextContent className="text-muted small" value={task.description} />
                             )}
                           </td>
                           <td>
@@ -1125,11 +1115,7 @@ export default function AdminTasks() {
                                       <td>{variant.points}</td>
                                       <td className="text-muted small">
                                         {variant.description ? (
-                                          <div
-                                            dangerouslySetInnerHTML={{
-                                              __html: DOMPurify.sanitize(marked.parse(variant.description))
-                                            }}
-                                          />
+                                          <RichTextContent value={variant.description} />
                                         ) : (
                                           <em>{t('adminTasks.noDescription')}</em>
                                         )}

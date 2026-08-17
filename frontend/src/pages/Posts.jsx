@@ -9,7 +9,7 @@ import UserAvatar from "../components/UserAvatar";
 import MediaPreview from "../modules/web/media/MediaPreview";
 import api from "../services/api";
 import { parseServerDate } from "../utils/dateUtils";
-import { renderMarkdown } from "../utils/markdown";
+import RichTextContent from "../components/RichTextContent";
 
 const formatDate = (value, options = {}) => {
   const date = parseServerDate(value);
@@ -91,7 +91,7 @@ export function PostDetailPage() {
     <article className="mx-auto mt-3"><header className="post-reading-header"><h1>{post.title}</h1><div className="d-flex align-items-center gap-2 small text-muted mt-3"><UserAvatar user={{ real_name: post.author, avatar: post.author_avatar }} size={30} fallbackClass="bg-success" /><span>{post.author || "Oddíl"} · {formatDate(post.published_at)}</span></div></header>
     {post.cover_media_id && <MediaPreview src={`/api/web/media/${post.cover_media_id}/file`} alt="" className="post-reading-cover w-100 my-4" />}
     {post.event && <EventInfoBox event={post.event} />}
-    <div className="post-reading-body" dangerouslySetInnerHTML={renderMarkdown(post.body)} />
+    <RichTextContent className="post-reading-body" value={post.body} />
     </article>
   </main>;
 }

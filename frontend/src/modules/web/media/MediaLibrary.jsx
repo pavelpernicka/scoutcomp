@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { cmsApi } from "../api/cms";
 import MediaCard from "./MediaCard";
+import "../styles/admin.css";
 
 function flattenFolders(nodes, out = []) {
   nodes.forEach((node) => {

@@ -423,6 +423,20 @@ def test_rich_article_html_is_allowlisted():
     assert "script" not in rendered
 
 
+def test_rich_article_allows_only_trusted_embeds_and_rewrites_media_urls():
+    from app.web_render import render_article_body
+
+    rendered = render_article_body(
+        '<iframe src="https://www.youtube-nocookie.com/embed/abc" allowfullscreen></iframe>'
+        '<iframe src="https://evil.example/embed/abc"></iframe>'
+        '<figure><img src="/api/web/media/42/file" data-media-id="42" alt="Fotka"></figure>'
+    )
+
+    assert 'src="https://www.youtube-nocookie.com/embed/abc"' in rendered
+    assert 'src="https://evil.example/embed/abc"' not in rendered
+    assert 'src="/media/42/file"' in rendered
+
+
 def test_web_revisions_duplicate_and_trash(client, db_session):
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     headers = _headers(token)

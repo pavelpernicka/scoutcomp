@@ -26,7 +26,7 @@ describe("CMS content API contracts", () => {
       body: "Full body",
       cover_media_id: 12,
       event_id: 31,
-      published: false,
+      published: true,
       seo_title: "SEO",
       meta_description: null,
       canonical_url: null,

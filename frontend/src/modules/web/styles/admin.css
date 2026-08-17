@@ -179,17 +179,34 @@
 
 
 /* Article editor uses the shared media selector even outside the Web admin shell. */
-.article-edit-modal { max-width: min(880px, calc(100vw - 2rem)); }
-.article-edit-modal .article-media-picker { display:flex; align-items:center; gap:.5rem; min-height:3rem; padding:.45rem; border:1px solid #dfe3e8; border-radius:.45rem; background:#f8fafc; }
+.article-edit-modal { width:min(1080px, calc(100vw - 2rem)); max-width:none; max-height:calc(100vh - 2rem); display:flex; flex-direction:column; overflow:hidden; border:0; border-radius:.8rem; box-shadow:0 1.5rem 4rem rgba(19,43,28,.32); }
+.article-edit-modal__header { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid #dbe4da; background:#f2f6ef; }
+.article-edit-modal__header h2 { margin:.1rem 0 0; color:#193a28; font-size:1.2rem; }
+.article-edit-modal__eyebrow { color:#68806e; font-size:.7rem; font-weight:800; letter-spacing:.09em; text-transform:uppercase; }
+.article-edit-modal__body { display:grid; gap:1.15rem; overflow:auto; padding:1.25rem; background:#fffefa; }
+.article-edit-modal__title-field .form-label,.article-edit-modal__section-heading > span { display:block; margin-bottom:.35rem; color:#263f2f; font-size:.84rem; font-weight:750; }
+.article-edit-modal__title-field .form-control { min-height:2.7rem; border-color:#c8d6c7; font-size:1.05rem; font-weight:650; }
+.article-edit-modal__section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; margin-bottom:.55rem; }
+.article-edit-modal__section-heading small { color:#718074; font-size:.75rem; }
+.article-edit-modal__settings { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:1rem; }
+.article-edit-modal__panel { min-width:0; padding:1rem; border:1px solid #dce6d9; border-radius:.65rem; background:#f8fbf6; }
+.article-edit-modal .article-media-picker { display:flex; align-items:center; gap:.5rem; min-height:3rem; padding:.45rem; border:1px solid #d1ddd0; border-radius:.45rem; background:#fff; }
 .article-edit-modal .article-media-picker > .btn:first-child { flex:1; min-height:2.25rem; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .article-edit-modal .article-media-picker > .btn-link { color:#b42318; text-decoration:none; }
 .article-edit-modal .article-editbox { background:#fff; }
-.article-cover-preview { width:min(100%, 22rem); margin:0 0 .65rem; overflow:hidden; border:1px solid #dfe3e8; border-radius:.45rem; background:#f3f5f1; }
+.article-cover-preview { width:100%; margin:0 0 .7rem; overflow:hidden; border:1px solid #cddccc; border-radius:.5rem; background:#eef4eb; }
 .article-cover-preview img { display:block; width:100%; aspect-ratio:16 / 8; object-fit:cover; }
+.article-cover-preview-placeholder { display:grid; width:100%; aspect-ratio:16 / 8; place-items:center; color:#758275; font-size:2rem; }
+.article-edit-modal__footer { display:flex; justify-content:flex-end; gap:.55rem; padding:.85rem 1.25rem; border-top:1px solid #dbe4da; background:#f7faf5; }
+.article-edit-modal__footer .btn { min-height:2.4rem; padding-inline:1rem; }
 
 /* Posts retain a compact table on wide screens; on phones the same records turn
    into short rows so the title and actions never sit outside the viewport. */
 @media (max-width:700px) {
+  .article-edit-modal { width:100vw; max-height:100dvh; border-radius:0; }
+  .article-edit-modal__header,.article-edit-modal__body,.article-edit-modal__footer { padding-inline:1rem; }
+  .article-edit-modal__settings { grid-template-columns:1fr; }
+  .article-edit-modal__section-heading { align-items:flex-start; flex-direction:column; gap:.15rem; }
   .web-admin-posts > .d-flex { align-items:stretch !important; }
   .web-admin-posts > .d-flex .btn-group { width:100%; }
   .web-admin-posts > .d-flex .btn-group .btn { flex:1 1 0; padding-inline:.35rem; font-size:.74rem; }

@@ -1,0 +1,43 @@
+.web-editor-media-modal {
+  position: fixed;
+  z-index: 5000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(20, 25, 32, .7);
+}
+
+.web-media-picker-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100vw - 3rem));
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #fffefa;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, .35);
+}
+
+.web-media-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .75rem 1.25rem;
+  border-bottom: 1px solid #d8e2d6;
+  background: #f1f6ef;
+}
+
+.web-media-picker-header h2 { margin: 0; color: #1d442c; font-size: 1.1rem; font-weight: 700; }
+.web-media-picker-body { flex: 1; overflow-y: auto; min-height: 0; }
+.web-media-picker-body .web-media-layout { border: 0; }
+.web-media-picker-body .web-media-main { padding: .75rem 1rem; }
+.web-media-picker-body .web-media-sidebar { padding: .75rem .5rem; border-right: 1px solid #e1e7df; }
+.web-media-library-shell.embedded .web-media-layout { max-height: calc(90vh - 56px); }
+
+@media (max-width: 700px) {
+  .web-editor-media-modal { padding: 0; }
+  .web-media-picker-modal { width: 100vw; max-height: 100dvh; border-radius: 0; }
+  .web-media-picker-header { min-height: 3.5rem; padding: .7rem 1rem; }
+}

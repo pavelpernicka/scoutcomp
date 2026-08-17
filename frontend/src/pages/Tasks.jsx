@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
@@ -12,16 +10,11 @@ import Alert from "../components/Alert";
 import Button from "../components/Button";
 import "./Tasks.css";
 import Modal from "../components/Modal";
+import RichTextContent from "../components/RichTextContent";
 
 const COOLDOWN_MS = 5000;
 const MAX_PREVIEW_LENGTH = 220;
 const EMPTY_TASKS = [];
-
-marked.setOptions({ breaks: true });
-
-const renderMarkdown = (markdown) => ({
-  __html: DOMPurify.sanitize(marked.parse(markdown || "")),
-});
 
 const extractErrorMessage = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -471,11 +464,7 @@ export default function TasksPage() {
                   <span className="me-2">📋</span>
                   {t("tasks.questDescription")}
                 </h5>
-                <div
-                  className="text-dark"
-                  dangerouslySetInnerHTML={renderMarkdown(selectedTask.description)}
-                  style={{ lineHeight: '1.6' }}
-                />
+                <RichTextContent className="text-dark" value={selectedTask.description} />
               </div>
             )}
 
@@ -511,13 +500,7 @@ export default function TasksPage() {
             <div className="tab-content bg-light border border-info rounded-bottom-3 p-4">
               {selectedVariant && (
                 <div className="tab-pane fade show active">
-                  <div
-                    className="text-dark"
-                    dangerouslySetInnerHTML={renderMarkdown(
-                      selectedVariant.description || t("tasks.noVariantDescription")
-                    )}
-                    style={{ lineHeight: '1.6' }}
-                  />
+                  <RichTextContent className="text-dark" value={selectedVariant.description || t("tasks.noVariantDescription")} />
                 </div>
               )}
             </div>
@@ -529,13 +512,7 @@ export default function TasksPage() {
               <span className="me-2">📋</span>
               {t("tasks.questDescription")}
             </h5>
-            <div
-              className="text-dark"
-              dangerouslySetInnerHTML={renderMarkdown(
-                selectedTask.description || t("tasks.noDescription")
-              )}
-              style={{ lineHeight: '1.6' }}
-            />
+            <RichTextContent className="text-dark" value={selectedTask.description || t("tasks.noDescription")} />
           </div>
         )}
 
@@ -712,11 +689,7 @@ export default function TasksPage() {
 
                   {/* Description */}
                   <div className="card-text text-dark flex-grow-1 mb-3">
-                    <div
-                      className="task-description"
-                      dangerouslySetInnerHTML={renderMarkdown(getPreview(task))}
-                      style={{ fontSize: '0.95rem', lineHeight: '1.5' }}
-                    />
+                    <RichTextContent className="task-description" value={getPreview(task)} />
                     {hasMoreContent(task) && (
                       <button
                         type="button"

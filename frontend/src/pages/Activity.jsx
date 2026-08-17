@@ -7,7 +7,7 @@ import PropTypes from "prop-types";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { convertLocalToUTC, parseServerDate, formatServerDateToInputValue } from "../utils/dateUtils";
-import { renderMarkdown } from "../utils/markdown";
+import RichTextContent from "../components/RichTextContent";
 import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
@@ -105,6 +105,21 @@ const mapEventToForm = (event) => ({
   is_public: Boolean(event.is_public),
 });
 
+const validateEventForm = (form) => {
+  if (!form.title.trim()) return "validationTitle";
+  const startsAt = new Date(form.starts_at);
+  if (!form.starts_at || Number.isNaN(startsAt.getTime())) return "validationStart";
+  if (form.ends_at) {
+    const endsAt = new Date(form.ends_at);
+    if (Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) return "validationEnd";
+  }
+  if (form.requires_planned) {
+    const deadline = new Date(form.planned_deadline);
+    if (!form.planned_deadline || Number.isNaN(deadline.getTime()) || deadline > startsAt) return "validationDeadline";
+  }
+  return null;
+};
+
 function KindBadge({ kind, t }) {
   const style = KIND_STYLES[kind] || KIND_STYLES.other;
   const label = t(`calendar.kind${kind === "meeting" ? "Meeting" : kind === "trip" ? "Trip" : "Other"}`);
@@ -129,6 +144,7 @@ export default function Activity() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm());
+  const [formError, setFormError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [selectedTeamIds, setSelectedTeamIds] = useState([]);
   const [teamFilterOpen, setTeamFilterOpen] = useState(false);
@@ -210,12 +226,13 @@ export default function Activity() {
       }
     },
     onSuccess: () => {
+      setFormError(null);
       setFormOpen(false);
       setFeedback({ type: "success", message: t("calendar.saveSuccess") });
       queryClient.invalidateQueries({ queryKey: ["activity-events"] });
     },
     onError: (error) => {
-      setFeedback({ type: "danger", message: extractError(error, t("calendar.saveError")) });
+      setFormError(extractError(error, t("calendar.saveError")));
     },
   });
 
@@ -338,6 +355,7 @@ export default function Activity() {
   const past = sortedEvents.filter((event) => parseServerDate(event.starts_at) < today);
 
   const openCreateForm = (date) => {
+    setFormError(null);
     setEditing(null);
     const startsAt = date ? toLocalInput(date, true) : "";
     setForm({
@@ -350,6 +368,7 @@ export default function Activity() {
   };
 
   const openEditForm = (event) => {
+    setFormError(null);
     setSelectedEvent(null);
     setEditing(event);
     const nextForm = mapEventToForm(event);
@@ -399,8 +418,9 @@ export default function Activity() {
 
   const handleSave = (eventForm) => {
     eventForm.preventDefault();
-    if (!form.title.trim() || !form.starts_at) {
-      setFeedback({ type: "warning", message: t("calendar.saveError") });
+    const validationError = validateEventForm(form);
+    if (validationError) {
+      setFormError(t(`calendar.${validationError}`));
       return;
     }
     const payload = {
@@ -481,7 +501,7 @@ export default function Activity() {
         </div>
       </HeroHeader>
 
-      {feedback && (
+      {feedback && !formOpen && (
         <Alert type={feedback.type} className="mb-4" icon={<></>}>
           {feedback.message}
         </Alert>
@@ -790,10 +810,7 @@ export default function Activity() {
             </div>
             <div className="col-12">
               {selectedEvent.description ? (
-                <div
-                  className="markdown-body"
-                  dangerouslySetInnerHTML={renderMarkdown(selectedEvent.description)}
-                />
+                <RichTextContent className="markdown-body" value={selectedEvent.description} />
               ) : (
                 <p className="mb-0">
                   <em className="text-muted">—</em>
@@ -972,6 +989,11 @@ export default function Activity() {
         }
       >
         <form onSubmit={handleSave}>
+          {formError && (
+            <Alert type="warning" className="mb-3" icon={<></>}>
+              {formError}
+            </Alert>
+          )}
           <div className="row g-3">
             <div className="col-12">
               <label className="form-label small fw-semibold">{t("calendar.titleField")} *</label>

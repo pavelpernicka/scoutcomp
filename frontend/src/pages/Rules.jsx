@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal } from "../utils/dateUtils";
-import { renderMarkdown } from "../utils/markdown";
+import RichTextContent from "../components/RichTextContent";
 import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
@@ -181,7 +181,7 @@ export default function RulesPage() {
               </div>
             ) : page.content ? (
               <div className="bg-white rounded-3 p-4 border border-light">
-                <div className="markdown-preview" dangerouslySetInnerHTML={renderMarkdown(page.content)} />
+                <RichTextContent className="markdown-preview" value={page.content} />
               </div>
             ) : (
               <div className="text-center py-5">

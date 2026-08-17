@@ -58,7 +58,8 @@ async def public_security_headers(request: Request, call_next):
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; "
+        "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https:; "
+        "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; "
         "font-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     )
     return response

@@ -9,6 +9,7 @@ import { useAuth } from "../../../providers/AuthProvider";
 import { formatDateToLocal } from "../../../utils/dateUtils";
 import { buildPostDraftPayload } from "./contentContracts";
 import MediaPickerField from "../media/MediaPickerField";
+import MediaPreview from "../media/MediaPreview";
 import ArticleEditBox from "./ArticleEditBox";
 import UserAvatar from "../../../components/UserAvatar";
 import EventPickerField from "../../../components/EventPickerField";
@@ -66,6 +67,7 @@ export default function WebAdminPosts() {
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["web", "posts"] });
     queryClient.invalidateQueries({ queryKey: ["web-news-list"] });
+    queryClient.invalidateQueries({ queryKey: ["posts", "feed"] });
   };
 
   const deleteMutation = useMutation({
@@ -90,11 +92,30 @@ export default function WebAdminPosts() {
       if (post.published) return (await api.post(`/web/posts/${post.id}/unpublish`)).data;
       return (await api.post(`/web/posts/${post.id}/publish`, { expected_version: post.draft_version })).data;
     },
-    onSuccess: () => {
-      invalidate();
+    onMutate: async (post) => {
+      await queryClient.cancelQueries({ queryKey: ["web", "posts"] });
+      const snapshots = queryClient.getQueriesData({ queryKey: ["web", "posts"] });
+      queryClient.setQueriesData({ queryKey: ["web", "posts"] }, (current) => {
+        if (!current?.items) return current;
+        return { ...current, items: current.items.map((item) => item.id === post.id ? { ...item, published: !post.published, published_at: post.published ? null : new Date().toISOString() } : item) };
+      });
+      return { snapshots };
+    },
+    onSuccess: (response) => {
+      const updatedPost = response?.post || response;
+      queryClient.setQueriesData({ queryKey: ["web", "posts"] }, (current) => {
+        if (!current?.items || !updatedPost?.id) return current;
+        return { ...current, items: current.items.map((item) => item.id === updatedPost.id ? { ...item, ...updatedPost } : item) };
+      });
+      queryClient.invalidateQueries({ queryKey: ["web-news-list"] });
+      queryClient.invalidateQueries({ queryKey: ["posts", "feed"] });
       setFeedback({ type: "success", message: t("web.saveSuccess") });
     },
-    onError: (error) => setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.saveFailed") }),
+    onError: (error, _post, context) => {
+      context?.snapshots?.forEach(([key, data]) => queryClient.setQueryData(key, data));
+      setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.saveFailed") });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["web", "posts"] }),
   });
 
   const handleDelete = (post) => {
@@ -258,7 +279,11 @@ export default function WebAdminPosts() {
         <ArticleEditBoxModal
           post={editing === "new" ? {} : editingPost}
           onCancel={() => setEditing(null)}
-          onSaved={() => {
+          onSaved={(savedPost) => {
+            queryClient.setQueriesData({ queryKey: ["web", "posts"] }, (current) => {
+              if (!current?.items || !savedPost?.id) return current;
+              return { ...current, items: current.items.map((item) => item.id === savedPost.id ? { ...item, ...savedPost } : item) };
+            });
             setEditing(null);
             invalidate();
             setFeedback({ type: "success", message: t("web.saveSuccess") });
@@ -281,7 +306,7 @@ function PostActions({ post, canEdit, canPublish, t, onEdit, onToggleVisibility,
   return (
     <div className={`btn-group btn-group-sm ${className}`.trim()} role="group" onClick={onClick}>
       {canEdit && <button type="button" className="btn btn-outline-secondary" title={t("web.edit")} onClick={onEdit}><i className="fas fa-pen" /></button>}
-      {canPublish && <button type="button" className={`btn ${post.published ? "btn-outline-warning" : "btn-outline-success"}`} title={post.published ? t("web.unpublish") : t("web.editor.publish")} onClick={onToggleVisibility} disabled={visibilityPending}><i className={`fas ${post.published ? "fa-eye-slash" : "fa-eye"}`} /></button>}
+      {canPublish && <button type="button" className={`btn ${post.published ? "btn-outline-warning" : "btn-outline-success"}`} title={post.published ? t("web.unpublish") : t("web.editor.publish")} onClick={(event) => { event.stopPropagation(); onToggleVisibility(); }} disabled={visibilityPending}><i className={`fas ${post.published ? "fa-eye-slash" : "fa-eye"}`} /></button>}
       <button type="button" className="btn btn-outline-danger" title={t("web.delete")} onClick={onDelete} disabled={deletePending}><i className="fas fa-trash" /></button>
     </div>
   );
@@ -311,7 +336,6 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
     cover_media_id: post.cover_media_id ? String(post.cover_media_id) : "",
     event_id: post.event_id ? String(post.event_id) : "",
   }));
-  const [coverPreviewBroken, setCoverPreviewBroken] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async ({ payload }) => {
@@ -325,7 +349,7 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
       }
       return saved;
     },
-    onSuccess: () => onSaved(),
+    onSuccess: (savedPost) => onSaved(savedPost),
     onError: (error) => {
       window.alert(error?.response?.data?.detail || t("web.saveFailed"));
     },
@@ -340,19 +364,19 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
   return (
     <div className="web-builder-modal-backdrop" onClick={onCancel}>
       <form
-        className="card web-builder-modal web-template-modal article-edit-modal"
+        className="card web-builder-modal article-edit-modal"
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="card-body">
-          <h5 className="card-title mb-3">
-            <i className="fas fa-newspaper me-2"></i>
-            {isNew ? t("web.newPost") : t("web.editPost")}
-          </h5>
-          <div className="mb-3">
-            <label className="form-label small fw-semibold">{t("web.title")}</label>
+        <header className="article-edit-modal__header">
+          <div><span className="article-edit-modal__eyebrow">{isNew ? "Nový obsah" : "Úprava obsahu"}</span><h2><i className="fas fa-newspaper me-2"></i>{isNew ? t("web.newPost") : t("web.editPost")}</h2></div>
+          <button type="button" className="btn-close" aria-label={t("web.close")} onClick={onCancel} />
+        </header>
+        <div className="article-edit-modal__body">
+          <div className="article-edit-modal__title-field">
+            <label className="form-label">{t("web.title")}</label>
             <input
-              className="form-control form-control-sm"
+              className="form-control"
               value={form.title}
               onChange={(e) =>
                 setForm((f) => ({
@@ -363,20 +387,19 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
               required
             />
           </div>
-
-
-          <div className="mb-3">
-            <label className="form-label small fw-semibold">{t("web.postBody")}</label>
+          <section className="article-edit-modal__editor">
+            <div className="article-edit-modal__section-heading"><span>{t("web.postBody")}</span><small>Formátovaný text, odkazy, média a vložený obsah</small></div>
             <ArticleEditBox value={form.body} onChange={(body) => setForm((f) => ({ ...f, body }))} disabled={saveMutation.isPending} />
-          </div>
-          <div className="mb-3">
-            <label className="form-label small fw-semibold d-block">{t("web.postCover")}</label>
-            {form.cover_media_id && !coverPreviewBroken && (
+          </section>
+          <div className="article-edit-modal__settings">
+          <section className="article-edit-modal__panel">
+            <div className="article-edit-modal__section-heading"><span>{t("web.postCover")}</span><small>Titulní fotografie příspěvku</small></div>
+            {form.cover_media_id && (
               <figure className="article-cover-preview">
-                <img
+                <MediaPreview
                   src={`/api/web/media/${encodeURIComponent(form.cover_media_id)}/file`}
                   alt={form.title || t("web.postCover")}
-                  onError={() => setCoverPreviewBroken(true)}
+                  fallback={<i className="fas fa-image article-cover-preview-placeholder" aria-hidden="true" />}
                 />
               </figure>
             )}
@@ -384,21 +407,21 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
               value={form.cover_media_id || null}
               className="article-media-picker"
               onChange={(item) => {
-                setCoverPreviewBroken(false);
                 setForm((f) => ({ ...f, cover_media_id: item ? String(item.id) : "" }));
               }}
             />
-          </div>
-          <div className="mb-3">
-            <label className="form-label small fw-semibold">{t("web.linkedEvent")}</label>
+          </section>
+          <section className="article-edit-modal__panel">
+            <div className="article-edit-modal__section-heading"><span>{t("web.linkedEvent")}</span><small>{t("web.eventLinkHint")}</small></div>
             <EventPickerField
               value={form.event_id ? Number(form.event_id) : undefined}
               disabled={saveMutation.isPending}
               onChange={(item) => setForm((current) => ({ ...current, event_id: item ? String(item.id) : "" }))}
             />
-            <div className="form-text">{t("web.eventLinkHint")}</div>
+          </section>
           </div>
-          <div className="d-flex justify-content-end gap-2">
+        </div>
+          <footer className="article-edit-modal__footer">
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onCancel}>
               {t("web.cancel")}
             </button>
@@ -410,8 +433,7 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
               <i className="fas fa-save me-1"></i>
               {t("web.save")}
             </button>
-          </div>
-        </div>
+          </footer>
       </form>
     </div>
   );
