@@ -14,7 +14,7 @@ import EditorRail from "./EditorRail";
 import EditorTopbar from "./EditorTopbar";
 import PreviewDialog from "./PreviewDialog";
 import RevisionsDialog from "./RevisionsDialog";
-import { detachLinkedResource, filterCatalogResources, insertLinkedResource, linkedResourceInstance } from "./resourceBlocks";
+import { cloneResourceComponents, detachLinkedResource, filterCatalogResources, hydrateMenuComponents, insertResource } from "./resourceBlocks";
 import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
@@ -45,7 +45,7 @@ export default function WebEditorPage() {
   const [inspectorOpen, setInspectorOpen] = useState(() => !isCompactViewport());
   const [device, setDeviceState] = useState("Desktop");
   const [selected, setSelected] = useState(null);
-  const [pageForm, setPageForm] = useState({ title: "", path_segment: "", meta_description: "", template_id: null });
+  const [pageForm, setPageForm] = useState({ title: "", path_segment: "", meta_description: "", template_id: null, replace_content_with_template: false });
   const [preview, setPreview] = useState(null);
   const [previewError, setPreviewError] = useState("");
   const [publishedNotice, setPublishedNotice] = useState("");
@@ -59,13 +59,19 @@ export default function WebEditorPage() {
   const componentsQuery = useQuery({ queryKey: ["web", "design", "components"], queryFn: () => cmsApi.listDesignResources("components"), retry: 1 });
   const mediaQuery = useQuery({ queryKey: ["web", "media"], queryFn: () => cmsApi.listMedia({ limit: 100, offset: 0 }), retry: 1 });
   const templatesQuery = useQuery({ queryKey: ["web", "templates"], queryFn: cmsApi.listTemplates, retry: 1 });
+  const menusQuery = useQuery({
+    queryKey: ["web", "menus"],
+    queryFn: cmsApi.listMenus,
+    enabled: can("web.pages.manage") || can("web.templates.manage") || can("web.menus.manage") || can("web.manage"),
+    retry: 1,
+  });
   const canvasStylesQuery = useQuery({ queryKey: ["web", "canvas-styles"], queryFn: cmsApi.getCanvasStyles, retry: 1 });
   const page = pageQuery.data;
   pageRef.current = pageForm;
 
   useEffect(() => {
     if (!page) return;
-    const next = { title: page.title || "", path_segment: page.path_segment || page.slug || "", meta_description: page.meta_description || "", template_id: page.template_id || null };
+    const next = { title: page.title || "", path_segment: page.path === "/" ? "/" : (page.path_segment || page.slug || ""), meta_description: page.meta_description || "", template_id: page.template_id || null, replace_content_with_template: false };
     pageRef.current = next;
     editorTemplateIdRef.current = page.template_id || null;
     setPageForm(next);
@@ -85,14 +91,14 @@ export default function WebEditorPage() {
       id: `sc-resource-component-${item.id}`,
       label: item.name,
       category: t("web.editor.catalog.components"),
-      content: linkedResourceInstance(item, "component"),
+      content: cloneResourceComponents(item),
       attributes: { title: item.description || item.name },
     })),
     ...sections.map((item) => ({
       id: `sc-resource-section-${item.id}`,
       label: item.name,
       category: t("web.editor.catalog.sections"),
-      content: linkedResourceInstance(item, "section"),
+      content: cloneResourceComponents(item),
       attributes: { title: item.description || item.name },
     })),
   ], [components, sections, t]);
@@ -121,10 +127,15 @@ export default function WebEditorPage() {
     onError: () => setPreviewError(t("web.errors.editorLoad")),
   });
 
+  useEffect(() => {
+    if (!editor.isReady) return undefined;
+    return hydrateMenuComponents(editor.editorRef.current, menusQuery.data || []);
+  }, [editor.editorRef, editor.isReady, menusQuery.data]);
+
   const getPayload = useCallback(() => {
     const snapshot = editor.getSnapshot();
     savedDirtyCountRef.current = snapshot?.dirtyCount;
-    return { project_data: snapshot?.projectData, draft_css: snapshot?.css || "", title: pageRef.current.title.trim(), path_segment: pageRef.current.path_segment, meta_description: pageRef.current.meta_description || null, template_id: pageRef.current.template_id, editor_template_id: editorTemplateIdRef.current };
+    return { project_data: snapshot?.projectData, draft_css: snapshot?.css || "", title: pageRef.current.title.trim(), path_segment: pageRef.current.path_segment, meta_description: pageRef.current.meta_description || null, template_id: pageRef.current.template_id, editor_template_id: editorTemplateIdRef.current, replace_content_with_template: pageRef.current.replace_content_with_template === true };
   }, [editor]);
   const saveDraft = useCallback((payload) => cmsApi.saveDraft(pageId, payload).then((result) => {
     editor.markSaved(savedDirtyCountRef.current);
@@ -170,7 +181,11 @@ export default function WebEditorPage() {
     let cancelled = false;
     Promise.all(definitions.map(async (item) => {
       try {
-        const { data } = await api.get(item.preview_url.replace(/^\/api\//, "/"), { responseType: "blob" });
+        const previewUrl = item.preview_url;
+        if (previewUrl.startsWith("data:")) {
+          return [String(item.qualified_key || item.id), previewUrl];
+        }
+        const { data } = await api.get(previewUrl.replace(/^\/api\//, "/"), { responseType: "blob" });
         return [String(item.qualified_key || item.id), URL.createObjectURL(data)];
       } catch { return null; }
     })).then((entries) => {
@@ -187,6 +202,61 @@ export default function WebEditorPage() {
     });
     return () => { cancelled = true; };
   }, [activeThemeVersionId, componentsQuery.data, editor.editorRef, sectionsQuery.data]);
+
+  // A linked resource must look like the section the author will publish, not
+  // like an opaque placeholder. Hydrate it with the same server materializer
+  // used by the explicit detach operation, while retaining only the link and
+  // props in persisted GrapesJS project data. Runtime-bound resources fall
+  // back to their generated preview artifact because they need request data.
+  useEffect(() => {
+    const instance = editor.editorRef.current;
+    if (!instance || !editor.isReady) return undefined;
+    const resourcesByKey = new Map([...components, ...sections].flatMap((resource) => [
+      [String(resource.id), resource],
+      [String(resource.qualified_key || ""), resource],
+    ].filter(([key]) => key)));
+    const pending = new Map();
+    let cancelled = false;
+    const hydrate = (component) => {
+      if (cancelled || component?.get?.("type") !== "sc-resource-instance") return;
+      const definition = resourcesByKey.get(String(component.get("resourceId") || ""));
+      if (!definition?.id || !definition.draft_version || definition.can_materialize === false) return;
+      const key = component.cid || component.getId?.();
+      if (pending.has(key)) window.clearTimeout(pending.get(key));
+      pending.set(key, window.setTimeout(async () => {
+        pending.delete(key);
+        try {
+          const kind = component.get("resourceKind") === "section" ? "sections" : "components";
+          const fragment = await cmsApi.materializeDesignResource(kind, definition.id, {
+            props: component.get("props") || {},
+            variant: component.get("variant") || null,
+            expected_version: definition.draft_version,
+          });
+          if (!cancelled) component.set?.({ livePreviewHtml: fragment.html || "", livePreviewCss: fragment.css || "" }, { avoidStore: true });
+        } catch {
+          // A preview artifact remains available for bindings, stale drafts or
+          // any fragment that cannot intentionally be materialized.
+        }
+      }, 80));
+    };
+    const hydrateTree = (component) => {
+      hydrate(component);
+      component?.components?.().forEach?.(hydrateTree);
+    };
+    const onAdd = (component) => hydrateTree(component);
+    const onUpdate = (component) => hydrate(component);
+    hydrateTree(instance.getWrapper?.());
+    instance.on("component:add", onAdd);
+    instance.on("component:update:props", onUpdate);
+    instance.on("component:update:variant", onUpdate);
+    return () => {
+      cancelled = true;
+      pending.forEach((timer) => window.clearTimeout(timer));
+      instance.off("component:add", onAdd);
+      instance.off("component:update:props", onUpdate);
+      instance.off("component:update:variant", onUpdate);
+    };
+  }, [components, editor.editorRef, editor.isReady, sections]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -292,8 +362,11 @@ export default function WebEditorPage() {
     instance.on("component:selected", addImageToolbarAction);
     addImageToolbarAction(instance.getSelected?.());
     return () => {
-      instance.off("component:selected", addImageToolbarAction);
-      instance.Commands.remove(command);
+      // React may unmount after GrapesJS has already destroyed its command
+      // manager (for example while navigating away during a template reload).
+      // Event removal is harmless, but Commands is no longer guaranteed.
+      instance.off?.("component:selected", addImageToolbarAction);
+      instance.Commands?.remove?.(command);
     };
   }, [editor.editorRef, editor.isReady, openMediaPicker, t]);
   const changePageForm = (patch) => {
@@ -309,6 +382,12 @@ export default function WebEditorPage() {
         .then(() => pageQuery.refetch())
         .catch(() => {});
     }
+  };
+  const requestTemplateChange = (templateId) => {
+    if (String(templateId || "") === String(pageRef.current.template_id || "")) return;
+    if (!window.confirm(t("web.editor.confirmTemplateSwitch"))) return;
+    const replaceContent = templateId && window.confirm(t("web.editor.confirmTemplateContent"));
+    changePageForm({ template_id: templateId, replace_content_with_template: Boolean(replaceContent) });
   };
   const selectedComponent = selected ? editor.editorRef.current?.getSelected() : null;
   const selectComponent = (component) => editor.editorRef.current?.select(component);
@@ -335,7 +414,7 @@ export default function WebEditorPage() {
   const handleEditDefinition = useCallback(async (component, kind, definition) => {
     const apiKind = kind === "sections" ? "sections" : "components";
     let editable = definition;
-    if (definition.is_locked || definition.theme_version_id) {
+    if (definition.is_locked) {
       editable = await handleClone(component, kind, definition);
     }
     if (!editable) return;
@@ -346,7 +425,7 @@ export default function WebEditorPage() {
     const definition = templates.find((item) => String(item.id) === String(templateId));
     if (!definition) return;
     let editable = definition;
-    if (definition.theme_version_id || definition.is_system) {
+    if (definition.is_locked) {
       try {
         editable = await cmsApi.cloneTemplate(definition.id);
         queryClient.invalidateQueries({ queryKey: ["web", "templates"] });
@@ -382,7 +461,7 @@ export default function WebEditorPage() {
     if (catalog === "data") return editor.addBlock(`sc-data-${safeId(item.id)}`);
     const instance = editor.editorRef.current;
     if (!instance) return [];
-    return insertLinkedResource(instance, item, catalog);
+    return insertResource(instance, item);
   };
   const navigateAfterSave = async (destination) => {
     if (autosave.hasPendingChanges) {
@@ -413,9 +492,9 @@ export default function WebEditorPage() {
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
     <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => openMediaPicker()} />
-    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
+    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onTemplateChange={requestTemplateChange} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
-    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} />
+    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>
     <div className="visually-hidden" aria-live="polite">{publishedNotice || t(`web.editor.saveStates.${autosave.status}`)}</div>
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}

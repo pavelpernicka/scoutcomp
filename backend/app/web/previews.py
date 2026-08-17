@@ -5,14 +5,18 @@ renders a styled HTML fragment suitable for an iframe preview.
 """
 from __future__ import annotations
 
+import base64
 import hashlib
 import html as html_lib
 import json
 import logging
 import os
+import re
 import uuid
+from mimetypes import guess_type
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from sqlalchemy.orm import Session
 
@@ -25,6 +29,76 @@ PREVIEW_DATA_DIR = Path(settings.app.web_media_dir).expanduser().resolve().paren
 PREVIEW_VIEWPORT = "1280x720"
 PREVIEW_FORMAT = "png"
 MAX_RETRIES = 3
+
+_THEME_ASSET_URL = re.compile(
+    r"/(?:api/web/)?theme-assets/(?P<version>\d+)/(?P<path>assets/[A-Za-z0-9%._~!$&'+,;=:@/-]+)"
+)
+_CSS_ASSET_URL = re.compile(r"url\(\s*(['\"]?)(?P<path>assets/[A-Za-z0-9%._~!$&'()*+,;=:@/-]+)\1\s*\)", re.I)
+
+
+def _resource_theme_version_id(db: Session, resource_kind: str, resource_id: int) -> int | None:
+    """Return the owning theme version without coupling callers to resource models."""
+    from ..models import WebReusableComponent, WebSection, WebTemplate
+
+    model = {
+        "components": WebReusableComponent,
+        "sections": WebSection,
+        "templates": WebTemplate,
+    }.get(resource_kind)
+    if model is None:
+        return None
+    return db.query(model.theme_version_id).filter(model.id == resource_id).scalar()
+
+
+def _namespace_preview_css(css: str, theme_version_id: int | None) -> str:
+    """Give package-relative CSS URLs enough context for offline rendering."""
+    if theme_version_id is None:
+        return css or ""
+
+    def replace(match: re.Match[str]) -> str:
+        quote = match.group(1)
+        path = match.group("path")
+        return f"url({quote}/theme-assets/{theme_version_id}/{path}{quote})"
+
+    return _CSS_ASSET_URL.sub(replace, css or "")
+
+
+def _inline_theme_assets(db: Session, document: str) -> str:
+    """Inline validated theme files so Playwright never needs authenticated HTTP.
+
+    Preview pages are rendered from ``page.set_content`` and therefore have no
+    application origin or session.  Replacing only DB-declared assets with data
+    URIs keeps the artifact self-contained while preserving the package path
+    checks used by the public asset endpoint.
+    """
+    from ..models import WebThemeAsset, WebThemeVersion
+    from .theme_package import ThemePackageError, resolve_theme_asset_path
+
+    cache: dict[tuple[int, str], str | None] = {}
+
+    def replace(match: re.Match[str]) -> str:
+        version_id = int(match.group("version"))
+        relative_path = unquote(match.group("path"))
+        key = (version_id, relative_path)
+        if key not in cache:
+            version = db.get(WebThemeVersion, version_id)
+            asset = db.query(WebThemeAsset).filter_by(
+                theme_version_id=version_id,
+                relative_path=relative_path,
+            ).one_or_none()
+            uri = None
+            if version is not None and asset is not None:
+                try:
+                    path = resolve_theme_asset_path(version, relative_path)
+                except ThemePackageError:
+                    path = None
+                if path is not None and path.is_file() and path.stat().st_size == asset.size:
+                    mime = asset.mime or guess_type(path.name)[0] or "application/octet-stream"
+                    uri = f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
+            cache[key] = uri
+        return cache[key] or match.group(0)
+
+    return _THEME_ASSET_URL.sub(replace, document)
 
 
 def _source_hash(
@@ -143,13 +217,14 @@ def render_html_preview(
         published_resources=False,
     )
     linked_css_text = "\n".join(linked_css)
-    return render_document(
+    document = render_document(
         body,
         title=title,
         css=f"{css}\n{compiled.css}\n{linked_css_text}",
         base_css=base_css,
         tokens=tokens or {},
     )
+    return _inline_theme_assets(db, document)
 
 
 def build_preview(
@@ -163,6 +238,7 @@ def build_preview(
     tokens: dict[str, Any] | None = None,
     title: str = "",
     force: bool = False,
+    browser_render: bool = True,
 ) -> dict[str, Any]:
     """Build and persist a preview artifact synchronously.
 
@@ -170,6 +246,8 @@ def build_preview(
     structural SVG is persisted instead, so every returned artifact URL is
     physically servable. The caller owns the surrounding database transaction.
     """
+    theme_version_id = _resource_theme_version_id(db, resource_kind, resource_id)
+    base_css = _namespace_preview_css(base_css, theme_version_id)
     target_hash = _source_hash(
         project_data, css, base_css=base_css, tokens=tokens, title=title,
     )
@@ -190,15 +268,17 @@ def build_preview(
             if existing_path is not None and existing_path.is_file():
                 return _artifact_out(existing)
 
-    # Attempt real PNG screenshot via Playwright; fall back to SVG marker.
-    try:
-        preview_html = render_html_preview(
-            db, project_data, css, base_css=base_css, tokens=tokens, title=title or "Preview",
-        )
-        png_bytes = render_png_preview(preview_html)
-    except Exception as exc:  # noqa: BLE001 - structural SVG remains available
-        logger.warning("HTML preview rendering failed, using SVG fallback: %s", exc)
-        png_bytes = None
+    # Catalog backfills intentionally use the lightweight structural artifact;
+    # explicit saves/regeneration may opt into the browser screenshot.
+    png_bytes = None
+    if browser_render:
+        try:
+            preview_html = render_html_preview(
+                db, project_data, css, base_css=base_css, tokens=tokens, title=title or "Preview",
+            )
+            png_bytes = render_png_preview(preview_html)
+        except Exception as exc:  # noqa: BLE001 - structural SVG remains available
+            logger.warning("HTML preview rendering failed, using SVG fallback: %s", exc)
     if png_bytes:
         content = png_bytes
         extension = "png"
@@ -236,6 +316,49 @@ def build_preview(
     db.flush()
 
     return _artifact_out(artifact)
+
+
+def ensure_preview(
+    db: Session,
+    resource_kind: str,
+    resource_id: int,
+    project_data: dict[str, Any],
+    css: str = "",
+    *,
+    base_css: str = "",
+    tokens: dict[str, Any] | None = None,
+    title: str = "",
+) -> dict[str, Any] | None:
+    """Return a usable preview, creating a missing artifact best-effort.
+
+    Theme archives predate preview artifacts in existing installations.  The
+    authoring catalog uses this small lazy backfill so immutable originals get
+    the same visual cards as new site-owned copies without making a GET fail
+    when browser or preview storage is temporarily unavailable.
+    """
+    current = get_current_preview(db, resource_kind, resource_id)
+    if current:
+        return current
+    try:
+        return build_preview(
+            db,
+            resource_kind,
+            resource_id,
+            project_data,
+            css,
+            base_css=base_css,
+            tokens=tokens,
+            title=title,
+            browser_render=False,
+        )
+    except Exception:  # noqa: BLE001 - catalog fallback remains usable
+        logger.warning(
+            "Could not backfill preview for %s/%s",
+            resource_kind,
+            resource_id,
+            exc_info=True,
+        )
+        return None
 
 
 def _project_preview_svg(project_data, *, title="", width=400, height=300) -> str:
@@ -321,7 +444,11 @@ def render_png_preview(
                 page = browser.new_page(viewport={"width": viewport[0], "height": viewport[1]})
                 page.set_content(html, wait_until="networkidle")
                 page.wait_for_timeout(250)
-                return page.screenshot(type="png", full_page=False)
+                # A resource rarely fills a 1280×720 viewport. Capturing the
+                # document itself instead of the viewport removes the blank
+                # canvas and makes the preview card focus on authored content.
+                body = page.locator("body")
+                return body.screenshot(type="png", animations="disabled")
             finally:
                 browser.close()
     except Exception as exc:  # noqa: BLE001 - preview is best-effort

@@ -14,6 +14,8 @@ class FakeSelected {
 
   get(key) { return this.values[key]; }
   getAttributes() { return this.values.attributes || {}; }
+  addAttributes(next) { this.values.attributes = { ...(this.values.attributes || {}), ...next }; }
+  removeAttributes(name) { const next = { ...(this.values.attributes || {}) }; delete next[name]; this.values.attributes = next; }
   getClasses() { return []; }
   parent() { return this.parentNode; }
   on(event, handler) {
@@ -75,6 +77,26 @@ describe("EditorInspector linked props", () => {
     expect(onContentChange).toHaveBeenCalled();
   });
 
+  it("configures a meeting list for an explicit team without page coupling", () => {
+    const selected = new FakeSelected({ type: "sc-repeat", source: "core.events", params: {} });
+    render(<EditorInspector
+      selected={selected}
+      dataSources={[{
+        id: "core.events", label: "Events", collection: true,
+        fields: { title: { label: "Title" } },
+        parameters: { team_id: { type: "integer", label: "Team", minimum: 1 } },
+      }]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+      onContentChange={vi.fn()}
+    />);
+
+    fireEvent.click(screen.getAllByRole("tab")[2]);
+    fireEvent.change(screen.getByLabelText("Team"), { target: { value: "7" } });
+    expect(selected.values.params).toEqual({ team_id: 7 });
+  });
+
   it("reflects GrapesJS undo and external prop changes", () => {
     const selected = new FakeSelected({
       type: "sc-resource-instance",
@@ -94,6 +116,31 @@ describe("EditorInspector linked props", () => {
     expect(screen.getByLabelText("Title")).toHaveValue("Current");
     act(() => selected.set("props", { title: "Restored by undo" }));
     expect(screen.getByLabelText("Title")).toHaveValue("Restored by undo");
+  });
+
+  it("offers the shared media picker from an image content panel", () => {
+    const onSelectMedia = vi.fn();
+    const selected = new FakeSelected({
+      type: "image",
+      attributes: { src: "blob:preview", alt: "Výprava", "data-sc-media-id": "12" },
+    });
+    render(<EditorInspector
+      selected={selected}
+      dataSources={[]}
+      resources={{ components: [], sections: [] }}
+      onDuplicate={vi.fn()}
+      onDelete={vi.fn()}
+      onSelectMedia={onSelectMedia}
+    />);
+
+    fireEvent.click(screen.getByRole("button", { name: /Vybrat médium|Choose media/ }));
+    expect(onSelectMedia).toHaveBeenCalledWith(selected);
+    expect(screen.getByLabelText(/Alternativní text|Alternative text/)).toHaveValue("Výprava");
+    const source = screen.getByLabelText(/Zdroj obrázku|Image source/);
+    fireEvent.change(source, { target: { value: "/custom/hero.jpg" } });
+    fireEvent.blur(source);
+    expect(selected.values.attributes.src).toBe("/custom/hero.jpg");
+    expect(selected.values.attributes["data-sc-media-id"]).toBeUndefined();
   });
 
   it("keeps linked template shell read-only and routes editing to its definition", () => {

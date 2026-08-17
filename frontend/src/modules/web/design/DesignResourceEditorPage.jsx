@@ -6,13 +6,15 @@ import { useTranslation } from "react-i18next";
 
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../providers/AuthProvider";
+import api from "../../../services/api";
 import { cmsApi } from "../api/cms";
-import { filterCatalogResources, linkedResourceInstance } from "../editor/resourceBlocks";
-import { DataBindings, LinkedResourceProps, RepeatConfigurator } from "../editor/EditorInspector";
+import { cloneResourceComponents, filterCatalogResources, hydrateMenuComponents } from "../editor/resourceBlocks";
+import { DataBindings, ImageContentPanel, LinkedResourceProps, RepeatConfigurator } from "../editor/EditorInspector";
 import EditorNavigator from "../editor/EditorNavigator";
 import EditorBreadcrumbs from "../editor/EditorBreadcrumbs";
 import useGrapesEditor from "../editor/useGrapesEditor";
 import MediaPreview from "../media/MediaPreview";
+import MediaPickerModal from "../media/MediaPickerModal";
 import { getTemplateUsageMode, TEMPLATE_USAGE_MODES, templatePersistenceFields } from "../templateContracts";
 import ResourcePropSchemaEditor from "./ResourcePropSchemaEditor";
 import "../styles/editor.css";
@@ -39,6 +41,7 @@ export default function DesignResourceEditorPage({ kind }) {
   const versionRef = useRef(1);
   const [status, setStatus] = useState("saved");
   const [error, setError] = useState("");
+  const [mediaPickerTarget, setMediaPickerTarget] = useState(null);
   const [device, setDeviceState] = useState("Desktop");
   const [leftPanel, setLeftPanel] = useState("insert");
   const [rightPanel, setRightPanel] = useState("style");
@@ -75,6 +78,12 @@ export default function DesignResourceEditorPage({ kind }) {
     enabled: kind === "templates" || kind === "sections",
     retry: 1,
   });
+  const menusQuery = useQuery({
+    queryKey: ["web", "menus"],
+    queryFn: cmsApi.listMenus,
+    enabled: can("web.design.manage") || can("web.menus.manage") || can("web.manage"),
+    retry: 1,
+  });
   const resource = itemsFrom(resourcesQuery.data).find((item) => item.id === resourceId);
   const activeThemeVersionId = canvasStylesQuery.data?.active_theme_version_id ?? null;
   const catalogSections = useMemo(
@@ -85,7 +94,7 @@ export default function DesignResourceEditorPage({ kind }) {
     () => filterCatalogResources(componentsQuery.data, activeThemeVersionId),
     [activeThemeVersionId, componentsQuery.data],
   );
-  const readOnly = Boolean(resource?.is_locked || resource?.theme_version_id);
+  const readOnly = false;
   const canPublish = can("web.publish") || can("web.manage");
 
   useEffect(() => {
@@ -126,7 +135,7 @@ export default function DesignResourceEditorPage({ kind }) {
           label: section.name,
           category: t("web.editor.catalog.sections"),
           attributes: { class: "web-resource-native-preview-block" },
-          content: linkedResourceInstance(section, "section"),
+          content: cloneResourceComponents(section),
         });
       });
     }
@@ -138,7 +147,7 @@ export default function DesignResourceEditorPage({ kind }) {
           label: component.name,
           category: t("web.editor.catalog.components"),
           attributes: { class: "web-resource-native-preview-block" },
-          content: linkedResourceInstance(component, "component"),
+          content: cloneResourceComponents(component),
         });
       });
     }
@@ -162,6 +171,11 @@ export default function DesignResourceEditorPage({ kind }) {
     },
     onError: () => setError(t("web.errors.editorLoad")),
   });
+
+  useEffect(() => {
+    if (!editor.isReady) return undefined;
+    return hydrateMenuComponents(editor.editorRef.current, menusQuery.data || []);
+  }, [editor.editorRef, editor.isReady, menusQuery.data]);
   const selectedComponent = selectionRevision >= 0 ? editor.editorRef.current?.getSelected?.() : null;
   const selectedLinkedResource = selectedComponent?.get?.("type") === "sc-resource-instance";
   const selectComponent = (component) => editor.editorRef.current?.select?.(component);
@@ -169,6 +183,23 @@ export default function DesignResourceEditorPage({ kind }) {
     if (readOnly) return;
     editGenerationRef.current += 1;
     setStatus("unsaved");
+  };
+  const handleMediaSelect = async (mediaItem) => {
+    const target = mediaPickerTarget;
+    setMediaPickerTarget(null);
+    if (!target || target.get?.("type") !== "image") return;
+    let src = mediaItem.url;
+    try {
+      const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
+      src = URL.createObjectURL(data);
+    } catch { /* the durable media id still renders on the public site */ }
+    target.addAttributes?.({
+      src,
+      alt: mediaItem.alt || "",
+      "data-sc-media-id": String(mediaItem.id),
+    });
+    target.set?.("src", src);
+    markComponentChanged();
   };
   const startResourceDrag = (event, blockId) => {
     const instance = editor.editorRef.current;
@@ -344,7 +375,10 @@ export default function DesignResourceEditorPage({ kind }) {
               onContentChange={markComponentChanged}
             /></div>
           : null}
-        <div className={selectedLinkedResource ? "d-none" : ""}><div className="web-editor-trait-manager" /></div>
+        <div className={selectedLinkedResource ? "d-none" : ""}>
+          {selectedComponent?.get?.("type") === "image" && <div className="web-editor-inspector-body"><ImageContentPanel selected={selectedComponent} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} /></div>}
+          <div className="web-editor-trait-manager" />
+        </div>
       </div>
       {rightPanel === "data" && selectedComponent && (selectedComponent.get?.("type") === "sc-repeat"
         ? <div className="web-editor-inspector-body"><RepeatConfigurator selected={selectedComponent} dataSources={itemsFrom(sourcesQuery.data)} onContentChange={markComponentChanged} /></div>
@@ -365,6 +399,7 @@ export default function DesignResourceEditorPage({ kind }) {
 
     {(error || status === "conflict") && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{status === "conflict" ? t("web.editor.conflictTitle") : t("web.resourceEditor.error")}</strong>{error}</span>{status === "conflict" && <button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button>}</div>}
     <span className="visually-hidden" aria-live="polite">{t(`web.editor.saveStates.${status}`)}</span>
+    {mediaPickerTarget && <MediaPickerModal title={t("web.chooseFromMedia")} onSelect={handleMediaSelect} onClose={() => setMediaPickerTarget(null)} />}
   </div>;
 }
 

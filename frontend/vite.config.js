@@ -2,7 +2,12 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { readFile } from "node:fs/promises";
 
-const appShellApiOrigin = process.env.DOCKER_ENV ? "http://backend:8000" : "http://localhost:8001";
+// Keep the default developer ergonomics, but permit isolated browser QA to
+// run an API on a non-conflicting local port without editing this config.
+const appShellApiOrigin = process.env.VITE_API_ORIGIN
+  || (process.env.DOCKER_ENV ? "http://backend:8000" : "http://localhost:8001");
+const publicSiteOrigin = process.env.VITE_PUBLIC_SITE_ORIGIN
+  || (process.env.DOCKER_ENV ? "http://site:8090" : "http://localhost:8090");
 
 const escapeHtml = (value) => String(value)
   .replaceAll("&", "&amp;")
@@ -44,9 +49,13 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/api": {
-        target: process.env.DOCKER_ENV ? "http://backend:8000" : "http://localhost:8001",
+        target: appShellApiOrigin,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
+      },
+      "/theme-assets": {
+        target: publicSiteOrigin,
+        changeOrigin: true,
       },
     },
   },

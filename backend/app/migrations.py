@@ -1187,6 +1187,22 @@ def _add_user_avatar_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE users ADD COLUMN avatar TEXT"))
 
 
+def _add_web_publication_artifacts(conn: Connection) -> None:
+    """Add immutable rendered public output to page publications."""
+    inspector = inspect(conn)
+    if "web_page_revisions" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("web_page_revisions")}
+    additions = {
+        "rendered_html": "TEXT",
+        "rendered_variants": "JSON",
+        "rendered_at": "TIMESTAMP",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            conn.execute(text(f"ALTER TABLE web_page_revisions ADD COLUMN {name} {definition}"))
+
+
 def _add_team_logo_column(conn: Connection) -> None:
     inspector = inspect(conn)
     if "teams" not in inspector.get_table_names():
@@ -2081,6 +2097,119 @@ def _add_page_source_template_columns(conn: Connection) -> None:
     ))
 
 
+def _add_web_page_revision_team_snapshot(conn: Connection) -> None:
+    """Freeze the team association along with each page publication."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if not {"web_pages", "web_page_revisions"}.issubset(tables):
+        return
+    revision_columns = {column["name"] for column in inspector.get_columns("web_page_revisions")}
+    page_columns = {column["name"] for column in inspector.get_columns("web_pages")}
+    if "team_id" not in revision_columns:
+        conn.execute(text(
+            "ALTER TABLE web_page_revisions ADD COLUMN team_id "
+            "INTEGER REFERENCES teams(id) ON DELETE SET NULL"
+        ))
+    # New installations already use the page-independent CMS model. Historic
+    # snapshots can only be backfilled while the legacy source field exists.
+    if "team_id" in page_columns:
+        conn.execute(text(
+            "UPDATE web_page_revisions SET team_id = ("
+            "SELECT web_pages.team_id FROM web_pages WHERE web_pages.id = web_page_revisions.page_id"
+            ") WHERE team_id IS NULL"
+        ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_page_revisions_team_id "
+        "ON web_page_revisions(team_id)"
+    ))
+
+
+def _sqlite_drop_team_column(conn: Connection, table: str, index: str) -> None:
+    """Rebuild one SQLite table because DROP COLUMN cannot remove its FK."""
+    definition = conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = :table"),
+        {"table": table},
+    ).scalar_one()
+    indexes = [row[0] for row in conn.execute(text(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' AND tbl_name = :table AND sql IS NOT NULL"),
+        {"table": table},
+    ).all()]
+    replacement = definition.replace(f"CREATE TABLE {table}", f"CREATE TABLE {table}__without_team", 1)
+    replacement = replacement.replace("\n\tteam_id INTEGER, ", "\n")
+    replacement = replacement.replace("\n\tFOREIGN KEY(team_id) REFERENCES teams (id) ON DELETE SET NULL, ", "\n")
+    if replacement == definition:
+        raise RuntimeError(f"Could not remove obsolete team_id from {table}")
+    columns = [row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")) if row[1] != "team_id"]
+    quoted = ", ".join(columns)
+    conn.execute(text(replacement))
+    conn.execute(text(f"INSERT INTO {table}__without_team ({quoted}) SELECT {quoted} FROM {table}"))
+    conn.execute(text(f"DROP TABLE {table}"))
+    conn.execute(text(f"ALTER TABLE {table}__without_team RENAME TO {table}"))
+    for statement in indexes:
+        conn.execute(text(statement))
+
+
+def _remove_web_page_team_association(conn: Connection) -> None:
+    """Remove the obsolete team-to-page relation from both CMS tables.
+
+    A page is generic content. Team filtering belongs to a data-source block,
+    never to page metadata or an immutable page revision. This is an explicit
+    contract removal, so the legacy values are intentionally discarded.
+    """
+    inspector = inspect(conn)
+    for table, index in (
+        ("web_page_revisions", "ix_web_page_revisions_team_id"),
+        ("web_pages", "ix_web_pages_team_id"),
+    ):
+        if table not in inspector.get_table_names():
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table)}
+        if "team_id" not in columns:
+            continue
+        if conn.dialect.name == "sqlite":
+            _sqlite_drop_team_column(conn, table, index)
+        else:
+            conn.execute(text(f"DROP INDEX IF EXISTS {index}"))
+            conn.execute(text(f"ALTER TABLE {table} DROP COLUMN team_id"))
+
+
+
+def _release_trashed_web_page_addresses(conn: Connection) -> None:
+    """Give soft-deleted pages a tombstone identity and free their old URL."""
+    inspector = inspect(conn)
+    if "web_pages" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("web_pages")}
+    additions = {
+        "trashed_slug": "VARCHAR(200)",
+        "trashed_path_segment": "VARCHAR(200)",
+        "trashed_path": "VARCHAR(500)",
+    }
+    for name, ddl in additions.items():
+        if name not in columns:
+            conn.execute(text(f"ALTER TABLE web_pages ADD COLUMN {name} {ddl}"))
+    rows = conn.execute(text(
+        "SELECT id, slug, path_segment, path FROM web_pages WHERE deleted_at IS NOT NULL"
+    )).mappings().all()
+    for row in rows:
+        tombstone = f"trashed-{row['id']}"
+        conn.execute(text(
+            "UPDATE web_pages SET "
+            "trashed_slug = COALESCE(trashed_slug, :slug), "
+            "trashed_path_segment = COALESCE(trashed_path_segment, :segment), "
+            "trashed_path = COALESCE(trashed_path, :path), "
+            "slug = CASE WHEN slug LIKE 'trashed-%' THEN slug ELSE :tombstone END, "
+            "path_segment = CASE WHEN path_segment LIKE 'trashed-%' THEN path_segment ELSE :tombstone END, "
+            "path = CASE WHEN path LIKE '/__trash/%' THEN path ELSE :tombstone_path END "
+            "WHERE id = :id"
+        ), {
+            "id": row["id"], "slug": row["slug"],
+            "segment": row["path_segment"] or row["slug"],
+            "path": row["path"] or f"/{row['slug']}",
+            "tombstone": tombstone, "tombstone_path": f"/__trash/{row['id']}/{tombstone}",
+        })
+
+
 def _create_web_global_parts(conn: Connection) -> None:
     """Create WebGlobalPart table for site-owned shared instances (headers, footers, etc.)."""
     inspector = inspect(conn)
@@ -2542,6 +2671,21 @@ MIGRATIONS: List[Migration] = [
         "Add source_template_id + source_template_version provenance columns",
     ),
     Migration(
+        "20260817_add_web_page_revision_team_snapshot",
+        _add_web_page_revision_team_snapshot,
+        "Freeze team association in immutable page revisions",
+    ),
+    Migration(
+        "20260817_remove_web_page_team_association",
+        _remove_web_page_team_association,
+        "Remove obsolete team_id fields from CMS pages and page revisions",
+    ),
+    Migration(
+        "20260817_add_web_publication_artifacts",
+        _add_web_publication_artifacts,
+        "Store immutable rendered documents for published page revisions",
+    ),
+    Migration(
         "20260816_create_web_global_parts",
         _create_web_global_parts,
         "Create WebGlobalPart table for site-owned shared parts",
@@ -2590,6 +2734,11 @@ MIGRATIONS: List[Migration] = [
         "20260816_attendance_query_indexes",
         _add_attendance_query_indexes,
         "Add indexes used by the administrative attendance views",
+    ),
+    Migration(
+        "20260817_release_trashed_web_page_addresses",
+        _release_trashed_web_page_addresses,
+        "Release URLs held by trashed web pages while preserving restore metadata",
     ),
 ]
 

@@ -6,9 +6,10 @@ from .routes_common import *  # noqa: F403
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload, _empty_project
+from .pages import rebuild_published_page_artifacts
 from .routes_design import _validate_custom_css
 from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
-from .previews import build_preview, get_current_preview, project_preview_svg
+from .previews import build_preview, ensure_preview, get_current_preview, project_preview_svg
 # ---------------------------------------------------------------- components & templates
 
 
@@ -23,6 +24,12 @@ _DEFAULT_TEMPLATE_SVG = (
     '%3Crect%20x%3D%2230%22%20y%3D%22255%22%20width%3D%22340%22%20height%3D%2230%22%20rx%3D%224%22%20fill%3D%22%233b82f6%22%2F%3E'
     '%3C%2Fsvg%3E'
 )
+
+
+def _template_is_locked(template: WebTemplate) -> bool:
+    """Package-owned shells cannot be deleted even though their draft is editable."""
+    qualified = str(template.qualified_key or "")
+    return bool(template.is_system or (template.theme_version_id and not qualified.startswith("site:template:")))
 
 
 def _serialize_template(db: Session, template: WebTemplate) -> dict:
@@ -57,6 +64,8 @@ def _serialize_template(db: Session, template: WebTemplate) -> dict:
         "preview_media_id": template.preview_media_id,
         "preview_url": preview_url,
         "is_system": template.is_system,
+        "is_locked": False,
+        "is_from_theme": bool(template.theme_version_id),
         "forked_from_id": template.forked_from_id,
     }
 
@@ -127,7 +136,9 @@ def seed_default_theme(db: Session) -> None:
         db.flush()
 
     version = db.query(WebThemeVersion).filter_by(theme_id=theme.id, version=DEFAULT_THEME_VERSION).one_or_none()
+    theme_css_changed = False
     if version is None:
+        theme_css_changed = True
         import hashlib
         payload = f"{DEFAULT_THEME_ID}:{DEFAULT_THEME_VERSION}".encode()
         version = WebThemeVersion(
@@ -159,9 +170,10 @@ def seed_default_theme(db: Session) -> None:
         db.add(version)
         db.flush()
     else:
-        # Ensure existing databases also receive the canonical theme CSS.
-        if not version.base_css:
+        # The system theme is code-owned; refresh CSS along with its markup.
+        if version.base_css != THEME_CSS:
             version.base_css = THEME_CSS
+            theme_css_changed = True
         if not version.manifest.get("config"):
             version.manifest = {**version.manifest, "config": {
                 "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
@@ -177,20 +189,24 @@ def seed_default_theme(db: Session) -> None:
         qualified = _qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", key)
         template = db.query(WebTemplate).filter_by(qualified_key=qualified).one_or_none()
         if template:
-            # System theme: refresh the canonical published tree idempotently.
-            template.name = key == "main" and "Hlavní stránka" or "Aktuality"
-            template.description = DEFAULT_THEME_DESCRIPTION
-            template.project_data = project_data
-            template.published_project_data = project_data
-            template.published_css = ""
-            template.published_version = max(template.published_version or 0, 1)
+            # Existing theme rows are an editable authoring workspace. Seed
+            # only repairs missing data; it must never erase an author draft.
+            if not template.name:
+                template.name = {"main": "Hlavní stránka", "news": "Aktuality", "scout-home": "Skautská úvodní stránka", "scout-story": "Příběh oddílu", "scout-team": "Družina", "scout-listing": "Výpis aktualit", "scout-detail": "Detail obsahu", "scout-landing": "Prezentační stránka", "scout-gallery-page": "Galerie", "scout-contact-page": "Kontakt"}.get(key, key.title())
+            if not template.description:
+                template.description = DEFAULT_THEME_DESCRIPTION
+            if not template.project_data:
+                template.project_data = project_data
+            if not template.published_project_data:
+                template.published_project_data = project_data
+                template.published_version = max(template.published_version or 0, 1)
             template.theme_version_id = version.id
             template.is_system = True
             template.template_kind = "layout"
             continue
         db.add(WebTemplate(
             key=_legacy_template_key(qualified),
-            name="Hlavní stránka" if key == "main" else "Aktuality",
+            name={"main": "Hlavní stránka", "news": "Aktuality", "scout-home": "Skautská úvodní stránka", "scout-story": "Příběh oddílu", "scout-team": "Družina", "scout-listing": "Výpis aktualit", "scout-detail": "Detail obsahu", "scout-landing": "Prezentační stránka", "scout-gallery-page": "Galerie", "scout-contact-page": "Kontakt"}.get(key, key.title()),
             description=DEFAULT_THEME_DESCRIPTION,
             html="",
             css="",
@@ -203,6 +219,21 @@ def seed_default_theme(db: Session) -> None:
             theme_version_id=version.id,
             is_system=True,
         ))
+    # Remove starters generated by ScoutComp 2.0. They were an accidental
+    # second template category; ordinary layouts now seed page content directly.
+    legacy_starters = db.query(WebTemplate).filter(
+        WebTemplate.theme_version_id == version.id,
+        WebTemplate.is_system.is_(True),
+        WebTemplate.usage_mode == "copy_on_create",
+        WebTemplate.qualified_key.like("%-starter"),
+    ).all()
+    for starter in legacy_starters:
+        db.query(WebPage).filter_by(source_template_id=starter.id).update(
+            {WebPage.source_template_id: None, WebPage.source_template_version: None},
+            synchronize_session=False,
+        )
+        db.delete(starter)
+
     # Install the theme's design resources (sections/components/patterns).
     design_resources = [
         (WebSection, DEFAULT_THEME_SECTIONS, "sections"),
@@ -213,10 +244,15 @@ def seed_default_theme(db: Session) -> None:
             qualified = _qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, kind, resource_id)
             row = db.query(model).filter_by(qualified_key=qualified).one_or_none()
             if row:
-                row.name = resource_id.replace("-", " ").title()
-                row.description = DEFAULT_THEME_DESCRIPTION
-                row.project_data = project_data
-                row.css = ""
+                if not row.name:
+                    row.name = resource_id.replace("-", " ").title()
+                if not row.description:
+                    row.description = DEFAULT_THEME_DESCRIPTION
+                if not row.project_data:
+                    row.project_data = project_data
+                if not row.published_project_data:
+                    row.published_project_data = project_data
+                    row.published_version = max(row.published_version or 0, 1)
                 row.theme_version_id = version.id
                 row.is_locked = True
                 continue
@@ -226,10 +262,37 @@ def seed_default_theme(db: Session) -> None:
                 description=DEFAULT_THEME_DESCRIPTION,
                 project_data=project_data,
                 css="",
+                prop_schema=[],
+                default_props={},
+                variants=[],
+                published_project_data=project_data,
+                published_css="",
+                published_prop_schema=[],
+                published_default_props={},
+                published_variants=[],
+                published_version=1,
                 theme_version_id=version.id,
                 is_locked=True,
                 created_by_id=None,
             ))
+    db.commit()
+    if theme_css_changed:
+        rebuild_published_page_artifacts(db)
+        db.commit()
+
+    # Generate/reuse compact real previews as soon as the bundled theme is
+    # loaded. build_preview is content-hashed, so repeated startup/list calls
+    # do not render unchanged definitions again.
+    preview_items = list(db.query(WebTemplate).filter_by(theme_version_id=version.id).all())
+    preview_items += list(db.query(WebSection).filter_by(theme_version_id=version.id).all())
+    preview_items += list(db.query(WebReusableComponent).filter_by(theme_version_id=version.id).all())
+    for item in preview_items:
+        kind = "templates" if isinstance(item, WebTemplate) else ("sections" if isinstance(item, WebSection) else "components")
+        build_preview(
+            db, kind, item.id, item.project_data or {}, item.css or "",
+            base_css=THEME_CSS, tokens=_THEME_TOKENS, title=item.name,
+            browser_render=False,
+        )
     db.commit()
 
     # Activate the system theme on first run so the public site renders the
@@ -244,6 +307,12 @@ def seed_default_theme(db: Session) -> None:
     # The Themes page frontend renders this directly (it's a data URI).
     version.default_tokens["__preview_svg__"] = _DEFAULT_TEMPLATE_SVG
     db.commit()
+
+    # Ontario is distributed as a second bundled option.  Seeding it here
+    # keeps fresh and upgraded databases reproducible, while the active-theme
+    # pointer above deliberately remains on the ScoutComp default.
+    from .ontario_theme import seed_ontario_theme
+    seed_ontario_theme(db)
 
 
 def seed_default_pages(db: Session) -> None:
@@ -283,7 +352,10 @@ def seed_default_pages(db: Session) -> None:
         page = db.query(WebPage).filter_by(slug=item["slug"], deleted_at=None).one_or_none()
         if not page:
             continue
-        theme_key = "main" if item["slug"] == "main" else item["slug"]
+        # The 2.0 system theme has dedicated composed starters; keep the
+        # built-in homepage and news page on those instead of the legacy
+        # compatibility layouts shipped under the generic main/news keys.
+        theme_key = {"main": "scout-home", "news": "scout-listing"}.get(item["slug"], item["slug"])
         template = theme_templates.get(theme_key)
         if not template:
             continue
@@ -328,11 +400,34 @@ class TemplateClonePayload(BaseModel):
     qualified_key: str | None = Field(default=None, max_length=240)
 
 
+def _active_theme_version_id(db: Session) -> int:
+    style = db.query(WebSiteStyle).filter_by(id=1).one_or_none()
+    if style is None or style.active_theme_version_id is None:
+        raise HTTPException(422, "Activate a theme before managing templates")
+    return int(style.active_theme_version_id)
+
+
 @router.get("/templates")
 def list_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.templates.manage")
-    seed_default_templates(db)
-    templates = db.query(WebTemplate).order_by(WebTemplate.name.asc()).all()
+    seed_default_theme(db)
+    active_theme_id = _active_theme_version_id(db)
+    templates = db.query(WebTemplate).filter_by(theme_version_id=active_theme_id).order_by(WebTemplate.name.asc()).all()
+    version = db.get(WebThemeVersion, active_theme_id)
+    for template in templates:
+        ensure_preview(
+            db,
+            "templates",
+            template.id,
+            template.project_data or template.published_project_data or _empty_project(),
+            template.css or template.published_css or "",
+            base_css=version.base_css if version else "",
+            tokens=version.default_tokens if version else {},
+            title=template.name,
+        )
+    # Lazy backfill also covers themes installed before preview artifacts were
+    # introduced.  No artifact changes are made when all previews are current.
+    db.commit()
     return [_serialize_template(db, t) for t in templates]
 
 
@@ -369,10 +464,11 @@ def create_template(payload: TemplatePayload, db: Session = Depends(get_db), cur
         html=payload.html,
         css=payload.css,
         project_data=project,
-        qualified_key=payload.qualified_key or key,
+        qualified_key=(payload.qualified_key if str(payload.qualified_key or "").startswith("site:template:") else f"site:template:{key}"),
         template_kind=payload.template_kind,
         usage_mode=payload.usage_mode if payload.usage_mode in {"linked_layout", "copy_on_create"} else "linked_layout",
         preview_media_id=payload.preview_media_id,
+        theme_version_id=_active_theme_version_id(db),
         draft_version=1,
         is_system=False,
         created_by_id=current_user.id,
@@ -393,8 +489,6 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
     template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
     if not template:
         raise HTTPException(404, "Template not found")
-    if template.theme_version_id:
-        raise HTTPException(409, "Installed theme templates must be cloned before editing")
     if payload.expected_version is None:
         raise HTTPException(428, "expected_version is required")
     expected = payload.expected_version
@@ -439,6 +533,9 @@ def clone_template(template_id: int, payload: TemplateClonePayload, db: Session 
     origin = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
     if not origin:
         raise HTTPException(404, "Template not found")
+    active_theme_id = _active_theme_version_id(db)
+    if origin.theme_version_id != active_theme_id:
+        raise HTTPException(404, "Template is not part of the active theme")
 
     requested_name = (payload.name or "").strip()
     name = requested_name or f"{origin.name} (copy)"
@@ -472,7 +569,7 @@ def clone_template(template_id: int, payload: TemplateClonePayload, db: Session 
         published_project_data=published_project,
         published_css=(origin.published_css or "") if published_project else "",
         published_version=int(origin.published_version or 1) if published_project else 0,
-        theme_version_id=None,
+        theme_version_id=active_theme_id,
         preview_media_id=origin.preview_media_id,
         forked_from_id=origin.id,
         is_system=False,
@@ -517,6 +614,8 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
         db, "templates", template.id,
         template.project_data or _empty_project(), template.css or "", title=template.name,
     )
+    # Layout content is part of each immutable public document.
+    rebuild_published_page_artifacts(db)
     db.commit(); db.refresh(template)
     return _serialize_template(db, template)
 
@@ -548,7 +647,7 @@ def delete_template(template_id: int, db: Session = Depends(get_db), current_use
     template = db.query(WebTemplate).filter_by(id=template_id).one_or_none()
     if not template:
         raise HTTPException(404, "Template not found")
-    if template.is_system or template.theme_version_id is not None:
+    if _template_is_locked(template):
         raise HTTPException(409, "Installed theme templates cannot be deleted")
     draft_reference = db.query(WebPage.id).filter(
         (WebPage.template_id == template.id) | (WebPage.template == template.key)

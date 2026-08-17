@@ -8,14 +8,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from html import unescape
 import json
 import re
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import Config, RegisteredModule, ScoutEvent, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
+from ..models import Config, RegisteredModule, ScoutEvent, Team, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
+from .url_schemes import meeting_url, post_url
 
 
 class DataSourceError(ValueError):
@@ -393,52 +396,92 @@ def is_media_published(db: Session, media_id: int) -> bool:
     return media_id in published_media_ids(db)
 
 
+def _plain_public_text(value: str | None, *, limit: int = 500) -> str:
+    """Project legacy rich text to safe readable text for repeat/card data."""
+    text = re.sub(r"<[^>]*>", " ", value or "")
+    return re.sub(r"\s+", " ", unescape(text)).strip()[:limit]
+
+
 def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
     is_public = getattr(ScoutEvent, "is_public", None)
     if is_public is None:  # Additive migrations must fail closed on older schemas.
         return []
+    # Publicity belongs to the event itself. It must not depend on whether an
+    # unrelated CMS page happens to be linked to the same team.
     query = db.query(ScoutEvent).filter(is_public.is_(True))
     if params.get("kind"):
         query = query.filter(ScoutEvent.kind == params["kind"])
+    if params.get("team_id") is not None:
+        query = query.filter(ScoutEvent.team_id == params["team_id"])
     if params.get("from"):
         query = query.filter(ScoutEvent.starts_at >= params["from"])
     if params.get("to"):
         query = query.filter(ScoutEvent.starts_at <= params["to"])
     order = ScoutEvent.starts_at.desc() if params.get("sort") == "start_at_desc" else ScoutEvent.starts_at.asc()
-    events = query.order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 10)).all()
+    limit = params.get("limit", 10)
+    offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
+    events = query.order_by(order).offset(offset).limit(limit).all()
     return [{
         "id": event.id,
         "title": event.title,
-        "description": event.description,
+        "description": _plain_public_text(event.description),
         "kind": event.kind,
         "start_at": event.starts_at,
         "end_at": event.ends_at,
-        "url": None,
+        "url": meeting_url(db, event.id),
         "color": event.color,
     } for event in events]
 
 
+def _plain_public_excerpt(value: str | None) -> str:
+    """Compatibility name for the article data-source contract."""
+    return _plain_public_text(value)
+
+
 def _posts_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
     order = WebPostRevision.created_at.asc() if params.get("sort") == "published_at_asc" else WebPostRevision.created_at.desc()
+    limit = params.get("limit", 10)
+    # ``page`` is author-facing pagination. Offset remains available for
+    # integrations, but an explicit page deliberately wins for site blocks.
+    offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
     posts = (
         db.query(WebPostRevision)
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
         .filter(WebPost.deleted_at.is_(None), WebPostRevision.is_publication.is_(True))
         .order_by(order)
-        .offset(params.get("offset", 0))
-        .limit(params.get("limit", 10))
+        .offset(offset)
+        .limit(limit)
         .all()
     )
     return [{
         "id": post.post_id,
         "title": post.title,
         "slug": post.slug,
-        "excerpt": post.excerpt,
+        "excerpt": _plain_public_excerpt(post.excerpt),
         "published_at": post.created_at,
-        "url": f"/post/{post.slug}",
+        "url": post_url(db, post.slug),
         "cover_url": f"/media/{post.cover_media_id}/file" if post.cover_media_id else None,
     } for post in posts]
 
+
+_SAFE_TEAM_LOGO = re.compile(r"^data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$", re.I)
+
+
+def _teams_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
+    """Expose team cards independently from CMS pages.
+
+    A CMS page is generic content, not a representation of a team. Team cards
+    therefore contain only public profile data; authors choose where they link
+    from their own page/menu configuration.
+    """
+    order = Team.name.desc() if params.get("sort") == "name_desc" else Team.name.asc()
+    teams = db.query(Team).order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 24)).all()
+    return [{
+        "id": team.id,
+        "name": team.name,
+        "description": team.description,
+        "logo_url": (team.logo or "").strip() if _SAFE_TEAM_LOGO.fullmatch((team.logo or "").strip()) else None,
+    } for team in teams]
 
 def _media_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
     public_ids = published_media_ids(db)
@@ -485,8 +528,10 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
     },
     parameters={
         "kind": QueryParameter("string", "Kind", choices=("meeting", "trip", "other")),
+        "team_id": QueryParameter("integer", "Team", minimum=1),
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
         "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
+        "page": QueryParameter("integer", "Page", minimum=1, maximum=10_000),
         "from": QueryParameter("datetime", "From"),
         "to": QueryParameter("datetime", "To"),
         "sort": QueryParameter("string", "Sort", default="start_at_asc", choices=("start_at_asc", "start_at_desc")),
@@ -505,9 +550,26 @@ POSTS_DATA_SOURCE = WebDataSourceManifest(
     parameters={
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
         "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
+        "page": QueryParameter("integer", "Page", minimum=1, maximum=10_000),
         "sort": QueryParameter("string", "Sort", default="published_at_desc", choices=("published_at_asc", "published_at_desc")),
     }, resolver=_posts_source, cache_ttl_seconds=60,
     label_key="web.dataSources.posts.label", description_key="web.dataSources.posts.description",
+)
+
+TEAMS_DATA_SOURCE = WebDataSourceManifest(
+    id="teams", label="Teams", description="Public team profile cards independent of CMS pages.", collection=True,
+    fields={
+        "id": PublicField("integer", "ID", nullable=False),
+        "name": PublicField("string", "Name", nullable=False),
+        "description": PublicField("string", "Description"),
+        "logo_url": PublicField("url", "Logo image URL"),
+    },
+    parameters={
+        "limit": QueryParameter("integer", "Limit", default=24, minimum=1, maximum=50),
+        "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
+        "sort": QueryParameter("string", "Sort", default="name_asc", choices=("name_asc", "name_desc")),
+    }, resolver=_teams_source, cache_ttl_seconds=60,
+    label_key="web.dataSources.teams.label", description_key="web.dataSources.teams.description",
 )
 
 MEDIA_DATA_SOURCE = WebDataSourceManifest(

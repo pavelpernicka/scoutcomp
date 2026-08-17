@@ -21,6 +21,7 @@ from app.models import (
 )
 from app.modules import registry
 from app.permissions import permission_keys
+from app.routers.config import set_config_value
 from app.web.data_sources import (
     DataSourceUnavailableError,
     DataSourceValidationError,
@@ -41,7 +42,7 @@ def _now():
 def test_catalog_only_contains_sources_from_available_modules(db_session):
     _seed(db_session)
     assert {item["id"] for item in list_data_sources(db_session)} == {
-        "core.events", "core.media", "web.menu", "core.posts",
+        "core.events", "core.media", "web.menu", "core.posts", "core.teams",
     }
 
     core = db_session.query(RegisteredModule).filter_by(code="core").one()
@@ -74,6 +75,23 @@ def test_events_are_public_only_and_projected_through_allowlist(db_session):
     with pytest.raises(DataSourceValidationError):
         resolve_data_source(db_session, "core.events", {"limit": 500})
 
+
+def test_events_are_public_by_event_flag_not_by_cms_page(db_session):
+    _seed(db_session)
+    from app.models import Team
+
+    first_team = Team(name="První", join_code="first-events")
+    second_team = Team(name="Druhá", join_code="second-events")
+    db_session.add_all([first_team, second_team]); db_session.flush()
+    db_session.add_all([
+        ScoutEvent(title="První schůzka", kind="meeting", starts_at=_now(), team_id=first_team.id, is_public=True),
+        ScoutEvent(title="Druhá schůzka", kind="meeting", starts_at=_now(), team_id=second_team.id, is_public=True),
+    ])
+    db_session.commit()
+
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": first_team.id})] == ["První schůzka"]
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": second_team.id})] == ["Druhá schůzka"]
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"kind": "meeting"})] == ["První schůzka", "Druhá schůzka"]
 
 def test_request_cache_reuses_projected_result(db_session):
     _seed(db_session)
@@ -117,6 +135,25 @@ def test_posts_source_reads_published_snapshot_not_mutable_draft(db_session):
     assert result[0]["url"] == "/post/live"
 
 
+def test_public_content_urls_follow_validated_site_schemes(db_session):
+    _seed(db_session)
+    post = WebPost(title="Článek", slug="clanek", published=True)
+    db_session.add(post); db_session.flush()
+    revision = WebPostRevision(
+        post_id=post.id, revision_number=1, source_version=1, title="Článek",
+        slug="clanek", reason="publish", is_publication=True,
+    )
+    db_session.add(revision); db_session.flush(); post.published_revision_id = revision.id
+    event = ScoutEvent(title="Schůzka", kind="meeting", starts_at=_now(), is_public=True)
+    db_session.add(event)
+    set_config_value(db_session, "web.post_url_pattern", "/aktuality/{slug}")
+    set_config_value(db_session, "web.meeting_url_pattern", "/schuzky/{id}")
+    db_session.commit()
+
+    assert resolve_data_source(db_session, "core.posts")[0]["url"] == "/aktuality/clanek"
+    assert resolve_data_source(db_session, "core.events")[0]["url"] == f"/schuzky/{event.id}"
+
+
 def test_collection_sources_accept_a_bounded_offset_for_pagination(db_session):
     _seed(db_session)
     now = _now()
@@ -130,6 +167,51 @@ def test_collection_sources_accept_a_bounded_offset_for_pagination(db_session):
 
     assert [item["title"] for item in result] == ["Second"]
 
+
+def test_events_source_accepts_author_facing_page_pagination(db_session):
+    _seed(db_session)
+    now = _now()
+    db_session.add_all([
+        ScoutEvent(title="First", kind="meeting", starts_at=now, is_public=True),
+        ScoutEvent(title="Second", kind="meeting", starts_at=now + timedelta(days=1), is_public=True),
+    ])
+    db_session.commit()
+
+    result = resolve_data_source(db_session, "core.events", {"limit": 1, "page": 2})
+
+    assert [item["title"] for item in result] == ["Second"]
+
+
+def test_posts_source_accepts_author_facing_page_pagination(db_session):
+    _seed(db_session)
+    posts = [WebPost(title=f"Příspěvek {index}", slug=f"post-{index}", published=True) for index in range(3)]
+    db_session.add_all(posts); db_session.flush()
+    revisions = [WebPostRevision(
+        post_id=post.id, revision_number=1, source_version=1, title=post.title,
+        slug=post.slug, reason="publish", is_publication=True,
+    ) for post in posts]
+    db_session.add_all(revisions); db_session.flush()
+    for post, revision in zip(posts, revisions):
+        post.published_revision_id = revision.id
+    db_session.commit()
+
+    result = resolve_data_source(db_session, "core.posts", {"limit": 1, "page": 2})
+
+    assert [item["title"] for item in result] == ["Příspěvek 1"]
+
+
+def test_teams_source_is_independent_of_cms_pages(db_session):
+    _seed(db_session)
+    from app.models import Team
+
+    first_team = Team(name="Lachtani", join_code="first-team", description="První družina", logo="data:image/png;base64,iVBORw0KGgo=")
+    second_team = Team(name="Medojedi", join_code="second-team", description="Druhá družina")
+    db_session.add_all([first_team, second_team]); db_session.commit()
+
+    assert resolve_data_source(db_session, "core.teams") == [
+        {"id": first_team.id, "name": "Lachtani", "description": "První družina", "logo_url": "data:image/png;base64,iVBORw0KGgo="},
+        {"id": second_team.id, "name": "Medojedi", "description": "Druhá družina", "logo_url": None},
+    ]
 
 def test_menu_source_reads_published_tree_and_projects_nested_items(db_session):
     _seed(db_session)
@@ -242,3 +324,10 @@ def test_seed_removes_obsolete_default_web_read_permission(db_session):
     db_session.commit()
     _seed(db_session)
     assert pages.default_for_member is False
+
+
+def test_posts_source_projects_legacy_html_excerpt_to_plain_public_text(db_session):
+    from app.web.data_sources import _plain_public_excerpt, _plain_public_text
+
+    assert _plain_public_excerpt('<p>Ahoj <img src="/api/web/media/2/file"> světe</p>') == "Ahoj světe"
+    assert _plain_public_text('<p>Schůzka <img src="/api/web/media/2/file"> dnes</p>') == "Schůzka dnes"

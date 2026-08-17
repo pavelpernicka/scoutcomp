@@ -4,6 +4,7 @@ from .routes_common import *  # noqa: F403
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload
+from .pages import rebuild_published_page_artifacts
 
 
 def _require_post_manage(db: Session, user: User) -> None:
@@ -80,7 +81,11 @@ def _serialize_menus(db: Session) -> list[dict]:
 
 @router.get("/menus")
 def list_menus(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_action(db, current_user, "web.menus.manage")
+    # Page/template editors need the draft tree to render the atomic menu in
+    # GrapesJS, but only ``web.menus.manage`` may mutate it.
+    permissions = permission_keys(db, current_user)
+    if not ({"web.menus.manage", "web.pages.manage", "web.templates.manage", "web.design.manage"} & permissions):
+        raise HTTPException(403, "Missing web.menus.manage")
     return _serialize_menus(db)
 
 
@@ -224,6 +229,7 @@ def publish_menu(menu_id: int, payload: PublishPayload, db: Session = Depends(ge
     ).update({WebMenu.published_revision_id: revision.id}, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Menu was changed by another editor")
+    rebuild_published_page_artifacts(db)
     db.commit(); db.refresh(menu)
     return {"menu_id": menu.id, "published_revision_id": revision.id}
 
@@ -321,6 +327,7 @@ def _publish_post(db: Session, post: WebPost, expected_version: int, user_id: in
     if updated != 1:
         db.rollback()
         raise HTTPException(409, "Draft was changed by another editor")
+    rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(post)
     return revision
@@ -596,6 +603,7 @@ def unpublish_post(post_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(404, "Post not found")
     post.published = False
     post.published_at = None
+    rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(post)
     return _serialize_post(post)

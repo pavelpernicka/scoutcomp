@@ -53,6 +53,14 @@ SAFE_CSS_PROPERTIES = {
     "padding", "padding-bottom", "padding-left", "padding-right", "padding-top",
     "position", "text-align", "text-decoration", "text-transform", "transform",
     "vertical-align", "white-space", "width", "word-break", "z-index",
+    # Common visual controls exposed by the GrapesJS style manager.  Values
+    # still pass the CSS breakout and URL allow-lists below; adding a property
+    # here does not make executable CSS or remote package code possible.
+    "top", "right", "bottom", "left", "inset", "aspect-ratio",
+    "background-image", "background-position", "background-repeat",
+    "background-size", "background-blend-mode", "object-position",
+    "grid-template-rows", "grid-column", "grid-row", "grid-gap",
+    "clip-path", "filter", "mix-blend-mode", "isolation",
 }
 CONDITION_OPERATORS = {"eq", "neq", "in", "not_in", "exists", "empty", "gt", "gte", "lt", "lte"}
 BIND_TARGETS = {
@@ -90,6 +98,7 @@ BUILDER_LAYOUT_CSS = (
     ".sc-menu--footer .sc-menu-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.25rem 1rem}"
     ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
     "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
+    ".sc-pagination{display:flex;align-items:center;gap:.5rem;margin:1.5rem 0}.sc-pagination-link,.sc-pagination-current{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .85rem;border:1px solid currentColor;border-radius:.25rem;text-decoration:none}.sc-pagination-current{font-weight:700}"
 )
 
 
@@ -197,6 +206,24 @@ def _normalise_binding(value: Any) -> dict[str, Any]:
     return result
 
 
+def _normalise_repeat_param(value: Any) -> Any:
+    """Allow a repeat to consume a published page value, nothing else.
+
+    Page metadata is intentionally generic. In particular, pages cannot carry
+    a team identity; authors configure an explicit team filter when needed.
+    """
+    if isinstance(value, (str, int, float, bool, type(None))):
+        return value
+    if not isinstance(value, dict) or set(value) != {"$scBinding"}:
+        raise CompileError("Repeat parameter is invalid")
+    binding = _normalise_binding(value["$scBinding"])
+    if binding["scope"] != "page":
+        raise CompileError("Repeat parameter binding must use page scope")
+    if binding["field"] == "team_id":
+        raise CompileError("Pages cannot be bound to a team")
+    return {"$scBinding": binding}
+
+
 def _normalise_condition(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise CompileError("Condition must be an object")
@@ -242,7 +269,7 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         ):
             raise CompileError("Repeat data source is invalid")
         params = node.get("params") if isinstance(node.get("params"), dict) else {}
-        params = {str(key): value for key, value in params.items() if len(str(key)) <= 80 and isinstance(value, (str, int, float, bool, type(None)))}
+        params = {str(key): _normalise_repeat_param(value) for key, value in params.items() if len(str(key)) <= 80}
         if "limit" in params:
             try:
                 params["limit"] = max(0, min(int(params["limit"]), MAX_REPEAT))
@@ -253,6 +280,26 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         if not isinstance(empty, list):
             raise CompileError("Repeat empty state must be a list")
         result["empty"] = [_normalise_node(item, depth=depth + 1, counter=counter) for item in empty]
+    elif component_type == "sc-pagination":
+        # GrapesJS omits values equal to a component type's defaults from its
+        # JSON. The editor's pagination default is core.posts, so a missing
+        # source is a legitimate persisted document, not corrupt input.
+        source = node.get("source", node.get("dataSource", "core.posts"))
+        if source in (None, ""):
+            source = ""
+        elif not isinstance(source, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*\.[a-z][a-z0-9_.-]*", source):
+            raise CompileError("Pagination data source is invalid")
+        limit = node.get("limit", 10)
+        if isinstance(limit, bool):
+            raise CompileError("Pagination limit is invalid")
+        try:
+            limit = max(1, min(int(limit), MAX_REPEAT))
+        except (TypeError, ValueError) as exc:
+            raise CompileError("Pagination limit is invalid") from exc
+        params = node.get("params") if isinstance(node.get("params"), dict) else {}
+        result.update(source=source, limit=limit, params={
+            str(key): _normalise_repeat_param(value) for key, value in params.items() if len(str(key)) <= 80
+        })
     elif component_type == "sc-condition":
         result["condition"] = _normalise_condition(node.get("condition"))
     elif component_type == "sc-bind":
@@ -298,11 +345,20 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         result["name"] = name
     elif component_type == "sc-empty":
         pass
+    elif component_type == "sc-detail-content":
+        # A detail template receives a server-generated, sanitised content
+        # fragment through its content slot. No editor-provided HTML is used.
+        children = []
     elif component_type == "sc-menu":
         location = str(node.get("location") or "main").strip().lower()
         if not re.fullmatch(r"[a-z][a-z0-9_-]{0,49}", location):
             raise CompileError("Menu location is invalid")
         result["location"] = location
+        presentation = str(node.get("presentation") or "").strip().lower()
+        if presentation:
+            if presentation not in {"bootstrap-navbar", "ontario-mobile-navbar", "bootstrap-footer-columns"}:
+                raise CompileError("Menu presentation is invalid")
+            result["presentation"] = presentation
     else:
         tag = (
             "main" if component_type == "wrapper" else
@@ -496,6 +552,16 @@ class _RenderState:
         self.cache[key] = value
         return value
 
+    def resolve_params(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Resolve the explicitly normalised page-context parameter values."""
+        result = {}
+        for key, value in params.items():
+            if isinstance(value, dict) and set(value) == {"$scBinding"}:
+                result[key] = _binding_value(value["$scBinding"], self, None)
+            else:
+                result[key] = value
+        return result
+
 
 def _binding_value(binding: dict[str, Any], state: _RenderState, context: Any) -> Any:
     scope = binding.get("scope", "context")
@@ -548,7 +614,9 @@ def _rich_text(value: Any) -> str:
     return "<br>".join(escape(part) for part in _format_value(value, None).splitlines())
 
 
-def _render_menu_items(items: Any, *, level: int = 0) -> str:
+def _render_menu_items(
+    items: Any, *, level: int = 0, bootstrap: bool = False, disclosure: bool = False,
+) -> str:
     """Render a validated menu tree without flattening child relationships."""
     if not isinstance(items, (list, tuple)) or level > 8:
         return ""
@@ -559,14 +627,67 @@ def _render_menu_items(items: Any, *, level: int = 0) -> str:
         label = escape(_format_value(item.get("label"), None))
         href = _safe_url(item.get("url")) or "#"
         target = ' target="_blank" rel="noopener noreferrer"' if item.get("target") == "_blank" else ""
-        children = _render_menu_items(item.get("children"), level=level + 1)
-        rows.append(
-            '<li class="sc-menu-item">'
-            f'<a class="sc-menu-link" href="{escape(href, quote=True)}"{target}>{label}</a>'
-            + (f'<ul class="sc-menu-dropdown">{children}</ul>' if children else "")
-            + "</li>"
+        children = _render_menu_items(
+            item.get("children"), level=level + 1,
+            bootstrap=bootstrap, disclosure=disclosure,
         )
+        has_children = bool(children)
+        item_class = "sc-menu-item"
+        link_class = "sc-menu-link"
+        submenu_class = "sc-menu-dropdown"
+        if bootstrap:
+            item_class += " nav-item" + (" dropdown has-children" if has_children else "")
+            link_class += " " + ("dropdown-item" if level else "nav-link")
+            if has_children and level == 0:
+                link_class += " dropdown-toggle"
+            submenu_class += " dropdown-menu"
+        if bootstrap and disclosure and has_children:
+            # Native details/summary gives the mobile navigation a real,
+            # keyboard-operable accordion without shipping executable theme
+            # JavaScript.  Desktop CSS keeps the familiar hover/focus dropdown.
+            rows.append(
+                f'<li class="{item_class}"><details class="sc-menu-details">'
+                f'<summary class="{link_class}"><span>{label}</span></summary>'
+                f'<ul class="{submenu_class}">{children}</ul>'
+                "</details></li>"
+            )
+        else:
+            rows.append(
+                f'<li class="{item_class}">'
+                f'<a class="{link_class}" href="{escape(href, quote=True)}"{target}>{label}</a>'
+                + (f'<ul class="{submenu_class}">{children}</ul>' if children else "")
+                + "</li>"
+            )
     return "".join(rows)
+
+
+def _render_footer_menu(items: Any) -> str:
+    if not isinstance(items, (list, tuple)):
+        return ""
+    columns: list[str] = []
+    for item in items[:24]:
+        if not isinstance(item, dict):
+            continue
+        label = escape(_format_value(item.get("label"), None))
+        href = _safe_url(item.get("url"))
+        target = ' target="_blank" rel="noopener noreferrer"' if item.get("target") == "_blank" else ""
+        # Bootstrap's base anchor colour must not leak into column headings
+        # when an older publication artifact still carries an earlier theme
+        # stylesheet.  Utilities also make the intended presentation explicit
+        # in the generated semantic markup.
+        heading_class = "sc-menu-heading text-white text-decoration-none fw-bold"
+        heading = (
+            f'<a class="{heading_class}" href="{escape(href, quote=True)}"{target}>{label}</a>'
+            if href else f'<span class="{heading_class}">{label}</span>'
+        )
+        children = _render_menu_items(item.get("children"), level=1, bootstrap=True)
+        columns.append(
+            '<div class="sc-menu-column col">'
+            f"{heading}"
+            + (f'<ul class="sc-menu-dropdown">{children}</ul>' if children else "")
+            + "</div>"
+        )
+    return "".join(columns)
 
 
 def _render_nodes(nodes: list[dict[str, Any]], state: _RenderState, context: Any, depth: int) -> str:
@@ -583,17 +704,44 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
         if not source:
             # No source configured yet: fail closed to the authored empty branch.
             return _render_nodes(node.get("empty", []), state, context, depth + 1)
+        params = state.resolve_params(node.get("params") or {})
         records = (
             _lookup(context, source.removeprefix("context."))
             if source.startswith("context.") else
-            state.resolve_source(source, node.get("params") or {})
+            state.resolve_source(source, params)
         )
         if not isinstance(records, (list, tuple)):
             records = []
-        limit = min(int((node.get("params") or {}).get("limit", MAX_REPEAT)), MAX_REPEAT)
+        limit = min(int(params.get("limit", MAX_REPEAT)), MAX_REPEAT)
         if not records:
             return _render_nodes(node.get("empty", []), state, context, depth + 1)
         return "".join(_render_nodes(node.get("components", []), state, record, depth + 1) for record in records[:limit])
+    if component_type == "sc-pagination":
+        if not node["source"]:
+            return ""
+        params = state.resolve_params(node.get("params") or {})
+        limit = node["limit"]
+        # Ask for one extra record solely to determine whether a next page
+        # exists.  The old >= limit check produced a phantom next link whenever
+        # the final page contained exactly `limit` records.
+        lookahead = dict(params)
+        lookahead["limit"] = min(limit + 1, 50)
+        records = state.resolve_source(node["source"], lookahead)
+        records = records if isinstance(records, (list, tuple)) else []
+        try:
+            current = max(1, int(_lookup(state.page, "query.page") or 1))
+        except (TypeError, ValueError):
+            current = 1
+        has_next = len(records) > limit
+        if current == 1 and not has_next:
+            return ""
+        links = []
+        if current > 1:
+            links.append(f'<a class="sc-pagination-link" rel="prev" href="?page={current - 1}">Předchozí</a>')
+        links.append(f'<span class="sc-pagination-current" aria-current="page">{current}</span>')
+        if has_next:
+            links.append(f'<a class="sc-pagination-link" rel="next" href="?page={current + 1}">Další</a>')
+        return f'<nav class="sc-pagination" aria-label="Stránkování">{"".join(links)}</nav>'
     if component_type == "sc-condition":
         return _render_nodes(node.get("components", []), state, context, depth + 1) if _condition_matches(node["condition"], state, context) else ""
     if component_type == "sc-bind":
@@ -601,15 +749,36 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
         return _rich_text(value) if node.get("mode") == "richText" else escape(_format_value(value, node["binding"].get("format")))
     if component_type == "sc-empty":
         return _render_nodes(node.get("components", []), state, context, depth + 1)
+    if component_type == "sc-detail-content":
+        fragment = state.page.get("detail_html")
+        return fragment if isinstance(fragment, str) else ""
     if component_type == "sc-menu":
         location = node.get("location", "main")
         items = state.resolve_source("web.menu", {"location": location})
-        rendered_items = _render_menu_items(items)
+        presentation = node.get("presentation") or (
+            "bootstrap-footer-columns" if location == "footer" else ""
+        )
+        if presentation == "bootstrap-footer-columns":
+            rendered_items = _render_footer_menu(items)
+        else:
+            rendered_items = _render_menu_items(
+                items,
+                bootstrap=presentation in {"bootstrap-navbar", "ontario-mobile-navbar"},
+                disclosure=presentation == "ontario-mobile-navbar",
+            )
         if not rendered_items:
             return ""
         modifier = " sc-menu--footer" if location == "footer" else ""
+        if presentation:
+            modifier += f" sc-menu--{presentation}"
         label = "Patičkové menu" if location == "footer" else "Navigace"
-        return f'<nav class="sc-menu{modifier}" aria-label="{label}"><ul class="sc-menu-list">{rendered_items}</ul></nav>'
+        tag = "div" if presentation == "bootstrap-footer-columns" else "ul"
+        classes = (
+            "sc-menu-list row" if tag == "div" else
+            "sc-menu-list navbar-nav" if presentation in {"bootstrap-navbar", "ontario-mobile-navbar"} else
+            "sc-menu-list"
+        )
+        return f'<nav class="sc-menu{modifier}" aria-label="{label}"><{tag} class="{classes}">{rendered_items}</{tag}></nav>'
     if component_type == "sc-template-part":
         resource_id = str(node["resourceId"])
         if resource_id in state.parts or len(state.parts) >= 12:
@@ -759,7 +928,7 @@ def has_runtime_bindings(node: dict[str, Any]) -> bool:
         if not isinstance(item, dict):
             continue
         component_type = str(item.get("type") or "default")
-        if component_type in {"sc-repeat", "sc-condition", "sc-menu", "sc-template-part", "sc-global-part", "sc-slot"}:
+        if component_type in {"sc-repeat", "sc-pagination", "sc-condition", "sc-menu", "sc-template-part", "sc-global-part", "sc-slot", "sc-detail-content"}:
             return True
         if component_type == "sc-bind":
             binding = item.get("binding") or {}

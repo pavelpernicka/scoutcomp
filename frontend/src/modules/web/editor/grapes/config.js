@@ -43,6 +43,11 @@ export const editorCanvasCss = (translate = (key) => key) => `
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
+/* Transparent Bootstrap headers need a deliberate canvas-only backdrop when
+   their hero sibling is not part of the resource being edited. */
+.navbar:has([data-sc-menu-preview]) {
+  background-color: #24384b !important;
+}
 @media (max-width: 575px) {
   .sc-layout-columns { grid-template-columns: 1fr; }
 }

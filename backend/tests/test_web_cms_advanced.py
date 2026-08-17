@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from app.models import (
     DirectUserPermission, DirectUserPermissionDeny, PermissionDefinition,
-    RegisteredModule, RoleEnum, User, WebMedia, WebMenu, WebMenuRevision,
+    RegisteredModule, RoleEnum, ScoutEvent, User, WebMedia, WebMenu, WebMenuRevision,
     WebPage, WebPageRevision, WebPost, WebPostRevision, WebReusableComponent,
     WebTemplate, WebSection, WebTheme, WebThemeVersion,
 )
@@ -23,6 +23,7 @@ from app.web.renderer import CompileError, compile_project, render_document, ren
 from app.web.resource_props import ResourcePropsError
 from app.web.routes_media import MAX_MEDIA_SIZE, _sniff_image, _stored_media_path
 from app.web_render import render_markdown, sanitize_legacy_html
+from app.web.url_schemes import validate_url_pattern
 
 
 def project(*components, styles=None):
@@ -78,6 +79,75 @@ def test_real_grapes_project_repeat_bind_condition_and_empty(db_session):
     assert "Nic tu není" in empty
 
 
+def test_repeat_rejects_page_team_parameter_binding():
+    with pytest.raises(CompileError, match="cannot be bound to a team"):
+        compile_project(project({
+            "type": "sc-repeat", "source": "core.events",
+            "params": {"team_id": {"$scBinding": {"scope": "page", "field": "team_id"}}},
+        }))
+
+def test_repeat_rejects_non_page_parameter_binding():
+    with pytest.raises(CompileError, match="page scope"):
+        compile_project(project({
+            "type": "sc-repeat", "source": "core.events",
+            "params": {"team_id": {"$scBinding": {"scope": "site", "field": "id"}}},
+        }))
+
+
+def test_url_schema_rejects_external_and_ambiguous_patterns():
+    assert validate_url_pattern("/aktuality/{slug}", "slug", label="Article") == "/aktuality/{slug}"
+    with pytest.raises(HTTPException, match="schema is invalid"):
+        validate_url_pattern("https://example.test/{slug}", "slug", label="Article")
+    with pytest.raises(HTTPException, match="schema is invalid"):
+        validate_url_pattern("/aktuality/{id}", "slug", label="Article")
+
+
+def test_pagination_renders_previous_and_next_links_from_request_page(db_session):
+    compiled = compile_project(project({
+        "type": "sc-pagination", "source": "core.posts", "limit": 2,
+        "params": {"limit": 2, "page": {"$scBinding": {"scope": "page", "field": "query.page"}}},
+    }))
+
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"page": "2"}},
+        resolver=lambda *_: [{"id": 1}, {"id": 2}, {"id": 3}],
+    )
+
+    assert 'rel="prev" href="?page=1"' in rendered
+    assert 'aria-current="page">2<' in rendered
+    assert 'rel="next" href="?page=3"' in rendered
+
+
+def test_pagination_accepts_grapesjs_omitted_default_source(db_session):
+    compiled = compile_project(project({"type": "sc-pagination", "limit": 6, "params": {"limit": 6}}))
+
+    assert compiled.tree["components"][0]["source"] == "core.posts"
+    assert render_project(db_session, compiled.tree, resolver=lambda *_: []) == "<main></main>"
+
+
+def test_unconfigured_pagination_saves_and_fails_closed(db_session):
+    compiled = compile_project(project({"type": "sc-pagination", "source": "", "limit": 6}))
+
+    assert compiled.tree["components"][0]["source"] == ""
+    assert render_project(
+        db_session, compiled.tree,
+        resolver=lambda *_: pytest.fail("resolver must not run"),
+    ) == "<main></main>"
+
+
+def test_pagination_does_not_render_phantom_next_link_on_exact_final_page(db_session):
+    compiled = compile_project(project({
+        "type": "sc-pagination", "source": "core.posts", "limit": 2,
+        "params": {"limit": 2, "page": {"$scBinding": {"scope": "page", "field": "query.page"}}},
+    }))
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"page": "2"}},
+        resolver=lambda *_: [{"id": 1}, {"id": 2}],
+    )
+    assert 'rel="prev" href="?page=1"' in rendered
+    assert 'rel="next"' not in rendered
+
+
 def test_hierarchical_menu_component_preserves_children_and_safe_links(db_session):
     compiled = compile_project(project({"type": "sc-menu", "location": "main"}))
     assert compiled.tree["components"][0] == {"type": "sc-menu", "location": "main", "components": []}
@@ -94,6 +164,43 @@ def test_hierarchical_menu_component_preserves_children_and_safe_links(db_sessio
     assert 'class="sc-menu-list"' in rendered
     assert 'class="sc-menu-dropdown"' in rendered
     assert 'href="/historie" target="_blank" rel="noopener noreferrer"' in rendered
+
+
+def test_menu_bootstrap_presentations_render_dropdowns_and_footer_columns(db_session):
+    items = [{
+        "label": "Schůzky",
+        "url": "/schuzky",
+        "children": [{"label": "Lachtani", "url": "/schuzky/lachtani"}],
+    }]
+    navbar = compile_project(project({
+        "type": "sc-menu",
+        "location": "main",
+        "presentation": "bootstrap-navbar",
+    }))
+    navbar_html = render_project(db_session, navbar.tree, resolver=lambda *_: items)
+    assert 'class="sc-menu-list navbar-nav"' in navbar_html
+    assert "dropdown-toggle" in navbar_html
+    assert "dropdown-menu" in navbar_html
+    assert "<details" not in navbar_html
+
+    mobile = compile_project(project({
+        "type": "sc-menu",
+        "location": "main",
+        "presentation": "ontario-mobile-navbar",
+    }))
+    mobile_html = render_project(db_session, mobile.tree, resolver=lambda *_: items)
+    assert '<details class="sc-menu-details">' in mobile_html
+    assert '<summary class="sc-menu-link nav-link dropdown-toggle">' in mobile_html
+
+    footer = compile_project(project({
+        "type": "sc-menu",
+        "location": "footer",
+        "presentation": "bootstrap-footer-columns",
+    }))
+    footer_html = render_project(db_session, footer.tree, resolver=lambda *_: items)
+    assert 'class="sc-menu-list row"' in footer_html
+    assert 'class="sc-menu-column col"' in footer_html
+    assert "Lachtani" in footer_html
 
 
 def test_theme_export_declares_user_resources_as_a_template_bundle(db_session):
@@ -914,6 +1021,41 @@ def test_public_post_route_uses_published_revision_slug(db_session, monkeypatch)
     assert caught.value.status_code == 404
 
 
+def test_public_site_resolves_custom_article_url_schema(db_session, monkeypatch):
+    from starlette.requests import Request
+    from app import site_app as site_module
+    from app.routers.config import set_config_value
+
+    post = WebPost(title="Článek", slug="clanek", body="Obsah", published=True)
+    db_session.add(post); db_session.flush()
+    revision = WebPostRevision(
+        post_id=post.id, revision_number=1, source_version=1, title="Článek",
+        slug="clanek", body="Obsah", reason="publish", is_publication=True,
+    )
+    db_session.add(revision); db_session.flush(); post.published_revision_id = revision.id
+    set_config_value(db_session, "web.post_url_pattern", "/aktuality/{slug}")
+    db_session.commit()
+    monkeypatch.setattr(site_module, "SessionLocal", sessionmaker(bind=db_session.bind))
+
+    response = site_module.nested_site_page("aktuality/clanek", Request({"type": "http", "query_string": b""}))
+
+    assert response.status_code == 200
+    assert "Obsah" in response.body.decode()
+
+
+def test_public_meeting_detail_requires_public_event_and_renders_it(db_session, monkeypatch):
+    from app import site_app as site_module
+
+    event = ScoutEvent(title="Veřejná schůzka", description="Sraz u klubovny", kind="meeting", starts_at=datetime.now(), is_public=True)
+    db_session.add(event); db_session.commit()
+    monkeypatch.setattr(site_module, "SessionLocal", sessionmaker(bind=db_session.bind))
+
+    response = site_module.site_meeting(event.id)
+
+    assert response.status_code == 200
+    assert "Veřejná schůzka" in response.body.decode()
+
+
 def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
     from app.web.routes_content import delete_menu, delete_post
     from app.web.routes_design import activate_theme_version
@@ -1127,11 +1269,17 @@ def test_template_clone_creates_editable_site_owned_variant(db_session):
         username="template-cloner", real_name="Template cloner", password_hash="x",
         role=RoleEnum.ADMIN,
     )
+    from app.models import WebSiteStyle, WebTheme, WebThemeVersion
+    theme = WebTheme(stable_key="test-template-clone", name="Test")
+    db_session.add(theme); db_session.flush()
+    version = WebThemeVersion(theme_id=theme.id, version="1.0.0", schema_version=1, manifest={}, package_hash="a" * 64, install_path="test/template-clone")
+    db_session.add(version); db_session.flush()
+    db_session.get(WebSiteStyle, 1).active_theme_version_id = version.id
     origin = WebTemplate(
         key="theme-starter", qualified_key="theme:templates:starter", name="Starter",
         html="", css=".starter{color:green}", project_data=project(text("Starter")),
         published_project_data=project(text("Published")), published_version=1,
-        usage_mode="copy_on_create", is_system=True,
+        usage_mode="copy_on_create", is_system=True, theme_version_id=version.id,
     )
     db_session.add_all([user, origin]); db_session.commit()
 
@@ -1144,7 +1292,7 @@ def test_template_clone_creates_editable_site_owned_variant(db_session):
     assert clone["published_project_data"] == origin.published_project_data
     assert clone["is_system"] is False
     cloned_model = db_session.get(WebTemplate, clone["id"])
-    assert cloned_model.theme_version_id is None
+    assert cloned_model.theme_version_id == version.id
     assert cloned_model.project_data == origin.project_data
     assert cloned_model.project_data is not origin.project_data
 
@@ -1511,3 +1659,352 @@ def test_whole_site_export_keeps_site_owned_designs_and_metadata(db_session, mon
     assert exported["format"] == "scoutcomp-web-export"
     assert exported["pages"][0]["title"] == "Export"
     assert exported["components"][0]["qualified_key"] == "site:export-card"
+
+
+def test_page_publication_materialises_an_immutable_document_artifact(db_session):
+    """The visitor app reads this document instead of invoking the renderer."""
+    page = WebPage(
+        slug="artifact", path_segment="artifact", path="/artifact", title="Artifact",
+        data=project(text("Published snapshot")), draft_version=1,
+    )
+    db_session.add(page)
+    db_session.commit()
+
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+    assert revision.rendered_html
+    assert "Published snapshot" in revision.rendered_html
+    assert revision.rendered_at is not None
+
+    from app.site_app import _render_revision
+    page.title = "Mutable draft title"
+    db_session.flush()
+    assert _render_revision(db_session, page, revision) == revision.rendered_html
+
+
+def test_public_renderer_rejects_missing_new_publication_artifact(db_session):
+    page = WebPage(slug="not-built", path_segment="not-built", path="/not-built", title="Not built", draft_version=1)
+    db_session.add(page); db_session.flush()
+    revision = WebPageRevision(page_id=page.id, revision_number=1, is_publication=True, reason="publish")
+    db_session.add(revision); db_session.flush()
+    from app.site_app import _render_revision
+    with pytest.raises(HTTPException) as exc:
+        _render_revision(db_session, page, revision)
+    assert exc.value.status_code == 503
+
+
+def test_detail_layout_renders_sanitised_fragment_in_its_content_slot(db_session):
+    from app.routers.config import set_config_value
+    from app.site_app import _detail_document
+
+    template = WebTemplate(
+        key="article-layout", qualified_key="site:template:article-layout", name="Article layout", html="",
+        usage_mode="linked_layout", project_data=project(text("Draft")),
+        published_project_data=project(
+            {"type": "text", "tagName": "header", "content": "Shared header"},
+            {"type": "sc-slot", "name": "content", "components": []},
+        ), published_css=".web-post{max-width:60rem}", published_version=1,
+    )
+    db_session.add(template); db_session.flush()
+    set_config_value(db_session, "web.post_detail_template_id", str(template.id))
+    document = _detail_document(
+        db_session, setting_key="web.post_detail_template_id",
+        detail_html='<article class="web-post"><h1>Safe title</h1></article>', title="Safe title",
+    )
+    assert "Shared header" in document
+    assert "Safe title" in document
+
+
+def test_scout_theme_seeds_a_composed_homepage_and_rich_sections(db_session):
+    from app.web.default_template import DEFAULT_THEME_VERSION
+    from app.web.routes_templates import seed_default_theme
+    from app.web.renderer import compile_project
+    from app.web.theme_package import activate_theme
+
+    seed_default_theme(db_session)
+    home = db_session.query(WebTemplate).filter_by(
+        qualified_key=f"scoutcomp-default@{DEFAULT_THEME_VERSION}:templates:scout-home",
+    ).one()
+    assert home.published_project_data
+    theme_version = db_session.get(WebThemeVersion, home.theme_version_id)
+    assert ".sc2-hero" in theme_version.base_css
+    compiled = compile_project(home.published_project_data)
+    assert compiled.tree
+    templates = db_session.query(WebTemplate).filter(
+        WebTemplate.qualified_key.like(f"scoutcomp-default@{DEFAULT_THEME_VERSION}:templates:%"),
+    ).all()
+    assert {"scout-home", "scout-landing", "scout-story", "scout-team", "scout-listing", "scout-detail", "scout-gallery-page", "scout-contact-page"} <= {
+        item.qualified_key.rsplit(":", 1)[-1] for item in templates
+    }
+    resources = db_session.query(WebSection).filter(
+        WebSection.qualified_key.like(f"scoutcomp-default@{DEFAULT_THEME_VERSION}:sections:%"),
+    ).all()
+    assert {"scout-hero-full", "scout-hero-compact", "scout-showcase", "scout-posts-grid", "scout-team-grid", "scout-events", "scout-values", "scout-cta", "scout-gallery", "scout-contact"} <= {
+        item.qualified_key.rsplit(":", 1)[-1] for item in resources
+    }
+    assert all(item.published_project_data and item.published_version >= 1 for item in resources)
+    assert all(item.usage_mode == "linked_layout" for item in templates)
+    assert activate_theme(db_session, home.theme_version_id).active_theme_version_id == home.theme_version_id
+
+
+def test_ontario_theme_is_seeded_with_assets_and_default_hierarchical_menus(db_session):
+    from app.models import WebReusableComponent, WebSiteStyle, WebTheme, WebThemeAsset
+    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION
+    from app.web.routes_templates import seed_default_theme
+    from app.web.theme_package import activate_theme, resolve_theme_asset_path
+
+    seed_default_theme(db_session)
+    theme = db_session.query(WebTheme).filter_by(stable_key=ONTARIO_THEME_ID).one()
+    version = db_session.query(WebThemeVersion).filter_by(
+        theme_id=theme.id, version=ONTARIO_THEME_VERSION,
+    ).one()
+    assert db_session.get(WebSiteStyle, 1).active_theme_version_id != version.id
+    assert db_session.query(WebTemplate).filter_by(theme_version_id=version.id).count() >= 16
+    assert db_session.query(WebSection).filter_by(theme_version_id=version.id).count() >= 14
+    assert db_session.query(WebReusableComponent).filter_by(theme_version_id=version.id).count() >= 11
+    font = db_session.query(WebThemeAsset).filter_by(
+        theme_version_id=version.id,
+        relative_path="assets/fonts/SKAUT-Bold.otf",
+    ).one()
+    assert resolve_theme_asset_path(version, font.relative_path).is_file()
+    home = db_session.query(WebTemplate).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:templates:home",
+    ).one()
+    compiled = compile_project(home.project_data)
+    assert "bootstrap-navbar" in str(compiled.tree)
+    assert "bootstrap-footer-columns" in str(compiled.tree)
+
+    activate_theme(db_session, version.id)
+    main = db_session.query(WebMenu).filter_by(location="main").one()
+    footer = db_session.query(WebMenu).filter_by(location="footer").one()
+    main_tree = db_session.get(WebMenuRevision, main.published_revision_id).tree
+    footer_tree = db_session.get(WebMenuRevision, footer.published_revision_id).tree
+    assert [item["label"] for item in main_tree] == [
+        "Kalendář", "Schůzky", "Galerie", "Kontakt", "Ostatní", "Domů",
+    ]
+    assert [item["label"] for item in main_tree[1]["children"]] == [
+        "Lachtani", "Delfíni", "Kanafásci", "Medojedi", "Kanci",
+    ]
+    assert [item["label"] for item in footer_tree] == ["ODDÍL", "SCHŮZKY DRUŽIN", "OSTATNÍ"]
+
+
+def test_ontario_theme_resources_are_directly_editable(db_session, monkeypatch):
+    from app.web import routes_design, routes_templates
+    from app.web.ontario_theme import ONTARIO_THEME_VERSION
+    from app.web.routes_design import DesignResourcePayload
+    from app.web.routes_templates import TemplatePayload, seed_default_theme
+
+    seed_default_theme(db_session)
+    user = User(
+        username="ontario-editor", real_name="Ontario editor", password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    db_session.add(user)
+    db_session.commit()
+    monkeypatch.setattr(routes_design, "_require_action", lambda *_args: None)
+    monkeypatch.setattr(routes_templates, "_require_action", lambda *_args: None)
+    monkeypatch.setattr(routes_design, "build_resource_preview", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(routes_templates, "build_preview", lambda *_args, **_kwargs: None)
+
+    component = db_session.query(WebReusableComponent).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:components:button",
+    ).one()
+    updated_component = routes_design.update_design_resource(
+        "components",
+        component.id,
+        DesignResourcePayload(
+            qualified_key=component.qualified_key,
+            name="Vlastní Ontario tlačítko",
+            project_data=component.project_data,
+            css=".btn-skaut{letter-spacing:.05em}",
+            expected_version=component.draft_version,
+        ),
+        db_session,
+        user,
+    )
+    assert updated_component["name"] == "Vlastní Ontario tlačítko"
+    assert updated_component["is_locked"] is False
+    assert updated_component["is_from_theme"] is True
+
+    template = db_session.query(WebTemplate).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:templates:home",
+    ).one()
+    updated_template = routes_templates.update_template(
+        template.id,
+        TemplatePayload(
+            key=template.key,
+            qualified_key=template.qualified_key,
+            name="Vlastní Ontario homepage",
+            project_data=template.project_data,
+            css=".ontario-hero{min-height:600px}",
+            expected_version=template.draft_version,
+        ),
+        db_session,
+        user,
+    )
+    assert updated_template["name"] == "Vlastní Ontario homepage"
+    assert updated_template["is_locked"] is False
+    assert updated_template["is_from_theme"] is True
+
+    # Routine startup/catalog seeding repairs missing rows but must not erase
+    # direct author edits to bundled resources.
+    seed_default_theme(db_session)
+    assert db_session.get(WebReusableComponent, component.id).name == "Vlastní Ontario tlačítko"
+    assert db_session.get(WebReusableComponent, component.id).css == ".btn-skaut{letter-spacing:.05em}"
+    assert db_session.get(WebTemplate, template.id).name == "Vlastní Ontario homepage"
+    assert db_session.get(WebTemplate, template.id).css == ".ontario-hero{min-height:600px}"
+
+
+def test_ontario_seed_refreshes_only_untouched_bundled_resources(db_session):
+    from app.web.ontario_theme import ONTARIO_THEME_VERSION, seed_ontario_theme
+    from app.web.routes_templates import seed_default_theme
+
+    seed_default_theme(db_session)
+    home = db_session.query(WebTemplate).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:templates:home",
+    ).one()
+    stale = deepcopy(home.project_data)
+    components = stale["pages"][0]["frames"][0]["component"]["components"]
+    components.append({
+        "type": "link", "tagName": "a",
+        "attributes": {"class": "ontario-search", "href": "/hledat"},
+        "content": "Hledat",
+    })
+    home.project_data = stale
+    home.published_project_data = deepcopy(stale)
+    db_session.commit()
+
+    seed_ontario_theme(db_session)
+    db_session.refresh(home)
+    refreshed = str(home.project_data)
+    assert "ontario-search" not in refreshed
+    assert "ontario-menu-shell" in refreshed
+    assert "Powered by Vyveh" in refreshed
+
+    # Once an author has saved a draft, the bundled baseline must no longer
+    # replace it during routine startup/catalog seeding.
+    home.project_data = stale
+    home.published_project_data = deepcopy(stale)
+    home.draft_version = 2
+    home.published_version = 2
+    db_session.commit()
+    seed_ontario_theme(db_session)
+    db_session.refresh(home)
+    assert "ontario-search" in str(home.project_data)
+
+
+def test_ontario_theme_export_contains_all_editable_resources_and_fonts(db_session, tmp_path):
+    from app.models import WebThemeAsset
+    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION
+    from app.web.routes_templates import seed_default_theme
+    from app.web.theme_package import export_theme_archive, install_theme, uninstall_theme
+
+    seed_default_theme(db_session)
+    theme = db_session.query(WebTheme).filter_by(stable_key=ONTARIO_THEME_ID).one()
+    version = db_session.query(WebThemeVersion).filter_by(
+        theme_id=theme.id, version=ONTARIO_THEME_VERSION,
+    ).one()
+    archive_bytes = export_theme_archive(db_session, version.id, include_site_resources=False)
+    with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        assert len(manifest["resources"]["templates"]) >= 16
+        assert len(manifest["resources"]["sections"]) >= 14
+        assert len(manifest["resources"]["components"]) >= 11
+        assert "assets/fonts/SKAUT-Bold.otf" in manifest["resources"]["assets"]
+        home = json.loads(archive.read("templates/home.json"))
+        assert "/theme-assets/" not in json.dumps(home)
+
+    uninstall_theme(db_session, version.id)
+    installed = install_theme(db_session, archive_bytes, storage_root=tmp_path / "themes")
+    assert db_session.query(WebTemplate).filter_by(theme_version_id=installed.id).count() >= 16
+    assert db_session.query(WebThemeAsset).filter_by(
+        theme_version_id=installed.id,
+        relative_path="assets/fonts/SKAUT-Bold.otf",
+    ).one()
+
+
+def test_page_creation_supports_editable_custom_and_root_paths(db_session):
+    from app.web.pages import ROOT_PAGE_SEGMENT, normalise_path_segment
+    from app.web.routes_pages import PagePayload, create_page
+
+    user = User(
+        username="root-page-user", real_name="Root page user", password_hash="x",
+        role=RoleEnum.ADMIN,
+    )
+    db_session.add(user)
+    db_session.commit()
+
+    custom = create_page(PagePayload(title="O nás", slug="Náš vlastní odkaz"), db_session, user)
+    assert custom["path_segment"] == "nas-vlastni-odkaz"
+    assert custom["path"] == "/nas-vlastni-odkaz"
+
+    homepage = create_page(PagePayload(title="Domů", slug="/"), db_session, user)
+    assert normalise_path_segment("/") == ROOT_PAGE_SEGMENT
+    assert homepage["path"] == "/"
+    assert homepage["path_segment"] == ROOT_PAGE_SEGMENT
+
+    with pytest.raises(HTTPException) as duplicate_root:
+        create_page(PagePayload(title="Druhá domů", slug="/"), db_session, user)
+    assert duplicate_root.value.status_code == 409
+
+    with pytest.raises(HTTPException) as nested_root:
+        create_page(PagePayload(title="Vnořená domů", slug="/", parent_id=custom["id"]), db_session, user)
+    assert nested_root.value.status_code == 422
+
+
+def test_trashing_page_releases_root_path_and_restore_detects_collision(db_session):
+    from app.web.pages import restore_trashed_page, trash_page
+    from app.web.routes_pages import PagePayload, create_page
+
+    user = User(username="trash-root-user", real_name="Trash root", password_hash="x", role=RoleEnum.ADMIN)
+    db_session.add(user); db_session.commit()
+    original = create_page(PagePayload(title="Původní domů", slug="/"), db_session, user)
+    page = db_session.get(WebPage, original["id"])
+    trash_page(db_session, page)
+    db_session.refresh(page)
+    assert page.trashed_path == "/"
+    assert page.path.startswith("/__trash/")
+
+    replacement = create_page(PagePayload(title="Nová domů", slug="/"), db_session, user)
+    assert replacement["path"] == "/"
+    with pytest.raises(HTTPException) as restore_error:
+        restore_trashed_page(db_session, page)
+    assert restore_error.value.status_code == 409
+
+
+def test_confirmed_layout_switch_adopts_template_slot_content(db_session):
+    layout_one = WebTemplate(
+        key="switch-one", qualified_key="site:switch-one", name="One", html="",
+        usage_mode="linked_layout", project_data=project({"type": "sc-slot", "name": "content", "components": [text("One")]}),
+    )
+    layout_two = WebTemplate(
+        key="switch-two", qualified_key="site:switch-two", name="Two", html="",
+        usage_mode="linked_layout", project_data=project({"type": "sc-slot", "name": "content", "components": [text("Template body")]}),
+    )
+    page = WebPage(slug="switch-page", path_segment="switch-page", path="/switch-page", title="Switch", data=project(text("Old body")), draft_version=1, template_id=None)
+    db_session.add_all([layout_one, layout_two, page]); db_session.commit()
+
+    save_draft(
+        db_session, page, expected_version=1, project=project(text("Old body")), user_id=1,
+        metadata={"title": "Switch", "template_id": layout_two.id, "replace_content_with_template": True},
+    )
+    root = page.data["pages"][0]["frames"][0]["component"]
+    assert root["components"][0]["content"] == "Template body"
+
+
+def test_new_page_uses_selected_classic_template_as_layout_and_initial_content(db_session):
+    from app.web.routes_pages import PagePayload, create_page
+
+    user = User(username="classic-template-user", real_name="Classic template", password_hash="x", role=RoleEnum.ADMIN)
+    layout = WebTemplate(
+        key="classic-layout", qualified_key="site:template:classic-layout", name="Classic", html="",
+        usage_mode="linked_layout",
+        project_data=project({"type": "sc-slot", "name": "content", "components": [text("Template content")]}),
+        published_project_data=project({"type": "sc-slot", "name": "content", "components": [text("Template content")]}),
+        published_version=1,
+    )
+    db_session.add_all([user, layout]); db_session.commit()
+
+    created = create_page(PagePayload(title="New", source_template_id=layout.id), db_session, user)
+    page = db_session.get(WebPage, created["id"])
+    assert page.template_id == layout.id
+    assert page.data["pages"][0]["frames"][0]["component"]["components"][0]["content"] == "Template content"

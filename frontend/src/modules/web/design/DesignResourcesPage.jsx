@@ -61,13 +61,6 @@ export default function DesignResourcesPage({ kind }) {
     },
   });
   const edit = async (resource) => {
-    // Installed package resources are immutable by contract.  "Edit" creates
-    // a site-owned linked clone, so authors reach a real editor rather than a
-    // read-only dead end and future theme upgrades remain safe.
-    if (resource.is_locked || resource.theme_version_id) {
-      const cloned = await clone.mutateAsync(resource);
-      return cloned;
-    }
     navigate(`/admin/web/design/${kind}/${resource.id}/editor`);
     return resource;
   };
@@ -80,10 +73,10 @@ export default function DesignResourcesPage({ kind }) {
     <AdminPageHeader title={t(`web.design.${kind}`)} description={t(`web.designDescriptions.${kind}`)} action={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}><i className="fas fa-plus me-2" />{t("web.commands.createResource")}</button>} />
     {creating && <form className="web-inline-create" onSubmit={(event) => { event.preventDefault(); if (name.trim()) create.mutate(); }}><label htmlFor="resource-name">{t("web.fields.name")}</label><input id="resource-name" autoFocus className="form-control" value={name} onChange={(event) => setName(event.target.value)} /><button className="btn btn-primary" disabled={!name.trim() || create.isPending}>{t("web.create")}</button><button type="button" className="btn btn-link" onClick={() => setCreating(false)}>{t("web.cancel")}</button></form>}
     {resourcesLoading ? <LoadingSpinner /> : resources.length === 0 ? <div className="web-admin-empty"><i className="fas fa-shapes" /><h3>{t("web.empty.resourcesTitle")}</h3><p>{t("web.empty.resourcesBody")}</p></div> : <div className="web-resource-grid">{resources.map((resource) => {
-      const installed = Boolean(resource.is_locked || resource.theme_version_id);
+      const installed = Boolean(resource.is_from_theme || resource.theme_version_id);
       const previewUrl = resource.preview_url || (resource.preview_media_id ? `/api/web/media/${resource.preview_media_id}/file` : null);
       const icon = kind === "components" ? "fa-layer-group" : "fa-layer-group";
-      return <article key={resource.id} className="web-resource-item"><div className="web-resource-preview">{previewUrl ? <MediaPreview src={previewUrl} alt="" /> : <i className={`fas ${icon}`} />}</div><div><h3>{resource.name}</h3><p>{resource.description || t(`web.resourceKinds.${kind}`)}</p><span>{installed ? t("web.states.fromTheme") : t("web.states.siteLocal")}</span>{kind === "templates" && <small className="ms-2">{t(`web.templateUsage.${getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.copyOnCreate ? "copyOnCreate" : "linkedLayout"}`)}</small>}</div><div className="d-flex gap-1"><button type="button" className="btn btn-sm btn-outline-secondary" title={t("web.duplicate")} disabled={clone.isPending} onClick={() => clone.mutate(resource)}><i className="fas fa-copy" /></button><button type="button" className="btn btn-sm btn-outline-primary" title={t("web.edit")} disabled={clone.isPending} onClick={() => { void edit(resource); }}><i className="fas fa-pen" /></button>{!installed && !resource.is_system && <button type="button" className="btn btn-sm btn-outline-danger" title={t("web.delete")} onClick={() => { if (window.confirm(t("web.confirmDeleteResource"))) remove.mutate(resource.id); }}><i className="fas fa-trash" /></button>}</div></article>;
+      return <article key={resource.id} className="web-resource-item"><div className="web-resource-preview">{previewUrl ? <MediaPreview src={previewUrl} alt="" /> : <i className={`fas ${icon}`} />}</div><div><h3>{resource.name}</h3><p>{resource.description || t(`web.resourceKinds.${kind}`)}</p><span>{installed ? t("web.states.fromTheme") : t("web.states.siteLocal")}</span>{kind === "templates" && <small className="ms-2">{t(`web.templateUsage.${getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.copyOnCreate ? "copyOnCreate" : "linkedLayout"}`)}</small>}</div><div className="d-flex gap-1"><button type="button" className="btn btn-sm btn-outline-secondary" title={t("web.duplicate")} disabled={clone.isPending} onClick={() => clone.mutate(resource)}><i className="fas fa-copy" /></button><button type="button" className="btn btn-sm btn-outline-primary" title={t("web.edit")} disabled={clone.isPending} onClick={() => { void edit(resource); }}><i className="fas fa-pen" /></button>{!installed && <button type="button" className="btn btn-sm btn-outline-danger" title={t("web.delete")} onClick={() => { if (window.confirm(t("web.confirmDeleteResource"))) remove.mutate(resource.id); }}><i className="fas fa-trash" /></button>}</div></article>;
     })}</div>}
   </section>;
 }

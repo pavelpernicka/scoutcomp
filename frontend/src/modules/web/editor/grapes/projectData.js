@@ -2,6 +2,21 @@ const isObject = (value) => value !== null && typeof value === "object" && !Arra
 
 const serializableClone = (value) => JSON.parse(JSON.stringify(value));
 
+// These values hydrate the authenticated editor canvas only. A linked
+// resource's persisted contract remains resourceKind/resourceId/props/variant;
+// storing the materialized fragment would make snapshots stale and duplicate
+// the authoritative server render.
+const stripEditorOnlyPreview = (value) => {
+  if (Array.isArray(value)) return value.map(stripEditorOnlyPreview);
+  if (!isObject(value)) return value;
+  const next = {};
+  Object.entries(value).forEach(([key, child]) => {
+    if (key === "livePreviewHtml" || key === "livePreviewCss" || key === "menuItems") return;
+    next[key] = stripEditorOnlyPreview(child);
+  });
+  return next;
+};
+
 const withSchemaVersion = (project) => ({
   ...project,
   scoutcomp: {
@@ -54,7 +69,7 @@ export function loadEditorProject(editor, { projectData, legacyHtml = "", legacy
 /** Capture the canonical editor representation and derived output atomically. */
 export function getEditorSnapshot(editor) {
   return {
-    projectData: withSchemaVersion(editor.getProjectData()),
+    projectData: withSchemaVersion(stripEditorOnlyPreview(editor.getProjectData())),
     html: editor.getHtml(),
     css: editor.getCss(),
     dirtyCount: editor.getDirtyCount(),

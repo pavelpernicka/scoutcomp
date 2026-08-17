@@ -25,7 +25,7 @@ from ..routers import (
 )
 from ..inventory import router as inventory_router
 from ..routers import members
-from ..web.data_sources import EVENTS_DATA_SOURCE, MEDIA_DATA_SOURCE, MENU_DATA_SOURCE, POSTS_DATA_SOURCE
+from ..web.data_sources import EVENTS_DATA_SOURCE, MEDIA_DATA_SOURCE, MENU_DATA_SOURCE, POSTS_DATA_SOURCE, TEAMS_DATA_SOURCE
 
 
 def register_all_modules() -> None:
@@ -64,7 +64,7 @@ def register_all_modules() -> None:
                  {"id":"core.planned_events", "component":"planned_events", "title":"Plánované akce", "text":"Tvoje schůzky, výpravy a přihlášení.", "icon":"fa-calendar-check", "permission":"core.events.read", "width":"col-xl-5"},),
         # Posts and media are Core-owned content. The public CMS consumes
         # these declared sources but does not own their lifecycle.
-        web_data_sources=(EVENTS_DATA_SOURCE, POSTS_DATA_SOURCE, MEDIA_DATA_SOURCE),
+        web_data_sources=(EVENTS_DATA_SOURCE, POSTS_DATA_SOURCE, MEDIA_DATA_SOURCE, TEAMS_DATA_SOURCE),
         menu=({"label":"Kalendář", "route":"/activity", "icon":"fa-calendar", "permission":"core.events.read"}, {"label":"Zprávy", "route":"/messages", "icon":"fa-envelope", "permission":"core.messages"}, {"label":"Příspěvky", "route":"/posts", "icon":"fa-newspaper", "permission":"core.posts.read"}),
         admin_menu=({"section":"Core", "label":"Nastavení", "route":"/admin/core/config", "permission":"core.modules.manage"}, {"section":"Core", "label":"Moduly", "route":"/admin/core/modules", "permission":"core.modules.manage"}, {"section":"Core", "label":"Nástěnka", "route":"/admin/core/widgets", "permission":"core.modules.manage"}, {"section":"Core", "label":"Družiny", "route":"/admin/core/teams", "permission":"core.teams.manage"}, {"section":"Core", "label":"Členská evidence", "route":"/admin/core/users", "permission":"core.members.read"}, {"section":"Core", "label":"Příspěvky", "route":"/admin/core/posts", "permission":"core.posts.manage"}, {"section":"Core", "label":"Média", "route":"/admin/core/media", "permission":"core.media.manage"}, {"section":"Core", "label":"Oprávnění", "route":"/admin/core/access", "permission":"core.access.manage"}, {"section":"Core", "label":"Docházka", "route":"/admin/core/attendance", "permission":"core.attendance.manage"}), routers=(auth.router, users.router, members.router, teams.router, notifications.router, config.router, config.admin_router, messages.router, modules.router, modules.admin_router, widgets.router, widgets.admin_router, activity.router, activity.admin_router)))
     registry.register(ModuleManifest("competitions", "Soutěže", "Úkoly, plnění, výsledky a týmy", "fa-trophy", "/tasks",

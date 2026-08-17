@@ -42,6 +42,28 @@ describe("builder primitive blocks", () => {
     }
   });
 
+  it("offers reusable Ontario, Font Awesome and safe Bootstrap starters", () => {
+    const ids = createPrimitiveBlocks((key) => key).map((block) => block.id);
+
+    expect(ids).toEqual(expect.arrayContaining([
+      "sc-fa-icon",
+      "sc-organic-edge",
+      "sc-photo-mask",
+      "bs-alert",
+      "bs-badge",
+      "bs-breadcrumb",
+      "bs-card",
+      "bs-button-group",
+      "bs-list-group",
+      "bs-accordion",
+      "bs-pagination",
+      "bs-table-responsive",
+      "bs-ratio",
+      "bs-progress",
+      "bs-callout",
+    ]));
+  });
+
   it("adds a native tooltip to data-source blocks", () => {
     const [block] = createDataSourceBlocks([{
       id: "core.events",
@@ -51,5 +73,28 @@ describe("builder primitive blocks", () => {
     }], (key) => key);
 
     expect(block.attributes.title).toBe("Veřejné události oddílu");
+  });
+
+  it("offers purpose-built card starters for public teams and posts", () => {
+    const blocks = createDataSourceBlocks([
+      { id: "core.teams", label: "Družiny", collection: true, fields: { name: {}, logo_url: {}, url: {} } },
+      { id: "core.posts", label: "Příspěvky", collection: true, fields: { title: {}, cover_url: {}, url: {} } },
+      { id: "core.events", label: "Schůzky", collection: true, fields: { title: {}, start_at: {} } },
+    ], (key) => key);
+
+    const team = blocks.find((block) => block.id === "sc-data-core-teams");
+    const post = blocks.find((block) => block.id === "sc-data-core-posts");
+    const meeting = blocks.find((block) => block.id === "sc-data-core-events");
+    expect(team.content.params).toEqual({ limit: 6 });
+    expect(team.content.components[0].components[0].scBindings).toEqual({
+      src: { scope: "context", field: "logo_url" },
+      alt: { scope: "context", field: "name" },
+    });
+    const postRepeat = post.content.components[0];
+    const pagination = post.content.components[1];
+    expect(postRepeat.components[0].components[0].scBindings.src.field).toBe("cover_url");
+    expect(postRepeat.params.page).toEqual({ $scBinding: { scope: "page", field: "query.page" } });
+    expect(pagination.type).toBe("sc-pagination");
+    expect(meeting.content.params).toEqual({ limit: 6, kind: "meeting" });
   });
 });

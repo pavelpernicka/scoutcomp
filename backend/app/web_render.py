@@ -565,7 +565,6 @@ def render_components_in_html(
     db: Session,
     html: str,
     *,
-    page_team_id: int | None = None,
     current_slug: str | None = None,
     enabled_components: set[str] | None = None,
     media_base: str = "",
@@ -593,7 +592,7 @@ def render_components_in_html(
         if not renderer:
             return ""
         try:
-            return renderer(db, params, team_id=page_team_id, current_slug=current_slug, media_base=media_base)
+            return renderer(db, params, team_id=None, current_slug=current_slug, media_base=media_base)
         except Exception:
             return ""
 
@@ -634,7 +633,6 @@ def render_site_page(
     body = _rewrite_media_urls(body, base=media_base)
     body = render_components_in_html(
         db, body,
-        page_team_id=page.team_id,
         current_slug=page.slug,
         enabled_components=enabled_components,
         media_base=media_base,

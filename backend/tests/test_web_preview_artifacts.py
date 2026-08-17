@@ -29,6 +29,8 @@ def preview_context(db_session, tmp_path, monkeypatch):
     monkeypatch.setattr(previews, "render_png_preview", lambda _html: None)
     monkeypatch.setattr(routes_design, "_require_action", lambda *_args: None)
     monkeypatch.setattr(routes_templates, "_require_action", lambda *_args: None)
+    # Site-owned resources belong to the active theme workspace.
+    routes_templates.seed_default_theme(db_session)
     user = User(
         username="preview-admin",
         real_name="Preview Admin",
@@ -230,3 +232,27 @@ def test_preview_html_resolves_linked_resources_with_database_session(
     )
     assert "Linked content" in rendered_html[0]
     assert ".linked { color: red; }" in rendered_html[0]
+
+
+def test_theme_preview_inlines_package_images_and_fonts(db_session, preview_context):
+    from app.models import WebTemplate, WebTheme, WebThemeVersion
+
+    theme = db_session.query(WebTheme).filter_by(stable_key="ontario").one()
+    version = db_session.query(WebThemeVersion).filter_by(theme_id=theme.id, version="1.0.0").one()
+    template = db_session.query(WebTemplate).filter_by(
+        theme_version_id=version.id,
+        qualified_key="ontario@1.0.0:templates:home",
+    ).one()
+
+    rendered = previews.render_html_preview(
+        db_session,
+        template.project_data,
+        template.css or "",
+        base_css=previews._namespace_preview_css(version.base_css, version.id),
+        tokens=version.default_tokens,
+        title=template.name,
+    )
+
+    assert "data:image/jpeg;base64," in rendered
+    assert "data:font/" in rendered or "data:application/" in rendered
+    assert f"/theme-assets/{version.id}/assets/main_header.jpg" not in rendered

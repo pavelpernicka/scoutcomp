@@ -71,10 +71,31 @@ describe("GrapesJS project helpers", () => {
     });
   });
 
+  it("does not persist editor-only linked resource preview fragments", () => {
+    const editor = {
+      getProjectData: () => ({ pages: [{ component: {
+        type: "sc-resource-instance",
+        resourceId: "site:hero",
+        props: { title: "Hero" },
+        livePreviewHtml: "<section>editor only</section>",
+        livePreviewCss: ".hero { color: red; }",
+      } }] }),
+      getHtml: () => "",
+      getCss: () => "",
+      getDirtyCount: () => 0,
+    };
+
+    expect(getEditorSnapshot(editor).projectData.pages[0].component).toEqual({
+      type: "sc-resource-instance",
+      resourceId: "site:hero",
+      props: { title: "Hero" },
+    });
+  });
+
   it("creates serializable collection starters with bind and empty nodes", () => {
     const [block] = createDataSourceBlocks([
       {
-        id: "core.events",
+        id: "core.example",
         label: "Events",
         collection: true,
         fields: { title: { type: "string" }, description: { type: "string" } },
@@ -83,7 +104,7 @@ describe("GrapesJS project helpers", () => {
 
     expect(block.content).toMatchObject({
       type: "sc-repeat",
-      source: "core.events",
+      source: "core.example",
       params: {},
     });
     expect(block.content.components[0].components[0].components[0]).toMatchObject({

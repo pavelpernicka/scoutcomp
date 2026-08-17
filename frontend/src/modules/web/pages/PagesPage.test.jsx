@@ -9,7 +9,7 @@ import PagesPage from "./PagesPage";
 describe("PagesPage copy-on-create templates", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("offers published site and active-theme templates and sends source_template_id", async () => {
+  it("offers all published templates from the active theme and sends source_template_id", async () => {
     vi.spyOn(cmsApi, "listPages").mockResolvedValue([]);
     vi.spyOn(cmsApi, "listTemplates").mockResolvedValue([
       { id: 11, name: "Site draft", usage_mode: "copy_on_create", published_version: 0 },
@@ -34,16 +34,47 @@ describe("PagesPage copy-on-create templates", () => {
 
     await waitFor(() => expect(container.querySelector("#new-page-template")).not.toBeDisabled());
     const templateSelect = container.querySelector("#new-page-template");
-    expect(Array.from(templateSelect.options).map((option) => option.value)).toEqual(["", "12", "13"]);
+    expect(Array.from(templateSelect.options).map((option) => option.value)).toEqual(["", "13", "15"]);
     fireEvent.change(templateSelect, { target: { value: "13" } });
+    fireEvent.change(container.querySelector("#new-page-slug"), { target: { value: "vlastni-cesta" } });
     fireEvent.submit(container.querySelector(".web-inline-create"));
 
     await waitFor(() => expect(createPage).toHaveBeenCalledWith({
       title: "Demo page",
-      slug: "demo-page",
+      slug: "vlastni-cesta",
       parent_id: null,
       position: 0,
       source_template_id: 13,
+      data: null,
+    }));
+  });
+
+  it("allows the / homepage path and clears its parent", async () => {
+    vi.spyOn(cmsApi, "listPages").mockResolvedValue([{ id: 7, title: "Existing", path: "/existing" }]);
+    vi.spyOn(cmsApi, "listTemplates").mockResolvedValue([]);
+    vi.spyOn(cmsApi, "getCanvasStyles").mockResolvedValue({ active_theme_version_id: null, css: "" });
+    const createPage = vi.spyOn(cmsApi, "createPage").mockResolvedValue({ id: 100 });
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { container } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <PagesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(container.querySelector(".web-admin-page-header button"));
+    fireEvent.change(container.querySelector("#new-page-title"), { target: { value: "Domů" } });
+    fireEvent.change(container.querySelector("#new-page-slug"), { target: { value: "/" } });
+    expect(container.querySelector("#new-page-parent")).toBeDisabled();
+    fireEvent.submit(container.querySelector(".web-inline-create"));
+
+    await waitFor(() => expect(createPage).toHaveBeenCalledWith({
+      title: "Domů",
+      slug: "/",
+      parent_id: null,
+      position: 0,
+      source_template_id: null,
       data: null,
     }));
   });

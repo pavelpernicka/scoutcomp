@@ -18,6 +18,7 @@ export default function EditorLeftPanel({
   selected,
   onOpenPage,
   onPageFormChange,
+  onTemplateChange,
   onEditTemplate,
   onRevisions,
   onInsert,
@@ -61,7 +62,7 @@ export default function EditorLeftPanel({
       <div className="web-editor-document-settings">
         <h3>{t("web.editor.pageSettings")}</h3>
         <label><span>{t("web.fields.pathSegment")}</span><input value={pageForm.path_segment} onChange={(event) => onPageFormChange({ path_segment: event.target.value })} /></label>
-        <label><span>{t("web.template")}</span><select value={pageForm.template_id || ""} onChange={(event) => onPageFormChange({ template_id: event.target.value || null })}>
+        <label><span>{t("web.template")}</span><select value={pageForm.template_id || ""} onChange={(event) => onTemplateChange(event.target.value || null)}>
           <option value="">{t("web.editor.noTemplate")}</option>
           {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
         </select></label>
@@ -96,6 +97,7 @@ EditorLeftPanel.propTypes = {
   pages: PropTypes.array.isRequired,
   currentPageId: PropTypes.number.isRequired,
   pageForm: PropTypes.object.isRequired,
+  teams: PropTypes.array.isRequired,
   templates: PropTypes.array.isRequired,
   components: PropTypes.array.isRequired,
   sections: PropTypes.array.isRequired,
@@ -104,6 +106,7 @@ EditorLeftPanel.propTypes = {
   selected: PropTypes.object,
   onOpenPage: PropTypes.func.isRequired,
   onPageFormChange: PropTypes.func.isRequired,
+  onTemplateChange: PropTypes.func.isRequired,
   onEditTemplate: PropTypes.func.isRequired,
   onRevisions: PropTypes.func.isRequired,
   onInsert: PropTypes.func.isRequired,

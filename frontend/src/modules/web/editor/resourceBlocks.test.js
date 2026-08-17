@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { cloneResourceComponents, detachLinkedResource, filterCatalogResources, getResourceComponent, insertLinkedResource, insertResource, linkedResourceInstance } from "./resourceBlocks";
+import { cloneResourceComponents, detachLinkedResource, filterCatalogResources, getResourceComponent, hydrateMenuComponents, insertLinkedResource, insertResource, linkedResourceInstance } from "./resourceBlocks";
 
 describe("builder resource insertion", () => {
   it("reads the canonical Grapes frame component before legacy page.component", () => {
@@ -70,15 +70,33 @@ describe("builder resource insertion", () => {
     });
   });
 
-  it("keeps site-owned resources and only the active theme version", () => {
+  it("keeps only resources owned by the active theme", () => {
     const resources = [
       { id: 1, name: "Site card", theme_version_id: null },
       { id: 2, name: "Active card", theme_version_id: 8 },
       { id: 3, name: "Old card", theme_version_id: 5 },
     ];
 
-    expect(filterCatalogResources(resources, 8).map((item) => item.id)).toEqual([1, 2]);
-    expect(filterCatalogResources({ items: resources }, null).map((item) => item.id)).toEqual([1]);
+    expect(filterCatalogResources(resources, 8).map((item) => item.id)).toEqual([2]);
+    expect(filterCatalogResources({ items: resources }, null).map((item) => item.id)).toEqual([]);
+  });
+
+  it("hydrates an atomic menu with its full draft hierarchy", () => {
+    const set = vi.fn();
+    const child = {
+      get: vi.fn((key) => ({ type: "sc-menu", location: "main" })[key]),
+      set,
+      components: () => [],
+    };
+    const wrapper = { get: vi.fn(() => "wrapper"), components: () => [child] };
+    const editor = { getWrapper: () => wrapper, on: vi.fn(), off: vi.fn() };
+    const items = [{ label: "Schůzky", children: [{ label: "Lachtani", children: [] }] }];
+
+    const cleanup = hydrateMenuComponents(editor, [{ location: "main", items }]);
+
+    expect(set).toHaveBeenCalledWith("menuItems", items, { avoidStore: true });
+    cleanup();
+    expect(editor.off).toHaveBeenCalledWith("component:add", expect.any(Function));
   });
 
   it("explicitly detaches into local DOM, CSS, and provenance metadata", () => {

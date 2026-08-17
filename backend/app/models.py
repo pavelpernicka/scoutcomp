@@ -860,7 +860,11 @@ class WebPage(Base):
     noindex = Column(Boolean, nullable=False, default=False)
     sitemap_include = Column(Boolean, nullable=False, default=True)
     deleted_at = Column(DateTime, nullable=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
+    # A soft-deleted page releases its public address. These fields retain the
+    # original identity so restore can be explicit and collision-safe.
+    trashed_slug = Column(String(200), nullable=True)
+    trashed_path_segment = Column(String(200), nullable=True)
+    trashed_path = Column(String(500), nullable=True)
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     updated_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
@@ -888,6 +892,13 @@ class WebPageRevision(Base):
     template_id = Column(Integer, ForeignKey("web_templates.id", ondelete="SET NULL"), nullable=True)
     compiled_tree = Column(JSON, nullable=True)
     compiled_css = Column(Text, nullable=True)
+    # Fully rendered immutable public document(s). The public app must only
+    # read these artifacts, never compile/render a draft or publication at
+    # request time. Variants are keyed by a canonical query string (currently
+    # pagination uses ``page=N``).
+    rendered_html = Column(Text, nullable=True)
+    rendered_variants = Column(JSON, nullable=True)
+    rendered_at = Column(DateTime, nullable=True)
     reason = Column(String(32), nullable=True)
     is_publication = Column(Boolean, nullable=False, default=False)
     seo_title = Column(String(200), nullable=True)
@@ -896,6 +907,8 @@ class WebPageRevision(Base):
     og_image_id = Column(Integer, ForeignKey("web_media.id", ondelete="SET NULL"), nullable=True)
     noindex = Column(Boolean, nullable=False, default=False)
     sitemap_include = Column(Boolean, nullable=False, default=True)
+    # Public routing/data context is part of an immutable publication, not a
+    # pointer back to the mutable WebPage draft.
     created_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
 

@@ -6,6 +6,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import json
 import re
+import uuid
 from typing import Any
 
 from fastapi import HTTPException
@@ -26,6 +27,16 @@ def slugify(value: str) -> str:
     value = unidecode((value or "").strip().lower())
     value = re.sub(r"[^a-z0-9]+", "-", value).strip("-")
     return value[:200] or "stranka"
+
+ROOT_PAGE_SEGMENT = "main"
+
+
+def normalise_path_segment(value: Any, fallback: str = "") -> str:
+    """Accept the user-facing root path ``/`` while retaining one stable key."""
+    raw = str(value if value is not None else fallback).strip()
+    if raw == "/":
+        return ROOT_PAGE_SEGMENT
+    return slugify(raw or fallback)
 
 
 def _next_revision(db: Session, page_id: int) -> int:
@@ -56,9 +67,9 @@ def serialize_page(page: WebPage) -> dict[str, Any]:
     data = project_data(page)
     return {
         "id": page.id,
-        "slug": page.path_segment or page.slug,
-        "path_segment": page.path_segment or page.slug,
-        "path": page.path or ("/" if page.slug == "main" else f"/{page.slug}"),
+        "slug": (page.trashed_path_segment or page.trashed_slug) if page.deleted_at else (page.path_segment or page.slug),
+        "path_segment": (page.trashed_path_segment or page.trashed_slug) if page.deleted_at else (page.path_segment or page.slug),
+        "path": (page.trashed_path or page.path) if page.deleted_at else (page.path or ("/" if page.slug == "main" else f"/{page.slug}")),
         "title": page.title,
         "template": page.template,
         "template_id": page.template_id,
@@ -80,7 +91,6 @@ def serialize_page(page: WebPage) -> dict[str, Any]:
         "deleted_at": page.deleted_at.isoformat() if page.deleted_at else None,
         "source_template_id": page.source_template_id,
         "source_template_version": page.source_template_version,
-        "team_id": page.team_id,
         "updated_at": page.updated_at.isoformat() if page.updated_at else None,
     }
 
@@ -126,8 +136,22 @@ def validate_template_usage(
     return template
 
 
+def validate_detail_template(db: Session, template_id: int | None, *, label: str) -> WebTemplate | None:
+    """Resolve a published layout suitable for an article/event detail."""
+    if template_id is None:
+        return None
+    template = validate_template_usage(db, template_id, "linked_layout", label=label)
+    if template is None or not template.published_project_data:
+        raise HTTPException(422, f"{label} has not been published")
+    compiled = compile_project(template.published_project_data)
+    if not _content_slots(compiled.tree):
+        raise HTTPException(422, f"{label} must contain a content slot")
+    return template
+
+
 def unique_segment(db: Session, segment: str, parent_id: int | None, page_id: int | None = None) -> None:
     query = db.query(WebPage).filter(
+        WebPage.deleted_at.is_(None),
         WebPage.parent_id == parent_id,
         WebPage.path_segment == segment,
     )
@@ -139,7 +163,7 @@ def unique_segment(db: Session, segment: str, parent_id: int | None, page_id: in
 
 def build_path(parent: WebPage | None, segment: str) -> str:
     if parent is None:
-        return "/" if segment == "main" else f"/{segment}"
+        return "/" if segment == ROOT_PAGE_SEGMENT else f"/{segment}"
     prefix = (parent.path or f"/{parent.path_segment or parent.slug}").rstrip("/")
     return f"{prefix}/{segment}"
 
@@ -147,13 +171,14 @@ def build_path(parent: WebPage | None, segment: str) -> str:
 def unique_legacy_slug(db: Session, desired: str, page_id: int | None = None) -> str:
     candidate, counter = desired, 1
     while True:
-        query = db.query(WebPage).filter(WebPage.slug == candidate)
+        query = db.query(WebPage).filter(WebPage.deleted_at.is_(None), WebPage.slug == candidate)
         if page_id is not None:
             query = query.filter(WebPage.id != page_id)
         if not query.first():
             return candidate
         counter += 1
         candidate = f"{desired[:190]}-{counter}"
+
 
 
 def snapshot_draft(db: Session, page: WebPage, user_id: int | None, reason: str) -> WebPageRevision:
@@ -351,8 +376,13 @@ def save_draft(
     title = str(metadata.get("title", page.title)).strip()
     if not title:
         raise HTTPException(422, "Page title is required")
-    segment = slugify(str(metadata.get("path_segment") or metadata.get("slug") or page.path_segment or page.slug))
+    segment = normalise_path_segment(
+        metadata.get("path_segment") if metadata.get("path_segment") is not None else metadata.get("slug"),
+        page.path_segment or page.slug,
+    )
     parent_id = metadata.get("parent_id", page.parent_id)
+    if segment == ROOT_PAGE_SEGMENT and parent_id is not None:
+        raise HTTPException(422, "Homepage cannot have a parent page")
     parent = validate_parent(db, page, parent_id)
     unique_segment(db, segment, parent_id, page.id)
     path = build_path(parent, segment)
@@ -375,7 +405,16 @@ def save_draft(
     # nest the template shell inside itself. When the page has no template the
     # project is stored verbatim.
     template_project = editor_template.project_data if editor_template is not None else None
-    page.data = _extract_page_content(project, template_project)
+    if metadata.get("replace_content_with_template") and selected_template is not None:
+        # A confirmed layout switch intentionally adopts the new layout's
+        # authored slot content. The layout shell itself remains linked; only
+        # this page-owned initial content is copied into the page draft.
+        page.data = _extract_page_content(
+            selected_template.project_data or selected_template.published_project_data or _legacy_project(page),
+            selected_template.project_data or selected_template.published_project_data or _legacy_project(page),
+        )
+    else:
+        page.data = _extract_page_content(project, template_project)
     page.html = None
     page.meta_description = metadata.get("meta_description", page.meta_description)
     page.seo_title = metadata.get("seo_title", page.seo_title)
@@ -476,9 +515,70 @@ def publish_page(db: Session, page: WebPage, *, expected_version: int, user_id: 
     if updated != 1:
         db.rollback()
         raise HTTPException(409, "Draft was changed by another editor")
+
+    # Compile all public documents before committing the publication pointer.
+    # The public server therefore has a single immutable output to read and
+    # cannot accidentally render mutable data during a visitor request.
+    _build_publication_artifacts(db, page, revision)
     db.commit()
     db.refresh(revision)
     return revision
+
+
+def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRevision) -> None:
+    """Materialise page 1 and bounded pagination variants in the same tx.
+
+    The linked pagination component uses only ``?page=N`` and shows a next
+    link while another variant exists. Rendering until that link disappears
+    gives visitors static output for every reachable page without a request
+    time renderer. The upper bound protects publication from malformed data.
+    """
+    from ..site_app import _render_revision
+
+    default = _render_revision(db, page, revision, query={}, use_artifact=False)
+    variants: dict[str, str] = {}
+    current = 2
+    previous = default
+    while 'rel="next"' in previous and current <= 100:
+        document = _render_revision(db, page, revision, query={"page": str(current)}, use_artifact=False)
+        variants[f"page={current}"] = document
+        previous = document
+        current += 1
+    if 'rel="next"' in previous:
+        raise HTTPException(422, "Pagination exceeds the publication limit of 100 pages")
+    revision.rendered_html = default
+    revision.rendered_variants = variants
+    revision.rendered_at = datetime.now(timezone.utc)
+
+
+def rebuild_published_page_artifacts(db: Session, *, page_ids: set[int] | None = None) -> int:
+    """Regenerate immutable output before a related publication is committed.
+
+    Rebuilds happen in the caller's transaction: either all rendered documents
+    become visible together, or none do. ``page_ids`` enables future dependency
+    narrowing while the conservative default protects existing dynamic blocks.
+    """
+    query = db.query(WebPage).filter(
+        WebPage.published.is_(True),
+        WebPage.published_revision_id.is_not(None),
+        WebPage.deleted_at.is_(None),
+    )
+    if page_ids is not None:
+        if not page_ids:
+            return 0
+        query = query.filter(WebPage.id.in_(page_ids))
+    pages = query.order_by(WebPage.id.asc()).all()
+    count = 0
+    for published_page in pages:
+        revision = db.query(WebPageRevision).filter_by(
+            id=published_page.published_revision_id, page_id=published_page.id,
+            is_publication=True,
+        ).one_or_none()
+        if revision is None:
+            continue
+        _build_publication_artifacts(db, published_page, revision)
+        count += 1
+    return count
 
 
 def restore_revision(db: Session, page: WebPage, revision: WebPageRevision, *, user_id: int) -> WebPage:
@@ -504,8 +604,45 @@ def restore_revision(db: Session, page: WebPage, revision: WebPageRevision, *, u
 
 
 def trash_page(db: Session, page: WebPage) -> None:
+    """Move a page to trash while releasing its URL and slug immediately."""
+    if page.deleted_at is not None:
+        return
+    page.trashed_slug = page.slug
+    page.trashed_path_segment = page.path_segment or page.slug
+    page.trashed_path = page.path or build_path(None, page.trashed_path_segment)
+    tombstone = f"trashed-{page.id}-{uuid.uuid4().hex[:8]}"
+    page.slug = tombstone
+    page.path_segment = tombstone
+    page.path = f"/__trash/{page.id}/{tombstone}"
     page.deleted_at = datetime.now(timezone.utc)
     page.published = False
+    db.commit()
+
+
+def restore_trashed_page(db: Session, page: WebPage) -> None:
+    """Restore a page only when its original address is still available."""
+    if page.deleted_at is None:
+        raise HTTPException(404, "Trashed page not found")
+    slug = page.trashed_slug or page.slug
+    segment = page.trashed_path_segment or slug
+    path = page.trashed_path or build_path(None, segment)
+    parent_id = page.parent_id
+    if parent_id is not None and not validate_parent(db, page, parent_id):
+        parent_id = None
+        path = build_path(None, segment)
+    if db.query(WebPage).filter(WebPage.deleted_at.is_(None), WebPage.slug == slug).first():
+        raise HTTPException(409, "Cannot restore page because its original slug is now used")
+    if db.query(WebPage).filter(WebPage.deleted_at.is_(None), WebPage.path == path).first():
+        raise HTTPException(409, "Cannot restore page because its original path is now used")
+    unique_segment(db, segment, parent_id, page.id)
+    page.slug = slug
+    page.path_segment = segment
+    page.path = path
+    page.parent_id = parent_id
+    page.deleted_at = None
+    page.trashed_slug = None
+    page.trashed_path_segment = None
+    page.trashed_path = None
     db.commit()
 
 

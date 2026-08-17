@@ -57,7 +57,10 @@ from ..web.pages import (
     compile_draft,
     project_data as canonical_project_data,
     publish_page,
+    normalise_path_segment,
+    rebuild_published_page_artifacts,
     restore_revision as restore_page_revision_service,
+    restore_trashed_page,
     save_draft,
     serialize_page as serialize_cms_page,
     slugify as cms_slugify,
@@ -114,6 +117,10 @@ SITE_SETTING_KEYS = (
     "web.social_facebook",
     "web.social_instagram",
     "web.social_whatsapp",
+    "web.post_url_pattern",
+    "web.meeting_url_pattern",
+    "web.post_detail_template_id",
+    "web.meeting_detail_template_id",
 )
 
 def _slugify(value: str) -> str:

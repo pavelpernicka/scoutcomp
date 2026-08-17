@@ -10,6 +10,7 @@ import pytest
 
 from app.models import (
     WebPage,
+    WebPreviewArtifact,
     WebReusableComponent,
     WebSiteStyle,
     WebTemplate,
@@ -167,6 +168,72 @@ def test_install_lists_and_inspects_immutable_theme(db_session, tmp_path):
     assert {asset["path"] for asset in detail["assets"]} == set(_valid_files())
 
 
+def test_theme_package_accepts_declared_fonts_and_rejects_spoofing(db_session, tmp_path):
+    files = _valid_files(css="@font-face{font-family:Theme;src:url(assets/theme.woff) format('woff')}")
+    manifest = json.loads(files["manifest.json"])
+    manifest["resources"]["assets"].append("assets/theme.woff")
+    files["manifest.json"] = json.dumps(manifest).encode()
+    files["assets/theme.woff"] = b"wOFF" + (b"\0" * 64)
+    installed = install_theme(db_session, _zip(files), storage_root=tmp_path / "themes")
+    assert resolve_theme_asset_path(
+        installed, "assets/theme.woff", storage_root=tmp_path / "themes",
+    ).read_bytes().startswith(b"wOFF")
+
+    invalid = _valid_files(
+        version="1.0.1",
+        css="@font-face{font-family:Theme;src:url(assets/theme.woff)}",
+    )
+    invalid_manifest = json.loads(invalid["manifest.json"])
+    invalid_manifest["resources"]["assets"].append("assets/theme.woff")
+    invalid["manifest.json"] = json.dumps(invalid_manifest).encode()
+    invalid["assets/theme.woff"] = b"<script>not a font</script>"
+    with pytest.raises(ThemePackageError, match="Font content"):
+        install_theme(db_session, _zip(invalid), storage_root=tmp_path / "themes")
+
+
+def test_install_generates_preview_artifacts_for_immutable_package_resources(
+    db_session, tmp_path, monkeypatch,
+):
+    """Package originals must be visible in the catalog without cloning."""
+    from app.web import previews
+
+    monkeypatch.setattr(previews, "PREVIEW_DATA_DIR", tmp_path / "previews")
+    monkeypatch.setattr(previews, "render_png_preview", lambda _html: None)
+
+    installed = _install(db_session, tmp_path)
+    template = db_session.query(WebTemplate).filter_by(theme_version_id=installed.id).one()
+    component = db_session.query(WebReusableComponent).filter_by(theme_version_id=installed.id).one()
+
+    for kind, resource_id in (("templates", template.id), ("components", component.id)):
+        artifact = db_session.query(WebPreviewArtifact).filter_by(
+            resource_kind=kind, resource_id=resource_id, status="current",
+        ).one()
+        assert (tmp_path / "previews" / artifact.storage_path).is_file()
+
+
+def test_catalogue_backfills_missing_package_preview_artifacts(
+    db_session, tmp_path, monkeypatch,
+):
+    """Existing installations get previews at first catalog access too."""
+    from app.web import previews, routes_templates, theme_package
+
+    monkeypatch.setattr(previews, "PREVIEW_DATA_DIR", tmp_path / "previews")
+    monkeypatch.setattr(previews, "render_png_preview", lambda _html: None)
+    monkeypatch.setattr(theme_package, "build_preview", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(routes_templates, "_require_action", lambda *_args: None)
+
+    installed = _install(db_session, tmp_path)
+    template = db_session.query(WebTemplate).filter_by(theme_version_id=installed.id).one()
+    assert db_session.query(WebPreviewArtifact).filter_by(
+        resource_kind="templates", resource_id=template.id,
+    ).count() == 0
+
+    activate_theme(db_session, installed.id)
+    catalogue = routes_templates.list_templates(db_session, None)
+
+    assert catalogue[0]["preview_url"].startswith("/api/web/preview-artifacts/")
+
+
 def test_install_namespaces_linked_component_and_persists_typed_props(db_session, tmp_path):
     installed = _install(db_session, tmp_path, files=_files_with_linked_component())
     component = db_session.query(WebReusableComponent).filter_by(theme_version_id=installed.id).one()
@@ -281,6 +348,7 @@ def test_executable_or_active_asset_types_are_rejected(db_session, tmp_path, ext
     ".x { background: url(https://evil.example/track) }",
     ".x { background: url(data:image/svg+xml,bad) }",
     ".x { width: expression(alert(1)) }",
+    ".x { behavior: url(assets/not-declared.htc) }",
     ".x { color: red }</style><script>alert(1)</script>",
     ".x { background: url(assets/not-declared.png) }",
 ])
@@ -288,6 +356,15 @@ def test_theme_css_rejects_import_urls_expression_and_style_breakout(db_session,
     with pytest.raises(ThemePackageError):
         _install(db_session, tmp_path, files=_valid_files(css=css))
     assert db_session.query(WebThemeVersion).count() == 0
+
+
+def test_theme_css_allows_standard_scroll_behavior(db_session, tmp_path):
+    installed = _install(
+        db_session,
+        tmp_path,
+        files=_valid_files(css="html { scroll-behavior: smooth }"),
+    )
+    assert "scroll-behavior" in installed.base_css
 
 
 @pytest.mark.parametrize("project_data", [
@@ -422,7 +499,7 @@ def test_uninstall_rejects_draft_linked_resource_reference(db_session, tmp_path)
     assert db_session.get(WebThemeVersion, old.id) is not None
 
 
-def test_uninstall_preserves_user_clone_and_removes_package_files(db_session, tmp_path):
+def test_uninstall_removes_theme_owned_legacy_clone_and_package_files(db_session, tmp_path):
     old = _install(db_session, tmp_path, version="1.0.0")
     new = _install(db_session, tmp_path, version="2.0.0")
     activate_theme(db_session, new.id)
@@ -438,12 +515,11 @@ def test_uninstall_preserves_user_clone_and_removes_package_files(db_session, tm
     )
     db_session.add(clone)
     db_session.commit()
+    clone_id = clone.id
     old_path = tmp_path / "themes" / old.install_path
 
     uninstall_theme(db_session, old.id, storage_root=tmp_path / "themes")
 
-    db_session.refresh(clone)
-    assert clone.origin_resource_id is None
-    assert clone.project_data["components"][0]["content"] == "Local"
+    assert db_session.get(WebReusableComponent, clone_id) is None
     assert not old_path.exists()
     assert db_session.get(WebThemeVersion, new.id) is not None

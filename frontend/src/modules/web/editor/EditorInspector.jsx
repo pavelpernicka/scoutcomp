@@ -11,7 +11,7 @@ const tabs = ["content", "style", "data", "code", "advanced"];
 
 export { getTemplateOwnerId } from "./componentOwnership";
 
-export default function EditorInspector({ selected, dataSources, resources, onDuplicate, onDelete, onClone, onDetach, onEditDefinition, onEditTemplate, onContentChange }) {
+export default function EditorInspector({ selected, dataSources, resources, onDuplicate, onDelete, onClone, onDetach, onEditDefinition, onEditTemplate, onContentChange, onSelectMedia }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState("content");
   const type = selected?.get?.("type") || selected?.get?.("tagName") || "component";
@@ -29,7 +29,10 @@ export default function EditorInspector({ selected, dataSources, resources, onDu
             detached and every ordinary component appears uneditable. */}
         <div className={tab === "content" ? "" : "d-none"}>
           {linked && <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} />}
-          <div className={linked ? "d-none" : ""}><div className="web-editor-trait-manager" /></div>
+          <div className={linked ? "d-none" : ""}>
+            {type === "image" && <ImageContentPanel selected={selected} onSelectMedia={onSelectMedia} onContentChange={onContentChange} />}
+            <div className="web-editor-trait-manager" />
+          </div>
         </div>
         <div className={tab === "style" ? "" : "d-none"}>
           {linked && <LinkedStyleInfo selected={selected} resources={resources} />}
@@ -45,7 +48,65 @@ export default function EditorInspector({ selected, dataSources, resources, onDu
   </aside>;
 }
 
-EditorInspector.propTypes = { selected: PropTypes.object, dataSources: PropTypes.array.isRequired, resources: PropTypes.object.isRequired, onDuplicate: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onEditTemplate: PropTypes.func, onContentChange: PropTypes.func };
+EditorInspector.propTypes = { selected: PropTypes.object, dataSources: PropTypes.array.isRequired, resources: PropTypes.object.isRequired, onDuplicate: PropTypes.func.isRequired, onDelete: PropTypes.func.isRequired, onClone: PropTypes.func, onDetach: PropTypes.func, onEditDefinition: PropTypes.func, onEditTemplate: PropTypes.func, onContentChange: PropTypes.func, onSelectMedia: PropTypes.func };
+
+/**
+ * Images are the one native element every author expects to edit without
+ * knowing about GrapesJS traits. Keep the picker in the familiar Content tab;
+ * the durable media reference remains data-sc-media-id and the canvas-only
+ * blob URL is still owned by WebEditorPage.
+ */
+export function ImageContentPanel({ selected, onSelectMedia, onContentChange }) {
+  const { t } = useTranslation();
+  const attributes = selected?.getAttributes?.() || {};
+  const [alt, setAlt] = useState(() => attributes.alt || "");
+  const [src, setSrc] = useState(() => attributes.src || selected?.get?.("src") || "");
+
+  useEffect(() => {
+    const update = () => {
+      const next = selected?.getAttributes?.() || {};
+      setAlt(next.alt || "");
+      setSrc(next.src || selected?.get?.("src") || "");
+    };
+    update();
+    selected?.on?.("change:attributes", update);
+    return () => selected?.off?.("change:attributes", update);
+  }, [selected]);
+
+  const setAttribute = (name, value) => {
+    const clean = value.trim();
+    if (clean) selected?.addAttributes?.({ [name]: clean });
+    else selected?.removeAttributes?.(name);
+    onContentChange?.();
+  };
+  const removeMedia = () => {
+    selected?.removeAttributes?.("data-sc-media-id");
+    selected?.removeAttributes?.("src");
+    selected?.set?.("src", "");
+    setSrc("");
+    onContentChange?.();
+  };
+  const setSource = (value) => {
+    const clean = value.trim();
+    selected?.removeAttributes?.("data-sc-media-id");
+    if (clean) selected?.addAttributes?.({ src: clean });
+    else selected?.removeAttributes?.("src");
+    selected?.set?.("src", clean);
+    onContentChange?.();
+  };
+
+  return <section className="web-editor-image-content" aria-label={t("web.editor.imageContent.title") }>
+    <div className="web-editor-image-content-head"><span><i className="fas fa-image" />{t("web.editor.imageContent.title")}</span><small>{attributes["data-sc-media-id"] ? t("web.editor.imageContent.fromLibrary") : t("web.editor.imageContent.noMedia")}</small></div>
+    <div className="web-editor-image-actions">
+      <button type="button" className="btn btn-sm btn-primary" onClick={() => onSelectMedia?.(selected)}><i className="fas fa-images me-1" />{t("web.editor.imageContent.choose")}</button>
+      {attributes["data-sc-media-id"] && <button type="button" className="btn btn-sm btn-outline-light" onClick={removeMedia}>{t("web.editor.imageContent.remove")}</button>}
+    </div>
+    <label><span>{t("web.editor.imageContent.src")}</span><input value={src} placeholder="/media/…" onChange={(event) => setSrc(event.target.value)} onBlur={(event) => setSource(event.target.value)} /></label>
+    <label><span>{t("web.editor.imageContent.alt")}</span><input value={alt} onChange={(event) => setAlt(event.target.value)} onBlur={(event) => setAttribute("alt", event.target.value)} /></label>
+  </section>;
+}
+
+ImageContentPanel.propTypes = { selected: PropTypes.object.isRequired, onSelectMedia: PropTypes.func, onContentChange: PropTypes.func };
 
 function TemplateOwnedInfo({ templateId, onEdit }) {
   const { t } = useTranslation();
@@ -94,6 +155,7 @@ export function LinkedResourceProps({ selected, resources, onClone, onDetach, on
   if (!definition) return <div className="web-editor-linked-help is-error"><i className="fas fa-link-slash" /><p>{t("web.props.missingDefinition")}</p><small>{resourceId}</small></div>;
   const variants = definition.variants || definition.published_variants || [];
   const schema = definition.prop_schema || definition.published_prop_schema || [];
+  const canMaterialize = definition.can_materialize !== false;
   return <div className="web-editor-linked-props">
     <div className="web-editor-resource-state state-linked"><i className="fas fa-link" /><span><strong>{definition.name}</strong><small>{t(kind === "sections" ? "web.props.linkedSection" : "web.props.linkedComponent")}</small></span></div>
     {showActions && <div className="web-editor-linked-actions">
@@ -101,7 +163,7 @@ export function LinkedResourceProps({ selected, resources, onClone, onDetach, on
         <i className="fas fa-clone me-1" />{t("web.props.cloneVariant")}
       </button>
       <button type="button" className="btn btn-sm btn-outline-light" onClick={() => onEditDefinition?.(selected, kind, definition)}><i className="fas fa-pen me-1" />{t("web.props.editDefinition")}</button>
-      <button type="button" className="btn btn-sm btn-outline-danger" disabled={detaching} onClick={async () => {
+      <button type="button" className="btn btn-sm btn-outline-danger" disabled={detaching || !canMaterialize} title={!canMaterialize ? t("web.props.detachUnavailable") : undefined} onClick={async () => {
         setDetaching(true);
         setDetachError("");
         try { await onDetach?.(selected, definition); }
@@ -111,6 +173,7 @@ export function LinkedResourceProps({ selected, resources, onClone, onDetach, on
         <i className={`fas fa-${detaching ? "spinner fa-spin" : "link-slash"} me-1`} />{detaching ? t("web.props.detaching") : t("web.props.detach")}
       </button>
       {detachError && <p className="web-editor-field-error" role="alert">{detachError}</p>}
+      {!canMaterialize && <p className="web-editor-linked-help"><i className="fas fa-circle-info" />{t("web.props.detachUnavailable")}</p>}
     </div>}
     {variants.length > 0 && <div className="web-editor-prop-section">
       <label className="web-prop-field web-prop-select"><span>{t("web.props.variant")}</span>

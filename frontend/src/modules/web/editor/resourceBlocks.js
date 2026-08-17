@@ -8,9 +8,8 @@ export const getResourceComponent = (resource = {}) => {
 
 export const filterCatalogResources = (value, activeThemeVersionId) => {
   const items = Array.isArray(value) ? value : value?.items || [];
-  return items.filter((resource) => resource.theme_version_id == null
-    || (activeThemeVersionId != null
-      && String(resource.theme_version_id) === String(activeThemeVersionId)));
+  if (activeThemeVersionId == null) return [];
+  return items.filter((resource) => String(resource.theme_version_id) === String(activeThemeVersionId));
 };
 
 export const cloneResourceComponents = (resource) => {
@@ -61,6 +60,27 @@ export const linkedResourceInstance = (resource, kind) => ({
 export const insertLinkedResource = (editor, resource, kind) => (
   insertEditorComponents(editor, linkedResourceInstance(resource, kind))
 );
+
+export const hydrateMenuComponents = (editor, menus = []) => {
+  if (!editor) return () => {};
+  const byLocation = new Map(
+    (Array.isArray(menus) ? menus : []).map((menu) => [String(menu.location || ""), menu.items || []]),
+  );
+  const apply = (component) => {
+    if (component?.get?.("type") === "sc-menu") {
+      component.set?.("menuItems", byLocation.get(String(component.get("location") || "main")) || [], { avoidStore: true });
+    }
+    component?.components?.().forEach?.(apply);
+  };
+  const update = (component) => apply(component);
+  apply(editor.getWrapper?.());
+  editor.on?.("component:add", update);
+  editor.on?.("component:update:location", update);
+  return () => {
+    editor.off?.("component:add", update);
+    editor.off?.("component:update:location", update);
+  };
+};
 
 
 /**

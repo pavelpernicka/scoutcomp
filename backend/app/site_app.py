@@ -25,6 +25,7 @@ from .config import settings
 from .database import SessionLocal
 from .models import (
     RegisteredModule,
+    ScoutEvent,
     WebMedia,
     WebMenuItem,
     WebMenu,
@@ -44,6 +45,13 @@ from .routers.config import get_config_value
 from .web_render import render_article_body, render_site_page
 from .web.renderer import CompileError, compile_project, render_document, render_project
 from .web.data_sources import is_media_published
+from .web.url_schemes import (
+    DEFAULT_MEETING_URL_PATTERN,
+    DEFAULT_POST_URL_PATTERN,
+    match_pattern,
+    meeting_url,
+    post_url,
+)
 
 register_all_modules()
 
@@ -224,12 +232,55 @@ def _media_is_published(db: Session, media_id: int) -> bool:
     return is_media_published(db, media_id)
 
 
-def _render(db: Session, page: WebPage, extra_head: str = "") -> str:
+def _detail_document(
+    db: Session,
+    *,
+    setting_key: str,
+    detail_html: str,
+    title: str,
+    description: str = "",
+    canonical_url: str = "",
+    noindex: bool = False,
+) -> str:
+    """Render a safe article/event fragment through an optional layout."""
+    raw_id = get_config_value(db, setting_key)
+    try:
+        template_id = int(raw_id) if raw_id else None
+    except (TypeError, ValueError):
+        template_id = None
+    template = db.query(WebTemplate).filter_by(id=template_id, usage_mode="linked_layout").one_or_none() if template_id else None
+    tokens, global_css, base_css = _published_style(db)
+    if template and isinstance(template.published_project_data, dict):
+        try:
+            tree = compile_project(template.published_project_data).tree
+            part_css: list[str] = []
+            body = render_project(
+                db, tree, slot_tree={"type": "sc-detail-content"},
+                page={"title": title, "detail_html": detail_html}, site=_site_settings(db), css_layers=part_css,
+            )
+            template_css = template.published_css or ""
+            if template.theme_version_id:
+                from .web.theme_package import rewrite_theme_asset_urls
+                template_css = rewrite_theme_asset_urls(template_css, template.theme_version_id)
+            return render_document(
+                body, title=title, description=description, canonical_url=canonical_url, noindex=noindex,
+                css=f"{global_css}\n{'\n'.join(part_css)}\n{template_css}", base_css=base_css, tokens=tokens,
+            )
+        except CompileError:
+            # A deleted/inconsistent setting must not take a public detail down.
+            pass
+    return render_document(
+        detail_html, title=title, description=description, canonical_url=canonical_url, noindex=noindex,
+        css=global_css, base_css=base_css, tokens=tokens,
+    )
+
+
+def _render(db: Session, page: WebPage, extra_head: str = "", query: dict[str, str] | None = None) -> str:
     if page.published_revision_id:
         revision = db.query(WebPageRevision).filter_by(id=page.published_revision_id, page_id=page.id).one_or_none()
         if not revision:
             raise HTTPException(404, "Published page is unavailable")
-        return _render_revision(db, page, revision)
+        return _render_revision(db, page, revision, query=query)
     # Compatibility path for records published before immutable snapshots were
     # introduced. Any subsequent publish sets the pointer and bypasses it.
     settings_data = _site_settings(db)
@@ -273,7 +324,36 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
-def _render_revision(db: Session, page: WebPage, revision: WebPageRevision) -> str:
+def _artifact_query_key(query: dict[str, str] | None) -> str:
+    """Canonical allowlisted public-document variant key."""
+    page = (query or {}).get("page")
+    if page is None or page == "" or page == "1":
+        return ""
+    try:
+        number = int(page)
+    except (TypeError, ValueError):
+        return "__invalid__"
+    return f"page={number}" if 1 < number <= 100 else "__invalid__"
+
+
+def _render_revision(
+    db: Session,
+    page: WebPage,
+    revision: WebPageRevision,
+    *,
+    query: dict[str, str] | None = None,
+    use_artifact: bool = True,
+) -> str:
+    # A visitor request must never invoke the compiler/data-source renderer.
+    # Publication produces the immutable document variants atomically instead.
+    if use_artifact:
+        key = _artifact_query_key(query)
+        variants = revision.rendered_variants if isinstance(revision.rendered_variants, dict) else {}
+        document = revision.rendered_html if key == "" else variants.get(key)
+        if isinstance(document, str) and document:
+            return document
+        if revision.reason != "migration":
+            raise HTTPException(503, "Published output is being generated")
     tree = revision.compiled_tree
     css = revision.compiled_css or ""
     if not isinstance(tree, dict):
@@ -290,7 +370,7 @@ def _render_revision(db: Session, page: WebPage, revision: WebPageRevision) -> s
             legacy = WebPage(
                 id=page.id, slug=revision.path_segment or page.slug,
                 title=revision.title or page.title, html=revision.html,
-                team_id=page.team_id, meta_description=revision.meta_description,
+                meta_description=revision.meta_description,
             )
             settings_data = _site_settings(db)
             return render_site_page(
@@ -302,6 +382,7 @@ def _render_revision(db: Session, page: WebPage, revision: WebPageRevision) -> s
             )
     page_context = {
         "id": page.id,
+        "query": dict(query or {}),
         "title": revision.title or page.title,
         "path": revision.path or page.path,
         "slug": revision.path_segment or page.path_segment or page.slug,
@@ -354,7 +435,7 @@ def healthcheck():
 
 
 @app.get("/", response_class=HTMLResponse)
-def homepage():
+def homepage(request: Request):
     session = SessionLocal()
     try:
         page = _main_page(session)
@@ -366,7 +447,7 @@ def homepage():
                 "<p>Webový modul ještě nemá publikovanou stránku.</p></body></html>",
                 status_code=404,
             )
-        return HTMLResponse(_render(session, page))
+        return HTMLResponse(_render(session, page, query=dict(request.query_params)))
     finally:
         session.close()
 
@@ -409,7 +490,10 @@ def sitemap():
                 if p.noindex or not p.sitemap_include:
                     continue
                 slug = p.slug
-            urls.append(f"<url><loc>{escape((base or '').rstrip('/') + '/post/' + slug)}</loc></url>")
+            urls.append(f"<url><loc>{escape((base or '').rstrip('/') + post_url(session, slug))}</loc></url>")
+        events = session.query(ScoutEvent).filter(ScoutEvent.is_public.is_(True)).order_by(ScoutEvent.id.asc()).all()
+        for event in events:
+            urls.append(f"<url><loc>{escape((base or '').rstrip('/') + meeting_url(session, event.id))}</loc></url>")
         body = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
@@ -434,6 +518,36 @@ def robots():
         media_type="text/plain",
     )
 
+
+@app.get("/meeting/{event_id}", response_class=HTMLResponse)
+def site_meeting(event_id: int):
+    """Public detail of an event that is explicitly safe for the website."""
+    session = SessionLocal()
+    try:
+        event = session.query(ScoutEvent).filter(
+            ScoutEvent.id == event_id,
+            ScoutEvent.is_public.is_(True),
+        ).one_or_none()
+        if not event:
+            raise HTTPException(404, "Schůzka nebyla nalezena")
+        details = []
+        if event.starts_at:
+            details.append(f'<p><strong>Začátek:</strong> {escape(event.starts_at.isoformat(sep=" ", timespec="minutes"))}</p>')
+        if event.ends_at:
+            details.append(f'<p><strong>Konec:</strong> {escape(event.ends_at.isoformat(sep=" ", timespec="minutes"))}</p>')
+        if event.location:
+            details.append(f'<p><strong>Místo:</strong> {escape(event.location)}</p>')
+        body = (
+            '<article class="sc-event-detail"><header>'
+            f'<p>{escape(event.kind or "event")}</p><h1>{escape(event.title)}</h1>'
+            f'</header>{"".join(details)}<div>{render_article_body(event.description or "")}</div></article>'
+        )
+        return HTMLResponse(_detail_document(
+            session, setting_key="web.meeting_detail_template_id", detail_html=body,
+            title=event.title, description=(event.description or "")[:300],
+        ))
+    finally:
+        session.close()
 
 @app.get("/theme-assets/{theme_version_id}/{asset_path:path}")
 def site_theme_asset(theme_version_id: int, asset_path: str):
@@ -470,7 +584,7 @@ def site_page(slug: str, request: Request):
         page = _find_published_page(session, f"/{slug}")
         if not page:
             raise HTTPException(404, "Stránka nebyla nalezena")
-        return HTMLResponse(_render(session, page))
+        return HTMLResponse(_render(session, page, query=dict(request.query_params)))
     finally:
         session.close()
 
@@ -532,16 +646,9 @@ def site_post(slug: str):
             f'</article>'
         )
         if revision is not None:
-            tokens, css, base_css = _published_style(session)
-            return HTMLResponse(render_document(
-                post_body,
-                title=seo_title,
-                description=description,
-                canonical_url=canonical_url,
-                noindex=noindex,
-                css=css,
-                base_css=base_css,
-                tokens=tokens,
+            return HTMLResponse(_detail_document(
+                session, setting_key="web.post_detail_template_id", detail_html=post_body,
+                title=seo_title, description=description, canonical_url=canonical_url, noindex=noindex,
             ))
         return HTMLResponse(render_site_page(
             session, page, site_title=settings_data["site_title"],
@@ -575,13 +682,24 @@ def site_media(media_id: int):
 
 
 @app.get("/{page_path:path}", response_class=HTMLResponse)
-def nested_site_page(page_path: str):
+def nested_site_page(page_path: str, request: Request):
     """Resolve immutable published paths, including nested page hierarchies."""
     session = SessionLocal()
     try:
+        path = f"/{page_path.strip('/')}"
+        post_slug = match_pattern(
+            session, "web.post_url_pattern", DEFAULT_POST_URL_PATTERN, "slug", path, label="Article",
+        )
+        if post_slug is not None:
+            return site_post(post_slug)
+        meeting_id = match_pattern(
+            session, "web.meeting_url_pattern", DEFAULT_MEETING_URL_PATTERN, "id", path, label="Meeting",
+        )
+        if meeting_id is not None:
+            return site_meeting(int(meeting_id))
         page = _find_published_page(session, f"/{page_path}")
         if not page:
             raise HTTPException(404, "Stránka nebyla nalezena")
-        return HTMLResponse(_render(session, page))
+        return HTMLResponse(_render(session, page, query=dict(request.query_params)))
     finally:
         session.close()

@@ -307,7 +307,7 @@ function MenuItemsEditor({ menu, onCancel, onSaved }) {
           rel: null,
           parent_id: parentId,
           position: maxPos + 1,
-          depth: current.find((i) => i.id === parentId)?.depth ?? 0 + 1,
+          depth: (current.find((i) => i.id === parentId)?.depth ?? -1) + 1,
         },
       ];
     });
@@ -332,7 +332,7 @@ function MenuItemsEditor({ menu, onCancel, onSaved }) {
       const item = current.find((i) => i.id === id);
       if (!item) return current;
       const siblings = current.filter(
-        (i) => (i.parent_id ?? null) === (item.parent_id ?? null) && i.id !== id
+        (i) => (i.parent_id ?? null) === (item.parent_id ?? null)
       ).sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
       const idx = siblings.findIndex((s) => s.id === id);
       if (idx === -1) return current;

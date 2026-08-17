@@ -31,6 +31,7 @@ export const cmsApi = {
   publishPage: (id, expectedVersion) =>
     api.post(`/web/pages/${id}/publish`, { expected_version: expectedVersion }).then(unwrap),
   unpublishPage: (id) => api.post(`/web/pages/${id}/unpublish`).then(unwrap),
+  regeneratePublicPages: () => api.post("/web/pages/regenerate-public").then(unwrap),
   listRevisions: (id) => api.get(`/web/pages/${id}/revisions`).then(unwrap),
   restoreRevision: (id, revisionId) =>
     api.post(`/web/pages/${id}/restore/${revisionId}`).then(unwrap),

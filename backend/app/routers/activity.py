@@ -26,6 +26,13 @@ admin_router = APIRouter(prefix="/admin/core/attendance", tags=["admin attendanc
 
 EVENT_PRESETS_KEY = "event_presets"
 
+
+def _refresh_public_web_artifacts(db: Session, event: ScoutEvent | None) -> None:
+    """Keep static public event/team listings coherent before commit."""
+    if event is not None and event.is_public:
+        from ..web.pages import rebuild_published_page_artifacts
+        rebuild_published_page_artifacts(db)
+
 class EventPayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str | None = None
@@ -248,7 +255,7 @@ def create_event(payload: EventPayload, db: Session = Depends(get_db), current_u
     if not allows(db, current_user, "core.events.create", team_id=payload.team_id): raise HTTPException(403, "Missing permission")
     if payload.audience == "leaders" and not _is_leader(db, current_user):
         raise HTTPException(403, "Only leaders can create council events")
-    event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.commit(); db.refresh(event); return serialize(event)
+    event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit(); db.refresh(event); return serialize(event)
 
 @router.put("/events/{event_id}")
 def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -257,7 +264,11 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
     if not allows(db, current_user, "core.events.edit", owner_id=event.created_by_id, team_id=event.team_id): raise HTTPException(403, "Missing permission")
     if payload.audience == "leaders" and not _is_leader(db, current_user):
         raise HTTPException(403, "Only leaders can set council audience")
+    was_public = event.is_public
     for key, value in payload.model_dump().items(): setattr(event, key, value)
+    if was_public or event.is_public:
+        from ..web.pages import rebuild_published_page_artifacts
+        rebuild_published_page_artifacts(db)
     db.commit(); return serialize(event)
 
 
@@ -267,7 +278,12 @@ def delete_event(event_id: int, db: Session = Depends(get_db), current_user: Use
     if not event: raise HTTPException(404, "Event not found")
     if not allows(db, current_user, "core.events.delete", owner_id=event.created_by_id, team_id=event.team_id):
         raise HTTPException(403, "Missing permission")
-    db.delete(event); db.commit()
+    was_public = event.is_public
+    db.delete(event)
+    if was_public:
+        from ..web.pages import rebuild_published_page_artifacts
+        rebuild_published_page_artifacts(db)
+    db.commit()
 
 @router.post("/events/{event_id}/attendance")
 def set_attendance(event_id: int, payload: AttendancePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):

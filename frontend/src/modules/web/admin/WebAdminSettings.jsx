@@ -21,6 +21,10 @@ const EMPTY_SETTINGS = {
   og_image: "",
   og_type: "",
   canonical_url: "",
+  post_url_pattern: "/post/{slug}",
+  meeting_url_pattern: "/meeting/{id}",
+  post_detail_template_id: "",
+  meeting_detail_template_id: "",
 };
 
 export default function WebAdminSettings() {
@@ -36,6 +40,14 @@ export default function WebAdminSettings() {
   });
 
   const [form, setForm] = useState(EMPTY_SETTINGS);
+  const { data: templatesData } = useQuery({
+    queryKey: ["web", "templates", "detail-layouts"],
+    queryFn: cmsApi.listTemplates,
+    staleTime: 30_000,
+  });
+  const detailTemplates = (templatesData?.templates || templatesData || []).filter(
+    (template) => template.usage_mode === "linked_layout" && template.published_version > 0,
+  );
 
   useEffect(() => {
     if (settingsData?.settings) {
@@ -52,6 +64,11 @@ export default function WebAdminSettings() {
   const saveMutation = useMutation({
     mutationFn: (payload) => api.put("/web/settings", payload),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["web", "settings"] }); setFeedback({ type: "success", message: t("web.saveSuccess") }); },
+    onError: (error) => setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.saveFailed") }),
+  });
+  const regenerateMutation = useMutation({
+    mutationFn: cmsApi.regeneratePublicPages,
+    onSuccess: (result) => setFeedback({ type: "success", message: t("web.regeneratePublicSuccess", { count: result.regenerated_pages }) }),
     onError: (error) => setFeedback({ type: "danger", message: error?.response?.data?.detail || t("web.saveFailed") }),
   });
   const exportMutation = useMutation({
@@ -138,6 +155,38 @@ export default function WebAdminSettings() {
               </div>
             </div>
 
+            <div className="card shadow-sm mt-4">
+              <div className="card-header"><i className="fas fa-link me-1" />{t("web.settingsUrls")}</div>
+              <div className="card-body">
+                <div className="mb-3">
+                  <label className="form-label small fw-semibold">{t("web.settingsPostUrl")}</label>
+                  <input className="form-control" value={form.post_url_pattern} onChange={(e) => setField("post_url_pattern", e.target.value)} />
+                  <div className="form-text">{t("web.settingsPostUrlHint")}</div>
+                </div>
+                <div className="mb-0">
+                  <label className="form-label small fw-semibold">{t("web.settingsMeetingUrl")}</label>
+                  <input className="form-control" value={form.meeting_url_pattern} onChange={(e) => setField("meeting_url_pattern", e.target.value)} />
+                  <div className="form-text">{t("web.settingsMeetingUrlHint")}</div>
+                </div>
+                <hr />
+                <div className="mb-3">
+                  <label className="form-label small fw-semibold">{t("web.settingsPostDetailTemplate")}</label>
+                  <select className="form-select" value={form.post_detail_template_id} onChange={(e) => setField("post_detail_template_id", e.target.value)}>
+                    <option value="">{t("web.settingsNoDetailTemplate")}</option>
+                    {detailTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                  </select>
+                </div>
+                <div className="mb-0">
+                  <label className="form-label small fw-semibold">{t("web.settingsMeetingDetailTemplate")}</label>
+                  <select className="form-select" value={form.meeting_detail_template_id} onChange={(e) => setField("meeting_detail_template_id", e.target.value)}>
+                    <option value="">{t("web.settingsNoDetailTemplate")}</option>
+                    {detailTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                  </select>
+                  <div className="form-text">{t("web.settingsDetailTemplateHint")}</div>
+                </div>
+              </div>
+            </div>
+
             <div className="card shadow-sm">
               <div className="card-header"><i className="fas fa-share-nodes me-1" />{t("web.settingsOpenGraph")}</div>
               <div className="card-body">
@@ -166,9 +215,14 @@ export default function WebAdminSettings() {
 
           <div className="col-12">
             <div className="d-flex justify-content-between gap-2">
-              <button type="button" className="btn btn-outline-secondary" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()}>
-                <i className={`fas ${exportMutation.isPending ? "fa-spinner fa-spin" : "fa-file-export"} me-2`} />{t("web.exportSite")}
-              </button>
+              <div className="d-flex gap-2">
+                <button type="button" className="btn btn-outline-secondary" disabled={exportMutation.isPending} onClick={() => exportMutation.mutate()}>
+                  <i className={`fas ${exportMutation.isPending ? "fa-spinner fa-spin" : "fa-file-export"} me-2`} />{t("web.exportSite")}
+                </button>
+                <button type="button" className="btn btn-outline-secondary" disabled={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate()}>
+                  <i className={`fas ${regenerateMutation.isPending ? "fa-spinner fa-spin" : "fa-arrows-rotate"} me-2`} />{t("web.regeneratePublic")}
+                </button>
+              </div>
               <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
                 <i className="fas fa-save me-2" />{t("web.save")}
               </button>

@@ -634,6 +634,13 @@ def test_web_design_resource_materialize(client, db_session):
     ctx_res = client.post("/web/design/components", headers=headers, json=ctx_payload)
     assert ctx_res.status_code == 201
     ctx_src = ctx_res.json()
+    # The editor uses this capability flag to retain dynamic definitions as
+    # linked resources instead of calling materialize and surfacing a 422.
+    listed = client.get("/web/design/components", headers=headers)
+    assert listed.status_code == 200
+    capabilities = {item["id"]: item["can_materialize"] for item in listed.json()}
+    assert capabilities[src["id"]] is True
+    assert capabilities[ctx_src["id"]] is False
     mat_ctx = client.post(
         f"/web/design/components/{ctx_src['id']}/materialize",
         headers=headers,

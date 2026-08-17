@@ -40,7 +40,7 @@ from ..models import (
     WebThemeAsset,
     WebThemeVersion,
 )
-from .previews import theme_preview_svg
+from .previews import build_preview, theme_preview_svg
 from .resource_props import (
     ResourcePropsError,
     normalise_default_props,
@@ -76,7 +76,7 @@ _DANGEROUS_PROJECT_TEXT = re.compile(
     re.IGNORECASE,
 )
 _FORBIDDEN_CSS = re.compile(
-    r"@import\b|</\s*style\b|expression\s*\(|behavior\s*:|"
+    r"@import\b|</\s*style\b|expression\s*\(|(?<![-\w])behavior\s*:|"
     r"-moz-binding\s*:|(?:https?|javascript|vbscript|data|file)\s*:",
     re.IGNORECASE,
 )
@@ -96,13 +96,14 @@ _RESOURCE_ALIASES = {
 }
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif"}
+_FONT_EXTENSIONS = {".woff", ".woff2", ".otf", ".ttf"}
 _ALLOWED_PREFIX_EXTENSIONS = {
     "templates": {".json"},
     "components": {".json"},
     "sections": {".json"},
     "patterns": {".json"},
     "styles": {".css"},
-    "assets": _IMAGE_EXTENSIONS,
+    "assets": _IMAGE_EXTENSIONS | _FONT_EXTENSIONS,
     "previews": _IMAGE_EXTENSIONS,
 }
 _IMAGE_MAGIC = {
@@ -397,6 +398,22 @@ def _validate_image(content: bytes, path: str) -> None:
         _fail(f"Image content does not match its extension: {path}")
 
 
+def _validate_asset(content: bytes, path: str) -> None:
+    """Validate declarative raster/font assets by their container signature."""
+    extension = PurePosixPath(path).suffix.casefold()
+    if extension in _IMAGE_EXTENSIONS:
+        _validate_image(content, path)
+        return
+    signatures = {
+        ".woff": (b"wOFF",),
+        ".woff2": (b"wOF2",),
+        ".otf": (b"OTTO",),
+        ".ttf": (b"\x00\x01\x00\x00", b"true"),
+    }
+    if extension not in signatures or not any(content.startswith(prefix) for prefix in signatures[extension]):
+        _fail(f"Font content does not match its extension: {path}")
+
+
 def _read_members(archive: zipfile.ZipFile, files: dict[str, zipfile.ZipInfo]) -> dict[str, bytes]:
     contents: dict[str, bytes] = {}
     actual_total = 0
@@ -564,6 +581,16 @@ def resolve_theme_asset_path(version: WebThemeVersion, relative_path: str, *, st
     target = (package / PurePosixPath(normal)).resolve()
     if not package.is_relative_to(root) or not target.is_relative_to(package) or target.is_symlink():
         raise ThemePackageError("Theme asset path escapes controlled storage")
+    # Bundled themes also have a read-only code-owned source. This fallback
+    # keeps API/public/editor processes coherent when they use separate media
+    # volumes; callers still verify the DB-declared size/hash metadata.
+    if storage_root is None and not target.is_file():
+        manifest = version.manifest if isinstance(version.manifest, dict) else {}
+        if manifest.get("id") == "ontario" and str(version.install_path).startswith("system/ontario/"):
+            bundled_root = (Path(__file__).with_name("builtin_themes") / "ontario").resolve()
+            bundled = (bundled_root / PurePosixPath(normal)).resolve()
+            if bundled.is_relative_to(bundled_root) and bundled.is_file() and not bundled.is_symlink():
+                return bundled
     return target
 
 
@@ -675,7 +702,7 @@ def install_theme(
     archive_paths = set(files)
     for kind in ("assets", "previews"):
         for entry in entries[kind]:
-            _validate_image(contents[entry["file"]], entry["file"])
+            _validate_asset(contents[entry["file"]], entry["file"])
 
     css_by_path: dict[str, str] = {}
     for entry in entries["styles"]:
@@ -788,6 +815,10 @@ def install_theme(
             ))
 
         installed_projects: list[dict[str, Any]] = []
+        # Keep the concrete rows as well as their projects. Package files stay
+        # the install baseline while DB drafts are first-class editable catalog
+        # entries and therefore need preview artifacts as well.
+        installed_preview_items: list[tuple[str, Any]] = []
         for kind, model in _DESIGN_KINDS.items():
             for entry, payload in design_payloads[kind]:
                 qualified = _qualified_key(theme_id, version, kind, entry["id"])
@@ -830,12 +861,37 @@ def install_theme(
                     row = model(qualified_key=qualified, is_locked=True, **resource_values, **common)
                 db.add(row)
                 installed_projects.append(namespaced_project)
+                installed_preview_items.append((kind, row))
         db.flush()
         try:
             for project_data in installed_projects:
                 validate_linked_resource_instances(db, project_data, published=True)
         except ResourcePropsError as exc:
             _fail(f"Theme contains an invalid linked resource: {exc}")
+        # Generate artifacts while the installation transaction still owns the
+        # resource rows.  A failed preview must not make a valid declarative
+        # theme un-installable: catalog serialization retains its SVG fallback
+        # and a later regenerate operation can fill the artifact in.
+        for kind, row in installed_preview_items:
+            try:
+                build_preview(
+                    db,
+                    kind,
+                    row.id,
+                    row.project_data or {},
+                    row.css or "",
+                    base_css=base_css,
+                    tokens=tokens,
+                    title=row.name,
+                    browser_render=False,
+                )
+            except Exception:  # noqa: BLE001 - previews are best-effort artifacts
+                logger.warning(
+                    "Could not generate preview for installed theme resource %s/%s",
+                    kind,
+                    row.id,
+                    exc_info=True,
+                )
         db.commit()
         db.refresh(theme_version)
         return theme_version
@@ -931,6 +987,14 @@ def activate_theme(db: Session, theme_version_id: int, *, updated_by_id: int | N
     # Site-local token and CSS overrides intentionally survive activation.
     style.active_theme_version_id = version.id
     style.updated_by_id = updated_by_id
+    theme = db.get(WebTheme, version.theme_id)
+    if theme is not None and theme.stable_key == "ontario":
+        from .ontario_theme import seed_ontario_menus
+        seed_ontario_menus(db, created_by_id=updated_by_id)
+    # Public pages serve immutable documents, so the new theme must be
+    # materialised before atomically switching the active-theme pointer.
+    from .pages import rebuild_published_page_artifacts
+    rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(style)
     return style
@@ -980,15 +1044,22 @@ def uninstall_theme(db: Session, theme_version_id: int, *, storage_root: str | P
     if style and style.active_theme_version_id == version.id:
         raise ThemeInUseError("The active theme cannot be uninstalled")
     template_ids, section_ids = _version_resource_ids(db, version.id)
+    # Older versions created editable copies outside the theme scope. Treat
+    # provenance as ownership as well, so uninstall/reinstall cannot leave
+    # those stale definitions in the database or catalog.
+    theme_template_ids = list(template_ids)
+    template_ids.extend(row[0] for row in db.query(WebTemplate.id).filter(WebTemplate.forked_from_id.in_(theme_template_ids)).all()) if theme_template_ids else None
+    owned_resource_ids: dict[type, list[int]] = {}
+    for model in (WebReusableComponent, WebSection, WebPattern):
+        imported = [row[0] for row in db.query(model.id).filter_by(theme_version_id=version.id).all()]
+        owned_resource_ids[model] = imported + ([row[0] for row in db.query(model.id).filter(model.origin_resource_id.in_(imported)).all()] if imported else [])
     templates = db.query(WebTemplate).filter(WebTemplate.id.in_(template_ids)).all() if template_ids else []
-    sections = db.query(WebSection).filter(WebSection.id.in_(section_ids)).all() if section_ids else []
+    sections = db.query(WebSection).filter(WebSection.id.in_(owned_resource_ids[WebSection])).all() if owned_resource_ids[WebSection] else []
     qualified_keys = {row.qualified_key for row in (*templates, *sections) if row.qualified_key}
     for model in (WebReusableComponent, WebSection, WebPattern):
-        qualified_keys.update(
-            row[0]
-            for row in db.query(model.qualified_key).filter_by(theme_version_id=version.id).all()
-            if row[0]
-        )
+        ids = owned_resource_ids[model]
+        if ids:
+            qualified_keys.update(row[0] for row in db.query(model.qualified_key).filter(model.id.in_(ids)).all() if row[0])
     legacy_template_keys = {row.key for row in templates}
     if template_ids and db.query(WebPageRevision).filter(WebPageRevision.template_id.in_(template_ids)).first():
         raise ThemeInUseError("A page revision references this theme")
@@ -1055,22 +1126,14 @@ def uninstall_theme(db: Session, theme_version_id: int, *, storage_root: str | P
         os.replace(package_path, moved_path)
 
     try:
-        # Preserve site-local clones/overrides while detaching their provenance.
-        for model in (WebTemplate,):
-            origin_column = model.forked_from_id
-            imported_ids = template_ids
-            if imported_ids:
-                db.query(model).filter(origin_column.in_(imported_ids)).update(
-                    {origin_column: None}, synchronize_session=False
-                )
+        # Theme-owned custom definitions share the same lifecycle as their
+        # active theme. Uninstall must not leave detached catalog remnants.
+        if template_ids:
+            db.query(WebTemplate).filter(WebTemplate.id.in_(template_ids)).delete(synchronize_session=False)
         for model in (WebReusableComponent, WebSection, WebPattern):
-            imported_ids = [row[0] for row in db.query(model.id).filter_by(theme_version_id=version.id).all()]
-            if imported_ids:
-                db.query(model).filter(model.origin_resource_id.in_(imported_ids)).update(
-                    {model.origin_resource_id: None}, synchronize_session=False
-                )
-        for model in (WebTemplate, WebReusableComponent, WebSection, WebPattern):
-            db.query(model).filter_by(theme_version_id=version.id).delete(synchronize_session=False)
+            ids = owned_resource_ids[model]
+            if ids:
+                db.query(model).filter(model.id.in_(ids)).delete(synchronize_session=False)
         db.query(WebThemeAsset).filter_by(theme_version_id=version.id).delete(synchronize_session=False)
         theme_id = version.theme_id
         db.delete(version)
@@ -1209,29 +1272,80 @@ def export_theme_archive(db: Session, theme_version_id: int, *, include_site_res
         has_manifest = any(n == "manifest.json" for n in archive.namelist())
         if not has_manifest:
             manifest_payload = manifest_payload or dict(version.manifest or {})
+            theme = db.get(WebTheme, version.theme_id)
             manifest_payload.setdefault("id", "theme")
             manifest_payload.setdefault("name", "Theme")
             manifest_payload.setdefault("version", version.version)
-            if "theme.json" not in archive.namelist():
-                archive.writestr("theme.json", json.dumps({
-                    "tokens": version.default_tokens or {},
-                    "styles": [],
-                }, indent=2, ensure_ascii=False))
+            manifest_payload.setdefault("schema_version", PACKAGE_SCHEMA_VERSION)
+            if theme is not None:
+                manifest_payload.update({
+                    "id": theme.stable_key,
+                    "name": theme.name,
+                    "author": theme.author,
+                    "description": theme.description,
+                    "license": theme.license,
+                    "version": version.version,
+                })
 
-            # Include template JSON from DB as canonical theme resources.
-            templates = db.query(WebTemplate).filter_by(theme_version_id=version.id).all()
-            for tpl in templates:
-                key = tpl.qualified_key.split(":")[-1] if tpl.qualified_key else tpl.key
-                archive.writestr(
-                    f"templates/{key}.json",
-                    json.dumps({
-                        "name": tpl.name,
-                        "kind": tpl.template_kind or "layout",
-                        "usage_mode": tpl.usage_mode or "linked_layout",
-                        "project_data": tpl.published_project_data or tpl.project_data or {},
-                        "css": tpl.published_css or tpl.css or "",
-                    }, indent=2, ensure_ascii=False),
-                )
+            archive.writestr("styles/theme.css", version.base_css or "")
+            archive.writestr("theme.json", json.dumps({
+                "tokens": version.default_tokens or {},
+                "styles": ["styles/theme.css"],
+            }, indent=2, ensure_ascii=False))
+
+            old_public_prefixes = (
+                f"/theme-assets/{version.id}/",
+                f"/api/web/theme-assets/{version.id}/",
+            )
+
+            def portable_project(value: Any) -> Any:
+                if isinstance(value, list):
+                    return [portable_project(child) for child in value]
+                if isinstance(value, dict):
+                    return {key: portable_project(child) for key, child in value.items()}
+                if isinstance(value, str):
+                    for prefix in old_public_prefixes:
+                        if value.startswith(prefix):
+                            return value.removeprefix(prefix)
+                return value
+
+            resources: dict[str, list[Any]] = {
+                "templates": [], "components": [], "sections": [], "patterns": [],
+                "styles": ["styles/theme.css"], "assets": [], "previews": [],
+            }
+            for kind, model in _DESIGN_KINDS.items():
+                rows = db.query(model).filter_by(theme_version_id=version.id).order_by(model.id).all()
+                for row in rows:
+                    key = (row.qualified_key or str(row.id)).split(":")[-1]
+                    file_name = f"{kind}/{key}.json"
+                    document = {
+                        "name": row.name,
+                        "description": row.description,
+                        "project_data": portable_project(
+                            getattr(row, "published_project_data", None) or row.project_data or {}
+                        ),
+                        "css": getattr(row, "published_css", None) or row.css or "",
+                    }
+                    entry: dict[str, Any] = {"id": key, "file": file_name}
+                    if kind == "templates":
+                        document["usage_mode"] = row.usage_mode or "linked_layout"
+                        entry["usage_mode"] = document["usage_mode"]
+                    if kind in {"components", "sections"}:
+                        document.update({
+                            "prop_schema": getattr(row, "published_prop_schema", None) or row.prop_schema or [],
+                            "default_props": getattr(row, "published_default_props", None) or row.default_props or {},
+                            "variants": getattr(row, "published_variants", None) or row.variants or [],
+                        })
+                    archive.writestr(file_name, json.dumps(document, indent=2, ensure_ascii=False))
+                    resources[kind].append(entry)
+
+            archive_names = set(archive.namelist())
+            for asset in db.query(WebThemeAsset).filter_by(theme_version_id=version.id).order_by(WebThemeAsset.relative_path):
+                if asset.relative_path in archive_names:
+                    group = "previews" if asset.relative_path.startswith("previews/") else "assets"
+                    if asset.relative_path.startswith(f"{group}/"):
+                        resources[group].append(asset.relative_path)
+            manifest_payload["resources"] = resources
 
         if include_site_resources:
             # A downloaded theme is also the natural hand-off format for an
@@ -1322,7 +1436,16 @@ def duplicate_theme(db: Session, theme_version_id: int, *, new_name: str, instal
     db.add(new_version)
     db.flush()
 
-    # Copy theme assets rows for the clone (same file contents, new version id).
+    # A clone owns its package directory. Reusing only DB rows would leave all
+    # image/font endpoints pointing at files that do not exist under the new
+    # install path.
+    root = _storage_root(None)
+    source_path = (root / PurePosixPath(version.install_path)).resolve()
+    target_path = (root / PurePosixPath(new_version.install_path)).resolve()
+    if source_path.is_dir() and source_path.is_relative_to(root) and target_path.is_relative_to(root):
+        shutil.copytree(source_path, target_path)
+
+    # Copy theme asset declarations for the clone (same bytes, new owner).
     for asset in db.query(WebThemeAsset).filter_by(theme_version_id=version.id).all():
         db.add(WebThemeAsset(
             theme_version_id=new_version.id,

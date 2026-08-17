@@ -10,13 +10,20 @@ from ..models import WebPreviewArtifact
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload
+from .pages import rebuild_published_page_artifacts, validate_detail_template
 from .previews import (
     build_preview as build_resource_preview,
+    ensure_preview,
     get_current_preview,
     project_preview_svg,
     stored_preview_path,
 )
 from .routes_content import _serialize_menus, _serialize_post
+from .url_schemes import (
+    DEFAULT_MEETING_URL_PATTERN,
+    DEFAULT_POST_URL_PATTERN,
+    validate_url_pattern,
+)
 from .linked_resources import validate_linked_resource_instances
 from .resource_props import (
     ResourcePropsError,
@@ -40,6 +47,10 @@ def _site_settings(db: Session) -> dict:
         "og_image": get_config_value(db, "web.og_image"),
         "og_type": get_config_value(db, "web.og_type"),
         "canonical_url": get_config_value(db, "web.canonical_url"),
+        "post_url_pattern": get_config_value(db, "web.post_url_pattern") or DEFAULT_POST_URL_PATTERN,
+        "meeting_url_pattern": get_config_value(db, "web.meeting_url_pattern") or DEFAULT_MEETING_URL_PATTERN,
+        "post_detail_template_id": get_config_value(db, "web.post_detail_template_id"),
+        "meeting_detail_template_id": get_config_value(db, "web.meeting_detail_template_id"),
     }
 
 
@@ -137,14 +148,37 @@ class SettingsPayload(BaseModel):
     og_image: str | None = None
     og_type: str | None = None
     canonical_url: str | None = None
+    post_url_pattern: str | None = None
+    meeting_url_pattern: str | None = None
+    post_detail_template_id: int | None = None
+    meeting_detail_template_id: int | None = None
 
 
 @router.put("/settings")
 def update_site_settings(payload: SettingsPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.settings.manage")
+    if "post_url_pattern" in payload.model_fields_set:
+        validate_url_pattern(payload.post_url_pattern, "slug", label="Article")
+    if "meeting_url_pattern" in payload.model_fields_set:
+        validate_url_pattern(payload.meeting_url_pattern, "id", label="Meeting")
+    if "post_detail_template_id" in payload.model_fields_set:
+        validate_detail_template(db, payload.post_detail_template_id, label="Article detail template")
+    if "meeting_detail_template_id" in payload.model_fields_set:
+        validate_detail_template(db, payload.meeting_detail_template_id, label="Meeting detail template")
+    # ``set_config_value`` commits each value, which would expose a partial
+    # public configuration before its static documents are rebuilt. Keep this
+    # whole settings publication in one transaction instead.
     for field in payload.model_fields_set:
-        value = getattr(payload, field)
-        set_config_value(db, f"web.{field}", "" if value is None else str(value))
+        key = f"web.{field}"
+        value = "" if getattr(payload, field) is None else str(getattr(payload, field))
+        record = db.query(Config).filter_by(key=key).one_or_none()
+        if record is None:
+            db.add(Config(key=key, value=value))
+        else:
+            record.value = value
+    # URLs and site identity are included in static page output.
+    rebuild_published_page_artifacts(db)
+    db.commit()
     return {"settings": _site_settings(db)}
 
 
@@ -186,6 +220,22 @@ def _design_out(db: Session, item) -> dict:
             getattr(item, "project_data", None),
             title=getattr(item, "name", "") or "",
         )
+    # Materializing a linked resource turns it into ordinary static HTML.
+    # Definitions that depend on site/request data must therefore remain linked;
+    # expose that capability to the editor so it does not issue a doomed 422
+    # request merely to render an in-canvas preview.
+    try:
+        from .linked_resources import resource_has_runtime_bindings, resource_snapshot
+        from .renderer import CompileError
+        singular = kind.rstrip("s") if kind.endswith("s") else kind
+        can_materialize = not resource_has_runtime_bindings(
+            db, resource_snapshot(db, singular, item.id, published=False)
+        )
+    except (CompileError, ResourcePropsError):
+        # A malformed or cyclic definition cannot safely be detached either.
+        # The materialize endpoint remains the authoritative error boundary.
+        can_materialize = False
+
     result = {
         "id": item.id, "qualified_key": item.qualified_key, "name": item.name,
         "description": item.description, "project_data": item.project_data,
@@ -199,7 +249,10 @@ def _design_out(db: Session, item) -> dict:
         "published_variants": item.published_variants or [],
         "preview_media_id": preview_media_id,
         "preview_url": preview_url,
-        "theme_version_id": item.theme_version_id, "is_locked": item.is_locked,
+        "theme_version_id": item.theme_version_id,
+        "is_locked": False,
+        "is_from_theme": bool(item.theme_version_id),
+        "can_materialize": can_materialize,
         "part_kind": getattr(item, "part_kind", None),
         "published_version": getattr(item, "published_version", None),
     }
@@ -319,6 +372,7 @@ def publish_global_styles(payload: PublishPayload, db: Session = Depends(get_db)
     }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Global styles were changed by another editor")
+    rebuild_published_page_artifacts(db)
     db.commit(); db.refresh(item)
     return get_global_styles(db, current_user)
 
@@ -371,6 +425,13 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
     }
 
 
+def _active_theme_version_id(db: Session) -> int:
+    style = db.query(WebSiteStyle).filter_by(id=1).one_or_none()
+    if style is None or style.active_theme_version_id is None:
+        raise HTTPException(422, "Activate a theme before managing design resources")
+    return int(style.active_theme_version_id)
+
+
 @router.get("/design/{kind}")
 def list_design_resources(
     kind: str,
@@ -382,10 +443,29 @@ def list_design_resources(
     model = DESIGN_MODELS.get(kind)
     if not model:
         raise HTTPException(404, "Unknown design resource kind")
-    query = db.query(model)
-    if theme_version_id is not None:
-        query = query.filter(model.theme_version_id == theme_version_id)
-    return [_design_out(db, item) for item in query.order_by(model.name.asc()).all()]
+    active_theme_id = _active_theme_version_id(db)
+    # The authoring catalog is the active theme workspace. Inactive package
+    # resources and stale site-owned definitions must never leak into it.
+    if theme_version_id is not None and int(theme_version_id) != active_theme_id:
+        return []
+    query = db.query(model).filter(model.theme_version_id == active_theme_id)
+    items = query.order_by(model.name.asc()).all()
+    version = db.get(WebThemeVersion, active_theme_id)
+    for item in items:
+        ensure_preview(
+            db,
+            kind,
+            item.id,
+            item.project_data or item.published_project_data or {},
+            item.css or item.published_css or "",
+            base_css=version.base_css if version else "",
+            tokens=version.default_tokens if version else {},
+            title=item.name,
+        )
+    # Backfill original package resources from existing installations on their
+    # first catalog load; preview failure falls back to the structural SVG.
+    db.commit()
+    return [_design_out(db, item) for item in items]
 
 
 @router.post("/design/{kind}", status_code=201)
@@ -406,6 +486,7 @@ def create_design_resource(kind: str, payload: DesignResourcePayload, db: Sessio
     schema, defaults, variants = _normalise_resource_definition(payload)
     values = dict(
         qualified_key=payload.qualified_key, name=payload.name.strip(),
+        theme_version_id=_active_theme_version_id(db), is_locked=False,
         description=payload.description, project_data=payload.project_data, css=payload.css,
         prop_schema=schema, default_props=defaults, variants=variants,
         preview_media_id=payload.preview_media_id,
@@ -417,6 +498,9 @@ def create_design_resource(kind: str, payload: DesignResourcePayload, db: Sessio
     build_resource_preview(
         db, kind, item.id, item.project_data or {}, item.css or "", title=item.name,
     )
+    # Linked definitions render into immutable documents; refresh them before
+    # atomically making the new definition visible.
+    rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(item)
     return _design_out(db, item)
@@ -431,8 +515,6 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
     item = db.query(model).filter_by(id=resource_id).one_or_none()
     if not item:
         raise HTTPException(404, "Design resource not found")
-    if item.is_locked or item.theme_version_id:
-        raise HTTPException(409, "Installed theme resources must be cloned before editing")
     if payload.expected_version is None:
         raise HTTPException(428, "expected_version is required")
     expected = payload.expected_version
@@ -481,8 +563,6 @@ def publish_design_resource(
     item = db.query(model).filter_by(id=resource_id).one_or_none()
     if not item:
         raise HTTPException(404, "Design resource not found")
-    if item.is_locked or item.theme_version_id:
-        raise HTTPException(409, "Installed theme resources are already immutable and published")
     if item.draft_version != payload.expected_version:
         raise HTTPException(409, "Resource was changed by another editor")
     try:
@@ -517,13 +597,7 @@ def publish_design_resource(
 
 @router.post("/design/{kind}/{resource_id}/clone", status_code=201)
 def clone_design_resource(kind: str, resource_id: int, payload: DesignResourceClonePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    """Clone a design resource into a site-owned definition.
-
-    Site-owned clones are the only sanctioned way to edit an installed theme
-    resource. The clone becomes the new source of truth; the original stays
-    immutable. If a name/key is not supplied, we derive a site-owned key that
-    does not collide with existing resources.
-    """
+    """Create an additional editable definition in the active theme workspace."""
     _require_action(db, current_user, _design_permission(kind))
     model = DESIGN_MODELS.get(kind)
     if not model:
@@ -531,10 +605,9 @@ def clone_design_resource(kind: str, resource_id: int, payload: DesignResourceCl
     origin = db.query(model).filter_by(id=resource_id).one_or_none()
     if not origin:
         raise HTTPException(404, "Design resource not found")
-    if origin.is_locked or origin.theme_version_id:
-        # Installing a theme is immutable; cloning is allowed and expected here.
-        pass
-
+    active_theme_id = _active_theme_version_id(db)
+    if origin.theme_version_id != active_theme_id:
+        raise HTTPException(404, "Design resource is not part of the active theme")
     name = (payload.name or "").strip() or f"{origin.name} (vlastní)"
     base_key = (payload.qualified_key or "").strip() or f"site:{kind[:-1] if kind.endswith('s') else kind}:{cms_slugify(origin.name) or 'clone'}"
 
@@ -560,7 +633,7 @@ def clone_design_resource(kind: str, resource_id: int, payload: DesignResourceCl
         published_default_props=origin.published_default_props or {},
         published_variants=origin.published_variants or [],
         published_version=int(origin.published_version or 1) if origin.published_project_data else 0,
-        theme_version_id=None,
+        theme_version_id=active_theme_id,
         preview_media_id=origin.preview_media_id,
         origin_resource_id=origin.id,
         draft_version=1,
@@ -729,9 +802,11 @@ def get_themes(db: Session = Depends(get_db), current_user: User = Depends(get_c
 @router.get("/theme-assets/{theme_version_id}/{asset_path:path}")
 def serve_theme_asset(
     theme_version_id: int, asset_path: str,
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
 ):
-    _require_action(db, current_user, "web.pages.manage")
+    # These are the same immutable, validated files exposed by the public-site
+    # process. Keeping this API path unauthenticated lets the isolated GrapesJS
+    # iframe load CSS images/fonts without copying bearer tokens into requests.
     from ..web.theme_package import ThemePackageError, resolve_theme_asset_path
     from ..models import WebThemeAsset
     version = db.query(WebThemeVersion).filter_by(id=theme_version_id).one_or_none()

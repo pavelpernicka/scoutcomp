@@ -30,6 +30,20 @@ const safePreviewUrl = (value) => {
 export function registerScoutCompTypes(editor, translate = (key) => key) {
   const components = editor.Components;
 
+  // GrapesJS has no built-in `heading` component type. Theme Project Data
+  // uses the explicit type so headings keep a useful name in the layer tree;
+  // register it before projects load instead of letting GrapesJS warn and
+  // silently fall back to `default`.
+  components.addType("heading", {
+    isComponent: (element) => /^H[1-6]$/.test(element?.tagName || "") && { type: "heading" },
+    extend: "text",
+    model: {
+      defaults: {
+        tagName: "h2",
+      },
+    },
+  });
+
   // ── sc-slot ──────────────────────────────────────────────────────────
   components.addType(SC_COMPONENT_TYPES.slot, {
     isComponent: matchesType("slot"),
@@ -195,6 +209,31 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
     },
   });
 
+  // ── sc-pagination ──────────────────────────────────────────────────
+  components.addType(SC_COMPONENT_TYPES.pagination, {
+    isComponent: matchesType("pagination"),
+    model: {
+      defaults: {
+        tagName: "nav",
+        name: translate("web.editor.component.pagination"),
+        attributes: { "data-sc-type": "pagination" },
+        source: "core.posts",
+        limit: 6,
+        params: { limit: 6 },
+        droppable: false,
+        editable: false,
+        content: "← Předchozí · 1 · Další →",
+        style: {
+          display: "flex",
+          gap: "8px",
+          padding: "14px 0",
+          color: "#506174",
+          fontSize: "14px",
+        },
+      },
+    },
+  });
+
   // ── sc-condition ────────────────────────────────────────────────────
   components.addType(SC_COMPONENT_TYPES.condition, {
     isComponent: matchesType("condition"),
@@ -314,7 +353,9 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         droppable: false,
         editable: false,
         location: "main",
-        content: "☰ menu: main",
+        presentation: "",
+        menuItems: [],
+        content: "",
         style: {
           padding: "8px",
           border: "2px dashed #79c49a",
@@ -325,14 +366,91 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           fontSize: "12px",
           background: "rgba(121,196,154,.08)",
         },
-        traits: [trait("text", "location", translate("web.editor.data.menuLocation"))],
+        traits: [
+          trait("text", "location", translate("web.editor.data.menuLocation")),
+          trait("select", "presentation", translate("web.editor.data.menuPresentation"), {
+            options: [
+              { id: "", label: translate("web.editor.data.menuPresentationDefault") },
+              { id: "bootstrap-navbar", label: translate("web.editor.data.menuPresentationNavbar") },
+              { id: "bootstrap-footer-columns", label: translate("web.editor.data.menuPresentationFooter") },
+            ],
+          }),
+        ],
       },
       init() {
         this.listenTo(this, "change:location", this.updateBadge);
         this.updateBadge();
       },
       updateBadge() {
-        this.set("content", `☰ menu: ${this.get("location") || "main"}`);
+        // The custom view renders the current menu tree. Keep Project Data
+        // free of an editor-only placeholder child.
+      },
+    },
+    view: {
+      init() {
+        this.listenTo(this.model, "change:menuItems change:location change:presentation", this.renderMenu);
+      },
+      onRender() {
+        this.renderMenu();
+      },
+      renderMenu() {
+        const documentRef = this.el.ownerDocument || document;
+        this.el.dataset.scMenuLocation = this.model.get("location") || "main";
+        this.el.dataset.scMenuPresentation = this.model.get("presentation") || "default";
+        let preview = this.el.querySelector(":scope > [data-sc-menu-preview]");
+        if (!preview) {
+          preview = documentRef.createElement("div");
+          preview.dataset.scMenuPreview = "true";
+          this.el.appendChild(preview);
+        }
+        preview.replaceChildren();
+        preview.style.pointerEvents = "none";
+        const presentation = this.model.get("presentation") || "";
+        const items = Array.isArray(this.model.get("menuItems")) ? this.model.get("menuItems") : [];
+        const renderFooter = (rows) => {
+          const grid = documentRef.createElement("div");
+          grid.className = "sc-menu-list row";
+          rows.forEach((item) => {
+            const column = documentRef.createElement("div");
+            column.className = "sc-menu-column col";
+            const heading = documentRef.createElement("span");
+            heading.className = "sc-menu-heading text-white text-decoration-none fw-bold";
+            heading.textContent = String(item.label || "");
+            column.appendChild(heading);
+            const children = Array.isArray(item.children) ? item.children : [];
+            if (children.length) column.appendChild(renderItems(children, 1));
+            grid.appendChild(column);
+          });
+          return grid;
+        };
+        const renderItems = (rows, level = 0) => {
+          const list = documentRef.createElement("ul");
+          list.className = `sc-menu-${level ? "dropdown" : "list"} ${presentation === "bootstrap-navbar" ? (level ? "dropdown-menu" : "navbar-nav") : ""}`;
+          rows.forEach((item) => {
+            const children = Array.isArray(item.children) ? item.children : [];
+            const li = documentRef.createElement("li");
+            li.className = `sc-menu-item nav-item${children.length ? " dropdown has-children" : ""}`;
+            const link = documentRef.createElement("a");
+            link.className = `sc-menu-link ${level ? "dropdown-item" : "nav-link"}${children.length && !level ? " dropdown-toggle" : ""}`;
+            link.textContent = String(item.label || "");
+            link.setAttribute("href", "#");
+            li.appendChild(link);
+            if (children.length) li.appendChild(renderItems(children, level + 1));
+            list.appendChild(li);
+          });
+          return list;
+        };
+        if (items.length) {
+          preview.appendChild(
+            presentation === "bootstrap-footer-columns" ? renderFooter(items) : renderItems(items),
+          );
+        }
+        else {
+          const empty = documentRef.createElement("span");
+          empty.className = "sc-menu-editor-empty";
+          empty.textContent = `☰ menu: ${this.model.get("location") || "main"}`;
+          preview.appendChild(empty);
+        }
       },
     },
   });
@@ -423,6 +541,11 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         resourceId: "",
         resourceName: "",
         previewUrl: "",
+        // Editor-only, server-materialized fragment. It is deliberately
+        // excluded from publication semantics: the persisted link + props are
+        // the canonical data and public rendering resolves them again.
+        livePreviewHtml: "",
+        livePreviewCss: "",
         props: {},
         content: `◇ ${translate("web.editor.placeholder.linkedResource")}`,
         style: {
@@ -488,7 +611,7 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
       init() {
         this.listenTo(
           this.model,
-          "change:previewUrl change:resourceName change:resourceId change:resourceKind change:props",
+          "change:previewUrl change:livePreviewHtml change:livePreviewCss change:resourceName change:resourceId change:resourceKind change:props",
           this.renderLinkedPreview,
         );
       },
@@ -518,12 +641,26 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           this.el.appendChild(preview);
         }
         preview.replaceChildren();
+        const liveHtml = String(this.model.get("livePreviewHtml") || "");
+        const liveCss = String(this.model.get("livePreviewCss") || "");
         const url = safePreviewUrl(this.model.get("previewUrl"));
         const name = String(this.model.get("resourceName") || this.model.get("resourceId") || "?");
         const values = Object.values(this.model.get("props") || {})
           .filter((value) => typeof value === "string" && value.trim())
           .slice(0, 2);
-        if (url) {
+        if (liveHtml) {
+          // The fragment comes exclusively from the authenticated backend
+          // materializer, which uses the same safe renderer as publication.
+          // Keep it inert: preview receives no pointer events and only acts as
+          // the visual face of the atomic linked component.
+          const style = documentRef.createElement("style");
+          style.textContent = liveCss;
+          const content = documentRef.createElement("div");
+          content.className = "sc-editor-linked-preview-content";
+          content.innerHTML = liveHtml;
+          Object.assign(content.style, { minWidth: "100%", minHeight: "100%", pointerEvents: "none" });
+          preview.append(style, content);
+        } else if (url) {
           const image = documentRef.createElement("img");
           image.src = url;
           image.alt = "";

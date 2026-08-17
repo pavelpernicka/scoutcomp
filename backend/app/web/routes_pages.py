@@ -4,6 +4,7 @@ from copy import deepcopy
 
 from .resource_props import ResourcePropsError
 from .renderer import component_slot_name
+from .pages import _extract_page_content
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -24,7 +25,6 @@ class PagePayload(BaseModel):
     parent_id: int | None = None
     position: int | None = None
     meta_description: str | None = None
-    team_id: int | None = None
     expected_version: int | None = None
     seo_title: str | None = None
     canonical_url: str | None = None
@@ -63,7 +63,6 @@ def list_pages(db: Session = Depends(get_db), current_user: User = Depends(get_c
             "draft_version": p.draft_version,
             "parent_id": p.parent_id,
             "position": p.position,
-            "team_id": p.team_id,
             "source_template_id": p.source_template_id,
             "source_template_version": p.source_template_version,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
@@ -95,42 +94,45 @@ def _copy_source_template_project(db: Session, source_template_id: int | None) -
         return None
 
     template = db.query(WebTemplate).filter_by(id=source_template_id).one_or_none()
-    if template is not None and getattr(template, "usage_mode", "linked_layout") == "copy_on_create":
-        source = template.published_project_data
-        if source and isinstance(source, dict) and source.get("pages"):
-            return deepcopy(source)
+    if template is None:
         return None
-
+    source = template.published_project_data
+    if source and isinstance(source, dict) and source.get("pages"):
+        return deepcopy(source)
     return None
 
 
 @router.post("/pages", status_code=201)
 def create_page(payload: PagePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.pages.manage")
-    segment = cms_slugify(payload.slug or payload.title)
+    segment = normalise_path_segment(payload.slug, payload.title)
+    if segment == "main" and payload.parent_id is not None:
+        raise HTTPException(422, "Homepage cannot have a parent page")
     parent = validate_parent(db, None, payload.parent_id)
     unique_segment(db, segment, payload.parent_id)
     slug = unique_legacy_slug(db, segment)
-    validate_template_usage(db, payload.template_id, "linked_layout")
+    selected_layout = validate_template_usage(db, payload.template_id, "linked_layout")
 
-    # Precedence: explicit project data -> published copy-on-create template -> empty project.
+    # A page always selects one ordinary template. Its published content seeds
+    # the page slot at creation time; we do not maintain a second "starter"
+    # template category.
     project = None
     source_template_id = None
     source_template_version = None
     if isinstance(payload.data, dict) and payload.data.get("pages"):
         project = payload.data
     elif payload.source_template_id is not None:
-        source_template = validate_template_usage(
-            db,
-            payload.source_template_id,
-            "copy_on_create",
-            label="Source template",
-        )
-        project = _copy_source_template_project(db, payload.source_template_id)
+        source_template = db.query(WebTemplate).filter_by(id=payload.source_template_id).one_or_none()
+        if source_template is None:
+            raise HTTPException(404, "Template not found")
+        project = _copy_source_template_project(db, source_template.id)
         if project is None:
-            raise HTTPException(422, "Source template must be published before use")
+            raise HTTPException(422, "Template must be published before use")
         source_template_id = source_template.id
         source_template_version = source_template.published_version
+        if source_template.usage_mode == "linked_layout":
+            selected_layout = source_template
+            project = _extract_page_content(project, project)
 
     if project is None:
         project = _empty_project()
@@ -140,8 +142,8 @@ def create_page(payload: PagePayload, db: Session = Depends(get_db), current_use
         path_segment=segment,
         path=build_path(parent, segment),
         title=payload.title.strip(),
-        template=payload.template,
-        template_id=payload.template_id,
+        template=(selected_layout.key if selected_layout is not None else payload.template),
+        template_id=(selected_layout.id if selected_layout is not None else payload.template_id),
         source_template_id=source_template_id,
         source_template_version=source_template_version,
         data=project,
@@ -156,7 +158,6 @@ def create_page(payload: PagePayload, db: Session = Depends(get_db), current_use
         og_image_id=payload.og_image_id,
         noindex=payload.noindex,
         sitemap_include=payload.sitemap_include,
-        team_id=payload.team_id,
         created_by_id=current_user.id,
         updated_by_id=current_user.id,
     )
@@ -459,6 +460,15 @@ def preview_page_draft(page_id: int, payload: PreviewPayload, db: Session = Depe
     return {"html": document, "warnings": [], "draft_version": page.draft_version}
 
 
+@router.post("/pages/regenerate-public")
+def regenerate_public_pages(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """One explicit, authorised rebuild for legacy published revisions."""
+    _require_action(db, current_user, "web.publish")
+    count = rebuild_published_page_artifacts(db)
+    db.commit()
+    return {"regenerated_pages": count}
+
+
 @router.post("/pages/{page_id}/publish")
 def publish_page_draft(page_id: int, payload: PublishPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.pages.manage")
@@ -504,8 +514,7 @@ def restore_page(page_id: int, db: Session = Depends(get_db), current_user: User
     page = db.query(WebPage).filter_by(id=page_id).one_or_none()
     if not page or page.deleted_at is None:
         raise HTTPException(404, "Trashed page not found")
-    page.deleted_at = None
-    db.commit()
+    restore_trashed_page(db, page)
 
 
 @router.delete("/pages/{page_id}/purge", status_code=204)
@@ -554,7 +563,6 @@ def duplicate_page(page_id: int, db: Session = Depends(get_db), current_user: Us
         og_image_id=page.og_image_id,
         noindex=page.noindex,
         sitemap_include=page.sitemap_include,
-        team_id=page.team_id,
         created_by_id=current_user.id,
     )
     db.add(clone)
