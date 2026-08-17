@@ -5,8 +5,6 @@ import PropTypes from "prop-types";
 import api from "../../services/api";
 import { useAuth } from "../../providers/AuthProvider";
 
-const GRADIENT = "linear-gradient(120deg,#075985,#4f46e5 55%,#7c3aed)";
-
 function WelcomeStats() {
   const { t } = useTranslation();
   const { profile } = useAuth();
@@ -28,14 +26,14 @@ function WelcomeStats() {
   return (
     <div className="row g-3">
       <div className="col-6 col-lg-3">
-        <div className="text-center bg-white bg-opacity-25 rounded p-3">
+        <div className="dashboard-welcome-stat">
           <div className="fs-5 fw-bold">{totalPoints}</div>
           <small className="opacity-90">{t("dashboard.totalPoints")}</small>
         </div>
       </div>
       {memberRank !== "–" && (
         <div className="col-6 col-lg-3">
-          <div className="text-center bg-white bg-opacity-25 rounded p-3">
+          <div className="dashboard-welcome-stat">
             <div className="fs-5 fw-bold">#{memberRank}</div>
             <small className="opacity-90">{t("dashboard.yourRank")}</small>
           </div>
@@ -43,7 +41,7 @@ function WelcomeStats() {
       )}
       {teamRank !== "–" && (
         <div className="col-6 col-lg-3">
-          <div className="text-center bg-white bg-opacity-25 rounded p-3">
+          <div className="dashboard-welcome-stat">
             <div className="fs-5 fw-bold">#{teamRank}</div>
             <small className="opacity-90">{t("dashboard.teamRank")}</small>
           </div>
@@ -59,7 +57,7 @@ export default function WelcomeWidget({ widget }) {
 
   if (widget?.stats) {
     return (
-      <section className="p-4 p-md-5 rounded-4 text-white shadow" style={{ background: GRADIENT }}>
+      <section className="dashboard-welcome">
         <div className="d-flex align-items-center mb-3">
           <span className="fs-1 me-3">👋</span>
           <div>
@@ -79,7 +77,7 @@ export default function WelcomeWidget({ widget }) {
   }
 
   return (
-    <section className="p-4 p-md-5 rounded-4 text-white shadow" style={{ background: GRADIENT }}>
+    <section className="dashboard-welcome">
       <div className="d-flex align-items-center">
         <i className={`fas ${widget?.icon || "fa-house-user"} fs-1 me-3`}></i>
         <div>

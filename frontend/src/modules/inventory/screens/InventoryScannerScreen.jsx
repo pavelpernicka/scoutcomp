@@ -12,8 +12,8 @@ export default function InventoryScannerScreen({ scanValue, onScanValueChange, o
       </header>
       <div className="inventory-scanner-grid">
         <InventoryQrScanner onDetected={onFindItem} />
-        <aside className="inventory-scan-manual">
-          <h2>Ruční nebo externí čtečka</h2>
+        <aside className="inventory-scan-manual" aria-labelledby="inventory-manual-title">
+          <h2 id="inventory-manual-title">Ruční nebo externí čtečka</h2>
           <p>Kurzor ponech v poli a čtečka kód vyplní automaticky.</p>
           <label className="form-label" htmlFor="inventory-qr-input">QR identifikátor</label>
           <div className="input-group input-group-lg">

@@ -3,6 +3,8 @@ import PropTypes from "prop-types";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
+import "./ArticleEditBox.css";
+
 import { renderMarkdown } from "../../../utils/markdown";
 
 const asHtml = (value) => {

@@ -17,7 +17,7 @@ const Card = ({
 }) => {
   const cardClasses = [
     'card',
-    shadow && 'shadow-lg',
+    shadow && 'shadow-sm',
     !border && 'border-0',
     className
   ].filter(Boolean).join(' ');

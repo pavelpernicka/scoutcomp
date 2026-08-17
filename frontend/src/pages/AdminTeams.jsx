@@ -5,9 +5,9 @@ import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import MemberSearchPicker from "../components/MemberSearchPicker";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 const LOGO_SIZE = 256;
 
@@ -408,22 +408,18 @@ export default function AdminTeams() {
   };
 
   return (
-    <>
-      <HeroHeader
+    <div className="admin-teams-page">
+      <AdminPageHeader
         title={t("adminTeams.title")}
-        subtitle={t("adminTeams.subtitle")}
-        icon="👥"
-        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
-      >
-        {isAdmin && (
-          <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={openCreateTeamModal}>
+        description={t("adminTeams.subtitle")}
+        action={isAdmin && (
+          <Button variant="primary" icon="fas fa-plus" onClick={openCreateTeamModal}>
             {t("adminTeams.addTeam")}
           </Button>
         )}
-      </HeroHeader>
+      />
 
-      <div className="card shadow-sm border-0 mt-4">
-        <div className="card-body">
+      <section className="admin-teams-overview" aria-label={t("adminTeams.title")}>
           {teamsLoading ? (
             <div className="text-center text-muted py-4">{t('adminTeams.loading')}</div>
           ) : teamsError ? (
@@ -440,24 +436,20 @@ export default function AdminTeams() {
                 const members = groupedUsers[team.id] ?? [];
                 return (
                   <div key={team.id} className="col-12 col-md-6 col-xl-4">
-                    <div className="card h-100 border border-light-subtle">
-                      <div className="card-body d-flex flex-column gap-3">
-                        <div>
-                          <div className="d-flex justify-content-between align-items-start">
-                            <div className="d-flex align-items-center gap-2">
+                    <article className="card admin-team-card h-100">
+                      <div className="card-body">
+                        <div className="admin-team-card__header">
+                          <div className="d-flex align-items-center gap-2 min-w-0">
                               <TeamLogo team={team} size={48} />
-                              <h5 className="card-title mb-0">{team.name}</h5>
-                            </div>
-                            <span className="badge bg-secondary">{t('adminTeams.memberCount', { count: members.length })}</span>
+                              <h2 className="admin-team-card__title">{team.name}</h2>
                           </div>
-                          {team.description && (
-                            <p className="text-muted small mt-2 mb-0">{team.description}</p>
-                          )}
+                          <span className="admin-team-card__count">{t('adminTeams.memberCount', { count: members.length })}</span>
                         </div>
-                        <div>
-                          <span className="fw-semibold">{t('adminTeams.joinCode')}</span>
-                          <div className="d-flex align-items-center gap-2 mt-1">
-                            <code className="bg-dark text-light px-2 py-1 rounded">{team.join_code}</code>
+                        {team.description && <p className="admin-team-card__description">{team.description}</p>}
+                        <div className="admin-team-card__code">
+                          <span>{t('adminTeams.joinCode')}</span>
+                          <div>
+                            <code>{team.join_code}</code>
                             {isAdmin && (
                               <button
                                 type="button"
@@ -465,52 +457,57 @@ export default function AdminTeams() {
                                 onClick={() => handleRotateCode(team)}
                                 disabled={rotateCodeMutation.isLoading}
                               >
-                                {t('adminTeams.rotate')}
+                                <i className="fas fa-rotate" aria-hidden="true"></i>
+                                <span>{t('adminTeams.rotate')}</span>
                               </button>
                             )}
                           </div>
                         </div>
-                        <div className="mt-auto d-flex gap-2">
+                        <div className="admin-team-card__actions">
                           <button
                             type="button"
-                            className="btn btn-outline-primary btn-sm w-100"
+                            className="btn btn-outline-primary"
                             onClick={() => setMembersModalTeamId(team.id)}
                           >
+                            <i className="fas fa-users" aria-hidden="true"></i>
                             {t('adminTeams.editMembers')}
                           </button>
                           {isAdmin && (
                             <button
                               type="button"
-                              className="btn btn-outline-secondary btn-sm"
+                              className="btn btn-outline-secondary admin-team-card__icon-action"
+                              title={t('adminTeams.editDetails')}
+                              aria-label={`${t('adminTeams.editDetails')}: ${team.name}`}
                               onClick={() => handleOpenEditTeam(team)}
                             >
-                              {t('adminTeams.editDetails')}
+                              <i className="fas fa-pen" aria-hidden="true"></i>
                             </button>
                           )}
                           {isAdmin && (
                             <button
                               type="button"
-                              className="btn btn-outline-danger btn-sm"
+                              className="btn btn-outline-danger admin-team-card__icon-action"
+                              title={t('adminTeams.delete')}
+                              aria-label={`${t('adminTeams.delete')}: ${team.name}`}
                               onClick={() => handleDeleteTeam(team)}
                               disabled={deleteTeamMutation.isLoading}
                             >
-                              {t('adminTeams.delete')}
+                              <i className="fas fa-trash" aria-hidden="true"></i>
                             </button>
                           )}
                         </div>
                       </div>
-                    </div>
+                    </article>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
-      </div>
+      </section>
 
       {unassignedUsers.length > 0 && (
-        <div className="card shadow-sm mt-4">
-          <div className="card-header">{t('adminTeams.unassignedUsers')}</div>
+        <section className="card admin-unassigned-users mt-4" aria-labelledby="unassigned-users-heading">
+          <div className="card-header" id="unassigned-users-heading">{t('adminTeams.unassignedUsers')}</div>
           <div className="card-body">
             <ul className="list-group list-group-flush">
               {unassignedUsers.map((user) => (
@@ -542,7 +539,7 @@ export default function AdminTeams() {
               ))}
             </ul>
           </div>
-        </div>
+        </section>
       )}
 
       {activeTeam && (
@@ -906,6 +903,6 @@ export default function AdminTeams() {
           <div className="modal-backdrop fade show"></div>
         </>
       )}
-    </>
+    </div>
   );
 }

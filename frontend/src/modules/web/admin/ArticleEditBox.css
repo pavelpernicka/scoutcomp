@@ -1,0 +1,17 @@
+.article-editbox-content .ProseMirror {
+  min-height: 16rem;
+  padding: .85rem 1rem;
+  outline: 0;
+}
+
+.article-editbox-content .ProseMirror > :first-child { margin-top: 0; }
+.article-editbox-content .ProseMirror > :last-child { margin-bottom: 0; }
+.article-editbox-content .ProseMirror p { margin-bottom: .85rem; }
+.article-editbox-content .ProseMirror blockquote {
+  margin: 1rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid #9ca3af;
+  color: #4b5563;
+}
+.article-editbox-content .ProseMirror ul,
+.article-editbox-content .ProseMirror ol { padding-left: 1.5rem; }

@@ -1,0 +1,29 @@
+/* Member detail: the avatar action remains a clear, touch-friendly circular control. */
+.member-avatar-upload-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--bs-body-bg);
+  border-radius: 50%;
+  background: var(--bs-primary);
+  color: #fff;
+  box-shadow: 0 0.2rem 0.45rem rgb(0 0 0 / 18%);
+}
+
+.member-avatar-upload-button:hover,
+.member-avatar-upload-button:focus-visible {
+  background: var(--bs-primary-dark, #0a58ca);
+  color: #fff;
+}
+
+@media (max-width: 767.98px) {
+  .member-detail-header { align-items: flex-start !important; gap: .8rem !important; margin-bottom: 1.15rem !important; padding-bottom: .15rem; }
+  .member-detail-identity { order: 2; width: 100%; min-width: 0; padding: .2rem 0 .1rem; }
+  .member-detail-save { order: 3; width: 100%; }
+  .member-detail-save .btn { min-height: 2.5rem; }
+  .member-detail-avatar { margin-right: .2rem; }
+  .member-detail-avatar__image { width: 76px !important; height: 76px !important; font-size: 1.75rem !important; }
+  .member-detail-avatar .member-avatar-upload-button { width: 2.15rem; height: 2.15rem; border-width: 2px; }
+}

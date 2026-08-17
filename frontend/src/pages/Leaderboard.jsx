@@ -11,6 +11,7 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
 import DecoratedCard from "../components/DecoratedCard";
+import "./Leaderboard.css";
 
 const formatScore = (score) => Number.parseFloat(score ?? 0).toFixed(2);
 
@@ -178,7 +179,7 @@ export default function LeaderboardPage() {
         const progressColor = entry.rank === 1 ? '#ffd700' : entry.rank === 2 ? '#c0c0c0' : entry.rank === 3 ? '#cd7f32' : '#28a745';
 
         return (
-          <div key={entry.entity_id} className={`p-3 rounded-3 border ${isTopThree ? 'bg-light shadow-sm' : 'bg-white'}`}>
+          <div key={entry.entity_id} className={`leaderboard-entry p-3 rounded-3 border ${isTopThree ? 'bg-light shadow-sm' : 'bg-white'}`}>
             <div className="d-flex justify-content-between align-items-center mb-2">
               <div className="d-flex align-items-center gap-2">
                 <span className="fs-5">{rankIcon}</span>
@@ -260,7 +261,7 @@ export default function LeaderboardPage() {
         icon={iconPreview || "📊"}
         headerGradient="linear-gradient(135deg, #6f42c1 0%, #764ba2 100%)"
         shadow={true}
-        className="h-100"
+        className="h-100 leaderboard-card"
         rightContent={categoryBoard.length > 5 && (
           <Button
             variant="primary"
@@ -338,7 +339,7 @@ export default function LeaderboardPage() {
             icon="🏆"
             headerGradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
             shadow={true}
-            className="h-100"
+            className="h-100 leaderboard-card"
             rightBadge={memberBoard.length}
             rightContent={hasAnyMemberPoints && memberBoard.length > 5 && (
               <Button
@@ -387,7 +388,7 @@ export default function LeaderboardPage() {
             icon="🏅"
             headerGradient="linear-gradient(45deg, rgb(233, 30, 99), rgb(255, 127, 39))"
             shadow={true}
-            className="h-100"
+            className="h-100 leaderboard-card"
             rightBadge={teamBoard.length}
             rightContent={isTeamModeLocked ? null : (
               <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label="Team leaderboard mode">

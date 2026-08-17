@@ -5,12 +5,11 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal } from "../utils/dateUtils";
-import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
 import LoadingSpinner from "../components/LoadingSpinner";
-import DecoratedCard from "../components/DecoratedCard";
 import Textarea from "../components/Textarea";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 const extractErrorMessage = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -104,107 +103,92 @@ export default function AdminApprovals() {
   }
 
   return (
-    <>
-      <HeroHeader
+    <div className="admin-approvals-page">
+      <AdminPageHeader
         title={t("approvals.title")}
-        subtitle={t("approvals.subtitle")}
-        icon="🔍"
-        gradient="linear-gradient(135deg, #28a745 0%, #20c997 100%)"
-      >
-        <div className="badge bg-light text-success px-3 py-2 fs-4">
+        description={t("approvals.subtitle")}
+        action={(
+          <div className="admin-approvals-pending-count">
           {pending.length} {t("approvals.pending")}
-        </div>
-      </HeroHeader>
+          </div>
+        )}
+      />
 
-      {/* Information Panel */}
-      <Alert type="info" className="shadow-sm border-0 mb-4" icon={<></>}>
-        <h6 className="alert-heading mb-3">{t("approvals.infoTitle")}</h6>
-        <div className="row g-3">
-          <div className="col-md-4">
-            <div className="d-flex align-items-start">
-              <div className="badge bg-warning text-dark me-2 mt-1">&nbsp;</div>
-              <div>
-                <strong>{t("approvals.pendingStatus")}</strong>
-                <div className="text-muted small">{t("approvals.pendingDescription")}</div>
-              </div>
+      <section className="admin-approvals-guide" aria-labelledby="approvals-guide-heading">
+        <h2 id="approvals-guide-heading">{t("approvals.infoTitle")}</h2>
+        <div className="admin-approvals-guide__items">
+          <div className="admin-approvals-guide__item">
+            <span className="admin-approvals-guide__marker admin-approvals-guide__marker--pending" aria-hidden="true" />
+            <div>
+              <strong>{t("approvals.pendingStatus")}</strong>
+              <p>{t("approvals.pendingDescription")}</p>
             </div>
           </div>
-          <div className="col-md-4">
-            <div className="d-flex align-items-start">
-              <div className="badge bg-success me-2 mt-1">&nbsp;</div>
-              <div>
-                <strong>{t("approvals.approvedStatus")}</strong>
-                <div className="text-muted small">{t("approvals.approvedDescription")}</div>
-              </div>
+          <div className="admin-approvals-guide__item">
+            <span className="admin-approvals-guide__marker admin-approvals-guide__marker--approved" aria-hidden="true" />
+            <div>
+              <strong>{t("approvals.approvedStatus")}</strong>
+              <p>{t("approvals.approvedDescription")}</p>
             </div>
           </div>
-          <div className="col-md-4">
-            <div className="d-flex align-items-start">
-              <div className="badge bg-danger me-2 mt-1">&nbsp;</div>
-              <div>
-                <strong>{t("approvals.rejectedStatus")}</strong>
-                <div className="text-muted small">{t("approvals.rejectedDescription")}</div>
-              </div>
+          <div className="admin-approvals-guide__item">
+            <span className="admin-approvals-guide__marker admin-approvals-guide__marker--rejected" aria-hidden="true" />
+            <div>
+              <strong>{t("approvals.rejectedStatus")}</strong>
+              <p>{t("approvals.rejectedDescription")}</p>
             </div>
           </div>
         </div>
-      </Alert>
+      </section>
 
       {/* Feedback */}
       {feedback && (
-        <Alert type={feedback.type} className="shadow-sm border-0 mb-4" icon={<></>}>
+        <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>
           {feedback.message}
         </Alert>
       )}
 
       {/* Approvals List */}
       {!pending.length ? (
-        <DecoratedCard
-          title={t("approvals.empty")}
-          subtitle={t("approvals.emptyDescription")}
-          icon={<i className="fas fa-check-circle text-success"></i>}
-          shadow={true}
-          bodyClassName="text-center py-5"
-        />
+        <div className="admin-approvals-empty">
+          <i className="fas fa-check-circle" aria-hidden="true" />
+          <h2>{t("approvals.empty")}</h2>
+          <p>{t("approvals.emptyDescription")}</p>
+        </div>
       ) : (
-        <div className="d-flex flex-column gap-4">
+        <div className="admin-approval-list">
           {pending.map((item) => (
-              <DecoratedCard
-                key={item.id}
-                title={item.task?.name || `Task #${item.task_id}`}
-                subtitle={`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` • ${item.member.team_name}` : ''} • ${t("approvals.count")}: ${item.count}${item.variant ? ` • Variant: ${item.variant.name} (${item.variant.points} pts)` : ''} • ${formatDateToLocal(item.submitted_at)}`}
-                icon="📝"
-                headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                shadow={true}
-                className="m-2"
-                rightBadge={t("approvals.awaitingReview")}
-              >
-                  <div className="row">
-                    <div className="col-md-8">
-                      {/* Variant Information */}
+              <article key={item.id} className="card admin-approval-card">
+                <header className="admin-approval-card__header">
+                  <div>
+                    <h2>{item.task?.name || `Task #${item.task_id}`}</h2>
+                    <p>{`${item.member?.real_name || item.member?.username || `User #${item.member_id}`}${item.member?.team_name ? ` · ${item.member.team_name}` : ""} · ${t("approvals.count")}: ${item.count}${item.variant ? ` · ${item.variant.name} (${item.variant.points} pts)` : ""} · ${formatDateToLocal(item.submitted_at)}`}</p>
+                  </div>
+                  <span className="admin-approval-card__status">{t("approvals.awaitingReview")}</span>
+                </header>
+                <div className="admin-approval-card__body">
+                  <div className="admin-approval-card__submission">
                       {item.variant && (
-                        <div className="mb-3">
-                          <p className="text-muted mb-2">Selected Variant:</p>
-                          <div className="bg-info bg-opacity-10 p-3 rounded border border-info border-opacity-25">
+                          <div className="admin-approval-variant">
                             <div className="d-flex align-items-center justify-content-between">
                               <div>
-                                <strong className="text-info">{item.variant.name}</strong>
-                                <div className="small text-muted">{item.variant.description || 'No description'}</div>
+                                <strong>{item.variant.name}</strong>
+                                {item.variant.description && <div>{item.variant.description}</div>}
                               </div>
-                              <span className="badge bg-info">{item.variant.points} pts</span>
+                              <span>{item.variant.points} pts</span>
                             </div>
                           </div>
-                        </div>
                       )}
 
-                      <p className="text-muted mb-2">{t("approvals.memberNote")}</p>
-                      <div className="bg-light p-3 rounded border">
+                      <h3>{t("approvals.memberNote")}</h3>
+                      <div className="admin-approval-note">
                         {item.member_note || <em className="text-muted">{t("approvals.noNote")}</em>}
                       </div>
-                    </div>
-                    <div className="col-md-4">
-                      <p className="text-muted mb-2">{t("approvals.adminFeedback")}</p>
+                  </div>
+                  <div className="admin-approval-card__review">
+                      <label htmlFor={`approval-note-${item.id}`}>{t("approvals.adminFeedback")}</label>
                       <Textarea
+                        id={`approval-note-${item.id}`}
                         className="mb-3"
                         rows={3}
                         placeholder={t("approvals.feedbackPlaceholder")}
@@ -213,7 +197,7 @@ export default function AdminApprovals() {
                           setReasonMap((prev) => ({ ...prev, [item.id]: event.target.value }))
                         }
                       />
-                      <div className="d-grid gap-2 d-md-flex justify-content-md-end">
+                      <div className="admin-approval-card__actions">
                         <Button
                           variant="success"
                           className="px-4"
@@ -233,12 +217,12 @@ export default function AdminApprovals() {
                           {reviewMutation.isLoading ? t("approvals.processing") : t("approvals.reject")}
                         </Button>
                       </div>
-                    </div>
                   </div>
-              </DecoratedCard>
+                </div>
+              </article>
           ))}
         </div>
       )}
-    </>
+    </div>
   );
 }

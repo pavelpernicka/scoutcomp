@@ -1,0 +1,105 @@
+/* Shared visual language: warm paper surfaces, forest navigation and modest
+   corners are intentionally calmer than generic gradient dashboard chrome. */
+.card {
+  background: var(--scout-paper);
+  border-color: var(--scout-line);
+  border-radius: 0.55rem;
+  box-shadow: 0 0.2rem 0.8rem rgba(32, 55, 40, 0.07) !important;
+}
+.card-header, .card-footer { background: rgba(241, 244, 238, 0.72); border-color: var(--scout-line); padding: 0.9rem 1.1rem; }
+.card-body { padding: clamp(1rem, 2.25vw, 1.4rem); }
+.card :is(h1, h2, h3, h4, h5, h6), .table :is(th, td) strong { color: #172a20; }
+.card-header :is(h1, h2, h3, h4, h5, h6) { font-weight: 750; letter-spacing: -0.015em; }
+.text-muted, .form-text { color: #59685f !important; }
+.decorated-card__header { color: var(--scout-forest-dark); background: #edf2e9; border-bottom: 3px solid var(--scout-ochre); }
+.decorated-card__header .text-white { color: inherit !important; }
+
+.page-heading { background: var(--scout-forest); color: #fff; border-radius: 0.65rem; border-left: 0.45rem solid var(--scout-ochre); box-shadow: 0 0.3rem 1.1rem rgba(24, 60, 42, .13); }
+.page-heading__body { padding: clamp(1.25rem, 3vw, 2rem); }
+.page-heading h1 { font-size: clamp(1.45rem, 2.4vw, 2.15rem); font-weight: 750; letter-spacing: -0.035em; }
+.page-heading p { color: rgba(255,255,255,.82); max-width: 62ch; }
+.page-heading--admin { background: transparent; color: var(--scout-forest-dark); border: 0; border-radius: 0; box-shadow: none; }
+.page-heading--admin .page-heading__body { padding: 0; }
+.admin-heading-wrap { width: 100%; margin-bottom: 1.25rem; }
+.page-heading--admin .page-heading__body > .row { --bs-gutter-x: 0; --bs-gutter-y: 0; }
+.page-heading--admin .fs-1 { margin-right: .55rem !important; font-size: 1.05rem !important; line-height: 1.25; }
+.page-heading--admin .d-flex { align-items: flex-start !important; margin-bottom: 0 !important; }
+.page-heading--admin h1 { font-size: 1.35rem; font-weight: 750; line-height: 1.25; letter-spacing: -.02em; }
+.page-heading--admin p { margin-top: .2rem; color: var(--scout-muted); font-size: .9rem; line-height: 1.45; }
+.page-heading--admin:not(:has(.text-md-end)) .col-md-8 { width: 100%; }
+.page-heading--admin .btn-light { --bs-btn-color: var(--scout-forest); --bs-btn-bg: #fff; --bs-btn-border-color: var(--scout-line); --bs-btn-hover-color: #fff; --bs-btn-hover-bg: var(--scout-forest); --bs-btn-hover-border-color: var(--scout-forest); }
+
+/* Flexible children should shrink before they force a horizontal viewport. */
+.row > *, .d-flex > * { min-width: 0; }
+.table-responsive { border-radius: inherit; -webkit-overflow-scrolling: touch; }
+.table-responsive > .table { min-width: 42rem; }
+.table td, .table th { overflow-wrap: anywhere; vertical-align: middle; }
+.dropdown-menu { max-width: min(24rem, calc(100vw - 1rem)); }
+img, svg, video, canvas { max-width: 100%; }
+
+.btn { border-radius: 0.38rem; font-weight: 650; letter-spacing: .005em; min-height: 2.5rem; }
+/* Bootstrap 5.3 variants are CSS-variable based. Supplying the complete
+   interaction set here preserves its hover, pressed, keyboard-focus and
+   disabled behaviour instead of overriding only the resting background. */
+.btn-primary, .btn-brand {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: var(--scout-forest);
+  --bs-btn-border-color: var(--scout-forest);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--scout-forest-dark);
+  --bs-btn-hover-border-color: var(--scout-forest-dark);
+  --bs-btn-focus-shadow-rgb: 54, 119, 91;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #0e2e21;
+  --bs-btn-active-border-color: #0e2e21;
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, .16);
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: var(--scout-forest);
+  --bs-btn-disabled-border-color: var(--scout-forest);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--scout-forest);
+  --bs-btn-border-color: var(--scout-forest);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: var(--scout-forest);
+  --bs-btn-hover-border-color: var(--scout-forest);
+  --bs-btn-focus-shadow-rgb: 54, 119, 91;
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: var(--scout-forest-dark);
+  --bs-btn-active-border-color: var(--scout-forest-dark);
+  --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, .16);
+  --bs-btn-disabled-color: var(--scout-forest);
+  --bs-btn-disabled-bg: transparent;
+  --bs-btn-disabled-border-color: var(--scout-forest);
+}
+/* Transitional support for native buttons that still carry an old gradient
+   inline. Inline longhands otherwise suppress Bootstrap's state selectors. */
+.btn[style*="linear-gradient"] {
+  background: var(--scout-forest) !important;
+  border-color: var(--scout-forest) !important;
+  color: #fff !important;
+}
+.btn[style*="linear-gradient"]:hover, .btn[style*="linear-gradient"]:focus-visible {
+  background: var(--scout-forest-dark) !important;
+  border-color: var(--scout-forest-dark) !important;
+}
+.btn[style*="linear-gradient"]:active, .btn[style*="linear-gradient"].active {
+  background: #0e2e21 !important;
+  border-color: #0e2e21 !important;
+}
+.form-control, .form-select, .input-group-text { border-color: #c6cec4; border-radius: .38rem; min-height: 2.65rem; }
+.form-control:focus, .form-select:focus { border-color: var(--scout-focus); box-shadow: 0 0 0 .2rem rgba(23, 111, 91, .18); }
+.form-label { font-weight: 650; color: #35453b; margin-bottom: .38rem; }
+:focus-visible { outline: 3px solid rgba(215, 154, 50, .82); outline-offset: 2px; }
+
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+@media (max-width: 991.98px) { .app-navbar .navbar-collapse { padding: .75rem 0; } .app-navbar .nav-link { padding: .7rem .75rem !important; } .app-navbar .dropdown-menu { min-width: 0; } .page-heading__body .text-md-end { margin-top: 1rem; text-align: left !important; } }
+@media (max-width: 575.98px) { .card-body { padding: 1rem; } .page-heading { border-radius: .45rem; } }
+
+span:has(.flip_vert) {
+  transform: scale(-1, 1);
+  -webkit-transform: scale(-1, 1);
+  -moz-transform: scale(-1, 1);
+  -o-transform: scale(-1, 1);
+}

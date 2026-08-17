@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import "./AdminPageHeader.css";
 
 export default function AdminPageHeader({ title, description, action }) {
   return (

@@ -1122,6 +1122,7 @@
     "confirmDelete": "Are you sure to delete this announcement?",
     "global": "Global",
     "team": "Team",
+    "pageTitle": "Announcements",
     "title": "Title",
     "subtitle": "Publish and manage announcements",
     "createAnnouncement": "Create new announcement",

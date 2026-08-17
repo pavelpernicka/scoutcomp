@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import HeroHeader from "../components/HeroHeader";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
+import Alert from "../components/Alert";
 import Button from "../components/Button";
+import Modal from "../components/Modal";
 
 const ICON_FILE_ACCEPT = "image/png,image/jpeg,image/svg+xml,image/webp,image/gif";
 const MAX_ICON_BYTES = 150 * 1024;
@@ -79,6 +81,7 @@ export default function AdminStats() {
   const [componentForm, setComponentForm] = useState(emptyComponentForm);
   const [componentDrafts, setComponentDrafts] = useState({});
   const [feedback, setFeedback] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const createIconInputRef = useRef(null);
   const editIconInputRef = useRef(null);
@@ -155,6 +158,7 @@ export default function AdminStats() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "stat-categories"] });
       setCreateForm({ ...emptyCategoryForm });
+      setIsCreateOpen(false);
       setFeedback({ type: "success", message: t('adminStats.categoryCreated') });
     },
     onError: (error) => {
@@ -459,32 +463,8 @@ export default function AdminStats() {
     });
   };
 
-  return (
-    <>
-      <HeroHeader
-        title={t("adminStats.title")}
-        subtitle={t("adminStats.subtitle")}
-        icon="📊"
-        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
-      >
-        <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={() => setCreateForm({ name: "", description: "", icon: "" })}>
-          {t("adminStats.createCategory")}
-        </Button>
-      </HeroHeader>
-
-      <div className="container px-0">
-      {feedback && (
-        <div className={`alert alert-${feedback.type}`} role="alert">
-          {feedback.message}
-        </div>
-      )}
-
-      <div className="row g-4">
-        <div className="col-12 col-xl-4">
-          <div className="card shadow-sm h-100">
-            <div className="card-header">{t('adminStats.createCategory')}</div>
-            <div className="card-body">
-              <form className="row g-3" onSubmit={handleCreateCategory}>
+  const renderCreateCategoryForm = () => (
+              <form id="create-stat-category" className="row g-3" onSubmit={handleCreateCategory}>
                 <div className="col-12">
                   <label className="form-label">{t('adminStats.name')}</label>
                   <input
@@ -568,19 +548,25 @@ export default function AdminStats() {
                     )}
                   </div>
                 </div>
-                <div className="col-12 d-grid">
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={createCategoryMutation.isPending}
-                  >
-                    {t('adminStats.createCategory')}
-                  </button>
-                </div>
               </form>
-              <hr />
+  );
+
+  return (
+    <div className="admin-stats-page">
+      <AdminPageHeader title={t("adminStats.title")} description={t("adminStats.subtitle")} action={<Button variant="primary" icon="fas fa-plus" onClick={() => { setCreateForm({ ...emptyCategoryForm }); setIsCreateOpen(true); }}>
+          {t("adminStats.createCategory")}
+        </Button>} />
+
+      <div className="admin-page-content">
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
+
+      <div className="row g-4">
+        <div className="col-12 col-xl-4">
+          <div className="card shadow-sm h-100">
+            <div className="card-header">{t('adminStats.categories')}</div>
+            <div className="card-body">
+
               <div>
-                <h6>{t('adminStats.categories')}</h6>
                 {categoriesLoading ? (
                   <div className="text-muted">{t('adminStats.loading')}</div>
                 ) : categories.length === 0 ? (
@@ -944,7 +930,23 @@ export default function AdminStats() {
           )}
         </div>
       </div>
+      </div>
+
+      <Modal
+        isVisible={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title={t('adminStats.createCategory')}
+        icon={<i className="fas fa-chart-column" />}
+        size="lg"
+        footer={(
+          <>
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setIsCreateOpen(false)} disabled={createCategoryMutation.isPending}>{t('common.cancel')}</button>
+            <button type="submit" form="create-stat-category" className="btn btn-primary" disabled={createCategoryMutation.isPending}>{t('adminStats.createCategory')}</button>
+          </>
+        )}
+      >
+        {renderCreateCategoryForm()}
+      </Modal>
     </div>
-    </>
   );
 }

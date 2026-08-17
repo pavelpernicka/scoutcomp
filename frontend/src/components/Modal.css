@@ -1,0 +1,15 @@
+.app-modal .modal-content {
+  border-radius: .6rem;
+  box-shadow: 0 1.25rem 3.5rem rgba(15, 34, 24, .3);
+}
+
+.app-modal .modal-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--scout-line);
+  background: #f0f2eb;
+  color: var(--scout-forest-dark);
+}
+
+.app-modal .modal-header small { color: var(--scout-muted); }
+.app-modal .modal-body { padding: clamp(1rem, 3vw, 1.5rem); }
+.app-modal .modal-footer { border-top-color: var(--scout-line); background: #fafbf7; }

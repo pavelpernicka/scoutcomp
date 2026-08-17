@@ -1,0 +1,11 @@
+.dashboard-widget-icon {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  flex: 0 0 2rem;
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.dashboard-widget-icon > i { font-size: 1.35rem; }

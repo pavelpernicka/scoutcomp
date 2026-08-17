@@ -38,7 +38,7 @@ export default function LanguageSwitcher({ isMobile = false }) {
   return (
     <div className={`dropdown ${isMobile ? 'w-100' : ''}`} ref={dropdownRef}>
       <button
-        className={`btn btn-outline-light d-flex align-items-center px-3 py-2 ${isMobile ? 'w-100 justify-content-between' : ''}`}
+        className={`btn btn-outline-light d-flex align-items-center px-3 py-2 ${isMobile ? 'w-100 justify-content-between app-mobile-bottom-trigger' : ''}`}
         type="button"
         onClick={() => setShowDropdown(!showDropdown)}
         style={{ borderRadius: '20px' }}

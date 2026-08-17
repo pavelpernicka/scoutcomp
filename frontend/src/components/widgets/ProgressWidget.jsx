@@ -22,8 +22,7 @@ export default function ProgressWidget() {
   return (
     <DecoratedCard
       title={t("dashboard.yourJourney")}
-      icon={<i className="fas fa-bolt text-white"></i>}
-      headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
+      icon={<i className="fas fa-bolt"></i>}
       shadow={true}
       className="h-100"
       bodyClassName="p-0 d-flex flex-column"
@@ -44,7 +43,7 @@ export default function ProgressWidget() {
         <div className="d-flex flex-column gap-3 flex-grow-1 justify-content-between">
           <div className="p-3 activity-feed" style={{ maxHeight: '400px', overflowY: 'auto' }}>
             {completions.slice(0, 5).map((entry) => (
-              <div key={entry.id} className={`p-3 mb-1 rounded border-start border-4 ${
+              <div key={entry.id} className={`p-3 mb-1 rounded border-start border-4 dashboard-progress-row ${
                 entry.status === 'approved' ? 'border-success bg-success bg-opacity-10' :
                 entry.status === 'pending' ? 'border-warning bg-warning bg-opacity-10' :
                 'border-danger bg-danger bg-opacity-10'

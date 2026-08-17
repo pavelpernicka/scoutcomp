@@ -9,7 +9,7 @@ export default function InventoryCategoriesScreen({ categories, selectedPath, on
   const categoryMap = buildPathMetaMap(categories);
   const selectedCategory = selectedPath ? categoryMap[selectedPath] : null;
   return (
-    <div className="row g-4">
+    <div className="row g-4 inventory-settings-grid">
       <div className="col-12 col-xl-8">
         <Card className="border-0 shadow-lg" title="Strom kategorií" icon={<i className="fas fa-diagram-project"></i>}>
           <div className="inventory-section-create mb-3">

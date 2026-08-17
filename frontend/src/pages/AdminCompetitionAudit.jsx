@@ -6,7 +6,7 @@ import UserListPanel from "../components/UserListPanel";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { useTranslation } from "react-i18next";
-import HeroHeader from "../components/HeroHeader";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 export default function AdminCompetitionAudit() {
   const { isAdmin, managedTeamIds } = useAuth();
@@ -56,20 +56,14 @@ export default function AdminCompetitionAudit() {
   }, [scopedUsers, selectedUserId]);
 
   return (
-    <>
-      <HeroHeader
+    <div className="admin-competition-audit-page">
+      <AdminPageHeader
         title={t("admin.audit.title")}
-        subtitle={t("admin.audit.subtitle")}
-        icon="📋"
-        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+        description={t("admin.audit.subtitle")}
       />
 
-      <div className="container px-0">
-      <div className="mb-4">
-        <h1 className="h2">{t("admin.audit.title")}</h1>
-        <p className="text-muted">{t("admin.audit.intro")}</p>
-      </div>
-      <div className="row g-4">
+      <p className="admin-competition-audit-page__intro">{t("admin.audit.intro")}</p>
+      <div className="admin-competition-audit-page__sections">
         <div className="col-12">
           <UserListPanel
             scopedUsers={scopedUsers}
@@ -87,6 +81,5 @@ export default function AdminCompetitionAudit() {
         </div>
       </div>
     </div>
-    </>
   );
 }

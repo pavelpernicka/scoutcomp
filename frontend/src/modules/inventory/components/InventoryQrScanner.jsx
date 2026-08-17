@@ -125,7 +125,7 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
         <video ref={videoRef} muted playsInline className={status === "scanning" || status === "detected" || status === "starting" ? "is-visible" : ""} />
         {status !== "scanning" && status !== "detected" && status !== "starting" ? <i className="fas fa-qrcode" aria-hidden="true" /> : <span className="inventory-camera-frame" aria-hidden="true" />}
       </div>
-      <div className="d-flex flex-wrap align-items-center gap-2 mt-3">
+      <div className="inventory-camera-controls">
         {status === "scanning" || status === "starting" ? <button type="button" className="btn btn-outline-secondary" onClick={() => stop()}>Zastavit kameru</button> : <button type="button" className="btn btn-primary" onClick={start} disabled={disabled}>Spustit kameru</button>}
         <span className="small text-muted" aria-live="polite">{message}</span>
       </div>

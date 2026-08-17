@@ -16,10 +16,24 @@ export default function InventorySettingsScreen({ activeSection, onSectionChange
         <div><div className="inventory-table-eyebrow">Konfigurace</div><h1>Nastavení skladu</h1><p>Správa kategorií, příznaků a šablon štítků.</p></div>
       </header>
       <div className="inventory-settings-layout">
-        <nav className="inventory-settings-nav" aria-label="Sekce nastavení skladu">
-          {sections.map((section) => <button key={section.id} type="button" className={activeSection === section.id ? "active" : ""} onClick={() => onSectionChange(section.id)}><i className={section.icon} /><span>{section.label}</span></button>)}
+        <nav className="inventory-settings-nav" aria-label="Sekce nastavení skladu" role="tablist">
+          {sections.map((section) => (
+            <button
+              key={section.id}
+              id={`inventory-settings-tab-${section.id}`}
+              type="button"
+              role="tab"
+              aria-selected={activeSection === section.id}
+              aria-controls="inventory-settings-panel"
+              className={activeSection === section.id ? "active" : ""}
+              onClick={() => onSectionChange(section.id)}
+            >
+              <i className={section.icon} aria-hidden="true" />
+              <span>{section.label}</span>
+            </button>
+          ))}
         </nav>
-        <div className="inventory-settings-content">{children}</div>
+        <div id="inventory-settings-panel" className="inventory-settings-content" role="tabpanel" aria-labelledby={`inventory-settings-tab-${activeSection}`}>{children}</div>
       </div>
     </section>
   );

@@ -5,13 +5,13 @@ import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
-import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
 import LoadingSpinner from "../components/LoadingSpinner";
 import Select from "../components/Select";
 import Input from "../components/Input";
 import { parseServerDate } from "../utils/dateUtils";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 const KIND_STYLES = {
   meeting: { badge: "text-bg-primary", icon: "fa-people-group", label: "calendar.kindMeeting" },
@@ -150,6 +150,7 @@ export default function AdminAttendance() {
     }
     return counts;
   }, [matrixData]);
+  const mobileEvents = events.slice(0, 5);
 
   const { data: memberResults = [] } = useQuery({
     queryKey: ["admin-attendance-member-search", debouncedQuery],
@@ -318,21 +319,40 @@ export default function AdminAttendance() {
     );
   };
 
-  return (
-    <>
-      <HeroHeader
-        title={t("admin.attendance.title")}
-        subtitle={t("admin.attendance.subtitle")}
-        icon="📋"
-        gradient="linear-gradient(135deg, #14532d 0%, #16a34a 100%)"
+  const renderMobileMatrixCell = (groupKey, member, event) => {
+    const status = member.attendance?.[String(event.id)] || null;
+    const meta = status ? REAL_STATUS_META[status] : null;
+    const cellKey = `${groupKey}:${member.id}:${event.id}`;
+    const isSaving = savingCells.has(cellKey);
+    return (
+      <button
+        key={event.id}
+        type="button"
+        className={`admin-attendance-mobile-cell ${meta ? meta.color : "text-muted"}`}
+        title={`${event.title}: ${meta ? t(meta.label) : t("admin.attendance.notRecorded")}`}
+        aria-label={`${event.title}: ${meta ? t(meta.label) : t("admin.attendance.notRecorded")}`}
+        onClick={() => cycleCell(groupKey, member, event)}
+        disabled={!editingEnabled || isSaving}
       >
-        <Button variant="light" icon="fas fa-download" onClick={handleExport} gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)">
+        <i className={`fas ${isSaving ? "fa-spinner fa-spin" : meta ? meta.icon : "fa-minus"}`} aria-hidden="true" />
+      </button>
+    );
+  };
+
+  return (
+    <div className="admin-attendance-page">
+      <AdminPageHeader
+        title={t("admin.attendance.title")}
+        description={t("admin.attendance.subtitle")}
+        action={(
+        <Button variant="primary" icon="fas fa-download" onClick={handleExport}>
           {t("admin.export")}
         </Button>
-      </HeroHeader>
+        )}
+      />
 
       {feedback && (
-        <Alert type={feedback.type} className="mb-4" icon={<></>} onClose={() => setFeedback(null)}>
+        <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>
           {feedback.message}
         </Alert>
       )}
@@ -363,9 +383,9 @@ export default function AdminAttendance() {
       {activeTab === "matrix" && (
         <>
           {/* Filters */}
-          <div className="card shadow-sm border-0 mb-4">
-            <div className="card-header bg-white border-0 py-3">
-              <h5 className="mb-0">{t("admin.attendance.filters")}</h5>
+          <section className="card admin-attendance-filters mb-4" aria-labelledby="attendance-filters-heading">
+            <div className="card-header">
+              <h2 id="attendance-filters-heading" className="h6 mb-0">{t("admin.attendance.filters")}</h2>
             </div>
             <div className="card-body">
               <div className="row g-3 align-items-end">
@@ -407,7 +427,7 @@ export default function AdminAttendance() {
                 </div>
               </div>
             </div>
-          </div>
+          </section>
 
           {/* Legend */}
           <div className="d-flex flex-wrap align-items-center gap-3 mb-2 small text-muted">
@@ -422,9 +442,9 @@ export default function AdminAttendance() {
           </div>
 
           {/* Matrix */}
-          <div className="card shadow-sm border-0 mb-4">
-              <div className="card-header bg-white border-0 py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                <h5 className="mb-0">{t("admin.attendance.matrixTitle")}</h5>
+          <section className="card admin-attendance-matrix mb-4" aria-labelledby="attendance-matrix-heading">
+              <div className="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h2 id="attendance-matrix-heading" className="h6 mb-0">{t("admin.attendance.matrixTitle")}</h2>
                 <div className="d-flex align-items-center gap-2">
                   <span className="text-muted small">{events.length} {t("calendar.events").toLowerCase()}</span>
                   {(eventOffset > 0 || matrixData?.has_more) && (
@@ -456,7 +476,37 @@ export default function AdminAttendance() {
                   <p className="mb-0">{t("calendar.noEventsInMonth")}</p>
                 </div>
               ) : (
-                <div className="table-responsive" style={{ overflowX: "auto", overscrollBehaviorInline: "contain" }}>
+                <>
+                  <div className="admin-attendance-mobile-matrix d-md-none">
+                    <div className="admin-attendance-mobile-events" style={{ gridTemplateColumns: `minmax(7.5rem, 1fr) repeat(${mobileEvents.length}, minmax(2rem, .55fr))` }}>
+                      <span>{t("calendar.member")}</span>
+                      {mobileEvents.map((event) => (
+                        <span key={event.id} className="admin-attendance-mobile-event" title={event.title}>
+                          <span className="admin-attendance-mobile-event__date">{formatDate(event.starts_at).replace(/\s.*$/, "")}</span>
+                          <span className="admin-attendance-mobile-event__title">{event.title}</span>
+                        </span>
+                      ))}
+                    </div>
+                    {(matrixData?.groups || []).map((group) => {
+                      const groupKey = group.team_id ?? "none";
+                      const isCollapsed = !!collapsed[groupKey];
+                      return (
+                        <section key={groupKey} className="admin-attendance-mobile-group">
+                          <button type="button" className="admin-attendance-mobile-group__heading" onClick={() => toggleGroup(groupKey)} aria-expanded={!isCollapsed}>
+                            <span><i className={`fas fa-chevron-${isCollapsed ? "right" : "down"}`} aria-hidden="true" /> {group.team_name || "Bez družiny"}</span>
+                            <span className="badge bg-secondary">{group.members.length}</span>
+                          </button>
+                          {!isCollapsed && group.members.map((member) => (
+                            <div key={member.id} className="admin-attendance-mobile-member" style={{ gridTemplateColumns: `minmax(7.5rem, 1fr) repeat(${mobileEvents.length}, minmax(2rem, .55fr))` }}>
+                              <div><strong>{member.real_name}</strong><small>{memberPercent(member)} %</small></div>
+                              {mobileEvents.map((event) => renderMobileMatrixCell(groupKey, member, event))}
+                            </div>
+                          ))}
+                        </section>
+                      );
+                    })}
+                  </div>
+                  <div className="table-responsive d-none d-md-block" style={{ overflowX: "auto", overscrollBehaviorInline: "contain" }}>
                   <table className="table table-sm table-bordered align-middle mb-0" style={{ minWidth: `${events.length * 90 + 220}px` }}>
                     <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 2 }}>
                       <tr>
@@ -465,12 +515,12 @@ export default function AdminAttendance() {
                           const counts = eventCounts[String(event.id)] || { present: 0, total: 0 };
                           const pct = counts.total ? Math.round((counts.present / counts.total) * 100) : 0;
                           return (
-                            <th key={event.id} className="text-center align-middle" style={{ minWidth: "90px", maxWidth: "110px" }}>
+                            <th key={event.id} className="text-center align-middle" style={{ minWidth: "118px", maxWidth: "144px" }}>
                               <div className="d-flex flex-column align-items-center gap-1">
                                 <span className="badge small fw-normal">
                                   <KindBadge kind={event.kind} t={t} compact />
                                 </span>
-                                <span className="text-truncate fw-semibold w-100" title={event.title} style={{ fontSize: "0.75rem" }}>
+                                <span className="text-truncate fw-semibold w-100" title={event.title} style={{ fontSize: "0.88rem" }}>
                                   {event.title}
                                 </span>
                                 <span className="small text-muted">{formatDate(event.starts_at)}</span>
@@ -521,18 +571,19 @@ export default function AdminAttendance() {
                       })}
                     </tbody>
                   </table>
-                </div>
+                  </div>
+                </>
               )}
             </div>
-          </div>
+          </section>
         </>
       )}
 
       {activeTab === "people" && (
         /* Member Overview */
-        <div className="card shadow-sm border-0 mb-4">
-          <div className="card-header bg-white border-0 py-3">
-            <h5 className="mb-0">{t("admin.attendance.memberOverview")}</h5>
+        <section className="card admin-attendance-member-overview mb-4" aria-labelledby="attendance-member-overview-heading">
+          <div className="card-header">
+            <h2 id="attendance-member-overview-heading" className="h6 mb-0">{t("admin.attendance.memberOverview")}</h2>
           </div>
           <div className="card-body">
             <div className="row g-3 align-items-end">
@@ -686,9 +737,9 @@ export default function AdminAttendance() {
               </>
             )}
           </div>
-        </div>
+        </section>
       )}
-    </>
+    </div>
   );
 }
 

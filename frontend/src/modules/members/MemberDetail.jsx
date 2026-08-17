@@ -7,6 +7,7 @@ import PropTypes from "prop-types";
 import api from "../../services/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import UserAvatar from "../../components/UserAvatar";
+import Alert from "../../components/Alert";
 import { useAuth } from "../../providers/AuthProvider";
 import { processAvatarFile } from "../../utils/avatar";
 import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
@@ -303,14 +304,14 @@ export default function MemberDetail() {
 
   return (
     <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+      <div className="member-detail-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
         <Link to="/admin/core/users" className="btn btn-sm btn-outline-secondary">
           <i className="fas fa-arrow-left me-1"></i>
           {t("members.backToDirectory")}
         </Link>
-        <div className="d-flex align-items-center gap-2">
-          <div className="position-relative">
-            <UserAvatar user={member} size={112} fallbackClass="bg-primary" />
+        <div className="member-detail-identity d-flex align-items-center gap-2">
+          <div className="member-detail-avatar position-relative">
+            <UserAvatar user={member} size={112} fallbackClass="bg-primary" className="member-detail-avatar__image" />
             {canEditAvatar && <><input ref={avatarInputRef} type="file" accept="image/*" className="d-none" onChange={handleAvatarFile} /><button type="button" className="member-avatar-upload-button position-absolute bottom-0 end-0" title={t("userSettings.uploadPhoto")} aria-label={t("userSettings.uploadPhoto")} onClick={() => avatarInputRef.current?.click()}><i className="fas fa-camera" /></button></>}
           </div>
           <div>
@@ -325,7 +326,7 @@ export default function MemberDetail() {
             </div>
           </div>
         </div>
-        <div className="d-flex align-items-start">
+        <div className="member-detail-save d-flex align-items-start">
           <button type="button" className="btn btn-primary" disabled={saveMutation.isPending} onClick={handleSave}>
             {saveMutation.isPending ? <span className="spinner-border spinner-border-sm me-1"></span> : <i className="fas fa-save me-1"></i>}
             {t("members.save")}
@@ -333,7 +334,7 @@ export default function MemberDetail() {
         </div>
       </div>
 
-      {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
       {avatarError && <div className="alert alert-danger py-2">{avatarError}</div>}
 
       <div className="row g-4">

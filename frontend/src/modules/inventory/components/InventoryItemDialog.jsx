@@ -146,7 +146,7 @@ export default function InventoryItemDialog({
           <div className="inventory-photo-controls">
             <button type="button" className="inventory-photo-placeholder" onClick={() => currentPhoto ? setPhotoPreviewVisible(true) : fileInputRef.current?.click()}>
               {currentPhoto ? <img src={currentPhoto} alt={form.name || "Fotka věci"} /> : <i className="fas fa-camera" />}
-              <span>{currentPhoto ? "Otevřít fotku" : "Nahrát fotku"}</span>
+              <span className="inventory-photo-placeholder-label">{currentPhoto ? "Otevřít fotku" : "Nahrát fotku"}</span>
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" className="d-none" onChange={handlePhotoPick} />
             {currentPhoto ? <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => fileInputRef.current?.click()}><i className="fas fa-image me-1" />Změnit fotku</button> : null}

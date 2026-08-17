@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
+import AdminPanel from "./AdminPanel";
+
 export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSelectUser, loading, headerExtra }) {
   const { t } = useTranslation();
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -42,21 +44,21 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
   };
 
   return (
-    <div className="card shadow-sm mb-4">
-      <div className="card-header d-flex justify-content-between align-items-center">
-        <span>{t('adminUsers.users')}</span>
-        {headerExtra}
-      </div>
-      <div className="card-body p-0">
+    <AdminPanel
+      className="competition-audit-user-list"
+      title={t('adminUsers.users')}
+      action={headerExtra}
+      bodyClassName="p-0"
+    >
         {loading ? (
           <div className="text-center text-muted py-3">{t('adminUsers.loading')}</div>
         ) : scopedUsers.length === 0 ? (
           <p className="text-muted px-3 py-2 mb-0">{t('adminUsers.noUsersYet')}</p>
         ) : (
           <>
-            <div className="p-3 border-bottom bg-light">
-              <div className="row g-2 align-items-end">
-                <div className="col-12 col-lg-5">
+            <div className="competition-audit-user-filters p-3 border-bottom bg-light">
+              <div className="competition-audit-filter-grid">
+                <div>
                   <label className="form-label mb-1 small">{t('adminUsers.searchUsers')}</label>
                   <input
                     type="search"
@@ -66,7 +68,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                     placeholder={t('adminUsers.searchUsersPlaceholder')}
                   />
                 </div>
-                <div className="col-6 col-lg-3">
+                <div>
                   <label className="form-label mb-1 small">{t('adminUsers.team')}</label>
                   <select
                     className="form-select form-select-sm"
@@ -81,7 +83,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                     ))}
                   </select>
                 </div>
-                <div className="col-6 col-lg-2">
+                <div>
                   <label className="form-label mb-1 small">{t('adminUsers.role')}</label>
                   <select
                     className="form-select form-select-sm"
@@ -94,7 +96,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                     <option value="admin">{t('adminUsers.roleAdmin')}</option>
                   </select>
                 </div>
-                <div className="col-12 col-lg-2 d-flex justify-content-lg-end">
+                <div className="competition-audit-filter-grid__action">
                   <button
                     type="button"
                     className="btn btn-outline-secondary btn-sm w-100"
@@ -111,7 +113,29 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
             {filteredUsers.length === 0 ? (
               <p className="text-muted px-3 py-2 mb-0">{t('adminUsers.noUsersMatchFilters')}</p>
             ) : (
-              <div className="table-responsive" style={{ maxHeight: "340px" }}>
+              <>
+              <div className="competition-audit-users-mobile d-md-none">
+                {filteredUsers.map((user) => {
+                  const roleLabel = user.role === "admin"
+                    ? t("adminUsers.roleAdmin")
+                    : user.role === "group_admin"
+                    ? t("adminUsers.roleGroupAdmin")
+                    : t("adminUsers.roleMember");
+                  return (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className={`competition-audit-user-card ${user.id === selectedUserId ? "is-selected" : ""}`}
+                      onClick={() => onSelectUser(user.id)}
+                    >
+                      <span className="competition-audit-user-card__name">{user.real_name || user.username}</span>
+                      <span className="competition-audit-user-card__meta">{user.team_id ? teamNameById.get(user.team_id) || "—" : "—"}</span>
+                      <span className="competition-audit-user-card__role">{roleLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="table-responsive d-none d-md-block" style={{ maxHeight: "340px" }}>
                 <table className="table table-hover table-sm align-middle mb-0">
                   <thead className="table-light sticky-top" style={{ zIndex: 5 }}>
                     <tr>
@@ -151,11 +175,11 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </>
         )}
-      </div>
-    </div>
+    </AdminPanel>
   );
 }
 

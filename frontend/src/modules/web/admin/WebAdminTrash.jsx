@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import api from "../../../services/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { formatDateToLocal } from "../../../utils/dateUtils";
+import Alert from "../../../components/Alert";
+import AdminPageHeader from "./AdminPageHeader";
 
 export default function WebAdminTrash() {
   const { t, i18n } = useTranslation();
@@ -75,16 +77,9 @@ export default function WebAdminTrash() {
 
   return (
     <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-        <div>
-          <h1 className="h3 mb-0">{t("web.trashTitle")}</h1>
-          <p className="text-muted mb-0 small">{t("web.trashSubtitle")}</p>
-        </div>
-      </div>
+      <AdminPageHeader title={t("web.trashTitle")} description={t("web.trashSubtitle")} />
 
-      {feedback && (
-        <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>
-      )}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
       {isLoading ? (
         <LoadingSpinner />

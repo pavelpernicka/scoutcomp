@@ -6,7 +6,7 @@ import { parseServerDate } from "../../utils/dateUtils";
 const WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 const PCT = 100 / 7;
 const CELL_HEIGHT = 110;
-const BAR_HEIGHT = 20;
+const BAR_HEIGHT = 24;
 const BAR_GAP = 2;
 const BAR_TOP_OFFSET = 26;
 const MAX_LANES = 3;
@@ -53,7 +53,7 @@ export default function EventMonthCalendar({ events, viewDate, onEventClick, onC
         {WEEKDAYS.map((day) => <div key={day} className="text-center bg-success text-white py-2 small fw-semibold border">{t(`calendar.${day}`)}</div>)}
       </div>
       {layout.map((week, weekIndex) => <div key={weekIndex} className="position-relative d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", borderTop: "1px solid #dee2e6" }}>
-        {week.items.map((item) => item.lane < MAX_LANES && <button key={`${item.event.id}-${weekIndex}`} type="button" className="calendar-event-bar d-block text-start border-0 rounded-1 text-white small text-truncate" style={{ position: "absolute", left: `${item.startCol * PCT}%`, width: `${(item.endCol - item.startCol + 1) * PCT}%`, top: BAR_TOP_OFFSET + item.lane * (BAR_HEIGHT + BAR_GAP), height: BAR_HEIGHT, lineHeight: `${BAR_HEIGHT}px`, padding: "0 6px", zIndex: 2, backgroundColor: getEventColor(item.event) }} title={item.event.title} onClick={(event) => { event.stopPropagation(); onEventClick?.(item.event); }}>
+        {week.items.map((item) => item.lane < MAX_LANES && <button key={`${item.event.id}-${weekIndex}`} type="button" className="calendar-event-bar d-block text-start border-0 rounded-1 text-white text-truncate" style={{ position: "absolute", left: `${item.startCol * PCT}%`, width: `${(item.endCol - item.startCol + 1) * PCT}%`, top: BAR_TOP_OFFSET + item.lane * (BAR_HEIGHT + BAR_GAP), height: BAR_HEIGHT, lineHeight: `${BAR_HEIGHT}px`, padding: "0 6px", zIndex: 2, backgroundColor: getEventColor(item.event) }} title={item.event.title} onClick={(event) => { event.stopPropagation(); onEventClick?.(item.event); }}>
           {item.continuesBefore ? <i className="fas fa-chevron-left me-1 small" /> : <span className="me-1">{getEventLabel(item.event)}</span>}{item.event.title}{plannedStatusByEvent[item.event.id] && <i className="fas fa-check ms-1 small" />}{item.continuesAfter && <i className="fas fa-chevron-right ms-1 small" />}
         </button>)}
         {week.days.map((day) => {

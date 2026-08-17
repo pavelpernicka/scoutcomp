@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import api from "../services/api";
+import Alert from "../components/Alert";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 const getErrorMessage = (error) => {
   const detail = error?.response?.data?.detail;
@@ -65,21 +67,21 @@ export default function AdminModules() {
   };
 
   return (
-    <div>
-      <div className="mb-4">
-        <h1 className="h2">{t("adminModules.title")}</h1>
-        <p className="text-muted">{t("adminModules.subtitle")}</p>
-        {actionError && (
-          <div className="alert alert-danger" role="alert">
-            {actionError}
-          </div>
-        )}
-        <input
-          className="form-control mt-3"
-          placeholder={t("adminModules.searchPlaceholder")}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+    <div className="admin-modules-page">
+      <AdminPageHeader title={t("adminModules.title")} description={t("adminModules.subtitle")} />
+      {actionError && <Alert type="danger" toast onDismiss={() => setActionError("")}>{actionError}</Alert>}
+      <div className="admin-modules-toolbar">
+        <label className="visually-hidden" htmlFor="module-search">{t("adminModules.searchPlaceholder")}</label>
+        <div className="input-group">
+          <span className="input-group-text"><i className="fas fa-magnifying-glass" aria-hidden="true" /></span>
+          <input
+            id="module-search"
+            className="form-control"
+            placeholder={t("adminModules.searchPlaceholder")}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="card shadow-sm">

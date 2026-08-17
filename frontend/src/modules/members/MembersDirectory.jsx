@@ -7,6 +7,8 @@ import api from "../../services/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import UserAvatar from "../../components/UserAvatar";
 import Modal from "../../components/Modal";
+import Alert from "../../components/Alert";
+import AdminPageHeader from "../web/admin/AdminPageHeader";
 import { useAuth } from "../../providers/AuthProvider";
 import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
 
@@ -206,19 +208,15 @@ export default function MembersDirectory() {
   };
 
   return (
-    <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-        <div>
-          <h1 className="h3 mb-0">
-            <i className="fas fa-address-book me-2 text-primary"></i>
-            {t("members.title")}
-          </h1>
-          <p className="text-muted mb-0 small">{t("members.subtitle")}</p>
-        </div>
-        <div className="d-flex flex-wrap gap-2">
+    <div className="members-directory-page">
+      <AdminPageHeader
+        title={t("members.title")}
+        description={t("members.subtitle")}
+        action={(
+          <div className="members-directory-actions">
           {can("core.users.create") && (
             <>
-              <button type="button" className="btn btn-outline-primary" onClick={() => setShowBulkModal(true)}>
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setShowBulkModal(true)}>
                 <i className="fas fa-list-check me-2"></i>
                 {t("members.bulkRegisterTitle")}
               </button>
@@ -232,12 +230,13 @@ export default function MembersDirectory() {
             <i className="fas fa-file-csv me-2"></i>
             {t("members.export")}
           </button>
-        </div>
-      </div>
+          </div>
+        )}
+      />
 
-      {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
-      <div className="card shadow-sm mb-4">
+      <section className="card members-directory-filters mb-4" aria-label={t("members.search")}>
         <div className="card-body">
           <div className="row g-2 align-items-end">
             <div className="col-12 col-md-4">
@@ -292,9 +291,9 @@ export default function MembersDirectory() {
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="d-flex justify-content-between align-items-center mb-2">
+      <div className="members-directory-result-count">
         <small className="text-muted">
           {t("members.showing", { count: Math.min(total, PAGE_SIZE), total })}
         </small>
@@ -308,7 +307,7 @@ export default function MembersDirectory() {
           {t("members.noMembers")}
         </div>
       ) : (
-        <div className="card shadow-sm">
+        <div className="card members-directory-table">
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead>
@@ -334,10 +333,13 @@ export default function MembersDirectory() {
                           size={34}
                           fallbackClass="bg-primary"
                         />
-                        <span className="fw-semibold text-body">{member.real_name}</span>
+                        <span className="members-directory-name">{member.real_name}</span>
                       </Link>
                     </td>
-                    <td>{member.team_name || <span className="text-muted">—</span>}</td>
+                    <td className="members-directory-team">
+                      <span className="members-directory-team__label">{t("members.team")}</span>
+                      {member.team_name || <span className="text-muted">—</span>}
+                    </td>
                     <td>
                       <span className={`badge ${STATUS_BADGE[member.member_status] || "bg-secondary"}`}>
                         {t(`members.status${member.member_status === "alumni" ? "Alumni" : member.member_status === "inactive" ? "Inactive" : "Active"}`)}
@@ -588,6 +590,6 @@ export default function MembersDirectory() {
           </>
         )}
       </Modal>
-    </>
+    </div>
   );
 }

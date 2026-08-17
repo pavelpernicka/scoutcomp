@@ -4,11 +4,11 @@ import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
 
 import api from "../services/api";
-import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 const extractError = (error, fallback) => {
   const detail = error?.response?.data?.detail;
@@ -128,31 +128,28 @@ export default function AdminAccess() {
   };
 
   return (
-    <>
-      <HeroHeader
+    <div className="admin-access-page">
+      <AdminPageHeader
         title={t("adminAccess.title")}
-        subtitle={t("adminAccess.subtitle")}
-        icon={<i className="fas fa-user-shield text-white fs-1"></i>}
-        gradient="linear-gradient(135deg, #6f42c1 0%, #4f46e5 100%)"
-      >
+        description={t("adminAccess.subtitle")}
+        action={(
         <Button
-          variant="light"
-          gradient="linear-gradient(135deg, #4f46e5 0%, #6f42c1 100%)"
+          variant="primary"
           icon="fas fa-plus"
           onClick={() => setEditor({ mode: "create" })}
         >
           {t("adminAccess.addGroup")}
         </Button>
-      </HeroHeader>
+        )}
+      />
 
       {feedback && (
-        <Alert type={feedback.type} className="mb-4" onDismiss={() => setFeedback(null)}>
+        <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>
           {feedback.message}
         </Alert>
       )}
 
-      <div className="row g-4">
-        <div className="col-12">
+      <div className="admin-access-groups">
           {groups.map((group) => {
             const expanded = expandedId === group.id;
             const members = group.member_ids
@@ -162,18 +159,18 @@ export default function AdminAccess() {
                 (a.real_name || a.username).localeCompare(b.real_name || b.username)
               );
             return (
-              <div key={group.id} className="card shadow-sm border-0 mb-3">
+              <article key={group.id} className="card admin-access-group">
                 <div className="card-body">
-                  <div className="d-flex flex-wrap align-items-center gap-2">
+                  <div className="admin-access-group__summary">
                     <div className="flex-grow-1 min-w-0">
-                      <h2 className="h5 mb-1 d-flex align-items-center flex-wrap gap-2">
+                      <h2 className="admin-access-group__title">
                         {group.name}
                         {group.is_system && (
                           <span className="badge text-bg-secondary">{t("adminAccess.systemGroup")}</span>
                         )}
                       </h2>
-                      {group.description && <p className="text-muted mb-1">{group.description}</p>}
-                      <div className="small text-muted">
+                      {group.description && <p className="admin-access-group__description">{group.description}</p>}
+                      <div className="admin-access-group__meta">
                         <span className="me-3">
                           <i className="fas fa-shield-halved me-1"></i>
                           {group.grants.length} {t("adminAccess.permissionsCount")}
@@ -184,7 +181,7 @@ export default function AdminAccess() {
                         </span>
                       </div>
                     </div>
-                    <div className="d-flex gap-2 flex-wrap">
+                    <div className="admin-access-group__actions">
                       <Button
                         variant="outline-primary"
                         size="sm"
@@ -256,7 +253,7 @@ export default function AdminAccess() {
                     )}
                   </div>
                 )}
-              </div>
+              </article>
             );
           })}
           {groups.length === 0 && (
@@ -265,7 +262,6 @@ export default function AdminAccess() {
               <p className="mb-0">{t("adminAccess.emptyGroups")}</p>
             </div>
           )}
-        </div>
       </div>
 
       <GroupEditorModal
@@ -285,7 +281,7 @@ export default function AdminAccess() {
         adding={addUserMutation.isPending}
         onAdd={handleAddUser}
       />
-    </>
+    </div>
   );
 }
 

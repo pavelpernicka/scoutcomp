@@ -1,0 +1,11 @@
+.leaderboard-entry { min-width: 0; }
+
+@media (max-width: 575.98px) {
+  .leaderboard-card .decorated-card__header { padding: .75rem .85rem; }
+  .leaderboard-card .decorated-card__header h4 { font-size: 1.1rem; }
+  .leaderboard-card .decorated-card__header p { font-size: .82rem; }
+  .leaderboard-card .decorated-card__header .badge { padding: .35rem .55rem !important; font-size: .78rem !important; }
+  .leaderboard-card .decorated-card__header .btn { min-height: 2.15rem; padding: .38rem .5rem !important; font-size: .74rem; line-height: 1.15; white-space: nowrap; }
+  .leaderboard-card .card-body { padding: .85rem; }
+  .leaderboard-entry { padding: .8rem !important; }
+}

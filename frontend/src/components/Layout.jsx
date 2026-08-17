@@ -31,7 +31,10 @@ export default function Layout({ children }) {
   const userDropdownRef = useRef(null);
 
   const hasAdminAccess = isAdmin || isGroupAdmin || canManageUsers || canReviewCompletions || adminItems.length > 0;
-  const groupedAdminItems = adminItems.reduce((groups, item) => ({ ...groups, [item.section]: [...(groups[item.section] || []), item] }), {});
+  const groupedAdminItems = useMemo(
+    () => adminItems.reduce((groups, item) => ({ ...groups, [item.section]: [...(groups[item.section] || []), item] }), {}),
+    [adminItems]
+  );
   const legacyAdminMenu = false;
 
   const moduleGroups = useMemo(
@@ -71,6 +74,36 @@ export default function Layout({ children }) {
   }, [location.pathname]);
 
   useEffect(() => {
+    if (!showMobileMenu || !window.matchMedia("(max-width: 991.98px)").matches) return;
+    const isRouteActive = (route) => location.pathname === route || location.pathname.startsWith(`${route.replace(/\/+$/, "")}/`);
+    const activeModuleGroup = moduleGroups.find((module) => module.items.some((item) => isRouteActive(item.route)));
+    setOpenModuleDropdown(activeModuleGroup?.code ?? null);
+
+    const activeAdminSection = Object.entries(groupedAdminItems).find(([, items]) => items.some((item) => isRouteActive(item.route)));
+    if (activeAdminSection) {
+      setShowAdminDropdown(true);
+      setOpenAdminSections({ [activeAdminSection[0]]: true });
+    } else {
+      setShowAdminDropdown(false);
+      setOpenAdminSections({});
+    }
+  }, [groupedAdminItems, location.pathname, moduleGroups, showMobileMenu]);
+
+  useEffect(() => {
+    if (!showMobileMenu) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setShowMobileMenu(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [showMobileMenu]);
+
+  useEffect(() => {
     if (!isAuthenticated) { setModules([]); setAdminItems([]); return; }
     api.get("/modules").then(({ data }) => setModules(data)).catch(() => setModules([]));
     api.get("/modules/admin-menu").then(({ data }) => setAdminItems(data)).catch(() => setAdminItems([]));
@@ -78,8 +111,20 @@ export default function Layout({ children }) {
 
   return (
     <div className="app-shell bg-light min-vh-100 d-flex flex-column">
-      <header className="navbar navbar-expand-lg shadow-sm" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+      <header className="navbar navbar-expand-lg app-navbar">
         <div className="container-fluid">
+          {/* Mobile menu toggle deliberately precedes the brand, so it remains
+              a stable thumb target at the left edge. */}
+          <button
+            className="navbar-toggler app-mobile-menu-toggle border-0 text-white d-lg-none"
+            type="button"
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            aria-controls="primaryNav"
+            aria-expanded={showMobileMenu}
+            aria-label={showMobileMenu ? "Zavřít navigaci" : "Otevřít navigaci"}
+          >
+            <i className={`fas fa-${showMobileMenu ? "xmark" : "bars"} fs-4`}></i>
+          </button>
           {/* Brand */}
           <Link className="navbar-brand d-flex align-items-center text-white fw-bold fs-3" to="/">
             <img
@@ -95,19 +140,11 @@ export default function Layout({ children }) {
             )}
           </Link>
 
-          {/* Mobile menu toggle */}
-          <button
-            className="navbar-toggler border-0 text-white"
-            type="button"
-            onClick={() => setShowMobileMenu(!showMobileMenu)}
-            aria-controls="primaryNav"
-            aria-expanded={showMobileMenu}
-            aria-label="Toggle navigation"
-          >
-            <i className="fas fa-bars fs-4"></i>
-          </button>
-
-          <div className={`collapse navbar-collapse ${showMobileMenu ? 'show' : ''}`} id="primaryNav">
+          <div className={`collapse navbar-collapse app-mobile-drawer ${showMobileMenu ? 'show' : ''}`} id="primaryNav">
+            <div className="app-mobile-drawer__heading d-lg-none">
+              <span>Menu</span>
+              <button type="button" className="btn btn-sm" onClick={() => setShowMobileMenu(false)} aria-label="Zavřít navigaci"><i className="fas fa-xmark" /></button>
+            </div>
             {isAuthenticated && (
               <ul className="navbar-nav me-auto mb-2 mb-lg-0 flex-column flex-lg-row">
                 <li className="nav-item">
@@ -131,7 +168,7 @@ export default function Layout({ children }) {
                       >
                         <span><i className={`fas ${module.icon} me-1`} />{module.name}</span>
                       </button>
-                      <ul className={`dropdown-menu shadow-lg border-0 w-100 ${openModuleDropdown === module.code ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
+                      <ul className={`dropdown-menu shadow-lg border-0 ${showMobileMenu ? 'w-100' : ''} ${openModuleDropdown === module.code ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                         {module.items.map((item) => (
                           <li key={item.route}>
                             <NavLink
@@ -158,7 +195,7 @@ export default function Layout({ children }) {
                     >
                       <span>{t("navigation.admin")}</span>
                     </button>
-                    <ul className={`dropdown-menu shadow-lg border-0 w-100 ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
+                    <ul className={`dropdown-menu shadow-lg border-0 ${showMobileMenu ? 'w-100' : ''} ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                       {Object.entries(groupedAdminItems).map(([section, items]) => <li key={section} className="border-bottom"><button type="button" className="dropdown-item fw-bold d-flex justify-content-between" onClick={()=>setOpenAdminSections(current=>({...current,[section]:!current[section]}))}>{section}<i className={`fas fa-chevron-${openAdminSections[section]?"up":"down"}`}/></button>{openAdminSections[section]&&<ul className="list-unstyled mb-1">{items.map(item=><li key={item.route}><NavLink to={item.route} className="dropdown-item ps-4" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{item.label}</NavLink></li>)}</ul>}</li>)}
                       {legacyAdminMenu && canReviewCompletions && (
                         <li>
@@ -231,10 +268,9 @@ export default function Layout({ children }) {
               {isAuthenticated ? (
                 <div className={`dropdown ${showMobileMenu ? 'w-100' : ''}`} ref={userDropdownRef}>
                   <button
-                    className={`btn btn-outline-light d-flex align-items-center px-3 py-2 ${showMobileMenu ? 'w-100 justify-content-between' : ''}`}
+                    className={`btn btn-outline-light d-flex align-items-center px-3 py-2 ${showMobileMenu ? 'w-100 justify-content-between app-mobile-bottom-trigger' : ''}`}
                     type="button"
                     onClick={() => setShowUserDropdown(!showUserDropdown)}
-                    style={{ borderRadius: '20px' }}
                   >
                     <UserAvatar
                       user={profile?.user}
@@ -307,6 +343,7 @@ export default function Layout({ children }) {
           </div>
         </div>
       </header>
+      {showMobileMenu && <button type="button" className="app-mobile-menu-backdrop d-lg-none" aria-label="Zavřít navigaci" onClick={() => setShowMobileMenu(false)} />}
       <main className="app-content flex-grow-1 d-lg-flex align-items-stretch">
         {activeModule ? (
           <>

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import PropTypes from 'prop-types';
+import Modal from './Modal';
 
 const TaskCompletionDetailsModal = ({
   isVisible,
@@ -10,29 +11,16 @@ const TaskCompletionDetailsModal = ({
 }) => {
   const { t } = useTranslation();
 
-  if (!isVisible) return null;
-
   return (
-    <>
-      <div className="modal fade show d-block" role="dialog" tabIndex="-1">
-        <div className="modal-dialog modal-lg" role="document">
-          <div className="modal-content border-0 shadow-lg">
-            <div className="modal-header text-white" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="d-flex align-items-center gap-2">
-                <i className="fas fa-chart-bar fs-3"></i>
-                <div>
-                  <h5 className="modal-title mb-0">{title}</h5>
-                  <small className="opacity-90">{userTaskDetails?.real_name || userTaskDetails?.username}</small>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="btn-close btn-close-white"
-                aria-label="Close"
-                onClick={onClose}
-              ></button>
-            </div>
-            <div className="modal-body p-4">
+    <Modal
+      isVisible={isVisible}
+      onClose={onClose}
+      title={title}
+      subtitle={userTaskDetails?.real_name || userTaskDetails?.username}
+      icon={<i className="fas fa-chart-bar" />}
+      size="lg"
+      footer={<button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times me-2" />{t("common.close")}</button>}
+    >
               {isLoading ? (
                 <div className="text-center py-4">
                   <div className="spinner-border" role="status">
@@ -120,22 +108,7 @@ const TaskCompletionDetailsModal = ({
                   )}
                 </>
               )}
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onClose}
-              >
-                <i className="fas fa-times me-2"></i>
-                {t("common.close")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="modal-backdrop fade show"></div>
-    </>
+    </Modal>
   );
 };
 

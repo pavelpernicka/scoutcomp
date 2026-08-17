@@ -23,8 +23,7 @@ export default function ActivityWidget() {
   return (
     <DecoratedCard
       title={t("dashboard.teamActivity")}
-      icon={<i className="fas fa-chart-line text-white"></i>}
-      headerGradient="linear-gradient(45deg, #E91E63, #ff7f27)"
+      icon={<i className="fas fa-chart-line"></i>}
       rightContent={
         teamActivity.stats.team_name && (
           <span className="badge bg-white text-dark">{teamActivity.stats.team_name}</span>
@@ -63,8 +62,8 @@ export default function ActivityWidget() {
 
           <div className="d-block activity-feed" style={{ maxHeight: '380px', overflowY: 'auto' }}>
             {teamActivity.activities.slice(0, 8).map((activity) => (
-              <div key={activity.id} className={`p-3 border-bottom ${activity.is_current_user ? 'bg-primary bg-opacity-10' : ''}`}>
-                <div className="d-block align-items-start gap-2">
+              <div key={activity.id} className={`p-3 border-bottom dashboard-activity-row ${activity.is_current_user ? 'dashboard-activity-row--current' : ''}`}>
+                <div className="d-flex align-items-start gap-2">
                   <div className="flex-shrink-0">
                     {activity.is_current_user ? (
                       <span className="badge bg-primary rounded-pill">{t("common.you")}</span>

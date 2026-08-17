@@ -14,7 +14,7 @@ export default function InventoryFlagsScreen({ flags, onCreate, onEdit, onDelete
   );
 
   return (
-    <div className="row g-4">
+    <div className="row g-4 inventory-settings-grid">
       <div className="col-12 col-xl-8">
         <Card className="border-0 shadow-lg" title="Konfigurace příznaků" icon={<i className="fas fa-palette"></i>}>
           <div className="inventory-section-create mb-3">

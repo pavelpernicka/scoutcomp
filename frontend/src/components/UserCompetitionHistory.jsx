@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
+import AdminPanel from "./AdminPanel";
 
 const COMPLETIONS_PAGE_SIZE = 20;
 const EMPTY_LIST = [];
@@ -358,22 +359,19 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
 
   return (
     <>
-      <div className="card shadow-sm">
-        <div className="card-header d-flex justify-content-between align-items-center">
-          <div className="d-flex align-items-center gap-2">
-            <span>{t('adminUsers.completionHistory')}</span>
-            <span className="badge bg-secondary">{filteredCompletions.length}</span>
-          </div>
-          <button
+      <AdminPanel
+        className="competition-audit-history"
+        title={<><span>{t('adminUsers.completionHistory')}</span><span className="badge bg-secondary ms-2">{filteredCompletions.length}</span></>}
+        action={<button
             type="button"
             className="btn btn-primary btn-sm"
             onClick={openCreateCompletionModal}
             disabled={!assignableTasks.length || tasksLoading}
           >
             {t('adminUsers.addCompletionBtn')}
-          </button>
-        </div>
-        <div className="card-body p-0">
+          </button>}
+        bodyClassName="p-0"
+      >
           {completionError && (
             <div className="alert alert-danger rounded-0 mb-0" role="alert">
               {completionError}
@@ -562,8 +560,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
               <button type="button" className="btn btn-outline-secondary btn-sm" disabled={visibleCompletionPage === completionPages} onClick={() => setCompletionPage((page) => page + 1)}>{t("adminUsers.next")}</button>
             </div>
           )}
-        </div>
-      </div>
+      </AdminPanel>
 
       {showCreateCompletionModal && (
         <>

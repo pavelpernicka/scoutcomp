@@ -12,6 +12,8 @@ import MediaPickerField from "../media/MediaPickerField";
 import ArticleEditBox from "./ArticleEditBox";
 import UserAvatar from "../../../components/UserAvatar";
 import EventPickerField from "../../../components/EventPickerField";
+import Alert from "../../../components/Alert";
+import AdminPageHeader from "./AdminPageHeader";
 import "../styles/admin.css";
 
 export default function WebAdminPosts() {
@@ -102,21 +104,13 @@ export default function WebAdminPosts() {
   };
 
   return (
-    <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-        <div>
-          <h1 className="h3 mb-0">{t("web.postsTitle")}</h1>
-          <p className="text-muted mb-0 small">{t("web.postsSubtitle")}</p>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
+    <div className="web-admin-posts">
+      <AdminPageHeader title={t("web.postsTitle")} description={t("web.postsSubtitle")} action={<button type="button" className="btn btn-primary" onClick={() => setEditing("new")}>
           <i className="fas fa-plus me-2"></i>
           {t("web.newPost")}
-        </button>
-      </div>
+        </button>} />
 
-      {feedback && (
-        <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>
-      )}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
       <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div className="btn-group" role="group" aria-label={t("web.published")}>
@@ -142,7 +136,49 @@ export default function WebAdminPosts() {
           {t("web.noPosts")}
         </div>
       ) : (
-        <div className="card shadow-sm">
+        <>
+        <div className="web-posts-mobile-list d-md-none">
+          {posts.map((post) => (
+            <article key={post.id} className="web-posts-mobile-card">
+              <button
+                type="button"
+                className="web-posts-mobile-card__main"
+                onClick={() => canEdit && setEditing(post.id)}
+                disabled={!canEdit}
+              >
+                <span className="web-posts-mobile-card__title">{post.title}</span>
+                <span className="web-posts-mobile-card__meta">
+                  <span className={`badge ${post.published ? "bg-success" : "bg-secondary"}`}>
+                    <i className={`fas fa-${post.published ? "check" : "file"} me-1`} />
+                    {post.published ? t("web.yes") : t("web.no")}
+                  </span>
+                  {post.author && <span className="web-posts-mobile-card__author"><UserAvatar user={{ real_name: post.author, avatar: post.author_avatar }} size={18} fallbackClass="bg-success" />{post.author}</span>}
+                  {post.updated_at && <span>{formatDateToLocal(post.updated_at, locale)}</span>}
+                </span>
+              </button>
+              <PostActions
+                post={post}
+                canEdit={canEdit}
+                canPublish={canPublish}
+                t={t}
+                onEdit={() => setEditing(post.id)}
+                onToggleVisibility={() => visibilityMutation.mutate(post)}
+                onDelete={() => handleDelete(post)}
+                visibilityPending={visibilityMutation.isPending}
+                deletePending={deleteMutation.isPending}
+                className="web-posts-mobile-card__actions"
+              />
+            </article>
+          ))}
+        </div>
+        <div className="web-posts-mobile-pagination d-md-none">
+          <span>{t("web.itemsAndPages", { count: total, page, pages: totalPages })}</span>
+          <div className="btn-group btn-group-sm">
+            <button type="button" className="btn btn-outline-secondary" disabled={page <= 1} onClick={() => setPage((current) => current - 1)}>{t("web.previous")}</button>
+            <button type="button" className="btn btn-outline-secondary" disabled={page >= totalPages} onClick={() => setPage((current) => current + 1)}>{t("web.next")}</button>
+          </div>
+        </div>
+        <div className="card shadow-sm web-posts-table d-none d-md-block">
           <div className="table-responsive">
             <table className="table table-hover align-middle mb-0">
               <thead>
@@ -157,7 +193,19 @@ export default function WebAdminPosts() {
               </thead>
               <tbody>
                 {posts.map((post) => (
-                  <tr key={post.id}>
+                  <tr
+                    key={post.id}
+                    className={canEdit ? "web-posts-table__row" : undefined}
+                    onClick={canEdit ? () => setEditing(post.id) : undefined}
+                    onKeyDown={canEdit ? (event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setEditing(post.id);
+                      }
+                    } : undefined}
+                    role={canEdit ? "button" : undefined}
+                    tabIndex={canEdit ? 0 : undefined}
+                  >
                     <td className="fw-semibold">{post.title}</td>
                     <td className="small text-muted"><span className="d-inline-flex align-items-center gap-2"><UserAvatar user={{ real_name: post.author, avatar: post.author_avatar }} size={24} fallbackClass="bg-success" />{post.author || "—"}</span></td>
                     <td>
@@ -170,41 +218,25 @@ export default function WebAdminPosts() {
                         <span className="badge bg-secondary">{t("web.no")}</span>
                       )}
                     </td>
-                    <td className="small text-muted">
+                    <td className="small text-muted web-posts-table__updated">
                       {post.published_at ? formatDateToLocal(post.published_at, locale) : "—"}
                     </td>
                     <td className="small text-muted">
                       {post.updated_at ? formatDateToLocal(post.updated_at, locale) : "—"}
                     </td>
                     <td className="text-end">
-                      <div className="btn-group btn-group-sm" role="group">
-                        {canEdit && <button
-                          type="button"
-                          className="btn btn-outline-secondary"
-                          title={t("web.edit")}
-                          onClick={() => setEditing(post.id)}
-                        >
-                          <i className="fas fa-pen"></i>
-                        </button>}
-                        {canPublish && <button
-                          type="button"
-                          className={`btn ${post.published ? "btn-outline-warning" : "btn-outline-success"}`}
-                          title={post.published ? t("web.unpublish") : t("web.editor.publish")}
-                          onClick={() => visibilityMutation.mutate(post)}
-                          disabled={visibilityMutation.isPending}
-                        >
-                          <i className={`fas ${post.published ? "fa-eye-slash" : "fa-eye"}`} />
-                        </button>}
-                        <button
-                          type="button"
-                          className="btn btn-outline-danger"
-                          title={t("web.delete")}
-                          onClick={() => handleDelete(post)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          <i className="fas fa-trash"></i>
-                        </button>
-                      </div>
+                      <PostActions
+                        post={post}
+                        canEdit={canEdit}
+                        canPublish={canPublish}
+                        t={t}
+                        onEdit={() => setEditing(post.id)}
+                        onToggleVisibility={() => visibilityMutation.mutate(post)}
+                        onDelete={() => handleDelete(post)}
+                        visibilityPending={visibilityMutation.isPending}
+                        deletePending={deleteMutation.isPending}
+                        onClick={(event) => event.stopPropagation()}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -219,6 +251,7 @@ export default function WebAdminPosts() {
             </div>
           </div>
         </div>
+        </>
       )}
 
       {editing !== null && (editing === "new" || editingPost) && (
@@ -240,9 +273,33 @@ export default function WebAdminPosts() {
           <div className="alert alert-danger">{t("web.postLoadFailed")}</div>
         </div>
       )}
-    </>
+    </div>
   );
 }
+
+function PostActions({ post, canEdit, canPublish, t, onEdit, onToggleVisibility, onDelete, visibilityPending, deletePending, className = "", onClick }) {
+  return (
+    <div className={`btn-group btn-group-sm ${className}`.trim()} role="group" onClick={onClick}>
+      {canEdit && <button type="button" className="btn btn-outline-secondary" title={t("web.edit")} onClick={onEdit}><i className="fas fa-pen" /></button>}
+      {canPublish && <button type="button" className={`btn ${post.published ? "btn-outline-warning" : "btn-outline-success"}`} title={post.published ? t("web.unpublish") : t("web.editor.publish")} onClick={onToggleVisibility} disabled={visibilityPending}><i className={`fas ${post.published ? "fa-eye-slash" : "fa-eye"}`} /></button>}
+      <button type="button" className="btn btn-outline-danger" title={t("web.delete")} onClick={onDelete} disabled={deletePending}><i className="fas fa-trash" /></button>
+    </div>
+  );
+}
+
+PostActions.propTypes = {
+  post: PropTypes.object.isRequired,
+  canEdit: PropTypes.bool.isRequired,
+  canPublish: PropTypes.bool.isRequired,
+  t: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onToggleVisibility: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  visibilityPending: PropTypes.bool,
+  deletePending: PropTypes.bool,
+  className: PropTypes.string,
+  onClick: PropTypes.func,
+};
 
 function ArticleEditBoxModal({ post, onCancel, onSaved }) {
   const { t } = useTranslation();
@@ -254,6 +311,7 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
     cover_media_id: post.cover_media_id ? String(post.cover_media_id) : "",
     event_id: post.event_id ? String(post.event_id) : "",
   }));
+  const [coverPreviewBroken, setCoverPreviewBroken] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async ({ payload }) => {
@@ -313,10 +371,22 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
           </div>
           <div className="mb-3">
             <label className="form-label small fw-semibold d-block">{t("web.postCover")}</label>
+            {form.cover_media_id && !coverPreviewBroken && (
+              <figure className="article-cover-preview">
+                <img
+                  src={`/api/web/media/${encodeURIComponent(form.cover_media_id)}/file`}
+                  alt={form.title || t("web.postCover")}
+                  onError={() => setCoverPreviewBroken(true)}
+                />
+              </figure>
+            )}
             <MediaPickerField
               value={form.cover_media_id || null}
               className="article-media-picker"
-              onChange={(item) => setForm((f) => ({ ...f, cover_media_id: item ? String(item.id) : "" }))}
+              onChange={(item) => {
+                setCoverPreviewBroken(false);
+                setForm((f) => ({ ...f, cover_media_id: item ? String(item.id) : "" }));
+              }}
             />
           </div>
           <div className="mb-3">

@@ -9,6 +9,7 @@ import DecoratedCard from "../DecoratedCard";
 import UserAvatar from "../UserAvatar";
 import { formatRelativeTime } from "./utils";
 import { parseServerDate } from "../../utils/dateUtils";
+import DashboardWidgetIcon from "./DashboardWidgetIcon";
 
 const timestamp = (value) => parseServerDate(value)?.getTime() || 0;
 
@@ -45,7 +46,7 @@ export default function MessagesWidget() {
   }, [conversations, notifications, t]);
   const unreadTotal = rows.reduce((sum, row) => sum + (row.unread ? Math.max(1, row.count) : 0), 0);
 
-  return <DecoratedCard title={t("dashboard.messages")} subtitle={t("dashboard.messagesSubtitle")} icon={<span className="flip_vert fs-2">💬</span>} headerGradient="linear-gradient(135deg, #0f766e 0%, #22d3ee 100%)" shadow border={false} className="h-100 dashboard-messages-card" bodyClassName="p-0 d-flex flex-column">
+  return <DecoratedCard title={t("dashboard.messages")} subtitle={t("dashboard.messagesSubtitle")} icon={<DashboardWidgetIcon flip>💬</DashboardWidgetIcon>} shadow border={false} className="h-100 dashboard-messages-card" bodyClassName="p-0 d-flex flex-column">
     <div className="p-3 bg-light border-bottom d-flex align-items-center justify-content-between"><span className="fw-medium text-dark">{t("dashboard.conversations")}</span><span className="badge bg-primary">{unreadTotal}</span></div>
     {rows.length === 0 ? <div className="d-flex flex-column align-items-center justify-content-center p-4 text-center flex-grow-1"><i className="fas fa-envelope-open-text fs-3 text-muted mb-2 opacity-50" /><p className="small text-muted mb-0">{t("dashboard.noConversations")}</p></div> : <div className="d-flex flex-column dashboard-message-list">
       {rows.map((row) => <Link to="/messages" key={row.key} className={`dashboard-message-row d-flex align-items-start gap-3 p-3 text-decoration-none text-reset ${row.unread ? "dashboard-message-unread" : ""}`}>

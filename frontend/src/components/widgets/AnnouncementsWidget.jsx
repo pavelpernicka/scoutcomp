@@ -25,7 +25,6 @@ export default function AnnouncementsWidget() {
       title={t("dashboard.announcements")}
       subtitle={t("dashboard.stayInformed")}
       icon={<span className="flip_vert fs-2">📢</span>}
-      headerGradient="linear-gradient(135deg, #4834d4 0%, #686de0 100%)"
       shadow={true}
       border={false}
       bodyClassName="p-0"
@@ -40,12 +39,11 @@ export default function AnnouncementsWidget() {
         {announcements.map((announcement, index) => (
           <div
             key={announcement.id}
-            className={`p-4 ${index !== announcements.length - 1 ? 'border-bottom' : ''} position-relative overflow-hidden`}
-            style={{ background: index % 2 === 0 ? '#f8f9fa' : 'white' }}
+            className={`p-4 ${index !== announcements.length - 1 ? 'border-bottom' : ''} position-relative overflow-hidden dashboard-announcement`}
           >
             <div className="position-absolute start-0 top-0 bottom-0 bg-primary" style={{ width: '4px' }}></div>
             <div className="d-flex justify-content-between align-items-start mb-3">
-              <h5 className="mb-0 text-dark display-6">{announcement.title || t("dashboard.infoTitle")}</h5>
+              <h3 className="mb-0 dashboard-announcement__title">{announcement.title || t("dashboard.infoTitle")}</h3>
               <div className="text-end">
                 <small className="text-muted d-flex align-items-center gap-1">
                   <i className="fas fa-clock text-muted"></i>
@@ -55,8 +53,7 @@ export default function AnnouncementsWidget() {
             </div>
             <div className="AnnText">
               <div
-                className="mb-2 text-dark lead"
-                style={{ lineHeight: '1.6' }}
+                className="mb-2 dashboard-announcement__body"
                 dangerouslySetInnerHTML={renderMarkdown(announcement.body)}
               />
               <span className="badge bg-primary px-2 py-2">

@@ -30,8 +30,11 @@ export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenRe
           placeholder="Hledej podle názvu věci nebo QR kódu"
         />
       </div>
-      <div className="table-responsive">
-        <table className="table inventory-modern-table align-middle">
+      {filteredEntries.length === 0 ? (
+        <div className="inventory-loans-empty">Teď není evidovaná žádná otevřená výpůjčka.</div>
+      ) : (
+      <div className="table-responsive inventory-loans-table-wrap">
+        <table className="table inventory-modern-table inventory-loans-table align-middle">
           <thead>
             <tr>
               <th>Věc</th>
@@ -42,19 +45,14 @@ export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenRe
             </tr>
           </thead>
           <tbody>
-            {filteredEntries.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="text-center py-5 text-muted">Teď není evidovaná žádná otevřená výpůjčka.</td>
-              </tr>
-            ) : (
-              filteredEntries.map((entry) => (
+            {filteredEntries.map((entry) => (
                 <tr key={entry.id}>
                   <td>
                     <button type="button" className="btn btn-link p-0 text-decoration-none fw-semibold" onClick={() => onOpenItem(entry.itemId)}>
                       {entry.itemName}
                     </button>
                   </td>
-                  <td>{entry.borrower_name}</td>
+                  <td>{entry.borrower_name}<span className="inventory-loans-quantity-mobile">{entry.quantity} {entry.quantityUnit}</span></td>
                   <td className="text-muted">{entry.qrIdentifier || "—"}</td>
                   <td>{entry.quantity} {entry.quantityUnit}</td>
                   <td className="text-end">
@@ -63,11 +61,11 @@ export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenRe
                     </button>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
+      )}
     </Card>
   );
 }

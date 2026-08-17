@@ -1,0 +1,476 @@
+/* Task administration: creation is a focused workflow, not a permanent
+   competing sidebar. The overview stays full-width and actions can wrap. */
+.admin-task-create-modal { position: fixed; inset: 0; z-index: 1060; display: grid; place-items: center; overflow-y: auto; padding: 1rem; background: rgba(15, 38, 27, .56); }
+.admin-task-create-modal > .card { width: min(58rem, 100%); max-height: calc(100dvh - 2rem); overflow: auto; margin: auto; }
+.admin-task-create-modal .card-header { position: sticky; top: 0; z-index: 1; }
+.admin-task-create-modal .card-body { padding: clamp(1rem, 3vw, 1.5rem); }
+.admin-task-create-modal .form-text + .border { max-height: 10rem; overflow: auto; }
+.admin-task-create-modal .btn-outline-secondary.btn-sm { min-height: 2rem; }
+.admin-task-edit-modal .modal-dialog { width: min(72rem, calc(100vw - 2rem)); max-width: none; }
+.admin-task-variants-modal .modal-dialog { width: min(50rem, calc(100vw - 2rem)); max-width: none; }
+.admin-task-variant-edit-modal .modal-dialog { width: min(42rem, calc(100vw - 2rem)); max-width: none; }
+.admin-task-edit-modal .modal-body, .admin-task-variants-modal .modal-body, .admin-task-variant-edit-modal .modal-body { padding: clamp(1rem, 2.5vw, 1.35rem); }
+.admin-task-edit-modal .article-editbox, .admin-task-variants-modal .article-editbox, .admin-task-variant-edit-modal .article-editbox { background: #fff; }
+.admin-task-edit-modal .article-editbox-content .ProseMirror, .admin-task-variants-modal .article-editbox-content .ProseMirror, .admin-task-variant-edit-modal .article-editbox-content .ProseMirror { min-height: 8rem; }
+.admin-task-edit-modal .modal-footer { position: sticky; bottom: 0; z-index: 2; }
+.admin-task-variants-modal .modal-body { display: grid; gap: 1rem; background: #fafbf8; }
+.admin-task-variants-modal .modal-body > .card { margin: 0 !important; border-color: var(--scout-line); box-shadow: none; }
+.admin-task-variants-modal .modal-body > .card:first-child { border-top: 3px solid var(--scout-ochre); }
+@media (max-width: 767.98px) {
+  .admin-task-edit-modal .modal-dialog, .admin-task-variants-modal .modal-dialog, .admin-task-variant-edit-modal .modal-dialog { width: calc(100vw - 1rem); }
+  .admin-task-edit-modal .modal-footer { flex-wrap: wrap; }
+  .admin-task-edit-modal .modal-footer .btn { flex: 1 1 auto; }
+  .admin-tasks-table-wrap { margin: -.35rem; padding: .35rem; }
+  .admin-tasks-table { font-size: .86rem; }
+  .admin-tasks-table th, .admin-tasks-table td { padding: .62rem .55rem !important; vertical-align: top; }
+  .admin-tasks-table th:nth-child(3), .admin-tasks-table td:nth-child(3),
+  .admin-tasks-table th:nth-child(4), .admin-tasks-table td:nth-child(4),
+  .admin-tasks-table th:nth-child(5), .admin-tasks-table td:nth-child(5) { display: none; }
+  .admin-tasks-table th:first-child, .admin-tasks-table td:first-child { width: 52%; min-width: 0; }
+  .admin-tasks-table td:last-child { width: 1%; white-space: nowrap; }
+  .admin-tasks-table td:last-child > div { flex-wrap: nowrap !important; gap: .3rem !important; }
+  .admin-tasks-table td:last-child .btn { min-width: 2.2rem; padding-inline: .5rem; font-size: .78rem; }
+}
+.admin-page-content { width: 100%; min-width: 0; }
+.admin-config-layout { width: min(100%, 56rem); }
+.admin-config-card { border-top: 3px solid var(--scout-ochre) !important; }
+.admin-config-card__header { padding: .8rem 1rem !important; }
+.admin-config-card__header h2 { color: var(--scout-forest-dark); font-weight: 750; }
+.admin-config-card .card-body { padding: 1.15rem !important; }
+.admin-config-card .form-control { border-color: #c6cec4; }
+.admin-config-icon-row { align-items: center; }
+.admin-config-icon-row .text-center { display: flex; align-items: center; justify-content: flex-start; gap: .75rem; text-align: left !important; }
+.admin-config-icon-row .text-center > div:first-child { padding: .6rem !important; background: #f6f8f3 !important; }
+.admin-config-icon-row .text-center > div:last-child { margin: 0 !important; }
+.admin-config-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--scout-line); }
+@media (max-width: 575.98px) { .admin-config-icon-row .text-center { justify-content: flex-start; } .admin-config-actions { align-items: stretch; flex-direction: column-reverse; } .admin-config-actions .btn { width: 100%; } }
+
+.admin-modules-toolbar { width: min(100%, 42rem); margin: 0 0 1.25rem; }
+.admin-modules-page .card { overflow: hidden; }
+.admin-modules-page .btn-link { color: #193d2d; font-weight: 750; }
+.admin-modules-page .btn-link:hover { color: var(--scout-forest); }
+.admin-modules-page code { font-size: .82em; color: #5a6a60; }
+.admin-modules-page td:last-child { min-width: 17rem; }
+.admin-modules-page td:last-child .btn { min-height: 2.25rem; }
+.admin-modules-page .badge { font-weight: 650; }
+@media (max-width: 767.98px) { .admin-modules-toolbar { width: 100%; } .admin-modules-page td:last-child { min-width: 13rem; } }
+
+/* Dashboard administration uses section headings and restrained working
+   surfaces just like Web administration. Widget identity stays scannable,
+   while configuration and visibility are explicit, reachable controls. */
+.admin-widgets-page { min-width: 0; }
+.admin-widget-groups { display: grid; gap: 1.75rem; }
+.admin-widget-group__heading { margin: 0 0 .55rem .5rem; }
+.admin-widget-group__heading h2 { margin: 0; color: var(--scout-forest-dark); font-size: 1.14rem; font-weight: 760; letter-spacing: -.015em; }
+.admin-widget-group__heading p { margin: .15rem 0 0; color: #64746b; font-size: .84rem; font-weight: 600; }
+.admin-widget-table-card { overflow: hidden; }
+.admin-widget-table-card .table th:first-child,
+.admin-widget-table-card .table td:first-child { padding-left: 1rem; }
+.admin-widget-table-card .table th:last-child,
+.admin-widget-table-card .table td:last-child { padding-right: 1rem; }
+.admin-widget-row { transition: background-color .14s ease; }
+.admin-widget-row:hover > * { background: #f3f7f2 !important; }
+.admin-widget-identity { display: flex; align-items: flex-start; gap: .75rem; min-width: 16rem; }
+.admin-widget-icon { width: 2.15rem; height: 2.15rem; display: grid; place-items: center; flex: 0 0 auto; border: 1px solid #d9e4db; border-radius: .4rem; background: #edf5ef; color: var(--scout-forest); }
+.admin-widget-title { color: #192e22; font-weight: 740; line-height: 1.28; }
+.admin-widget-description { max-width: 46rem; margin-top: .12rem; color: #57675d; font-size: .88rem; line-height: 1.4; }
+.admin-widget-identity code { display: inline-block; margin-top: .22rem; color: #6c7a71; font-size: .76rem; overflow-wrap: anywhere; }
+.admin-widget-type { display: inline-block; max-width: 12rem; overflow: hidden; color: #526259; font-family: var(--bs-font-monospace); font-size: .75rem; text-overflow: ellipsis; white-space: nowrap; }
+.admin-widget-controls { display: inline-flex; align-items: center; justify-content: flex-end; gap: .7rem; }
+.admin-widget-edit { width: 2.25rem; height: 2.25rem; padding: 0; display: inline-grid; place-items: center; }
+.admin-widget-switch { width: 2.35rem !important; height: 1.25rem; margin: 0 !important; cursor: pointer; }
+.admin-widgets-savebar { position: sticky; bottom: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding: .85rem 1rem; border: 1px solid var(--scout-line); border-radius: .45rem; background: rgb(250 251 248 / .96); box-shadow: 0 -.25rem .9rem rgb(25 55 40 / .06); backdrop-filter: blur(8px); }
+.admin-widgets-savebar p { margin: 0; color: #5a695f; font-size: .87rem; }
+.admin-widgets-savebar__actions { display: flex; gap: .5rem; flex: 0 0 auto; }
+@media (max-width: 767.98px) {
+  .admin-widget-groups { gap: 1.35rem; }
+  .admin-widget-group__heading { margin-left: 0; }
+  .admin-widget-table-card .table th:first-child, .admin-widget-table-card .table td:first-child { padding-left: .8rem; }
+  .admin-widget-table-card .table th:last-child, .admin-widget-table-card .table td:last-child { padding-right: .8rem; }
+  .admin-widget-identity { min-width: 14rem; gap: .6rem; }
+  .admin-widget-description { max-width: 17rem; }
+  .admin-widgets-savebar { align-items: stretch; flex-direction: column; }
+  .admin-widgets-savebar__actions { width: 100%; }
+  .admin-widgets-savebar__actions .btn { flex: 1; }
+}
+
+/* Teams are an operational overview: each card exposes one primary task and
+   keeps infrequent/destructive actions compact, so labels never break apart. */
+.admin-teams-page { min-width: 0; }
+.admin-teams-overview { padding: 1rem; border: 1px solid var(--scout-line); border-radius: .45rem; background: #fbfcf9; }
+.admin-team-card { border-color: #dde4dc !important; overflow: hidden; }
+.admin-team-card .card-body { display: flex; flex-direction: column; min-height: 15.25rem; padding: 1rem !important; }
+.admin-team-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.admin-team-card__title { margin: 0; color: var(--scout-forest-dark); font-size: 1.08rem; font-weight: 760; line-height: 1.22; overflow-wrap: anywhere; }
+.admin-team-card__count { display: inline-flex; align-items: center; min-height: 1.5rem; flex: 0 0 auto; padding: .1rem .45rem; border-radius: .25rem; background: #e9efea; color: #405447; font-size: .72rem; font-weight: 720; white-space: nowrap; }
+.admin-team-card__description { min-height: 2.45rem; margin: .7rem 0 0; color: #58695e; font-size: .88rem; line-height: 1.4; }
+.admin-team-card__code { margin-top: .65rem; padding-top: .7rem; border-top: 1px solid #e6ebe5; }
+.admin-team-card__code > span { display: block; margin-bottom: .35rem; color: #314438; font-size: .78rem; font-weight: 760; letter-spacing: .015em; text-transform: uppercase; }
+.admin-team-card__code > div { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+.admin-team-card__code code { padding: .38rem .52rem; border-radius: .3rem; background: #21332a; color: #fff; font-size: .84rem; font-weight: 650; letter-spacing: .02em; }
+.admin-team-card__code .btn { display: inline-flex; align-items: center; gap: .35rem; min-height: 2.15rem; padding-inline: .65rem; font-size: .8rem; }
+.admin-team-card__actions { display: grid; grid-template-columns: minmax(0, 1fr) 2.35rem 2.35rem; gap: .45rem; margin-top: auto; padding-top: 1rem; }
+.admin-team-card__actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-width: 0; min-height: 2.45rem; }
+.admin-team-card__icon-action { padding: 0; }
+.admin-unassigned-users { overflow: hidden; }
+.admin-unassigned-users .list-group-item { padding: .85rem 1rem; }
+.admin-unassigned-users .form-select { min-height: 2.55rem; }
+@media (max-width: 575.98px) {
+  .admin-teams-overview { padding: .75rem; }
+  .admin-team-card .card-body { min-height: 0; }
+  .admin-team-card__description { min-height: 0; }
+  .admin-team-card__code .btn span { display: none; }
+  .admin-team-card__code .btn { width: 2.15rem; padding: 0; justify-content: center; }
+  .admin-unassigned-users .list-group-item { align-items: stretch !important; flex-direction: column; }
+  .admin-unassigned-users .form-select { width: 100% !important; }
+}
+
+/* Member directory: filters are a compact working strip and the directory
+   itself remains the visual focus rather than competing with a decorative hero. */
+.members-directory-page { min-width: 0; }
+.members-directory-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+.members-directory-filters { border-color: var(--scout-line); }
+.members-directory-filters .card-body { padding: 1rem !important; }
+.members-directory-filters .form-label { color: #425349; font-size: .78rem !important; font-weight: 720; }
+.members-directory-result-count { display: flex; align-items: center; min-height: 1.5rem; margin: 0 0 .4rem; }
+.members-directory-table { overflow: hidden; }
+.members-directory-table .table th:first-child,
+.members-directory-table .table td:first-child { min-width: 18rem; padding-left: 1rem; }
+.members-directory-table .table th:last-child,
+.members-directory-table .table td:last-child { padding-right: 1rem; }
+.members-directory-table tbody tr { transition: background-color .14s ease; }
+.members-directory-table tbody tr:hover > * { background: #f3f7f2 !important; }
+.members-directory-name { color: #1b3024; font-weight: 740; }
+.members-directory-table .badge { font-weight: 700; }
+.members-directory-table .card-footer { padding: .7rem 1rem; background: #fafbf8; border-top-color: var(--scout-line); }
+@media (max-width: 767.98px) {
+  .members-directory-actions { justify-content: flex-start; width: 100%; }
+  .members-directory-actions .btn { flex: 1 1 auto; }
+  .members-directory-filters .card-body { padding: .8rem !important; }
+  .members-directory-table .table-responsive { overflow: hidden; }
+  .members-directory-table .table,
+  .members-directory-table .table tbody { display: block; width: 100%; }
+  .members-directory-table .table thead { display: none; }
+  .members-directory-table .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "member status" "team team"; gap: .35rem .6rem; padding: .7rem .8rem; border-bottom: 1px solid var(--scout-line); }
+  .members-directory-table .table tr:last-child { border-bottom: 0; }
+  .members-directory-table .table td { display: block; min-width: 0 !important; padding: 0 !important; border: 0; }
+  .members-directory-table .table td:nth-child(1) { grid-area: member; }
+  .members-directory-table .table td:nth-child(2) { grid-area: team; min-width: 0 !important; color: var(--scout-muted); font-size: .78rem; }
+  .members-directory-table .table td:nth-child(3) { grid-area: status; align-self: center; }
+  .members-directory-table .table td:nth-child(n + 4) { display: none; }
+  .members-directory-table .table td:nth-child(1) a { min-width: 0; }
+  .members-directory-table .table td:nth-child(1) .members-directory-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .members-directory-team__label { display: inline; margin-right: .3rem; color: #748278; font-size: .7rem; font-weight: 720; text-transform: uppercase; }
+  .members-directory-table .card-footer { gap: .5rem; padding: .65rem .8rem; }
+  .members-directory-table .card-footer .btn { min-width: 2.25rem; padding-inline: .5rem; }
+}
+@media (min-width: 768px) {
+  .members-directory-team__label { display: none; }
+}
+
+/* Permission groups read as an ordered administration list. Metadata is kept
+   close to the group name; controls remain a compact, predictable action set. */
+.admin-access-page { min-width: 0; }
+.admin-access-groups { display: grid; gap: .85rem; }
+.admin-access-group { overflow: hidden; }
+.admin-access-group .card-body { padding: 1rem !important; }
+.admin-access-group__summary { display: flex; align-items: center; justify-content: space-between; gap: 1.25rem; }
+.admin-access-group__title { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin: 0; color: var(--scout-forest-dark); font-size: 1.08rem; font-weight: 760; line-height: 1.25; }
+.admin-access-group__title .badge { color: #fff; background: #53616b !important; font-size: .7rem; font-weight: 700; }
+.admin-access-group__description { margin: .28rem 0; color: #58695e; font-size: .9rem; }
+.admin-access-group__meta { color: #66766d; font-size: .82rem; }
+.admin-access-group__meta i { color: #4d6857; }
+.admin-access-group__actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .45rem; flex: 0 0 auto; }
+.admin-access-group__actions .btn { min-height: 2.45rem; }
+.admin-access-group__actions .btn-outline-danger { color: #b2343f; }
+.admin-access-group__actions .btn:disabled { opacity: .42; }
+@media (max-width: 767.98px) {
+  .admin-access-group__summary { align-items: stretch; flex-direction: column; gap: .85rem; }
+  .admin-access-group__actions { justify-content: flex-start; }
+  .admin-access-group__actions .btn { flex: 1 1 auto; }
+}
+
+/* Attendance is data-dense. The filter strip stays modest, while the matrix
+   remains the dominant surface and keeps its horizontal scroll intentional. */
+.admin-attendance-page { min-width: 0; }
+.admin-attendance-page .nav-tabs { margin-bottom: 1rem; }
+.admin-attendance-filters .card-body { padding: 1rem !important; }
+.admin-attendance-filters .form-label { color: #425349; font-size: .78rem; font-weight: 720; }
+.admin-attendance-matrix { overflow: hidden; }
+.admin-attendance-matrix .card-header { min-height: 3.75rem; }
+.admin-attendance-matrix .table-responsive { max-height: calc(100dvh - 19rem); }
+.admin-attendance-matrix .table { border-color: #d9dfd8; }
+.admin-attendance-matrix .table th { background: #f7f9f5; }
+.admin-attendance-matrix .table thead > tr > th { color: #40544a; font-size: .82rem; font-weight: 760; }
+.admin-attendance-matrix .table thead .badge .badge { padding: .28rem .48rem; font-size: .7rem; font-weight: 750; letter-spacing: .015em; }
+.admin-attendance-matrix .table thead .text-truncate { color: #253b2e; line-height: 1.22; }
+.admin-attendance-matrix .table thead .small { font-size: .76rem; }
+.admin-attendance-matrix .table th.sticky-col,
+.admin-attendance-matrix .table td.sticky-col { position: sticky; left: 0; z-index: 1; background: inherit; }
+.admin-attendance-matrix .table thead .sticky-col { z-index: 3; background: #f7f9f5; }
+.admin-attendance-matrix .table th.sticky-right,
+.admin-attendance-matrix .table td.sticky-right { position: sticky; right: 0; z-index: 1; background: inherit; box-shadow: -1px 0 #d9dfd8; }
+.admin-attendance-matrix .table thead .sticky-right { z-index: 3; background: #f7f9f5; }
+.admin-attendance-matrix .table tbody tr:hover > * { background: #f3f7f2; }
+.admin-attendance-matrix .table tbody tr:hover .sticky-col,
+.admin-attendance-matrix .table tbody tr:hover .sticky-right { background: #f3f7f2; }
+.admin-attendance-member-overview .card-body { padding: 1rem !important; }
+.admin-attendance-mobile-matrix { display: none; }
+@media (max-width: 767.98px) {
+  .admin-attendance-matrix .card-header > div { width: 100%; justify-content: space-between; }
+  .admin-attendance-matrix .table-responsive { max-height: calc(100dvh - 15rem); }
+  /* Two sticky sides leave an event column unreadably narrow on a phone. */
+  .admin-attendance-matrix .table { min-width: 34rem !important; }
+  .admin-attendance-matrix .table th.sticky-right,
+  .admin-attendance-matrix .table td.sticky-right { position: static; box-shadow: none; }
+  .admin-attendance-matrix .table th.sticky-col,
+  .admin-attendance-matrix .table td.sticky-col { min-width: 10.5rem !important; }
+  .admin-attendance-mobile-matrix { display: grid; gap: .7rem; padding: .75rem; background: #fafbf8; }
+  .admin-attendance-mobile-events,
+  .admin-attendance-mobile-member { display: grid; align-items: center; gap: .2rem; }
+  .admin-attendance-mobile-events { padding: 0 .4rem; color: #65756b; font-size: .68rem; font-weight: 750; letter-spacing: .02em; text-align: center; text-transform: uppercase; }
+  .admin-attendance-mobile-events > span:first-child { text-align: left; }
+  .admin-attendance-mobile-event { display: grid; grid-template-rows: auto minmax(0, 1fr); justify-items: center; min-width: 0; min-height: 4.9rem; gap: .18rem; }
+  .admin-attendance-mobile-event__date { font-size: .66rem; }
+  .admin-attendance-mobile-event__title { display: block; max-height: 3.45rem; overflow: hidden; color: #4b6254; font-size: .62rem; font-weight: 750; line-height: 1; text-align: left; text-overflow: ellipsis; text-transform: none; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .admin-attendance-mobile-group { overflow: hidden; border: 1px solid #dce4dc; border-radius: .45rem; background: #fff; }
+  .admin-attendance-mobile-group__heading { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: .6rem .7rem; border: 0; border-bottom: 1px solid #e3e9e3; background: #f3f7f2; color: #1d3d2c; font-size: .84rem; font-weight: 750; text-align: left; }
+  .admin-attendance-mobile-group__heading i { width: 1rem; color: #61796a; }
+  .admin-attendance-mobile-member { min-height: 3.35rem; padding: .42rem .7rem; border-bottom: 1px solid #edf0ec; }
+  .admin-attendance-mobile-member:last-child { border-bottom: 0; }
+  .admin-attendance-mobile-member > div { min-width: 0; line-height: 1.2; }
+  .admin-attendance-mobile-member strong { display: block; overflow: hidden; font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-attendance-mobile-member small { color: #6a786f; font-size: .7rem; }
+  .admin-attendance-mobile-cell { display: grid; width: 2rem; height: 2rem; place-items: center; justify-self: center; padding: 0; border: 0; border-radius: .38rem; background: #f6f8f5; font-size: .9rem; }
+  .admin-attendance-mobile-cell:not(:disabled) { cursor: pointer; }
+  .admin-attendance-mobile-cell:disabled { opacity: 1; }
+}
+
+/* Approval is a decision workflow: state guidance is quiet and the current
+   submission, feedback field and irreversible choices form one clear unit. */
+.admin-approvals-page { min-width: 0; }
+.admin-approvals-pending-count { color: #137347; font-size: 1.1rem; font-weight: 760; white-space: nowrap; }
+.admin-approvals-guide { margin-bottom: 1.5rem; padding: 1rem; border: 1px solid #d9e4dc; border-radius: .45rem; background: #f6faf6; }
+.admin-approvals-guide > h2 { margin: 0 0 .75rem; color: #1c3d2c; font-size: .9rem; font-weight: 760; }
+.admin-approvals-guide__items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.admin-approvals-guide__item { display: flex; align-items: flex-start; gap: .55rem; }
+.admin-approvals-guide__marker { width: .7rem; height: .7rem; flex: 0 0 auto; margin-top: .28rem; border-radius: 50%; }
+.admin-approvals-guide__marker--pending { background: #d99b12; }
+.admin-approvals-guide__marker--approved { background: #18864b; }
+.admin-approvals-guide__marker--rejected { background: #c43d48; }
+.admin-approvals-guide__item strong { color: #203d2d; font-size: .88rem; }
+.admin-approvals-guide__item p { margin: .12rem 0 0; color: #627067; font-size: .81rem; line-height: 1.42; }
+.admin-approval-list { display: grid; gap: 1rem; }
+.admin-approval-card { overflow: hidden; }
+.admin-approval-card__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: .9rem 1rem; border-bottom: 1px solid var(--scout-line); background: #fafbf8; }
+.admin-approval-card__header h2 { margin: 0; color: var(--scout-forest-dark); font-size: 1.12rem; font-weight: 760; letter-spacing: -.012em; }
+.admin-approval-card__header p { margin: .22rem 0 0; color: #5d6e63; font-size: .84rem; font-weight: 600; }
+.admin-approval-card__status { flex: 0 0 auto; padding: .35rem .6rem; border-radius: .3rem; background: #fff4d7; color: #765b13; font-size: .8rem; font-weight: 740; white-space: nowrap; }
+.admin-approval-card__body { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(17rem, .82fr); gap: 1.25rem; padding: 1rem; }
+.admin-approval-variant { margin-bottom: 1rem; padding: .75rem .85rem; border: 1px solid #b8dede; border-radius: .4rem; background: #f0fbfb; color: #265e5e; }
+.admin-approval-variant strong { color: #126a70; }
+.admin-approval-variant div div { margin-top: .15rem; color: #527372; font-size: .87rem; }
+.admin-approval-variant > div > span { padding: .22rem .45rem; border-radius: .25rem; background: #0dabb9; color: #fff; font-size: .76rem; font-weight: 720; white-space: nowrap; }
+.admin-approval-card__submission h3, .admin-approval-card__review label { display: block; margin: 0 0 .4rem; color: #425349; font-size: .8rem; font-weight: 750; }
+.admin-approval-note { min-height: 3.65rem; padding: .75rem .85rem; border: 1px solid #dfe5dd; border-radius: .4rem; background: #fafbf9; color: #47574d; font-size: .92rem; }
+.admin-approval-card__review textarea { min-height: 5.4rem; }
+.admin-approval-card__actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.admin-approval-card__actions .btn { min-width: 6.7rem; }
+.admin-approvals-empty { padding: 3.5rem 1rem; border: 1px dashed #cbd8ce; border-radius: .45rem; color: #617067; text-align: center; }
+.admin-approvals-empty > i { display: block; margin-bottom: .7rem; color: #198754; font-size: 2rem; }
+.admin-approvals-empty h2 { margin: 0; color: #264232; font-size: 1.1rem; font-weight: 750; }
+.admin-approvals-empty p { margin: .25rem 0 0; }
+@media (max-width: 767.98px) {
+  .admin-approvals-guide__items { grid-template-columns: 1fr; gap: .7rem; }
+  .admin-approval-card__header, .admin-approval-card__body { display: flex; flex-direction: column; }
+  .admin-approval-card__body { gap: 1rem; }
+  .admin-approval-card__status { align-self: flex-start; }
+  .admin-approval-card__actions .btn { flex: 1; }
+}
+
+/* Competition audit keeps selection and history as sequential working areas,
+   without the oversized hero or competing card treatments. */
+.admin-competition-audit-page { min-width: 0; }
+.admin-competition-audit-page__intro { margin: 0 0 1rem; color: #4f6056; font-size: .94rem; }
+.admin-competition-audit-page__sections { display: grid; gap: 1rem; }
+.admin-competition-audit-page__sections > .col-12 { min-width: 0; max-width: 100%; padding: 0; }
+.competition-audit-user-list, .competition-audit-history { overflow: hidden; }
+.competition-audit-user-list .admin-panel__header, .competition-audit-history .admin-panel__header { min-height: 3.55rem; }
+.competition-audit-user-list .card-body > .bg-light { padding: .85rem 1rem !important; background: #fafbf8 !important; }
+.competition-audit-filter-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(9rem, 1fr) minmax(8rem, .78fr) minmax(7rem, .6fr); align-items: end; gap: .5rem; width: 100%; max-width: 100%; }
+.competition-audit-filter-grid > div { min-width: 0; }
+.competition-audit-filter-grid__action .btn { width: 100%; }
+.competition-audit-user-list .form-label, .competition-audit-history .form-label { color: #43544a; font-size: .76rem; font-weight: 720; }
+.competition-audit-user-list .table-responsive { max-height: min(22rem, 48dvh) !important; }
+.competition-audit-history .table-responsive { max-width: 100%; }
+.competition-audit-user-list tbody tr { cursor: pointer; }
+.competition-audit-user-list tbody tr.table-primary > * { background: #e3f0e6 !important; color: #183d29; }
+.competition-audit-user-list tbody tr:focus-visible > * { outline: 2px solid var(--scout-ochre); outline-offset: -2px; }
+.competition-audit-history .card-body > .border-bottom { padding: .85rem 1rem !important; background: #fafbf8; }
+.competition-audit-history .admin-panel__header .badge { color: #fff; background: #64726a !important; }
+.competition-audit-history .text-primary { color: var(--scout-forest) !important; font-weight: 760; }
+.competition-audit-history .table td:last-child .btn { min-width: 4.4rem; }
+@media (max-width: 767.98px) {
+  .competition-audit-user-list .admin-panel__header, .competition-audit-history .admin-panel__header { align-items: flex-start !important; flex-direction: column; gap: .65rem; }
+  .competition-audit-history .admin-panel__action { width: 100%; }
+  .competition-audit-history .admin-panel__action > .btn { width: 100%; }
+  .competition-audit-history .card-body > .border-bottom > .ms-auto { width: 100%; margin-left: 0 !important; justify-content: space-between; }
+  .competition-audit-user-list .card-body > .bg-light .row { display: grid; grid-template-columns: 1fr; gap: .7rem; margin: 0; }
+  .competition-audit-user-list .card-body > .bg-light .row > [class*="col-"] { width: auto; padding: 0; }
+  .competition-audit-user-list .table-responsive { overflow: hidden; }
+  .competition-audit-user-list .table { width: 100%; table-layout: fixed; font-size: .78rem; }
+  .competition-audit-user-list .table th, .competition-audit-user-list .table td { padding: .6rem .48rem !important; overflow-wrap: anywhere; }
+  .competition-audit-user-list .table th:nth-child(2), .competition-audit-user-list .table td:nth-child(2),
+  .competition-audit-user-list .table th:nth-child(3), .competition-audit-user-list .table td:nth-child(3) { display: none; }
+  .competition-audit-user-list .table th:first-child, .competition-audit-user-list .table td:first-child { width: 48%; }
+  .competition-audit-user-list .table th:nth-child(4), .competition-audit-user-list .table td:nth-child(4) { width: 25%; }
+  .competition-audit-user-list .table th:nth-child(5), .competition-audit-user-list .table td:nth-child(5) { width: 27%; }
+}
+
+/* Announcements are created and edited as focused dialogs; the page remains a
+   concise, scannable record of what is currently published. */
+.admin-announcements-page { min-width: 0; }
+.admin-announcements-table { overflow: hidden; }
+.admin-announcements-table .table th:first-child,
+.admin-announcements-table .table td:first-child { padding-left: 1rem; }
+.admin-announcements-table .table th:last-child,
+.admin-announcements-table .table td:last-child { padding-right: 1rem; }
+.admin-announcements-table__body { max-width: 36rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-announcements-table .badge { font-weight: 700; }
+.app-modal fieldset { min-width: 0; }
+.app-modal fieldset .form-label { margin-bottom: .45rem; }
+.app-modal .form-check + .form-check { margin-top: .4rem; }
+@media (max-width: 767.98px) {
+  .admin-announcements-table .table th:first-child, .admin-announcements-table .table td:first-child { padding-left: .8rem; }
+  .admin-announcements-table .table th:last-child, .admin-announcements-table .table td:last-child { padding-right: .8rem; }
+  .admin-announcements-table .admin-panel__body { overflow: hidden; }
+  .admin-announcements-table__table, .admin-announcements-table__table tbody { display: block; width: 100%; }
+  .admin-announcements-table__table thead { display: none; }
+  .admin-announcements-table__table tr { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .5rem .7rem; padding: .8rem; border-bottom: 1px solid var(--scout-line); }
+  .admin-announcements-table__table tr:last-child { border-bottom: 0; }
+  .admin-announcements-table__table td { display: block; min-width: 0; padding: 0 !important; border: 0; }
+  .admin-announcements-table__table th:nth-child(2), .admin-announcements-table__table td:nth-child(2),
+  .admin-announcements-table__table th:nth-child(4), .admin-announcements-table__table td:nth-child(4),
+  .admin-announcements-table__table th:nth-child(5), .admin-announcements-table__table td:nth-child(5) { display: none; }
+  .admin-announcements-table__table td:first-child { grid-column: 1; grid-row: 1 / span 2; align-self: start; }
+  .admin-announcements-table__table td:nth-child(3) { grid-column: 2; grid-row: 1; }
+  .admin-announcements-table__table td:last-child { grid-column: 2; grid-row: 2; justify-self: start; }
+  .admin-announcements-table__body { display: -webkit-box; max-width: none; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; }
+  .admin-announcements-table__table .btn { padding-inline: .45rem; font-size: .78rem; }
+}
+
+/* Core administration deliberately uses the same compact working surface as
+   Web administration: headings lead into content, tables stay quiet and
+   cards only group actual workflows. */
+.app-content:has(.page-heading--admin) .card,
+.app-content:has(.web-admin-page-header) .card { border-radius: .45rem; box-shadow: none !important; }
+.app-content:has(.page-heading--admin) .card-header,
+.app-content:has(.web-admin-page-header) .card-header { padding: .78rem 1rem; background: #f7f8f4; border-bottom: 1px solid var(--scout-line); color: #1d3427; font-size: .92rem; font-weight: 720; }
+.app-content:has(.page-heading--admin) .card-body,
+.app-content:has(.web-admin-page-header) .card-body { padding: 1rem; }
+.app-content:has(.page-heading--admin) .table,
+.app-content:has(.web-admin-page-header) .table { margin-bottom: 0; }
+.app-content:has(.page-heading--admin) .table thead th,
+.app-content:has(.web-admin-page-header) .table thead th { padding: .65rem .75rem; color: #68776d; background: #fafbf8; border-bottom-color: var(--scout-line); font-size: .72rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+.app-content:has(.page-heading--admin) .table tbody td,
+.app-content:has(.web-admin-page-header) .table tbody td { padding: .72rem .75rem; border-color: var(--scout-line); }
+.app-content:has(.page-heading--admin) .table-hover > tbody > tr:hover > *,
+.app-content:has(.web-admin-page-header) .table-hover > tbody > tr:hover > * { background: #f2f6f0; }
+.member-search-picker-results { max-height: 17rem; overflow-y: auto; }
+@media (max-width: 991.98px) {
+  .dashboard-message-list { max-height: none; }
+}
+@media (max-width: 767.98px) {
+  .post-reading { padding: .25rem 0 0; }
+  .post-reading-header h1 { font-size: clamp(1.8rem, 9vw, 2.35rem); }
+  .event-month-calendar .calendar-day { height: 72px !important; }
+  .event-month-calendar .calendar-event-bar { padding: 0 3px !important; font-size: .8rem !important; }
+  .dashboard-welcome .d-flex { align-items: flex-start !important; }
+  .dashboard-welcome-stat { padding: .65rem; }
+  .dashboard-announcement { padding: 1rem !important; }
+}
+.widget-event-row, .widget-event-row > * { min-width: 0; }
+.widget-event-row .btn-group { flex-wrap: wrap; }
+.widget-event-row .btn { white-space: nowrap; }
+
+/* Phone views use records, not clipped desktop grids. These three working
+   lists carry dense administrative data, so keeping the identity and the
+   next useful controls visible takes precedence over mirroring every column. */
+@media (max-width: 767.98px) {
+  .competition-audit-user-list .card-body > .bg-light { padding: .8rem !important; }
+  .competition-audit-user-filters { overflow: hidden; }
+  .competition-audit-user-list .card-body > .bg-light .row { display: grid; width: 100% !important; max-width: 100% !important; grid-template-columns: minmax(0, 1fr); gap: .65rem; margin: 0 !important; }
+  .competition-audit-filter-grid { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
+  .competition-audit-filter-grid__action .btn { width: 100%; max-width: 100%; }
+  .competition-audit-user-list .card-body > .bg-light .row > [class*="col-"] { width: 100% !important; max-width: 100%; min-width: 0; padding: 0; }
+  .competition-audit-user-list .card-body > .bg-light .btn { width: 100%; max-width: 100%; min-height: 2.5rem; }
+  .competition-audit-user-list .table-responsive { max-height: min(25rem, 48dvh) !important; overflow: auto hidden; }
+  .competition-audit-users-mobile { display: grid; max-height: min(25rem, 48dvh); overflow-y: auto; }
+  .competition-audit-user-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name role" "team team"; gap: .22rem .55rem; width: 100%; padding: .72rem .8rem; border: 0; border-bottom: 1px solid var(--scout-line); background: #fffefa; color: #1c3426; text-align: left; }
+  .competition-audit-user-card:last-child { border-bottom: 0; }
+  .competition-audit-user-card.is-selected { background: #e3f0e6; box-shadow: inset 3px 0 var(--scout-forest); }
+  .competition-audit-user-card:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--scout-ochre); outline-offset: -2px; }
+  .competition-audit-user-card__name { grid-area: name; overflow: hidden; font-size: .84rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+  .competition-audit-user-card__meta { grid-area: team; overflow: hidden; color: #64746b; font-size: .76rem; text-overflow: ellipsis; white-space: nowrap; }
+  .competition-audit-user-card__role { grid-area: role; align-self: center; color: #64746b; font-size: .72rem; white-space: nowrap; }
+  .competition-audit-user-list .table,
+  .competition-audit-user-list .table tbody { display: block; width: 100%; }
+  .competition-audit-user-list .table { table-layout: auto; font-size: .82rem; }
+  .competition-audit-user-list .table thead { display: none; }
+  .competition-audit-user-list .table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "member role" "team team"; gap: .28rem .55rem; padding: .7rem .8rem; border-bottom: 1px solid var(--scout-line); }
+  .competition-audit-user-list .table tr:last-child { border-bottom: 0; }
+  .competition-audit-user-list .table td { display: block; width: auto !important; min-width: 0; padding: 0 !important; border: 0; overflow: hidden; }
+  .competition-audit-user-list .table td:nth-child(1) { grid-area: member; overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+  .competition-audit-user-list .table td:nth-child(2),
+  .competition-audit-user-list .table td:nth-child(3) { display: none; }
+  .competition-audit-user-list .table td:nth-child(4) { grid-area: role; align-self: center; color: #56675d; font-size: .73rem; text-transform: capitalize; white-space: nowrap; }
+  .competition-audit-user-list .table td:nth-child(5) { grid-area: team; color: #64746b; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .competition-audit-user-list tbody tr.table-primary > * { background: transparent !important; }
+  .competition-audit-user-list tbody tr.table-primary { background: #e3f0e6; }
+
+  .admin-tasks-table-wrap { margin: 0 !important; padding: 0 !important; overflow: hidden; }
+  .admin-tasks-table,
+  .admin-tasks-table tbody { display: block; width: 100%; }
+  .admin-tasks-table { font-size: .84rem; table-layout: auto; }
+  .admin-tasks-table thead { display: none; }
+  .admin-tasks-table.table-striped > tbody > tr:nth-of-type(odd) > * { background-color: transparent; }
+  .admin-tasks-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name score" "team status" "actions actions"; gap: .4rem .65rem; padding: .8rem; border-bottom: 1px solid var(--scout-line); background: #fffefa; }
+  .admin-tasks-table tr:nth-child(even) { background: #fafbf8; }
+  .admin-tasks-table tr:last-child { border-bottom: 0; }
+  .admin-tasks-table td { display: block; width: auto !important; min-width: 0 !important; padding: 0 !important; border: 0; }
+  .admin-tasks-table td:nth-child(1) { grid-area: name; min-width: 0; }
+  .admin-tasks-table td:nth-child(1) .text-muted { display: -webkit-box; overflow: hidden; margin-top: .18rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .admin-tasks-table td:nth-child(2) { display: block; grid-area: score; align-self: start; text-align: right; }
+  .admin-tasks-table td:nth-child(3) { display: none; }
+  .admin-tasks-table td:nth-child(4) { display: block; grid-area: status; align-self: center; }
+  .admin-tasks-table td:nth-child(5) { display: block; grid-area: team; align-self: center; overflow: hidden; color: #63736a; font-size: .78rem; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-tasks-table td:nth-child(6) { grid-area: actions; justify-self: start; width: 100% !important; text-align: left !important; }
+  .admin-tasks-table td:nth-child(6) > div { display: flex !important; width: 100%; flex-wrap: nowrap !important; gap: .4rem !important; }
+  .admin-tasks-table td:nth-child(6) .btn { display: inline-grid; width: 2.45rem; height: 2.45rem; flex: 0 0 2.45rem; place-items: center; min-width: 0; padding: 0; font-size: .83rem; }
+  .admin-tasks-table td:nth-child(6) .btn span { display: none; }
+  .admin-tasks-mobile-list { display: grid; gap: .65rem; }
+  .admin-task-mobile-card { display: grid; gap: .65rem; padding: .8rem; border: 1px solid var(--scout-line); border-radius: .45rem; background: #fffefa; }
+  .admin-task-mobile-card__main { display: grid; min-width: 0; gap: .28rem; padding: 0; border: 0; background: transparent; color: #173526; text-align: left; }
+  .admin-task-mobile-card__main { cursor: pointer; }
+  .admin-task-mobile-card__main:focus-visible { outline: 2px solid var(--scout-ochre); outline-offset: 3px; }
+  .admin-task-mobile-card__main strong { overflow: hidden; font-size: .94rem; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-task-mobile-card__description { display: -webkit-box; overflow: hidden; color: #65746b; font-size: .75rem; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .admin-task-mobile-card__description > :first-child { margin-top: 0; }
+  .admin-task-mobile-card__description > :last-child { margin-bottom: 0; }
+  .admin-task-mobile-card__meta { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .55rem; color: #66776c; font-size: .75rem; }
+  .admin-task-mobile-card__meta > span:not(.badge) + span:not(.badge)::before { content: "·"; margin-right: .55rem; color: #a1ada4; }
+  .admin-task-action-buttons { display: flex; gap: .4rem; }
+  .admin-task-mobile-card__actions .btn { display: inline-grid; width: 2.45rem; height: 2.45rem; place-items: center; padding: 0; }
+  .admin-task-mobile-card__actions .btn span { display: none; }
+
+  .admin-announcements-table .table-responsive { overflow: hidden; }
+  .admin-announcements-table__table,
+  .admin-announcements-table__table tbody { display: block; width: 100%; min-width: 0 !important; table-layout: fixed; }
+  .admin-announcements-table__table tr { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "scope body" "actions actions"; gap: .55rem .65rem; padding: .8rem; }
+  .admin-announcements-table__table td { min-width: 0 !important; overflow: hidden; }
+  .admin-announcements-table__table td:first-child { grid-area: scope; grid-column: auto; grid-row: auto; align-self: start; }
+  .admin-announcements-table__table td:nth-child(3) { grid-area: body; grid-column: auto; grid-row: auto; }
+  .admin-announcements-table__table td:last-child { grid-area: actions; grid-column: auto; grid-row: auto; justify-self: start; }
+  .admin-announcements-table__body { overflow-wrap: anywhere; }
+  .admin-announcements-table__table .btn { min-width: 3.5rem; min-height: 2.45rem; padding-inline: .55rem; }
+}

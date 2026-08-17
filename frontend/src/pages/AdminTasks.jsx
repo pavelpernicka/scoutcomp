@@ -3,12 +3,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { useTranslation } from "react-i18next";
+import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { convertLocalToUTC, formatServerDateToInputValue, isDateExpired, parseServerDate } from "../utils/dateUtils";
-import HeroHeader from "../components/HeroHeader";
 import Button from "../components/Button";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
+import ArticleEditBox from "../modules/web/admin/ArticleEditBox";
 
 const getPeriodUnits = (t) => [
   { value: "hour", label: t("adminTasks.periodUnits.hour") },
@@ -122,11 +124,39 @@ const renderMarkdown = (markdown) => ({
   __html: DOMPurify.sanitize(marked.parse(markdown || "")),
 });
 
+function TaskActionButtons({ task, t, onEdit, onVariants, onArchive, onUnarchive, className = "" }) {
+  return (
+    <div className={`admin-task-action-buttons ${className}`.trim()} role="group" aria-label={t('adminTasks.actions')}>
+      <button type="button" className="btn btn-outline-secondary btn-sm" title={t('adminTasks.edit')} aria-label={t('adminTasks.edit')} onClick={onEdit}><i className="fas fa-pen" aria-hidden="true" /><span>{t('adminTasks.edit')}</span></button>
+      <button type="button" className="btn btn-outline-info btn-sm" title={t('adminTasks.variants', { count: task.variants?.length || 0 })} aria-label={t('adminTasks.variants', { count: task.variants?.length || 0 })} onClick={onVariants}><i className="fas fa-list-check" aria-hidden="true" /><span>{t('adminTasks.variants', { count: task.variants?.length || 0 })}</span></button>
+      {task.is_archived ? (
+        <button type="button" className="btn btn-outline-success btn-sm" title={t('adminTasks.unarchive')} aria-label={t('adminTasks.unarchive')} onClick={onUnarchive}><i className="fas fa-box-open" aria-hidden="true" /><span>{t('adminTasks.unarchive')}</span></button>
+      ) : (
+        <button type="button" className="btn btn-outline-danger btn-sm" title={t('adminTasks.archive')} aria-label={t('adminTasks.archive')} onClick={onArchive}><i className="fas fa-box-archive" aria-hidden="true" /><span>{t('adminTasks.archive')}</span></button>
+      )}
+    </div>
+  );
+}
+
+TaskActionButtons.propTypes = {
+  task: PropTypes.shape({
+    is_archived: PropTypes.bool,
+    variants: PropTypes.array,
+  }).isRequired,
+  t: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+  onVariants: PropTypes.func.isRequired,
+  onArchive: PropTypes.func.isRequired,
+  onUnarchive: PropTypes.func.isRequired,
+  className: PropTypes.string,
+};
+
 export default function AdminTasks() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { isAdmin } = useAuth();
   const [createForm, setCreateForm] = useState(emptyTaskForm);
+  const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [editForm, setEditForm] = useState(emptyTaskForm);
   const [variantManagementTaskId, setVariantManagementTaskId] = useState(null);
@@ -229,6 +259,7 @@ export default function AdminTasks() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "tasks"] });
       setCreateForm(emptyTaskForm);
+      setShowCreateTaskModal(false);
     },
   });
 
@@ -311,22 +342,15 @@ export default function AdminTasks() {
 
   return (
     <>
-      <HeroHeader
-        title={t("adminTasks.title")}
-        subtitle={t("adminTasks.subtitle")}
-        icon="📋"
-        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
-      >
-        <Button variant="light" gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" icon="fas fa-plus" onClick={() => setCreateForm(emptyTaskForm)}>
+      <AdminPageHeader title={t("adminTasks.title")} description={t("adminTasks.subtitle")} action={<Button variant="primary" icon="fas fa-plus" onClick={() => { setCreateForm(emptyTaskForm); setShowCreateTaskModal(true); }}>
           {t("adminTasks.createTask")}
-        </Button>
-      </HeroHeader>
+        </Button>} />
 
-      <div className="container px-0">
+      <div className="admin-page-content">
       <div className="row g-4">
-        <div className="col-12 col-xl-5">
+        <div className={showCreateTaskModal ? "col-12 col-xl-5 admin-task-create-modal" : "d-none"} role="dialog" aria-modal="true" aria-label={t('adminTasks.createTask')}>
           <div className="card shadow-sm h-100">
-            <div className="card-header">{t('adminTasks.createTask')}</div>
+            <div className="card-header d-flex align-items-center justify-content-between"><span>{t('adminTasks.createTask')}</span><button type="button" className="btn-close" aria-label={t('common.close')} onClick={() => setShowCreateTaskModal(false)} /></div>
             <div className="card-body">
               <form
                 className="row g-3"
@@ -365,22 +389,7 @@ export default function AdminTasks() {
                 </div>
                 <div className="col-12">
                   <label className="form-label">{t('adminTasks.description')}</label>
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={createForm.description}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({ ...prev, description: event.target.value }))
-                    }
-                    placeholder={t('adminTasks.markdownPlaceholder')}
-                  ></textarea>
-                  <div className="form-text">{t('adminTasks.preview')}</div>
-                  <div
-                    className="border rounded bg-light p-3"
-                    dangerouslySetInnerHTML={renderMarkdown(
-                      createForm.description || t('adminTasks.noDescriptionYet')
-                    )}
-                  />
+                  <ArticleEditBox value={createForm.description} onChange={(description) => setCreateForm((prev) => ({ ...prev, description }))} />
                 </div>
                 <div className="col-12 col-md-6">
                   <label className="form-label">{t('adminTasks.teamOptional')}</label>
@@ -562,7 +571,7 @@ export default function AdminTasks() {
           </div>
         </div>
 
-        <div className="col-12 col-xl-7">
+        <div className="col-12">
           <div className="card shadow-sm h-100">
             <div className="card-header d-flex justify-content-between align-items-center">
               <span>{t('adminTasks.existingTasks')}</span>
@@ -576,8 +585,41 @@ export default function AdminTasks() {
                   {error?.response?.data?.detail || t('adminTasks.failedToLoad')}
                 </div>
               ) : (
-                <div className="table-responsive">
-                  <table className="table table-striped align-middle">
+                <>
+                <div className="admin-tasks-mobile-list d-md-none">
+                  {sortedTasks.map((task) => {
+                    const statusLabel = formatStatus(task, t);
+                    const statusClass = task.is_archived ? "bg-secondary" : statusLabel === t("adminTasks.status.expired") ? "bg-warning text-dark" : statusLabel === t("adminTasks.status.limit") ? "bg-info text-dark" : "bg-success";
+                    const pointsLabel = task.variants?.length
+                      ? `${t('adminTasks.variantCount', { count: task.variants.length })} · ${Math.min(...task.variants.map((variant) => variant.points))}–${Math.max(...task.variants.map((variant) => variant.points))} ${t("tasks.pts")}`
+                      : `${task.points_per_completion} ${t("tasks.pts")}`;
+                    const teamLabel = task.team_id ? teams.find((team) => team.id === task.team_id)?.name || `#${task.team_id}` : t('adminTasks.allTeams');
+                    return (
+                      <article key={task.id} className="admin-task-mobile-card">
+                        <button type="button" className="admin-task-mobile-card__main" onClick={() => handleOpenEditModal(task)}>
+                          <strong>{task.name}</strong>
+                          {task.description && <span className="admin-task-mobile-card__description" dangerouslySetInnerHTML={renderMarkdown(task.description)} />}
+                        </button>
+                        <div className="admin-task-mobile-card__meta">
+                          <span>{pointsLabel}</span>
+                          <span>{teamLabel}</span>
+                          <span className={`badge ${statusClass}`}>{statusLabel}</span>
+                        </div>
+                        <TaskActionButtons
+                          task={task}
+                          t={t}
+                          onEdit={() => handleOpenEditModal(task)}
+                          onVariants={() => handleOpenVariantModal(task)}
+                          onArchive={() => archiveMutation.mutate(task.id)}
+                          onUnarchive={() => unarchiveMutation.mutate(task.id)}
+                          className="admin-task-mobile-card__actions"
+                        />
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="table-responsive admin-tasks-table-wrap d-none d-md-block">
+                  <table className="table table-striped align-middle admin-tasks-table">
                     <thead>
                       <tr>
                         <th>{t('adminTasks.name')}</th>
@@ -638,36 +680,48 @@ export default function AdminTasks() {
                               : t('adminTasks.allTeams')}
                           </td>
                           <td className="text-end">
-                            <div className="d-inline-flex flex-column gap-2">
+                            <div className="d-inline-flex flex-wrap justify-content-end gap-2">
                               <button
                                 type="button"
                                 className="btn btn-outline-secondary btn-sm"
+                                title={t('adminTasks.edit')}
+                                aria-label={t('adminTasks.edit')}
                                 onClick={() => handleOpenEditModal(task)}
                               >
-                                {t('adminTasks.edit')}
+                                <i className="fas fa-pen" aria-hidden="true" />
+                                <span>{t('adminTasks.edit')}</span>
                               </button>
                               <button
                                 type="button"
                                 className="btn btn-outline-info btn-sm"
+                                title={t('adminTasks.variants', { count: task.variants?.length || 0 })}
+                                aria-label={t('adminTasks.variants', { count: task.variants?.length || 0 })}
                                 onClick={() => handleOpenVariantModal(task)}
                               >
-                                {t('adminTasks.variants', { count: task.variants?.length || 0 })}
+                                <i className="fas fa-list-check" aria-hidden="true" />
+                                <span>{t('adminTasks.variants', { count: task.variants?.length || 0 })}</span>
                               </button>
                               {task.is_archived ? (
                                 <button
                                   type="button"
                                   className="btn btn-outline-success btn-sm"
+                                  title={t('adminTasks.unarchive')}
+                                  aria-label={t('adminTasks.unarchive')}
                                   onClick={() => unarchiveMutation.mutate(task.id)}
                                 >
-                                  {t('adminTasks.unarchive')}
+                                  <i className="fas fa-box-open" aria-hidden="true" />
+                                  <span>{t('adminTasks.unarchive')}</span>
                                 </button>
                               ) : (
                                 <button
                                   type="button"
                                   className="btn btn-outline-danger btn-sm"
+                                  title={t('adminTasks.archive')}
+                                  aria-label={t('adminTasks.archive')}
                                   onClick={() => archiveMutation.mutate(task.id)}
                                 >
-                                  {t('adminTasks.archive')}
+                                  <i className="fas fa-box-archive" aria-hidden="true" />
+                                  <span>{t('adminTasks.archive')}</span>
                                 </button>
                               )}
                             </div>
@@ -677,6 +731,7 @@ export default function AdminTasks() {
                     </tbody>
                   </table>
                 </div>
+                </>
               )}
             </div>
           </div>
@@ -685,7 +740,7 @@ export default function AdminTasks() {
 
       {activeEditingTask && (
         <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+          <div className="modal fade show d-block admin-task-edit-modal" role="dialog" tabIndex="-1">
             <div className="modal-dialog modal-xl" role="document">
               <div className="modal-content">
                 <div className="modal-header">
@@ -731,22 +786,7 @@ export default function AdminTasks() {
                       </div>
                       <div className="col-12">
                         <label className="form-label">{t('adminTasks.description')}</label>
-                        <textarea
-                          className="form-control"
-                          rows={4}
-                          value={editForm.description}
-                          onChange={(event) =>
-                            setEditForm((prev) => ({ ...prev, description: event.target.value }))
-                          }
-                          placeholder={t('adminTasks.markdownPlaceholder')}
-                        ></textarea>
-                        <div className="form-text">{t('adminTasks.preview')}</div>
-                        <div
-                          className="border rounded bg-light p-3"
-                          dangerouslySetInnerHTML={renderMarkdown(
-                            editForm.description || t('adminTasks.noDescriptionYet')
-                          )}
-                        />
+                        <ArticleEditBox value={editForm.description} onChange={(description) => setEditForm((prev) => ({ ...prev, description }))} />
                       </div>
                       <div className="col-12 col-md-6">
                         <label className="form-label">{t('adminTasks.teamOptional')}</label>
@@ -980,7 +1020,7 @@ export default function AdminTasks() {
       {/* Variant Management Modal */}
       {variantManagementTaskId && (
         <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+          <div className="modal fade show d-block admin-task-variants-modal" role="dialog" tabIndex="-1">
             <div className="modal-dialog modal-lg" role="document">
               <div className="modal-content">
                 <div className="modal-header">
@@ -1031,13 +1071,7 @@ export default function AdminTasks() {
                         </div>
                         <div className="col-12">
                           <label className="form-label">{t('adminTasks.descriptionOptional')}</label>
-                          <textarea
-                            className="form-control"
-                            rows={3}
-                            value={variantForm.description}
-                            onChange={(e) => setVariantForm(prev => ({ ...prev, description: e.target.value }))}
-                            placeholder={t('adminTasks.supportsMarkdown')}
-                          />
+                          <ArticleEditBox value={variantForm.description} onChange={(description) => setVariantForm((prev) => ({ ...prev, description }))} />
                         </div>
                         <div className="col-12">
                           <button
@@ -1154,7 +1188,7 @@ export default function AdminTasks() {
       {/* Edit Variant Modal */}
       {editVariantModalOpen && (
         <>
-          <div className="modal fade show d-block" role="dialog" tabIndex="-1">
+          <div className="modal fade show d-block admin-task-variant-edit-modal" role="dialog" tabIndex="-1">
             <div className="modal-dialog" role="document">
               <div className="modal-content">
                 <div className="modal-header">
@@ -1209,13 +1243,7 @@ export default function AdminTasks() {
                       </div>
                       <div className="col-12">
                         <label className="form-label">{t('adminTasks.descriptionOptional')}</label>
-                        <textarea
-                          className="form-control"
-                          rows="4"
-                          value={editVariantForm.description}
-                          onChange={(e) => setEditVariantForm(prev => ({ ...prev, description: e.target.value }))}
-                          placeholder={t('adminTasks.supportsMarkdown')}
-                        />
+                        <ArticleEditBox value={editVariantForm.description} onChange={(description) => setEditVariantForm((prev) => ({ ...prev, description }))} />
                       </div>
                     </div>
                   </div>

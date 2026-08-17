@@ -13,11 +13,11 @@ import Button from "../components/Button";
 import Alert from "../components/Alert";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
-import Textarea from "../components/Textarea";
 import Select from "../components/Select";
 import LoadingSpinner from "../components/LoadingSpinner";
 import AttendanceDialog from "../components/AttendanceDialog";
 import EventMonthCalendar from "../components/calendar/EventMonthCalendar";
+import ArticleEditBox from "../modules/web/admin/ArticleEditBox";
 
 const KIND_STYLES = {
   meeting: { badge: "text-bg-primary", chip: "bg-primary", icon: "fa-people-group" },
@@ -1097,13 +1097,11 @@ export default function Activity() {
             </div>
             <div className="col-12">
               <label className="form-label small fw-semibold">{t("calendar.description")}</label>
-              <Textarea
-                rows={3}
+              <ArticleEditBox
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder={t("calendar.description")}
+                onChange={(description) => setForm((current) => ({ ...current, description }))}
+                disabled={saveMutation.isPending}
               />
-              <div className="form-text">{t("calendar.markdownHint")}</div>
             </div>
           </div>
         </form>

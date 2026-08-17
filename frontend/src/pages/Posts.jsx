@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import PropTypes from "prop-types";
 
 import LoadingSpinner from "../components/LoadingSpinner";
+import HeroHeader from "../components/HeroHeader";
 import UserAvatar from "../components/UserAvatar";
 import MediaPreview from "../modules/web/media/MediaPreview";
 import api from "../services/api";
@@ -37,7 +38,7 @@ function EventInfoBox({ event }) {
   return <aside className="post-event-info rounded border p-3 my-4" aria-label="Související akce">
     <div className="d-flex align-items-start gap-3"><span className="post-event-icon"><i className="fas fa-calendar-check" /></span><div className="flex-grow-1"><div className="small text-uppercase fw-semibold text-primary">Související akce</div><h2 className="h5 mb-1">{event.title}</h2><div className="small text-muted">{formatDate(event.starts_at, { weekday: "long" })}{event.location ? ` · ${event.location}` : ""}</div>{event.description && <p className="mb-0 mt-2 small">{event.description}</p>}</div></div>
     {event.requires_planned && <><div className="alert alert-info py-2 small my-3 mb-0"><i className="fas fa-circle-info me-2" />{deadlinePassed ? "Termín pro přihlášení již uplynul." : "Vyberte, zda se akce zúčastníte."}{event.planned_deadline && !deadlinePassed && <> Uzávěrka: {formatDate(event.planned_deadline)}.</>}</div>
-      {!deadlinePassed && <div className="mt-3 d-flex flex-wrap gap-2" role="group" aria-label="Účast na akci">{choices.map(([status, className, icon, label]) => <button key={status} className={`btn btn-sm ${selection === status ? className : "btn-outline-secondary"}`} type="button" disabled={attendanceMutation.isPending} onClick={() => attendanceMutation.mutate(status)}><i className={`fas ${icon} me-1`} />{label}</button>)}</div>}
+      {!deadlinePassed && <div className="post-event-choice-group btn-group mt-3" role="group" aria-label="Účast na akci">{choices.map(([status, className, icon, label]) => <button key={status} className={`btn btn-sm ${selection === status ? className : "btn-outline-secondary"}`} type="button" disabled={attendanceMutation.isPending} onClick={() => attendanceMutation.mutate(status)}><i className={`fas ${icon} me-1`} />{label}</button>)}</div>}
       {registrationLabel && <p className="small text-muted mb-0 mt-2"><i className={`fas ${selection === "attending" ? "fa-check text-success" : "fa-xmark text-warning"} me-1`} />{registrationLabel}{registration.created_at && <> · {formatDate(registration.created_at)}</>}</p>}</>}
     <div className="mt-3"><Link className="btn btn-sm btn-outline-primary" to={`/activity?event=${event.id}`}>Detail akce</Link></div>
   </aside>;
@@ -63,8 +64,8 @@ export function PostsPage() {
   const currentPage = data?.page || page;
   const pages = data?.pages || 1;
 
-  return <main className="container py-4 py-lg-5">
-    <header className="mb-4"><h1 className="h2 mb-1">Příspěvky</h1><p className="text-muted mb-0">Novinky, informace a vše o akcích</p></header>
+  return <main className="posts-page">
+    <HeroHeader title="Příspěvky" subtitle="Novinky, informace a vše o akcích" icon="📰" />
     {isLoading ? <LoadingSpinner /> : posts.length === 0 ? <div className="text-muted py-5">Zatím není co číst.</div> : <>
       <div className="row g-4">{posts.map((post) => <article className="col-12 col-md-6 col-xl-4" key={post.id}>
         <Link to={`/posts/${post.id}`} className="card h-100 text-decoration-none text-reset shadow-sm overflow-hidden post-list-card">
@@ -84,9 +85,9 @@ export function PostDetailPage() {
     queryFn: async () => (await api.get(`/web/posts/feed/${id}`)).data,
     enabled: Boolean(id),
   });
-  if (isLoading) return <div className="container py-5"><LoadingSpinner /></div>;
-  if (isError || !post) return <main className="container py-5"><h1 className="h3">Článek se nepodařilo načíst</h1><Link to="/posts">Zpět na příspěvky</Link></main>;
-  return <main className="container py-4 py-lg-5 post-reading"><Link to="/posts" className="small text-decoration-none"><i className="fas fa-arrow-left me-1" />Všechny příspěvky</Link>
+  if (isLoading) return <div className="py-5"><LoadingSpinner /></div>;
+  if (isError || !post) return <main className="post-reading py-4"><h1 className="h3">Článek se nepodařilo načíst</h1><Link to="/posts">Zpět na příspěvky</Link></main>;
+  return <main className="post-reading"><Link to="/posts" className="post-back-link small text-decoration-none"><i className="fas fa-arrow-left me-1" />Všechny příspěvky</Link>
     <article className="mx-auto mt-3"><header className="post-reading-header"><h1>{post.title}</h1><div className="d-flex align-items-center gap-2 small text-muted mt-3"><UserAvatar user={{ real_name: post.author, avatar: post.author_avatar }} size={30} fallbackClass="bg-success" /><span>{post.author || "Oddíl"} · {formatDate(post.published_at)}</span></div></header>
     {post.cover_media_id && <MediaPreview src={`/api/web/media/${post.cover_media_id}/file`} alt="" className="post-reading-cover w-100 my-4" />}
     {post.event && <EventInfoBox event={post.event} />}

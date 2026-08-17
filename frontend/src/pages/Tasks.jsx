@@ -10,6 +10,7 @@ import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
+import "./Tasks.css";
 import Modal from "../components/Modal";
 
 const COOLDOWN_MS = 5000;
@@ -397,7 +398,7 @@ export default function TasksPage() {
         : extractErrorMessage(submissionMutation.error, t("tasks.error"));
 
     const modalFooter = (
-      <div className="bg-light bg-opacity-50 px-4 py-3">
+      <div className="task-detail-modal-actions bg-light bg-opacity-50 px-4 py-3">
         <Button
           variant="outline-secondary"
           className="px-4 py-2"
@@ -454,7 +455,7 @@ export default function TasksPage() {
         size="lg"
         headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
         footer={modalFooter}
-        className="position-relative"
+        className="position-relative task-detail-modal"
       >
         <div className="position-absolute top-0 end-0 opacity-20" style={{ fontSize: '4rem', lineHeight: 1, marginTop: '-1rem', marginRight: '3rem' }}>
           <i className="fas fa-star text-warning"></i>

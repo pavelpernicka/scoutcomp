@@ -8,6 +8,9 @@ import { useAuth } from "../../providers/AuthProvider";
 import DecoratedCard from "../DecoratedCard";
 import { parseServerDate } from "../../utils/dateUtils";
 import EventMonthCalendar from "../calendar/EventMonthCalendar";
+import DashboardWidgetIcon from "./DashboardWidgetIcon";
+
+import "./PlannedEventsWidget.css";
 
 const KIND_STYLES = {
   meeting: { chip: "#0d6efd", icon: "fa-people-group", label: "calendar.meeting" },
@@ -88,8 +91,7 @@ export default function PlannedEventsWidget() {
     <DecoratedCard
       title={t("dashboard.plannedEvents")}
       subtitle={t("dashboard.plannedEventsSubtitle")}
-      icon={<span>📅</span>}
-      headerGradient="linear-gradient(135deg, #14532d 0%, #22c55e 100%)"
+      icon={<DashboardWidgetIcon>📅</DashboardWidgetIcon>}
       shadow={true}
       border={false}
       bodyClassName="p-0 d-flex flex-column"
@@ -109,7 +111,7 @@ export default function PlannedEventsWidget() {
         </div>
       ) : (
         <div className="row g-0">
-          <div className="col-12 col-lg-7 border-end p-2">
+          <div className="col-12 col-lg-7 p-2 dashboard-events-calendar-pane">
             <div className="d-flex align-items-center justify-content-between px-1 pb-2">
               <button type="button" className="btn btn-sm btn-outline-secondary" aria-label="Předchozí měsíc" onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))}><i className="fas fa-chevron-left" /></button>
               <strong className="small text-capitalize">{calendarMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}</strong>
@@ -125,7 +127,11 @@ export default function PlannedEventsWidget() {
               compact
             />
           </div>
-          <div className="col-12 col-lg-5 d-flex flex-column">
+          <div className="col-12 col-lg-5 d-flex flex-column dashboard-events-list">
+          <div className="dashboard-events-list__heading">
+            <span>Nadcházející akce</span>
+            <span>{upcoming.length}</span>
+          </div>
           {upcoming.map((event, index) => {
             const style = KIND_STYLES[event.kind] || KIND_STYLES.other;
             const myEntry = myStatusByEvent[event.id];
@@ -136,7 +142,7 @@ export default function PlannedEventsWidget() {
               parseServerDate(event.planned_deadline) < new Date();
 
             return (
-              <div key={event.id} className={`p-3 ${index !== upcoming.length - 1 ? "border-bottom" : ""} widget-event-row`} style={{ background: index % 2 === 0 ? "#f8f9fa" : "white" }}>
+              <div key={event.id} className={`p-3 ${index !== upcoming.length - 1 ? "border-bottom" : ""} widget-event-row dashboard-event-row`}>
                 <div
                   role="button"
                   tabIndex={0}

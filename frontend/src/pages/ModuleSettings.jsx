@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import AdminConfig from "./AdminConfig";
 import LoadingSpinner from "../components/LoadingSpinner";
+import HeroHeader from "../components/HeroHeader";
+import Alert from "../components/Alert";
 
 export default function ModuleSettings() {
   const { t } = useTranslation();
@@ -62,29 +64,11 @@ export default function ModuleSettings() {
 
   return (
     <>
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="d-flex align-items-center mb-2">
-                <i className={`fas ${module.icon || "fa-puzzle-piece"} fs-3 me-3`}></i>
-                <div>
-                  <h1 className="mb-1">{module.name} · {t("adminModules.settings").toLowerCase()}</h1>
-                  <p className="mb-0 opacity-90 fs-5">{module.description}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <HeroHeader title={`${module.name} · ${t("adminModules.settings").toLowerCase()}`} subtitle={module.description} icon={<i className={`fas ${module.icon || "fa-puzzle-piece"}`} />} variant="admin" />
 
       <div className="row">
         <div className="col-12">
-          {feedback && (
-            <div className={`alert alert-${feedback.type} shadow-sm border-0 mb-4`} role="alert">
-              {feedback.message}
-            </div>
-          )}
+          {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
           <div className="card shadow-lg border-0" style={{ borderTop: '4px solid #6f42c1' }}>
             <div className="card-header bg-light border-0">
               <div className="d-flex align-items-center gap-2">

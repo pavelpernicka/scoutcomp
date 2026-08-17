@@ -1,0 +1,25 @@
+.dashboard-events-calendar-pane { border-right: 1px solid var(--scout-line); }
+.dashboard-events-list__heading { display: flex; align-items: center; justify-content: space-between; min-height: 3rem; padding: .7rem 1rem; border-bottom: 1px solid var(--scout-line); color: #33463a; font-size: .82rem; font-weight: 750; letter-spacing: .02em; text-transform: uppercase; }
+.dashboard-events-list__heading > span:last-child { display: grid; width: 1.45rem; height: 1.45rem; place-items: center; border-radius: 50%; background: #e8f1e8; color: var(--scout-forest); font-size: .75rem; }
+
+@media (max-width: 991.98px) {
+  .dashboard-events-calendar-pane {
+    margin-bottom: .45rem;
+    padding-bottom: 1rem !important;
+    border-right: 0;
+    border-bottom: 1px solid var(--scout-line);
+    box-shadow: 0 .5rem .8rem -1rem rgba(23, 53, 39, .55);
+  }
+  .dashboard-events-list { gap: .7rem; padding: .8rem; background: #f5f7f3; }
+  .dashboard-events-list__heading { min-height: auto; padding: 0 .2rem .25rem; border-bottom: 0; }
+  .dashboard-events-list .dashboard-event-row {
+    padding: 1rem !important;
+    border: 1px solid var(--scout-line) !important;
+    border-radius: .5rem;
+    background: var(--scout-paper);
+    box-shadow: 0 .18rem .55rem rgba(28, 60, 46, .06);
+  }
+  .dashboard-events-list .dashboard-event-row:nth-child(even) { background: var(--scout-paper); }
+  .dashboard-events-list .dashboard-event-row:has([role="button"]:hover),
+  .dashboard-events-list .dashboard-event-row:has([role="button"]:focus-visible) { background: #eef4ed; }
+}

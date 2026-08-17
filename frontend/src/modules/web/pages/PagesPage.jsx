@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import AdminPageHeader from "../admin/AdminPageHeader";
+import Alert from "../../../components/Alert";
 import { cmsApi, displayPagePath } from "../api/cms";
 import { filterCatalogResources } from "../editor/resourceBlocks";
 import { TEMPLATE_USAGE_MODES, templatesForUsage } from "../templateContracts";
@@ -80,7 +81,7 @@ export default function PagesPage() {
         description={t("web.pagesDescription")}
         action={<button className="btn btn-primary" type="button" onClick={() => setCreating(true)}><i className="fas fa-plus me-2" />{t("web.commands.newPage")}</button>}
       />
-      {error && <div className="alert alert-danger" role="alert">{error}</div>}
+      {error && <Alert type="danger" toast onDismiss={() => setError("")}>{error}</Alert>}
       <div className="web-page-filters" role="group" aria-label={t("web.fields.pageFilter")}>{["all", "published", "draft", "trash"].map((key) => <button key={key} type="button" className={view === key ? "active" : ""} aria-pressed={view === key} onClick={() => setView(key)}>{t(`web.pageViews.${key}`)}</button>)}</div>
       {creating && (
         <form className="web-inline-create" onSubmit={(event) => { event.preventDefault(); if (title.trim()) create.mutate(); }}>
@@ -97,7 +98,7 @@ export default function PagesPage() {
         <div className="web-admin-empty"><i className="fas fa-file-circle-plus" /><h3>{t("web.empty.pagesTitle")}</h3><p>{t("web.empty.pagesBody")}</p></div>
       ) : (
         <div className="web-admin-table-wrap">
-          <table className="table align-middle mb-0">
+          <table className="table align-middle mb-0 web-pages-table">
             <thead><tr><th>{t("web.title")}</th><th>{t("web.path")}</th><th>{t("web.status")}</th><th>{t("web.updated")}</th><th><span className="visually-hidden">{t("web.actionsLabel")}</span></th></tr></thead>
             <tbody>{displayedPages.map((page) => (
               <tr key={page.id}>

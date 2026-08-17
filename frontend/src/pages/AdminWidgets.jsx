@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
 import LoadingSpinner from "../components/LoadingSpinner";
+import Alert from "../components/Alert";
+import Modal from "../components/Modal";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 export default function AdminWidgets() {
   const { t } = useTranslation();
@@ -109,50 +112,30 @@ export default function AdminWidgets() {
   }
 
   return (
-    <>
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="d-flex align-items-center mb-2">
-                <i className="fas fa-th-large fs-3 me-3"></i>
-                <div>
-                  <h1 className="mb-1">{t("adminWidgets.title")}</h1>
-                  <p className="mb-0 opacity-90 fs-5">{t("adminWidgets.subtitle")}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="admin-widgets-page">
+      <AdminPageHeader title={t("adminWidgets.title")} description={t("adminWidgets.subtitle")} />
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
+
+      {Object.keys(grouped).length === 0 && (
+        <div className="card card-body text-center text-muted py-5">
+          <i className="fas fa-puzzle-piece fs-3 mb-2 opacity-50 d-block"></i>
+          {t("adminWidgets.empty")}
         </div>
-      </div>
+      )}
 
-      <div className="row">
-        <div className="col-12">
-          {feedback && (
-            <div className={`alert alert-${feedback.type} shadow-sm border-0 mb-4`} role="alert">
-              {feedback.message}
-            </div>
-          )}
-
-          {Object.keys(grouped).length === 0 && (
-            <div className="card card-body text-center text-muted py-5">
-              <i className="fas fa-puzzle-piece fs-3 mb-2 opacity-50 d-block"></i>
-              {t("adminWidgets.empty")}
-            </div>
-          )}
-
-          {Object.entries(grouped).map(([moduleKey, group]) => (
-            <div className="card shadow-sm border-0 mb-4" style={{ borderTop: '4px solid #6f42c1' }} key={moduleKey}>
-              <div className="card-header bg-light border-0 d-flex align-items-center gap-2">
-                <div>
-                  <h5 className="mb-0 fw-bold" style={{ color: '#6f42c1' }}>{group.name}</h5>
-                  <small className="text-muted">{t("adminWidgets.moduleWidgets", { module: group.name })}</small>
-                </div>
+      <div className="admin-widget-groups">
+        {Object.entries(grouped).map(([moduleKey, group]) => (
+          <section className="admin-widget-group" key={moduleKey} aria-labelledby={`widget-module-${moduleKey}`}>
+            <div className="admin-widget-group__heading">
+              <div>
+                <h2 id={`widget-module-${moduleKey}`}>{group.name}</h2>
+                <p>{t("adminWidgets.moduleWidgets", { module: group.name })}</p>
               </div>
-              <div className="card-body p-0">
-                <div className="table-responsive">
-                  <table className="table align-middle mb-0">
-                    <thead className="bg-light">
+            </div>
+            <div className="card admin-widget-table-card">
+              <div className="table-responsive">
+                <table className="table align-middle mb-0">
+                  <thead>
                       <tr>
                         <th className="ps-4">{t("adminWidgets.widget")}</th>
                         <th className="d-none d-md-table-cell">{t("adminWidgets.type")}</th>
@@ -161,33 +144,34 @@ export default function AdminWidgets() {
                     </thead>
                     <tbody>
                       {group.items.map((widget) => (
-                        <tr key={widget.id}>
-                          <td className="ps-4">
-                            <div className="d-flex align-items-center gap-3">
-                              <i className={`fas ${widget.icon} text-primary fs-5`}></i>
-                              <div>
-                                <div className="fw-medium">{widget.title}</div>
-                                <small className="text-muted d-block">{widget.text}</small>
-                                <code className="small text-muted">{widget.id}</code>
+                        <tr key={widget.id} className="admin-widget-row">
+                          <td>
+                            <div className="admin-widget-identity">
+                              <span className="admin-widget-icon" aria-hidden="true"><i className={`fas ${widget.icon}`}></i></span>
+                              <div className="min-w-0">
+                                <div className="admin-widget-title">{widget.title}</div>
+                                {widget.text && <div className="admin-widget-description">{widget.text}</div>}
+                                <code>{widget.id}</code>
                               </div>
                             </div>
                           </td>
                           <td className="d-none d-md-table-cell">
-                            <span className="badge text-bg-light border">{widget.component}</span>
+                            <span className="admin-widget-type">{widget.component}</span>
                           </td>
-                          <td className="text-end pe-4">
-                            <div className="d-inline-flex align-items-center gap-2">
+                          <td className="text-end">
+                            <div className="admin-widget-controls">
                               <button
                                 type="button"
-                                className="btn btn-outline-secondary btn-sm"
+                                className="btn btn-outline-secondary btn-sm admin-widget-edit"
                                 title={t("adminWidgets.editConfig")}
+                                aria-label={`${t("adminWidgets.editConfig")}: ${widget.title}`}
                                 onClick={() => openEditConfig(widget)}
                               >
                                 <i className="fas fa-pen"></i>
                               </button>
                               <div className="form-check form-switch d-inline-block m-0">
                                 <input
-                                  className="form-check-input"
+                                  className="form-check-input admin-widget-switch"
                                   type="checkbox"
                                   role="switch"
                                   id={`widget-${widget.id}`}
@@ -203,55 +187,53 @@ export default function AdminWidgets() {
                         </tr>
                       ))}
                     </tbody>
-                  </table>
-                </div>
+                </table>
               </div>
             </div>
-          ))}
+          </section>
+        ))}
+      </div>
 
-          <div className="d-flex justify-content-end align-items-center gap-2 mb-4">
-            <div className="text-muted me-auto">
-              <small>{t("adminWidgets.help")}</small>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline-secondary"
-              onClick={() => setDraft(null)}
-              disabled={draft === null || saveMutation.isLoading}
-            >
-              {t("common.reset")}
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary px-4 py-2"
-              onClick={() => saveMutation.mutate(draftIds)}
-              disabled={draft === null || saveMutation.isLoading}
-            >
-              {saveMutation.isLoading ? t("common.saving") : t("common.save")}
-            </button>
-          </div>
+      <div className="admin-widgets-savebar" aria-live="polite">
+        <p>{t("adminWidgets.help")}</p>
+        <div className="admin-widgets-savebar__actions">
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            onClick={() => setDraft(null)}
+            disabled={draft === null || saveMutation.isLoading}
+          >
+            {t("common.reset")}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => saveMutation.mutate(draftIds)}
+            disabled={draft === null || saveMutation.isLoading}
+          >
+            {saveMutation.isLoading ? t("common.saving") : t("common.save")}
+          </button>
         </div>
       </div>
 
       {editingWidget && (
-        <>
-          <div
-            className="modal fade show d-block"
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
-            onClick={() => setEditingWidget(null)}
-          >
-            <div className="modal-dialog modal-dialog-centered" onClick={(event) => event.stopPropagation()}>
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">
-                    <i className={`fas ${editingWidget.icon} me-2 text-primary`}></i>
-                    {t("adminWidgets.editConfig")} – {editingWidget.title}
-                  </h5>
-                  <button type="button" className="btn-close" aria-label="Close" onClick={() => setEditingWidget(null)}></button>
-                </div>
-                <div className="modal-body">
+        <Modal
+          isVisible={Boolean(editingWidget)}
+          onClose={() => setEditingWidget(null)}
+          title={`${t("adminWidgets.editConfig")} – ${editingWidget.title}`}
+          icon={<i className={`fas ${editingWidget.icon}`} />}
+          size="lg"
+          footer={(
+            <>
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setEditingWidget(null)}>
+                {t("common.cancel")}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={saveConfig} disabled={configMutation.isLoading}>
+                {configMutation.isLoading ? t("common.saving") : t("common.save")}
+              </button>
+            </>
+          )}
+        >
                   <div className="mb-3">
                     <label className="form-label">{t("adminWidgets.configTitle")}</label>
                     <input
@@ -282,21 +264,8 @@ export default function AdminWidgets() {
                     </div>
                     <div className="form-text">{t("adminWidgets.configIconHint")}</div>
                   </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-outline-secondary" onClick={() => setEditingWidget(null)}>
-                    {t("common.cancel")}
-                  </button>
-                  <button type="button" className="btn btn-primary" onClick={saveConfig} disabled={configMutation.isLoading}>
-                    {configMutation.isLoading ? t("common.saving") : t("common.save")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="modal-backdrop fade show"></div>
-        </>
+        </Modal>
       )}
-    </>
+    </div>
   );
 }

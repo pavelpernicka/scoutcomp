@@ -1,0 +1,11 @@
+.task-detail-modal .modal-footer { padding: .65rem 1rem; }
+.task-detail-modal-actions { display: flex; width: 100%; align-items: center; justify-content: flex-end; gap: .5rem; }
+
+@media (max-width: 575.98px) {
+  .task-detail-modal .modal-body { padding: .9rem; }
+  .task-detail-modal .nav-tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+  .task-detail-modal .nav-tabs .nav-link { flex: 0 0 auto; padding: .7rem .85rem !important; font-size: .86rem; white-space: nowrap; }
+  .task-detail-modal .tab-content { padding: 1rem !important; }
+  .task-detail-modal-actions { justify-content: stretch; gap: .45rem; padding: 0 !important; background: transparent !important; }
+  .task-detail-modal-actions .btn { flex: 1 1 0; min-width: 0; padding: .55rem .45rem !important; font-size: .82rem; white-space: nowrap; }
+}

@@ -69,7 +69,14 @@ export default function MediaCard({ item, onDragStart, onEdit, onDelete, onClick
       onDragStart={onClick ? undefined : onDragStart}
       onClick={onClick ? handleClick : undefined}
     >
-      <div className="web-media-thumb" onClick={isImage && onPreview ? handlePreview : undefined} role={isImage && onPreview ? "button" : undefined} tabIndex={isImage && onPreview ? 0 : undefined}>
+      <div
+        className="web-media-thumb"
+        onClick={isImage && onPreview ? handlePreview : undefined}
+        onKeyDown={isImage && onPreview ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); handlePreview(); } } : undefined}
+        role={isImage && onPreview ? "button" : undefined}
+        tabIndex={isImage && onPreview ? 0 : undefined}
+        aria-label={isImage && onPreview ? `${t("web.preview")} ${item.filename}` : undefined}
+      >
         {blobUrl && isImage ? (
           <img src={blobUrl} alt={item.alt || ""} loading="lazy" />
         ) : (
@@ -81,10 +88,10 @@ export default function MediaCard({ item, onDragStart, onEdit, onDelete, onClick
         <span>{item.mime || "\u2014"}</span>
         {item.alt && <small>{item.alt}</small>}
       </div>
-      <div className="d-flex gap-1">
+      <div className="web-media-card-actions">
         {onSelect && (
           <button className="btn btn-sm btn-primary" type="button" title={t("web.chooseFromMedia")} onClick={handleSelectPick}>
-            <i className="fas fa-check" />
+            <i className="fas fa-check me-1" /><span>{t("web.chooseFromMedia")}</span>
           </button>
         )}
         {!onClick && (

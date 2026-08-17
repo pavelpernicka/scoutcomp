@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import api from "../../../services/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MediaPickerModal from "../media/MediaPickerModal";
+import Alert from "../../../components/Alert";
+import AdminPageHeader from "./AdminPageHeader";
 import { cmsApi } from "../api/cms";
 
 const EMPTY_SETTINGS = {
@@ -83,14 +85,9 @@ export default function WebAdminSettings() {
 
   return (
     <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-        <div>
-          <h1 className="h3 mb-0">{t("web.settingsTitle")}</h1>
-          <p className="text-muted mb-0 small">{t("web.settingsSubtitle")}</p>
-        </div>
-      </div>
+      <AdminPageHeader title={t("web.settingsTitle")} description={t("web.settingsSubtitle")} />
 
-      {feedback && <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
       {isLoading ? <LoadingSpinner /> : (
         <form className="row g-4" onSubmit={handleSubmit}>

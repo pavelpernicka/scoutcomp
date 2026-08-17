@@ -11,6 +11,22 @@ import i18n from "./i18n";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles.css";
 
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js")
+      .then(async (registration) => {
+        const worker = (await navigator.serviceWorker.ready).active || registration.active;
+        const assetUrls = performance.getEntriesByType("resource")
+          .map((entry) => entry.name)
+          .filter((url) => url.startsWith(window.location.origin) && /\/assets\/.+\.(?:js|css|svg|woff2?)$/i.test(url));
+        worker?.postMessage({ type: "CACHE_ASSETS", urls: assetUrls });
+      })
+      .catch(() => {
+        // Installation is progressive enhancement; authentication must work without it.
+      });
+  });
+}
+
 const queryClient = new QueryClient();
 
 ReactDOM.createRoot(document.getElementById("root")).render(

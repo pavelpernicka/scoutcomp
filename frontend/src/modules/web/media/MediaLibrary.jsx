@@ -192,7 +192,7 @@ export default function MediaLibrary({ selectMode = false, onSelectItem, embedde
       {error && <div className="alert alert-danger">{error}</div>}
       <div className="web-media-library-toolbar">
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/*,.pdf,.svg,.csv,.txt,.zip" onChange={handleUpload} />
-        <button className="btn btn-primary btn-sm" type="button" disabled={upload.isPending} onClick={() => inputRef.current?.click()}>
+        <button className="btn btn-primary" type="button" disabled={upload.isPending} onClick={() => inputRef.current?.click()}>
           <i className="fas fa-upload me-2" />
           {upload.isPending ? t("web.states.uploading") : t("web.uploadMedia")}
         </button>

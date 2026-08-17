@@ -9,7 +9,7 @@ export default function InventoryLocationsScreen({ locations, selectedPath, onSe
     ? locations.flatMap(function flatten(node) { return [node, ...(node.children ? node.children.flatMap(flatten) : [])]; }).find((node) => node.path === selectedPath) ?? null
     : null;
   return (
-    <div className="row g-4">
+    <div className="row g-4 inventory-settings-grid">
       <div className="col-12 col-xl-8">
         <Card className="border-0 shadow-lg" title="Strom lokací" icon={<i className="fas fa-sitemap"></i>}>
           <div className="inventory-section-create mb-3">

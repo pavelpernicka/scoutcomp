@@ -14,7 +14,10 @@ const Button = ({
   ...props
 }) => {
   const getVariantClass = () => {
-    if (gradient) return '';
+    // Older callers may still pass a gradient. Keep their semantic intent but
+    // route it through the shared Bootstrap-variable brand button so hover,
+    // active, focus and disabled states stay coherent.
+    if (gradient) return 'btn-brand';
     return `btn-${variant}`;
   };
 
@@ -23,13 +26,6 @@ const Button = ({
   };
 
   const getStyle = () => {
-    if (gradient) {
-      return {
-        background: gradient,
-        border: 'none',
-        ...style
-      };
-    }
     return style;
   };
 

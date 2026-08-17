@@ -196,6 +196,24 @@ export default function Messages() {
     setSearchQuery("");
   };
 
+  const closeMobileThread = () => {
+    setSelectedId(null);
+    setPickedUser(null);
+    setBody("");
+    setSendError(null);
+  };
+
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && window.matchMedia("(max-width: 991.98px)").matches) {
+        closeMobileThread();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedId]);
+
   const threadUser = pickedUser || selectedUser;
 
   const showBlockedNotice = threadUser && threadUser.receive_messages === false;
@@ -347,7 +365,7 @@ export default function Messages() {
           </div>
 
           {/* Thread pane */}
-          <div className="col-12 col-lg-8 d-flex flex-column messages-thread">
+          <div className={`col-12 col-lg-8 d-flex flex-column messages-thread ${selectedId ? "messages-thread--open" : ""}`} role={selectedId ? "dialog" : undefined} aria-modal={selectedId ? "true" : undefined}>
             {!selectedId ? (
               <div className="d-flex flex-column align-items-center justify-content-center text-center p-5 flex-grow-1">
                 <i className="fas fa-comments fs-1 text-muted mb-3 opacity-50"></i>
@@ -361,6 +379,7 @@ export default function Messages() {
                     <h2 className="h6 mb-0">{t("messages.system")}</h2>
                     <small className="text-muted">{t("messages.systemDescription")}</small>
                   </div>
+                  <button type="button" className="btn btn-sm btn-outline-secondary d-lg-none ms-auto" onClick={closeMobileThread} aria-label="Zavřít konverzaci"><i className="fas fa-xmark" /></button>
                 </div>
                 <div className="flex-grow-1 overflow-auto">
                   {notifications.length === 0 ? (
@@ -418,6 +437,7 @@ export default function Messages() {
                       {threadUser?.team_name || t("messages.directMessages")}
                     </small>
                   </div>
+                  <button type="button" className="btn btn-sm btn-outline-secondary d-lg-none" onClick={closeMobileThread} aria-label="Zavřít konverzaci"><i className="fas fa-xmark" /></button>
                 </div>
 
                 <div
@@ -521,6 +541,7 @@ export default function Messages() {
           </div>
         </div>
       </div>
+      {selectedId && <button type="button" className="messages-thread-mobile-backdrop d-lg-none" aria-label="Zavřít konverzaci" onClick={closeMobileThread} />}
     </>
   );
 }

@@ -6,6 +6,8 @@ import api from "../services/api";
 import { useConfig } from "../providers/ConfigProvider";
 import LoadingSpinner from "../components/LoadingSpinner";
 import defaultAppIcon from "../assets/default-app-icon.svg";
+import Alert from "../components/Alert";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 export default function AdminConfig() {
   const { t } = useTranslation();
@@ -131,51 +133,24 @@ export default function AdminConfig() {
 
   return (
     <>
-      {/* Header */}
-      <div className="row mb-4">
-        <div className="col-12">
-          <div className="card shadow-lg border-0">
-            <div className="card-body text-white position-relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
-              <div className="row align-items-center">
-                <div className="col-md-8">
-                  <div className="d-flex align-items-center mb-2">
-                    <div>
-                      <h1 className="mb-1">{t("adminConfig.title")}</h1>
-                      <p className="mb-0 opacity-90 fs-5">
-                        {t("adminConfig.subtitle")}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader title={t("adminConfig.title")} description={t("adminConfig.subtitle")} />
 
       {/* Configuration Form */}
-      <div className="row">
-        <div className="col-12">
-          <div className="card shadow-lg border-0" style={{ borderTop: '4px solid #6f42c1' }}>
-            <div className="card-header bg-light border-0">
+      <div className="admin-config-layout">
+          <div className="card admin-config-card">
+            <div className="card-header admin-config-card__header">
               <div className="d-flex align-items-center gap-2">
                 <div>
-                  <h5 className="mb-0 fw-bold" style={{ color: '#6f42c1' }}>{t("adminConfig.generalSettings")}</h5>
+                  <h2 className="h5 mb-0">{t("adminConfig.generalSettings")}</h2>
                   <small className="text-muted">{t("adminConfig.generalDescription")}</small>
                 </div>
               </div>
             </div>
-            <div className="card-body p-4">
-              {feedback && (
-                <div className={`alert alert-${feedback.type} shadow-sm border-0 mb-4`} role="alert">
-                  <div className="d-flex align-items-center">
-                    {feedback.message}
-                  </div>
-                </div>
-              )}
+            <div className="card-body">
+              {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
               <form onSubmit={handleSubmit}>
-                <div className="row g-4">
+                <div className="row g-3">
                   {/* App Name */}
                   <div className="col-12">
                     <label className="form-label fw-medium">
@@ -199,7 +174,7 @@ export default function AdminConfig() {
                     <label className="form-label fw-medium">
                       {t("adminConfig.appIcon")}
                     </label>
-                    <div className="row g-3">
+                    <div className="row g-3 admin-config-icon-row">
                       <div className="col-md-8">
                         <div className="input-group">
                           <input
@@ -265,7 +240,7 @@ export default function AdminConfig() {
                   </div>
                 </div>
 
-                <div className="mt-4 d-flex justify-content-between align-items-center">
+                <div className="admin-config-actions">
                   <div className="text-muted">
                     <small>{t("adminConfig.adminOnly")}</small>
                   </div>
@@ -280,7 +255,6 @@ export default function AdminConfig() {
               </form>
             </div>
           </div>
-        </div>
       </div>
     </>
   );

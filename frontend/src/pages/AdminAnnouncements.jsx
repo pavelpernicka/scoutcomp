@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal } from "../utils/dateUtils";
-import HeroHeader from "../components/HeroHeader";
+import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
+import Alert from "../components/Alert";
+import Modal from "../components/Modal";
+import AdminPanel from "../components/AdminPanel";
 
 const initialCreateScope = (isAdmin) => (isAdmin ? "global" : "team");
 
@@ -15,6 +19,7 @@ export default function AdminAnnouncements() {
   const { isAdmin, managedTeamIds, canManageUsers } = useAuth();
 
   const [feedback, setFeedback] = useState(null);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(() => ({
     title: "",
     body: "",
@@ -106,6 +111,7 @@ export default function AdminAnnouncements() {
         scope: initialCreateScope(isAdmin),
         teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "",
       });
+      setIsCreateOpen(false);
       setFeedback({ type: "success", message: t('adminAnnouncements.announcementPublished') });
     },
     onError: (error) => {
@@ -250,311 +256,148 @@ export default function AdminAnnouncements() {
   };
 
   return (
-    <>
-      <HeroHeader
-        title={t("adminAnnouncements.title")}
-        subtitle={t("adminAnnouncements.subtitle")}
-        icon="📢"
-        gradient="linear-gradient(135deg, #0f766e 0%, #14b8a6 100%)"
+    <div className="admin-announcements-page">
+      <AdminPageHeader
+        title={t("adminAnnouncements.pageTitle")}
+        description={t("adminAnnouncements.subtitle")}
+        action={(
+          <button type="button" className="btn btn-primary" onClick={() => setIsCreateOpen(true)}>
+            <i className="fas fa-plus me-2" aria-hidden="true" />
+            {t('adminAnnouncements.createAnnouncement')}
+          </button>
+        )}
       />
 
-      <div className="container px-0">
-      {feedback && (
-        <div className={`alert alert-${feedback.type}`} role="alert">
-          {feedback.message}
-        </div>
-      )}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
-      <div className="row g-4">
-        <div className="col-12 col-xl-5">
-          <div className="card shadow-sm h-100">
-            <div className="card-header">{t('adminAnnouncements.createAnnouncement')}</div>
-            <div className="card-body">
-              <form className="row g-3" onSubmit={handleCreateSubmit}>
-                <div className="col-12">
-                  <label className="form-label">{t('adminAnnouncements.title')}</label>
-                  <input
-                    className="form-control"
-                    value={createForm.title}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({ ...prev, title: event.target.value }))
-                    }
-                    placeholder={t('adminAnnouncements.optionalHeadline')}
-                  />
-                </div>
-                <div className="col-12">
-                  <label className="form-label">{t('adminAnnouncements.message')}</label>
-                  <textarea
-                    className="form-control"
-                    rows={4}
-                    value={createForm.body}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({ ...prev, body: event.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                {isAdmin && (
-                  <div className="col-12">
-                    <label className="form-label">{t('adminAnnouncements.audience')}</label>
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        id="create-scope-global"
-                        name="create-scope"
-                        checked={createForm.scope === "global"}
-                        onChange={() => setCreateForm((prev) => ({ ...prev, scope: "global" }))}
-                      />
-                      <label className="form-check-label" htmlFor="create-scope-global">
-                        {t('adminAnnouncements.globalAllTeams')}
-                      </label>
-                    </div>
-                    <div className="form-check">
-                      <input
-                        className="form-check-input"
-                        type="radio"
-                        id="create-scope-team"
-                        name="create-scope"
-                        checked={createForm.scope === "team"}
-                        onChange={() => setCreateForm((prev) => ({ ...prev, scope: "team" }))}
-                      />
-                      <label className="form-check-label" htmlFor="create-scope-team">
-                        {t('adminAnnouncements.specificTeam')}
-                      </label>
-                    </div>
-                  </div>
-                )}
-                {createForm.scope === "team" && (
-                  <div className="col-12">
-                    <label className="form-label">{t('adminAnnouncements.team')}</label>
-                    <select
-                      className="form-select"
-                      value={createForm.teamId}
-                      onChange={(event) =>
-                        setCreateForm((prev) => ({ ...prev, teamId: event.target.value }))
-                      }
-                      disabled={teamsLoading || managedTeams.length === 0}
-                    >
-                      <option value="" disabled>
-                        {managedTeams.length === 0 ? t('adminAnnouncements.noAvailableTeams') : t('adminAnnouncements.selectTeam')}
-                      </option>
-                      {teamOptions.map((team) => (
-                        <option key={team.value} value={team.value}>
-                          {team.label}
-                        </option>
-                      ))}
-                    </select>
-                    {managedTeams.length === 0 && (
-                      <div className="form-text text-danger">
-                        {t('adminAnnouncements.assignManagedTeam')}
-                      </div>
-                    )}
-                  </div>
-                )}
-                <div className="col-12 d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline-secondary"
-                    onClick={() =>
-                      setCreateForm({
-                        title: "",
-                        body: "",
-                        scope: initialCreateScope(isAdmin),
-                        teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "",
-                      })
-                    }
-                    disabled={createMessageMutation.isLoading}
-                  >
-                    {t('adminAnnouncements.clear')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={createMessageMutation.isLoading}
-                  >
-                    {t('adminAnnouncements.publish')}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-
-        {editingMessage && (
-          <div className="col-12 col-xl-5">
-            <div className="card shadow-sm h-100">
-              <div className="card-header d-flex justify-content-between align-items-center">
-                <span>{t('adminAnnouncements.editAnnouncement')}</span>
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={handleCancelEdit}>
-                  {t('adminAnnouncements.cancel')}
-                </button>
-              </div>
-              <div className="card-body">
-                <form className="row g-3" onSubmit={handleEditSubmit}>
-                  <div className="col-12">
-                    <label className="form-label">{t('adminAnnouncements.title')}</label>
-                    <input
-                      className="form-control"
-                      value={editForm.title}
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, title: event.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label">{t('adminAnnouncements.message')}</label>
-                    <textarea
-                      className="form-control"
-                      rows={4}
-                      value={editForm.body}
-                      onChange={(event) =>
-                        setEditForm((prev) => ({ ...prev, body: event.target.value }))
-                      }
-                      required
-                    />
-                  </div>
-                  {isAdmin && (
-                    <div className="col-12">
-                      <label className="form-label">{t('adminAnnouncements.audience')}</label>
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="radio"
-                          id="edit-scope-global"
-                          name="edit-scope"
-                          checked={editForm.scope === "global"}
-                          onChange={() => setEditForm((prev) => ({ ...prev, scope: "global" }))}
-                        />
-                        <label className="form-check-label" htmlFor="edit-scope-global">
-                          {t('adminAnnouncements.globalAllTeams')}
-                        </label>
-                      </div>
-                      <div className="form-check">
-                        <input
-                          className="form-check-input"
-                          type="radio"
-                          id="edit-scope-team"
-                          name="edit-scope"
-                          checked={editForm.scope === "team"}
-                          onChange={() => setEditForm((prev) => ({ ...prev, scope: "team" }))}
-                        />
-                        <label className="form-check-label" htmlFor="edit-scope-team">
-                          {t('adminAnnouncements.specificTeam')}
-                        </label>
-                      </div>
-                    </div>
-                  )}
-                  {(editForm.scope === "team" || !isAdmin) && (
-                    <div className="col-12">
-                      <label className="form-label">{t('adminAnnouncements.team')}</label>
-                      <select
-                        className="form-select"
-                        value={editForm.teamId}
-                        onChange={(event) =>
-                          setEditForm((prev) => ({ ...prev, teamId: event.target.value }))
-                        }
-                        disabled={teamsLoading || managedTeams.length === 0}
-                      >
-                        <option value="" disabled>
-                          {managedTeams.length === 0 ? t('adminAnnouncements.noAvailableTeams') : t('adminAnnouncements.selectTeam')}
-                        </option>
-                        {teamOptions.map((team) => (
-                          <option key={team.value} value={team.value}>
-                            {team.label}
-                          </option>
-                        ))}
-                      </select>
-                      {managedTeams.length === 0 && (
-                        <div className="form-text text-danger">
-                          Assign a managed team before editing team announcements.
+      <AdminPanel title={t('adminAnnouncements.announcements')} className="admin-announcements-table" bodyClassName="p-0">
+          {messagesLoading ? (
+            <div className="text-center text-muted py-3">{t('adminAnnouncements.loading')}</div>
+          ) : dashboardMessages.length === 0 ? (
+            <p className="text-muted px-3 py-2 mb-0">{t('adminAnnouncements.noAnnouncementsYet')}</p>
+          ) : (
+            <div className="table-responsive">
+              <table className="table table-sm align-middle mb-0 admin-announcements-table__table">
+                <thead className="table-light">
+                  <tr>
+                    <th style={{ width: "6rem" }}>{t('adminAnnouncements.type')}</th>
+                    <th>{t('adminAnnouncements.title')}</th>
+                    <th>{t('adminAnnouncements.body')}</th>
+                    <th>{t('adminAnnouncements.team')}</th>
+                    <th>{t('adminAnnouncements.created')}</th>
+                    <th><span className="visually-hidden">{t('common.actions')}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboardMessages.map((message) => (
+                    <tr key={message.id}>
+                      <td>{renderScopeBadge(message)}</td>
+                      <td>{message.title || <span className="text-muted">—</span>}</td>
+                      <td className="admin-announcements-table__body">{message.body}</td>
+                      <td>{message.team_name || t('adminAnnouncements.all')}</td>
+                      <td>{formatDateToLocal(message.created_at)}</td>
+                      <td className="text-end">
+                        <div className="btn-group btn-group-sm" role="group">
+                          <button type="button" className="btn btn-outline-primary" onClick={() => handleStartEdit(message)} disabled={updateMessageMutation.isLoading}>{t('common.edit')}</button>
+                          <button type="button" className="btn btn-outline-danger" onClick={() => handleDeleteMessage(message.id)} disabled={deleteMessageMutation.isLoading}>{t('common.delete')}</button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                  <div className="col-12 d-flex justify-content-end gap-2">
-                    <button
-                      type="button"
-                      className="btn btn-outline-secondary"
-                      onClick={handleCancelEdit}
-                      disabled={updateMessageMutation.isLoading}
-                    >
-                      {t('adminAnnouncements.cancel')}
-                    </button>
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={updateMessageMutation.isLoading}
-                    >
-                      {t('adminAnnouncements.save')}
-                    </button>
-                  </div>
-                </form>
-              </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
-        )}
+          )}
+      </AdminPanel>
 
-        <div className="col-12">
-          <div className="card shadow-sm">
-            <div className="card-header">{t('adminAnnouncements.announcements')}</div>
-            <div className="card-body p-0">
-              {messagesLoading ? (
-                <div className="text-center text-muted py-3">{t('adminAnnouncements.loading')}</div>
-              ) : dashboardMessages.length === 0 ? (
-                <p className="text-muted px-3 py-2 mb-0">{t('adminAnnouncements.noAnnouncementsYet')}</p>
-              ) : (
-                <div className="table-responsive">
-                  <table className="table table-sm align-middle mb-0">
-                    <thead className="table-light">
-                      <tr>
-                        <th style={{ width: "6rem" }}>{t('adminAnnouncements.type')}</th>
-                        <th>{t('adminAnnouncements.title')}</th>
-                        <th>{t('adminAnnouncements.body')}</th>
-                        <th>{t('adminAnnouncements.team')}</th>
-                        <th>{t('adminAnnouncements.created')}</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dashboardMessages.map((message) => (
-                        <tr key={message.id}>
-                          <td>{renderScopeBadge(message)}</td>
-                          <td>{message.title || <span className="text-muted">—</span>}</td>
-                          <td>{message.body}</td>
-                          <td>{message.team_name || t('adminAnnouncements.all')}</td>
-                          <td>{formatDateToLocal(message.created_at)}</td>
-                          <td className="text-end">
-                            <div className="btn-group btn-group-sm" role="group">
-                              <button
-                                type="button"
-                                className="btn btn-outline-primary"
-                                onClick={() => handleStartEdit(message)}
-                                disabled={updateMessageMutation.isLoading}
-                              >
-                                {t('common.edit')}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-outline-danger"
-                                onClick={() => handleDeleteMessage(message.id)}
-                                disabled={deleteMessageMutation.isLoading}
-                              >
-                                {t('common.delete')}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <Modal
+        isVisible={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title={t('adminAnnouncements.createAnnouncement')}
+        icon={<i className="fas fa-bullhorn" />}
+        size="lg"
+        footer={<AnnouncementModalActions formId="create-announcement" cancelLabel={t('adminAnnouncements.clear')} submitLabel={t('adminAnnouncements.publish')} loading={createMessageMutation.isLoading} onCancel={() => setCreateForm({ title: "", body: "", scope: initialCreateScope(isAdmin), teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "" })} />}
+      >
+        <AnnouncementForm id="create-announcement" form={createForm} setForm={setCreateForm} isAdmin={isAdmin} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleCreateSubmit} t={t} />
+      </Modal>
+
+      <Modal
+        isVisible={Boolean(editingMessage)}
+        onClose={handleCancelEdit}
+        title={t('adminAnnouncements.editAnnouncement')}
+        icon={<i className="fas fa-pen" />}
+        size="lg"
+        footer={<AnnouncementModalActions formId="edit-announcement" cancelLabel={t('adminAnnouncements.cancel')} submitLabel={t('adminAnnouncements.save')} loading={updateMessageMutation.isLoading} onCancel={handleCancelEdit} />}
+      >
+        <AnnouncementForm id="edit-announcement" form={editForm} setForm={setEditForm} isAdmin={isAdmin} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleEditSubmit} t={t} />
+      </Modal>
     </div>
+  );
+}
+
+function AnnouncementModalActions({ formId, cancelLabel, submitLabel, loading, onCancel }) {
+  return (
+    <>
+      <button type="button" className="btn btn-outline-secondary" onClick={onCancel} disabled={loading}>{cancelLabel}</button>
+      <button type="submit" form={formId} className="btn btn-primary" disabled={loading}>{submitLabel}</button>
     </>
   );
 }
+
+function AnnouncementForm({ id, form, setForm, isAdmin, teams, teamsLoading, managedTeams, onSubmit, t }) {
+  const requiresTeam = form.scope === "team" || !isAdmin;
+  return (
+    <form id={id} className="row g-3" onSubmit={onSubmit}>
+      <div className="col-12">
+        <label className="form-label" htmlFor={`${id}-title`}>{t('adminAnnouncements.title')}</label>
+        <input id={`${id}-title`} className="form-control" value={form.title} onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))} placeholder={t('adminAnnouncements.optionalHeadline')} />
+      </div>
+      <div className="col-12">
+        <label className="form-label" htmlFor={`${id}-body`}>{t('adminAnnouncements.message')}</label>
+        <textarea id={`${id}-body`} className="form-control" rows={5} value={form.body} onChange={(event) => setForm((prev) => ({ ...prev, body: event.target.value }))} required />
+      </div>
+      {isAdmin && (
+        <fieldset className="col-12">
+          <legend className="form-label">{t('adminAnnouncements.audience')}</legend>
+          <div className="form-check"><input className="form-check-input" type="radio" id={`${id}-scope-global`} name={`${id}-scope`} checked={form.scope === "global"} onChange={() => setForm((prev) => ({ ...prev, scope: "global" }))} /><label className="form-check-label" htmlFor={`${id}-scope-global`}>{t('adminAnnouncements.globalAllTeams')}</label></div>
+          <div className="form-check"><input className="form-check-input" type="radio" id={`${id}-scope-team`} name={`${id}-scope`} checked={form.scope === "team"} onChange={() => setForm((prev) => ({ ...prev, scope: "team" }))} /><label className="form-check-label" htmlFor={`${id}-scope-team`}>{t('adminAnnouncements.specificTeam')}</label></div>
+        </fieldset>
+      )}
+      {requiresTeam && (
+        <div className="col-12">
+          <label className="form-label" htmlFor={`${id}-team`}>{t('adminAnnouncements.team')}</label>
+          <select id={`${id}-team`} className="form-select" value={form.teamId} onChange={(event) => setForm((prev) => ({ ...prev, teamId: event.target.value }))} disabled={teamsLoading || managedTeams.length === 0}>
+            <option value="" disabled>{managedTeams.length === 0 ? t('adminAnnouncements.noAvailableTeams') : t('adminAnnouncements.selectTeam')}</option>
+            {teams.map((team) => <option key={team.value} value={team.value}>{team.label}</option>)}
+          </select>
+          {managedTeams.length === 0 && <div className="form-text text-danger">{t('adminAnnouncements.assignManagedTeam')}</div>}
+        </div>
+      )}
+    </form>
+  );
+}
+
+AnnouncementModalActions.propTypes = {
+  formId: PropTypes.string.isRequired,
+  cancelLabel: PropTypes.string.isRequired,
+  submitLabel: PropTypes.string.isRequired,
+  loading: PropTypes.bool,
+  onCancel: PropTypes.func.isRequired,
+};
+
+AnnouncementForm.propTypes = {
+  id: PropTypes.string.isRequired,
+  form: PropTypes.shape({
+    title: PropTypes.string.isRequired,
+    body: PropTypes.string.isRequired,
+    scope: PropTypes.string.isRequired,
+    teamId: PropTypes.string.isRequired,
+  }).isRequired,
+  setForm: PropTypes.func.isRequired,
+  isAdmin: PropTypes.bool.isRequired,
+  teams: PropTypes.arrayOf(PropTypes.shape({ value: PropTypes.string, label: PropTypes.string })).isRequired,
+  teamsLoading: PropTypes.bool,
+  managedTeams: PropTypes.array.isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  t: PropTypes.func.isRequired,
+};

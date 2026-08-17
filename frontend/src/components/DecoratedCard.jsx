@@ -7,7 +7,7 @@ const DecoratedCard = ({
   icon,
 
   // Header styling
-  headerGradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  headerGradient,
   headerClassName = '',
 
   // Right side content
@@ -35,8 +35,8 @@ const DecoratedCard = ({
   // Build header content
   const renderHeader = () => (
     <div
-      className={`card-header text-white ${headerPosition ? 'position-' + headerPosition : ''} ${headerOverflow ? 'overflow-hidden' : ''} ${headerClassName}`}
-      style={{ background: headerGradient }}
+      className={`card-header decorated-card__header ${headerPosition ? 'position-' + headerPosition : ''} ${headerOverflow ? 'overflow-hidden' : ''} ${headerClassName}`}
+      style={headerGradient ? { '--card-accent': headerGradient } : undefined}
     >
       <div className="d-flex justify-content-between align-items-center position-relative">
         <div className="d-flex align-items-center gap-3">

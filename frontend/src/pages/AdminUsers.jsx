@@ -6,6 +6,7 @@ import { useAuth } from "../providers/AuthProvider";
 import api from "../services/api";
 import { formatDateToLocal, parseServerDate } from "../utils/dateUtils";
 import HeroHeader from "../components/HeroHeader";
+import Alert from "../components/Alert";
 
 const emptyCreateForm = {
   username: "",
@@ -859,18 +860,15 @@ export default function AdminUsers() {
   return (
     <>
       <HeroHeader
+        variant="admin"
         title={t("adminUsers.title")}
         subtitle={t("adminUsers.subtitle")}
         icon="👥"
         gradient="linear-gradient(135deg, #4338ca 0%, #6366f1 100%)"
       />
 
-      <div className="container px-0">
-      {feedback && (
-        <div className={`alert alert-${feedback.type}`} role="alert">
-          {feedback.message}
-        </div>
-      )}
+      <div className="admin-page-content">
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
       <div className="row g-4">
         <div className="col-12">

@@ -4,21 +4,23 @@ const HeroHeader = ({
   title,
   subtitle,
   icon,
-  gradient = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  gradient,
+  variant = 'default',
   children
 }) => {
+  const isAdmin = variant === 'admin';
   return (
-    <div className="row mb-4">
-      <div className="col-12">
-        <div className="card shadow-lg border-0">
-          <div className="card-body text-white position-relative overflow-hidden" style={{ background: gradient }}>
+    <div className={isAdmin ? 'admin-heading-wrap' : 'row mb-4'}>
+      <div className={isAdmin ? undefined : 'col-12'}>
+        <section className={`page-heading page-heading--${variant}`} style={gradient ? { '--page-accent': gradient } : undefined}>
+          <div className="page-heading__body">
             <div className="row align-items-center">
               <div className="col-md-8">
                 <div className="d-flex align-items-center mb-2">
                   {icon && <span className="fs-1 me-3">{icon}</span>}
                   <div>
                     <h1 className="mb-1">{title}</h1>
-                    {subtitle && <p className="mb-0 opacity-90 fs-5">{subtitle}</p>}
+                    {subtitle && <p className="mb-0">{subtitle}</p>}
                   </div>
                 </div>
               </div>
@@ -29,7 +31,7 @@ const HeroHeader = ({
               )}
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
@@ -40,6 +42,7 @@ HeroHeader.propTypes = {
   subtitle: PropTypes.string,
   icon: PropTypes.node,
   gradient: PropTypes.string,
+  variant: PropTypes.oneOf(['default', 'admin']),
   children: PropTypes.node
 };
 

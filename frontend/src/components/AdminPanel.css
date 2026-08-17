@@ -1,0 +1,19 @@
+.admin-panel { overflow: hidden; }
+.admin-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.5rem;
+  padding: .78rem 1rem;
+  border-bottom: 1px solid var(--scout-line);
+  background: #f7f8f4;
+}
+.admin-panel__title { margin: 0; color: var(--scout-forest-dark); font-size: .96rem; font-weight: 750; }
+.admin-panel__action { display: flex; align-items: center; gap: .5rem; }
+.admin-panel__body { min-width: 0; }
+.admin-panel__footer { padding: .75rem 1rem; border-top: 1px solid var(--scout-line); background: #fafbf8; }
+@media (max-width: 575.98px) {
+  .admin-panel__header { align-items: stretch; flex-direction: column; }
+  .admin-panel__action > .btn { width: 100%; }
+}

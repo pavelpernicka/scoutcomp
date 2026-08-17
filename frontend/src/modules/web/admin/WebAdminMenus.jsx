@@ -5,6 +5,8 @@ import PropTypes from "prop-types";
 
 import api from "../../../services/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import Alert from "../../../components/Alert";
+import AdminPageHeader from "./AdminPageHeader";
 import { useAuth } from "../../../providers/AuthProvider";
 import {
   buildMenuDraftPayload,
@@ -106,16 +108,9 @@ export default function WebAdminMenus() {
 
   return (
     <>
-      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
-        <div>
-          <h1 className="h3 mb-0">{t("web.menusTitle")}</h1>
-          <p className="text-muted mb-0 small">{t("web.menusSubtitle")}</p>
-        </div>
-      </div>
+      <AdminPageHeader title={t("web.menusTitle")} description={t("web.menusSubtitle")} />
 
-      {feedback && (
-        <div className={`alert alert-${feedback.type} py-2`}>{feedback.message}</div>
-      )}
+      {feedback && <Alert type={feedback.type} toast onDismiss={() => setFeedback(null)}>{feedback.message}</Alert>}
 
       <div className="card shadow-sm mb-4">
         <div className="card-body">
