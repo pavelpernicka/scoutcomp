@@ -13,6 +13,12 @@ const MAX_LANES = 3;
 const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
 const isSameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const daysBetween = (a, b) => Math.round((Date.UTC(a.getFullYear(), a.getMonth(), a.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 86400000);
+const plannedStatusIcon = (value) => {
+  const status = typeof value === "string" ? value : value?.status;
+  if (status === "attending") return "fa-check";
+  if (status === "not_attending") return "fa-xmark";
+  return null;
+};
 
 /** Builds the overlapping-event lanes shared by the full calendar and dashboard. */
 export const buildEventMonthLayout = (events, viewDate) => {
@@ -53,9 +59,12 @@ export default function EventMonthCalendar({ events, viewDate, onEventClick, onC
         {WEEKDAYS.map((day) => <div key={day} className="text-center bg-success text-white py-2 small fw-semibold border">{t(`calendar.${day}`)}</div>)}
       </div>
       {layout.map((week, weekIndex) => <div key={weekIndex} className="position-relative d-grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", borderTop: "1px solid #dee2e6" }}>
-        {week.items.map((item) => item.lane < MAX_LANES && <button key={`${item.event.id}-${weekIndex}`} type="button" className="calendar-event-bar d-block text-start border-0 rounded-1 text-white text-truncate" style={{ position: "absolute", left: `${item.startCol * PCT}%`, width: `${(item.endCol - item.startCol + 1) * PCT}%`, top: BAR_TOP_OFFSET + item.lane * (BAR_HEIGHT + BAR_GAP), height: BAR_HEIGHT, lineHeight: `${BAR_HEIGHT}px`, padding: "0 6px", zIndex: 2, backgroundColor: getEventColor(item.event) }} title={item.event.title} onClick={(event) => { event.stopPropagation(); onEventClick?.(item.event); }}>
-          {item.continuesBefore ? <i className="fas fa-chevron-left me-1 small" /> : <span className="me-1">{getEventLabel(item.event)}</span>}{item.event.title}{plannedStatusByEvent[item.event.id] && <i className="fas fa-check ms-1 small" />}{item.continuesAfter && <i className="fas fa-chevron-right ms-1 small" />}
-        </button>)}
+        {week.items.map((item) => {
+          const statusIcon = plannedStatusIcon(plannedStatusByEvent[item.event.id]);
+          return item.lane < MAX_LANES && <button key={`${item.event.id}-${weekIndex}`} type="button" className="calendar-event-bar d-block text-start border-0 rounded-1 text-white text-truncate" style={{ position: "absolute", left: `${item.startCol * PCT}%`, width: `${(item.endCol - item.startCol + 1) * PCT}%`, top: BAR_TOP_OFFSET + item.lane * (BAR_HEIGHT + BAR_GAP), height: BAR_HEIGHT, lineHeight: `${BAR_HEIGHT}px`, padding: "0 6px", zIndex: 2, backgroundColor: getEventColor(item.event) }} title={item.event.title} onClick={(event) => { event.stopPropagation(); onEventClick?.(item.event); }}>
+            {item.continuesBefore ? <i className="fas fa-chevron-left me-1 small" /> : <span className="me-1">{getEventLabel(item.event)}</span>}{item.event.title}{statusIcon && <i className={`fas ${statusIcon} ms-1 small`} />}{item.continuesAfter && <i className="fas fa-chevron-right ms-1 small" />}
+          </button>;
+        })}
         {week.days.map((day) => {
           const inMonth = day.getMonth() === viewDate.getMonth();
           const todayClass = isSameDay(day, today);
