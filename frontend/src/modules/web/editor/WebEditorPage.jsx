@@ -121,11 +121,25 @@ export default function WebEditorPage() {
     language: i18n.language,
     loadKey: page ? `${page.id}:${page.draft_version}:${page.template_id || "none"}` : undefined,
     canvasStyles: templateCSSQuery.data ? [...canvasStyles, { href: "", css: templateCSSQuery.data }] : canvasStyles,
+    fontSets: canvasStylesQuery.data?.font_sets || EMPTY,
     preferContentSlotInsertion: true,
     onDirtyChange: handleDirty,
     onSelectionChange: setSelected,
     onError: () => setPreviewError(t("web.errors.editorLoad")),
   });
+
+  useEffect(() => {
+    if (!editor.isReady || !canvasElement) return undefined;
+    let frame = 0;
+    const fit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => editor.fitDevice(device));
+    };
+    fit();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    observer?.observe(canvasElement);
+    return () => { window.cancelAnimationFrame(frame); observer?.disconnect(); };
+  }, [canvasElement, device, editor.fitDevice, editor.isReady, inspectorOpen, leftOpen]);
 
   useEffect(() => {
     if (!editor.isReady) return undefined;
@@ -307,6 +321,7 @@ export default function WebEditorPage() {
     setMediaPickerTarget(null);
     const instance = editor.editorRef.current;
     if (!instance) return;
+    if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
     if (mediaItem.is_image || (mediaItem.mime && mediaItem.mime.startsWith("image/"))) {
       let src = mediaItem.url;
       // GrapesJS iframe has no auth; fetch the blob so it displays.
@@ -321,9 +336,15 @@ export default function WebEditorPage() {
         alt: mediaItem.alt || "",
         "data-sc-media-id": String(mediaItem.id),
       };
-      if (target && target !== "insert" && target.get?.("type") === "image") {
-        target.addAttributes?.(attributes);
-        target.set?.("src", src);
+      const targetComponent = target?.component || target;
+      if (target?.mode === "background" && targetComponent?.addStyle) {
+        targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
+        autosaveRef.current?.schedule();
+        return;
+      }
+      if (targetComponent && targetComponent !== "insert" && targetComponent.get?.("type") === "image") {
+        targetComponent.addAttributes?.(attributes);
+        targetComponent.set?.("src", src);
         autosaveRef.current?.schedule();
         return;
       }
@@ -489,12 +510,12 @@ export default function WebEditorPage() {
     setInspectorOpen(next);
   };
 
-  return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`}>
-    <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
+  return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`} data-device={device.toLowerCase()}>
+    <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); if (next === "Mobile") { setLeftOpen(false); setInspectorOpen(false); } }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => openMediaPicker()} />
     <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onTemplateChange={requestTemplateChange} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
-    <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
-    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
+    <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}{device === "Mobile" && <div className="web-editor-device-fit" aria-hidden="true">{t("web.editor.devices.mobile")} · 375 px · {editor.canvasZoom} %</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
+    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || EMPTY} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>
     <div className="visually-hidden" aria-live="polite">{publishedNotice || t(`web.editor.saveStates.${autosave.status}`)}</div>
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}

@@ -6,6 +6,7 @@ export const SC_COMPONENT_TYPES = Object.freeze({
   condition: "sc-condition",
   empty: "sc-empty",
   menu: "sc-menu",
+  calendar: "sc-calendar",
   templatePart: "sc-template-part",
   globalPart: "sc-global-part",
   resourceInstance: "sc-resource-instance",

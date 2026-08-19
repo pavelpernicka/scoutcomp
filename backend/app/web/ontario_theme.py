@@ -52,14 +52,30 @@ def _project(*components: dict) -> dict:
     }
 
 
-def _image(src: str, alt: str, classes: str, *, lazy: bool = True) -> dict:
+def _image(src: str, alt: str, classes: str, *, lazy: bool = True,
+           template_logo: str | None = None) -> dict:
     return {
         "type": "image",
         "tagName": "img",
         "attributes": {
             "src": src, "alt": alt, "class": classes,
             **({"loading": "lazy"} if lazy else {}),
+            **({"data-sc-template-logo": template_logo} if template_logo else {}),
         },
+    }
+
+
+def _logo_fallback(role: str, classes: str, *, tag: str = "span") -> dict:
+    """Render the site title only when the adjacent template logo is disabled."""
+    return {
+        "type": "text",
+        "tagName": tag,
+        "attributes": {
+            "class": classes,
+            "data-sc-template-logo-fallback": role,
+        },
+        "content": "Ontario",
+        "scBindings": {"text": {"scope": "site", "field": "site_title"}},
     }
 
 
@@ -97,6 +113,16 @@ def _bound(tag: str, field: str, classes: str = "", *, scope: str = "context", f
     return _element(tag, classes, components=[_bind(field, scope=scope, fmt=fmt)])
 
 
+def _bound_time(field: str, classes: str = "", *, fmt: str = "datetime_short") -> dict:
+    return {
+        "type": "default",
+        "tagName": "time",
+        "attributes": {"class": classes},
+        "scBindings": {"datetime": {"scope": "context", "field": field}},
+        "components": [_bind(field, fmt=fmt)],
+    }
+
+
 def _icon(name: str, label: str = "") -> dict:
     return _element("i", f"fa-solid fa-{name} ontario-icon", **({"aria-label": label} if label else {"aria-hidden": "true"}))
 
@@ -104,42 +130,42 @@ def _icon(name: str, label: str = "") -> dict:
 ONTARIO_HEADER = _element("nav", "navbar ontario-navbar", name="Ontario – horní navigace",
     components=[_element("div", "container ontario-navbar-inner", components=[
         {"type": "link", "tagName": "a", "attributes": {"class": "navbar-brand", "href": "/", "aria-label": "Ontario – domů"},
-         "components": [_image("assets/white_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-light", lazy=False),
-                        _image("assets/blue_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-dark", lazy=False)]},
+         "components": [_image("assets/white_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-light", lazy=False, template_logo="navigation-light"),
+                        _logo_fallback("navigation-light", "ontario-wordmark-fallback ontario-wordmark-fallback-light"),
+                        _image("assets/blue_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-dark", lazy=False, template_logo="navigation-dark"),
+                        _logo_fallback("navigation-dark", "ontario-wordmark-fallback ontario-wordmark-fallback-dark")]},
         _element("div", "ontario-desktop-menu", components=[
             {"type": "sc-menu", "location": "main", "presentation": "bootstrap-navbar"},
         ]),
         _element("details", "ontario-menu-shell", components=[
-            _element("summary", "ontario-menu-toggle", components=[_element("span", "visually-hidden", content="Otevřít nebo zavřít menu")]),
+            _element("summary", "ontario-menu-toggle", components=[
+                _icon("bars"),
+                _icon("xmark"),
+                _element("span", "ontario-menu-close-label", content="Zavřít"),
+                _element("span", "visually-hidden", content="Otevřít nebo zavřít menu"),
+            ]),
             _element("div", "ontario-menu-panel", components=[
-                _element("div", "ontario-menu-tools", components=[_element("span", "ontario-menu-close-label", content="Zavřít")]),
                 {"type": "sc-menu", "location": "main", "presentation": "ontario-mobile-navbar"},
             ]),
         ]),
     ])], **{"aria-label": "Hlavní navigace"})
 
-ONTARIO_EDGE = _element("div", "ontario-edge ontario-edge--white", name="Organický skautský okraj",
-    components=[_element("span", "ontario-edge-blob ontario-edge-blob--one", **{"aria-hidden": "true"}),
-                _element("span", "ontario-edge-blob ontario-edge-blob--two", **{"aria-hidden": "true"}),
-                _element("span", "ontario-edge-blob ontario-edge-blob--three", **{"aria-hidden": "true"})],
-    **{"aria-hidden": "true"})
-
-ONTARIO_HERO = _element("header", "ontario-hero", name="Ontario – hero", components=[
+ONTARIO_HERO = _element("header", "ontario-hero sc-edge-rolling sc-edge-bottom sc-edge-white sc-edge-lg", name="Ontario – hero", components=[
     _element("div", "ontario-photo-mask ontario-hero-overlay", **{"aria-hidden": "true"}),
     _element("div", "container ontario-hero-content", components=[
-        _image("assets/round_notext.png", "Znak oddílu Ontario", "ontario-round-logo", lazy=False),
-        _heading("h1", "ONTARIO", "display-3 skaut"),
+        _image("assets/round_notext.png", "Znak oddílu Ontario", "ontario-round-logo", lazy=False, template_logo="hero-mark"),
+        _logo_fallback("hero-mark", "display-3 skaut ontario-hero-logo-fallback", tag="h1"),
         _heading("h2", "51. oddíl skautů ve Zlíně při 6. středisku", "h4 fw-normal"),
-    ]), deepcopy(ONTARIO_EDGE),
-])
+    ]),
+], **{"data-sc-overlay": "true"})
 
-ONTARIO_COMPACT_HERO = _element("header", "ontario-compact-hero", name="Kompaktní záhlaví", components=[
+ONTARIO_COMPACT_HERO = _element("header", "ontario-compact-hero sc-edge-soft sc-edge-bottom sc-edge-white sc-edge-md", name="Kompaktní záhlaví", components=[
     _element("div", "ontario-photo-mask", **{"aria-hidden": "true"}),
     _element("div", "container", components=[
         _heading("h1", "Název stránky", "display-4 skaut"),
         _text("Krátký úvod stránky", "lead"),
-    ]), deepcopy(ONTARIO_EDGE),
-])
+    ]),
+], **{"data-sc-overlay": "true"})
 
 ONTARIO_ABOUT = _element("section", "ontario-about ontario-section", name="O oddílu", components=[
     _element("div", "container", components=[_element("div", "row align-items-center g-5", components=[
@@ -147,7 +173,7 @@ ONTARIO_ABOUT = _element("section", "ontario-about ontario-section", name="O odd
         _element("div", "col-md-6", components=[
             _heading("h2", "Kdo jsme", "display-5 skaut"),
             _text("Jsme skautský oddíl pro kluky ve věku 11–15 let a spadáme pod 6. skautské středisko ve Zlíně.", "lead"),
-            {"type": "link", "tagName": "a", "attributes": {"class": "btn btn-secondary btn-lg btn-skaut", "href": "/o-nas"}, "content": "Více o nás →"},
+            {"type": "link", "tagName": "a", "attributes": {"class": "btn btn-secondary btn-lg btn-skaut ontario-btn-organic", "href": "/o-nas"}, "content": "Více o nás →"},
         ]),
     ])]),
 ])
@@ -156,7 +182,15 @@ ONTARIO_POST_CARD = _element("article", "card shadow-sm ontario-card ontario-pos
     {"type": "image", "tagName": "img", "attributes": {"class": "card-img-top ontario-photo-tint", "alt": "", "loading": "lazy"},
      "scBindings": {"src": {"scope": "context", "field": "cover_url"}, "alt": {"scope": "context", "field": "title"}}},
     _element("div", "card-body", components=[
-        _bound("time", "published_at", "ontario-meta", fmt="date"),
+        _element("div", "ontario-card-meta", components=[
+            _element("span", "ontario-card-author", components=[
+                {"type": "image", "tagName": "img", "attributes": {"class": "ontario-author-avatar", "alt": "", "loading": "lazy"},
+                 "scBindings": {"src": {"scope": "context", "field": "author_avatar"}}},
+                _element("span", "ontario-author-fallback", components=[_icon("user")], **{"aria-hidden": "true"}),
+                _bound("span", "author"),
+            ]),
+            _element("span", components=[_icon("calendar-days"), _bound_time("published_at", fmt="date_short")]),
+        ]),
         _bound("h3", "title", "h4 card-title skaut"),
         _bound("p", "excerpt", "card-text"),
         {"type": "link", "tagName": "a", "attributes": {"class": "stretched-link ontario-read-more", "aria-label": "Číst příspěvek"},
@@ -166,7 +200,15 @@ ONTARIO_POST_CARD = _element("article", "card shadow-sm ontario-card ontario-pos
 
 ONTARIO_EVENT_CARD = _element("article", "card shadow-sm ontario-card ontario-event-card", name="Karta schůzky", components=[
     _element("div", "card-body", components=[
-        _bound("time", "start_at", "ontario-meta", fmt="datetime"),
+        _element("div", "ontario-card-meta", components=[
+            _element("span", "ontario-card-author", components=[
+                {"type": "image", "tagName": "img", "attributes": {"class": "ontario-author-avatar", "alt": "", "loading": "lazy"},
+                 "scBindings": {"src": {"scope": "context", "field": "author_avatar"}}},
+                _element("span", "ontario-author-fallback", components=[_icon("user")], **{"aria-hidden": "true"}),
+                _bound("span", "author"),
+            ]),
+            _element("span", components=[_icon("calendar-days"), _bound_time("start_at")]),
+        ]),
         _bound("h3", "title", "h4 skaut"),
         _bound("p", "description", "card-text"),
         {"type": "link", "tagName": "a", "attributes": {"class": "stretched-link ontario-read-more", "aria-label": "Detail schůzky"},
@@ -227,36 +269,12 @@ ONTARIO_TEAM_HERO = _element("section", "ontario-team-heading ontario-section", 
     ]),
 ])
 
-ONTARIO_CALENDAR = _element("section", "ontario-calendar ontario-section", name="Kalendář – přístupná agenda", components=[
+ONTARIO_CALENDAR = _element("section", "ontario-calendar ontario-section", name="Kalendář – měsíční přehled", components=[
     _element("div", "container", components=[
         _heading("h1", "Kalendář", "display-4 skaut"),
         _text("Nejbližší schůzky, výpravy a oddílové akce.", "lead ontario-section-lead"),
-        _element("div", "list-group ontario-agenda", components=[{
-            "type": "sc-repeat", "source": "core.events", "params": {"limit": 24, "sort": "start_at_asc"},
-            "components": [{"type": "link", "tagName": "a", "attributes": {"class": "list-group-item list-group-item-action ontario-agenda-item"},
-                "scBindings": {"href": {"scope": "context", "field": "url"}}, "components": [
-                    _bound("time", "start_at", "ontario-agenda-date", fmt="datetime"),
-                    _element("span", "ontario-agenda-copy", components=[_bound("strong", "title", "skaut"), _bound("span", "description")]),
-                ]}],
-            "empty": [_text("V kalendáři zatím nejsou žádné veřejné akce.", "ontario-empty")],
-        }]),
+        {"type": "sc-calendar", "kind": "all", "firstDayOfWeek": "monday", "showDescription": True},
     ]),
-])
-
-ONTARIO_CONTACT = _element("section", "ontario-contact ontario-section", name="Kontakt", components=[
-    _element("div", "container", components=[_element("div", "row g-5 align-items-center", components=[
-        _element("div", "col-lg-6", components=[
-            _heading("h1", "Kontakt", "display-4 skaut"),
-            _text("Napište nám nebo se přijďte podívat na schůzku. Rádi odpovíme rodičům i budoucím členům.", "lead"),
-            _element("address", "ontario-contact-list", components=[
-                _element("p", components=[_icon("location-dot"), _bind("contact_address", scope="site")]),
-                _element("p", components=[_icon("phone"), _bind("contact_phone", scope="site")]),
-                _element("p", components=[_icon("envelope"), _bind("contact_email", scope="site")]),
-                _element("p", components=[_icon("clock"), _bind("contact_meeting_time", scope="site")]),
-            ]),
-        ]),
-        _element("div", "col-lg-6", components=[_image("assets/mockups/scout-planning-v1.webp", "Ilustrace plánování oddílové akce", "img-fluid ontario-mockup ontario-photo-tint")]),
-    ])]), deepcopy(ONTARIO_EDGE),
 ])
 
 ONTARIO_GALLERY = _element("section", "ontario-gallery ontario-section", name="Galerie", components=[
@@ -279,6 +297,136 @@ ONTARIO_FAQ = _element("section", "ontario-faq ontario-section", name="Časté o
     ]),
 ])
 
+ONTARIO_MEDIA_LINK_CARD = {
+    "type": "link", "tagName": "a",
+    "attributes": {"class": "ontario-media-link sc-shape-rounded", "href": "#", "data-sc-overlay": "true"},
+    "components": [
+        _image("assets/mockups/scout-planning-v1.webp", "Skauti na výpravě", "ontario-media-link-image"),
+        _element("span", "ontario-media-link-mask", **{"aria-hidden": "true"}),
+        _element("span", "ontario-media-link-content", components=[
+            _heading("h3", "FOTOGALERIE", "h3 skaut"),
+            _text("Prohlédněte si fotografie z našich akcí."),
+        ]),
+    ],
+}
+
+ONTARIO_GALLERY_HUB = _element("section", "ontario-gallery-hub ontario-section", name="Rozcestník galerie", components=[
+    _element("div", "container", components=[
+        _heading("h2", "Galerie", "text-center display-5 skaut"),
+        _element("div", "row g-4 mt-4", components=[
+            _element("div", "col-md-6", components=[deepcopy(ONTARIO_MEDIA_LINK_CARD)]),
+            _element("div", "col-md-6", components=[{
+                **deepcopy(ONTARIO_MEDIA_LINK_CARD),
+                "attributes": {"class": "ontario-media-link sc-shape-rounded", "href": "#", "data-sc-overlay": "true"},
+                "components": [
+                    _image("assets/main_header.jpg", "Videa z oddílových akcí", "ontario-media-link-image"),
+                    _element("span", "ontario-media-link-mask", **{"aria-hidden": "true"}),
+                    _element("span", "ontario-media-link-content", components=[
+                        _heading("h3", "VIDEA", "h3 skaut"), _text("Podívejte se na videa z výprav a táborů."),
+                    ]),
+                ],
+            }]),
+        ]),
+    ]),
+])
+
+def _person_card(name: str, role: str, phone: str = "605 404 983", email: str = "ontario@zlin6.cz") -> dict:
+    return _element("article", "ontario-person text-center", components=[
+        _image("assets/mockups/scout-planning-v1.webp", name, "ontario-person-photo sc-shape-oval"),
+        _text(role, "ontario-person-role skaut mb-1"),
+        _heading("h3", name, "h5 skaut"),
+        _element("p", "ontario-person-contact", components=[_text("Telefon: ", "", "span"), _element("a", content=phone, href=f"tel:{phone.replace(' ', '')}")]),
+        _element("p", "ontario-person-contact", components=[_text("E-mail: ", "", "span"), _element("a", content=email, href=f"mailto:{email}")]),
+    ])
+
+
+ONTARIO_CONTACT_HERO = _element("header", "ontario-contact-hero", name="Kontaktní hero", components=[
+    _element("div", "ontario-photo-mask", **{"aria-hidden": "true"}),
+    _element("div", "container ontario-contact-hero-content", components=[
+        _heading("h1", "Kontaktujte nás", "display-4 skaut"),
+        _heading("h2", "Máte dotazy a nevíte, na koho se obrátit?", "h4 skaut"),
+    ]),
+], **{"data-sc-overlay": "true"})
+
+ONTARIO_LEADERS = _element("section", "ontario-leaders ontario-section sc-edge-peaks sc-edge-bottom sc-edge-pale sc-edge-md", name="Vedoucí oddílu", components=[
+    _element("div", "container", components=[
+        _heading("h2", "Vůdcové", "text-center display-5 skaut"),
+        _element("div", "ontario-competencies", components=[
+            _text("Kompetence:", "text-muted", "span"),
+            _element("span", "badge bg-primary", content="Registrace"),
+            _element("span", "badge bg-danger", content="Tábory"),
+            _element("span", "badge ontario-badge-magenta", content="Oddílové věci"),
+        ]),
+        _element("div", "row row-cols-1 row-cols-sm-2 g-5 ontario-leader-grid", components=[
+            _element("div", "col", components=[_person_card("David Holík – Kráč", "Vůdce")]),
+            _element("div", "col", components=[_person_card("Matěj Škarka", "Zástupce vůdce", "605 579 131", "matej@zlin6.cz")]),
+        ]),
+    ]),
+])
+
+ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section", name="Oddílová rada", components=[
+    _element("div", "container", components=[
+        _heading("h2", "Oddílová rada", "text-center display-5 skaut"),
+        _element("div", "ontario-competencies", components=[
+            _text("Kompetence:", "text-muted", "span"),
+            _element("span", "badge ontario-badge-magenta", content="Organizační věci"),
+            _element("span", "badge bg-primary", content="Výpravy"),
+        ]),
+        _element("div", "row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-5 mt-4", components=[
+            _element("div", "col", components=[_person_card("Vojta Palíšek – Rychlonožka", "Rádce", "739 800 454", "rychlonozka@zlin6.cz")]),
+            _element("div", "col", components=[_person_card("Jan Holík – Tuty", "Rádce", "605 966 538", "tuty@zlin6.cz")]),
+            _element("div", "col", components=[_person_card("Vojta Mikulášek – Napoleon", "Vedoucí družiny", "605 909 585", "napoleon@zlin6.cz")]),
+            _element("div", "col", components=[_person_card("Jakub Tkadleček – Kuba", "Vedoucí družiny", "737 300 596", "jakub@zlin6.cz")]),
+        ]),
+    ]),
+])
+
+ONTARIO_CONTACT = _element("div", "ontario-contact-page", name="Kontakt", components=[
+    deepcopy(ONTARIO_CONTACT_HERO), deepcopy(ONTARIO_LEADERS), deepcopy(ONTARIO_COUNCIL),
+])
+
+def _social_link(label: str, network: str) -> dict:
+    return {
+        "type": "link", "tagName": "a",
+        "attributes": {
+            "class": f"ontario-social-link ontario-social-{network}", "href": "#", "aria-label": label,
+        },
+        "components": [_element("i", f"fa-brands fa-{network}", **{"aria-hidden": "true"})],
+    }
+
+
+ONTARIO_SOCIAL_LINKS = _element("section", "ontario-socials ontario-section", name="Sociální sítě a odkazy", components=[
+    _element("div", "container", components=[
+        _heading("h1", "Odkazy", "display-4 skaut text-center ontario-social-page-title"),
+        _heading("h2", "Jsme i na sociálních sítích", "h3 skaut text-center"),
+        _element("div", "ontario-social-row", components=[
+            _social_link("Instagram", "instagram"),
+            _social_link("YouTube", "youtube"),
+            _social_link("GitHub", "github"),
+        ]),
+        _heading("h2", "Další oddíly ve středisku", "h3 skaut text-center ontario-related-title"),
+        _element("div", "row row-cols-1 row-cols-sm-3 g-5 ontario-related-links", components=[
+            _element("div", "col", components=[_element("a", "ontario-related-link", href="#", components=[_image("assets/round_notext.png", "6. středisko Zlín", "ontario-related-logo"), _text("6. středisko Zlín", "skaut")])]),
+            _element("div", "col", components=[_element("a", "ontario-related-link", href="https://www.skaut.cz", components=[_image("assets/SKAUT_logo_podklad_bily.png", "Junák – český skaut", "ontario-related-logo"), _text("Stránky Junáka", "skaut")])]),
+            _element("div", "col", components=[_element("a", "ontario-related-link", href="#", components=[_icon("compass"), _text("Albion", "skaut")])]),
+        ]),
+    ]),
+])
+
+ONTARIO_DOWNLOAD_CARDS = _element("section", "ontario-downloads ontario-section", name="Materiály ke stažení", components=[
+    _element("div", "container", components=[
+        _heading("h2", "Naše oddílové materiály", "display-5 skaut"),
+        _element("div", "row row-cols-1 row-cols-lg-2 g-4 mt-3", components=[
+            _element("div", "col", components=[_element("article", "card ontario-resource-card h-100", components=[
+                _element("div", "card-body", components=[_heading("h3", "Ontario zpěvník", "h4 skaut"), _text("Stáhněte si zpěvník do mobilu nebo k tisku."), _element("a", "btn btn-info btn-skaut sc-mask-button-soft", content="Stáhnout PDF", href="#")]),
+            ])]),
+            _element("div", "col", components=[_element("article", "card ontario-resource-card h-100", components=[
+                _element("div", "card-body", components=[_heading("h3", "Kronika", "h4 skaut"), _text("Prolistujte si oddílovou kroniku online."), _element("a", "btn btn-info btn-skaut sc-mask-button-rugged", content="Otevřít kroniku", href="#")]),
+            ])]),
+        ]),
+    ]),
+])
+
 ONTARIO_FOOTER = {
     "type": "default",
     "tagName": "footer",
@@ -298,7 +446,10 @@ ONTARIO_FOOTER = {
                         "type": "link",
                         "tagName": "a",
                         "attributes": {"class": "ontario-footer-brand", "href": "/"},
-                        "components": [_image("assets/white_text_next.png", "Ontario", "ontario-footer-logo")],
+                        "components": [
+                            _image("assets/white_text_next.png", "Ontario", "ontario-footer-logo", template_logo="footer"),
+                            _logo_fallback("footer", "ontario-footer-logo-fallback skaut"),
+                        ],
                     },
                     {
                         "type": "sc-menu",
@@ -307,12 +458,11 @@ ONTARIO_FOOTER = {
                     },
                 ],
             },
-            {
-                "type": "text",
-                "tagName": "small",
-                "attributes": {"class": "ontario-copyright"},
-                "content": "© 2026 Ontario. Powered by Vyveh.",
-            },
+            _element("small", "ontario-copyright", components=[
+                _text("© 2026 Ontario. Powered by ", "", "span"),
+                _element("a", content="ScoutComp", href="https://scoutcomp.pernicka.cz"),
+                _text(".", "", "span"),
+            ]),
         ],
     }],
 }
@@ -356,7 +506,7 @@ ONTARIO_THEME_TEMPLATES = {
     "about": _project(deepcopy(ONTARIO_HEADER), _element("main", "ontario-page-top", components=[{"type": "sc-slot", "name": "content", "components": [deepcopy(ONTARIO_ABOUT), deepcopy(ONTARIO_FAQ)]}]), deepcopy(ONTARIO_FOOTER)),
     "support": _project(deepcopy(ONTARIO_HEADER), _element("main", "ontario-page-top", components=[deepcopy(ONTARIO_COMPACT_HERO), {"type": "sc-slot", "name": "content", "components": [_element("section", "ontario-section", components=[_element("div", "container ontario-reading", components=[_heading("h2", "Jak nás podpořit", "display-5 skaut"), _text("Pomoci můžete časem, materiálem i příspěvkem na oddílové aktivity.", "lead")])])]}]), deepcopy(ONTARIO_FOOTER)),
     "downloads": _project(deepcopy(ONTARIO_HEADER), _element("main", "ontario-page-top", components=[{"type": "sc-slot", "name": "content", "components": [_element("section", "ontario-section", components=[_element("div", "container ontario-reading", components=[_heading("h1", "Ke stažení", "display-4 skaut"), _element("div", "list-group", components=[_element("a", "list-group-item list-group-item-action", content="Přihláška a důležité dokumenty", href="#")])])])]}]), deepcopy(ONTARIO_FOOTER)),
-    "links": _project(deepcopy(ONTARIO_HEADER), _element("main", "ontario-page-top", components=[{"type": "sc-slot", "name": "content", "components": [_element("section", "ontario-section", components=[_element("div", "container ontario-reading", components=[_heading("h1", "Odkazy", "display-4 skaut"), _element("div", "list-group", components=[_element("a", "list-group-item list-group-item-action", content="Skaut.cz", href="https://www.skaut.cz")])])])]}]), deepcopy(ONTARIO_FOOTER)),
+    "links": _project(deepcopy(ONTARIO_HEADER), _element("main", "ontario-page-top", components=[{"type": "sc-slot", "name": "content", "components": [deepcopy(ONTARIO_SOCIAL_LINKS)]}]), deepcopy(ONTARIO_FOOTER)),
 }
 
 ONTARIO_THEME_SECTIONS = {
@@ -365,15 +515,20 @@ ONTARIO_THEME_SECTIONS = {
     "posts": _project(deepcopy(ONTARIO_POSTS)),
     "header": _project(deepcopy(ONTARIO_HEADER)),
     "footer": _project(deepcopy(ONTARIO_FOOTER)),
-    "edge": _project(deepcopy(ONTARIO_EDGE)),
     "compact-hero": _project(deepcopy(ONTARIO_COMPACT_HERO)),
     "archive": _project(deepcopy(ONTARIO_ARCHIVE)),
     "meetings": _project(deepcopy(ONTARIO_MEETINGS)),
     "calendar": _project(deepcopy(ONTARIO_CALENDAR)),
     "contact": _project(deepcopy(ONTARIO_CONTACT)),
+    "contact-hero": _project(deepcopy(ONTARIO_CONTACT_HERO)),
     "gallery": _project(deepcopy(ONTARIO_GALLERY)),
     "faq": _project(deepcopy(ONTARIO_FAQ)),
     "team-heading": _project(deepcopy(ONTARIO_TEAM_HERO)),
+    "gallery-hub": _project(deepcopy(ONTARIO_GALLERY_HUB)),
+    "leaders": _project(deepcopy(ONTARIO_LEADERS)),
+    "council": _project(deepcopy(ONTARIO_COUNCIL)),
+    "social-links": _project(deepcopy(ONTARIO_SOCIAL_LINKS)),
+    "download-cards": _project(deepcopy(ONTARIO_DOWNLOAD_CARDS)),
 }
 
 ONTARIO_THEME_COMPONENTS = {
@@ -389,7 +544,6 @@ ONTARIO_THEME_COMPONENTS = {
         "attributes": {"class": "btn btn-secondary btn-lg btn-skaut", "href": "#"},
         "content": "Tlačítko",
     }),
-    "edge": _project(deepcopy(ONTARIO_EDGE)),
     "font-awesome-icon": _project(_icon("compass", "Kompas")),
     "meeting-card": _project(deepcopy(ONTARIO_EVENT_CARD)),
     "alert": _project(_element("div", "alert alert-info", content="Důležité sdělení", role="alert")),
@@ -397,6 +551,10 @@ ONTARIO_THEME_COMPONENTS = {
     "breadcrumb": _project(_element("nav", components=[_element("ol", "breadcrumb", components=[_element("li", "breadcrumb-item", content="Domů"), _element("li", "breadcrumb-item active", content="Stránka", **{"aria-current": "page"})])], **{"aria-label": "Drobečková navigace"})),
     "accordion": _project(_element("details", "ontario-accordion", components=[_element("summary", content="Rozbalovací položka"), _text("Obsah rozbalovací položky.")])),
     "progress": _project(_element("div", "progress", components=[_element("div", "progress-bar", content="60 %", role="progressbar", **{"aria-label": "Postup", "aria-valuenow": "60", "aria-valuemin": "0", "aria-valuemax": "100"})])),
+    "media-link-card": _project(deepcopy(ONTARIO_MEDIA_LINK_CARD)),
+    "person-card": _project(_person_card("Jméno vedoucího", "Vedoucí družiny")),
+    "download-card": _project(_element("article", "card ontario-resource-card", components=[_element("div", "card-body", components=[_heading("h3", "Dokument", "h4 skaut"), _text("Krátký popis dokumentu."), _element("a", "btn btn-info btn-skaut sc-mask-button-soft", content="Stáhnout", href="#")])])),
+    "social-icon": _project(_social_link("Instagram", "instagram")),
 }
 
 _ONTARIO_MENU_DEFAULTS = {
@@ -507,14 +665,82 @@ _ONTARIO_CSS = r"""
 @font-face{font-family:"TheMix";src:url(assets/fonts/TheMix_LT_400.woff) format("woff");font-weight:400;font-display:swap}
 @font-face{font-family:"TheMix";src:url(assets/fonts/TheMix_LT_700.woff) format("woff");font-weight:700;font-display:swap}
 :root{--ontario-blue:#255c9e;--ontario-blue-dark:#0a224e;--ontario-blue-pale:#bdd4df;--ontario-yellow:#f9b200;--ontario-cream:#f6ebd8;--ontario-link:#a9bed2;--ontario-dark:#212529;--ontario-radius:1rem}
-html{overflow-x:hidden}body{font-family:"TheMix",Arial,sans-serif;color:#252b31;overflow-x:hidden}.skaut,.ontario-footer .sc-menu-heading{font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase}.ontario-icon{width:1.4em;text-align:center}.ontario-page-top{padding-top:6.25rem}.ontario-section{position:relative;padding:5.5rem 0}.ontario-section-lead{margin:0 auto 2.25rem;max-width:42rem}.ontario-reading{max-width:820px}.ontario-empty{grid-column:1/-1;padding:3rem;text-align:center;background:var(--ontario-cream);border-radius:var(--ontario-radius)}
-.ontario-navbar{position:absolute;inset:0 0 auto;z-index:100;padding:1.1rem 0;background:transparent}.ontario-navbar-inner{display:flex;align-items:center;justify-content:space-between;max-width:1300px}.ontario-wordmark{display:block;width:122px;height:auto}.ontario-wordmark-dark{display:none}.ontario-desktop-menu{display:flex;align-items:center}.ontario-menu-shell{display:none}.ontario-menu-panel{display:flex;align-items:center}.ontario-menu-tools{display:none}.ontario-navbar .sc-menu-list{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:.15rem;margin:0}.ontario-navbar .sc-menu-item{position:relative;list-style:none}.ontario-navbar .sc-menu-details>summary{list-style:none}.ontario-navbar .sc-menu-details>summary::-webkit-details-marker{display:none}.ontario-navbar .sc-menu-link{display:flex;align-items:center;gap:.55rem;padding:.6rem .72rem;color:rgba(255,255,255,.76);font-size:1rem;text-decoration:none;cursor:pointer}.ontario-navbar .sc-menu-item:hover>.sc-menu-link{color:#fff}.ontario-navbar .sc-menu-link:focus-visible,.ontario-navbar summary:focus-visible{color:#fff;outline:2px solid currentColor;outline-offset:2px}.ontario-navbar .sc-menu-details>summary:after{content:"";width:.6rem;height:.6rem;margin-top:-.2rem;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .18s ease}.ontario-navbar .sc-menu-details[open]>summary:after{transform:rotate(225deg);margin-top:.2rem}.ontario-navbar .sc-menu-dropdown{display:none;position:absolute;top:100%;left:0;z-index:110;min-width:13.5rem;margin:0;padding:.55rem 0;background:#fff;border:1px solid rgba(10,34,78,.08);box-shadow:0 .75rem 1.6rem rgba(10,34,78,.15)}.ontario-navbar .sc-menu-item:hover .sc-menu-dropdown,.ontario-navbar .sc-menu-item:focus-within .sc-menu-dropdown,.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{display:block}.ontario-navbar .sc-menu-dropdown .sc-menu-link{padding:.7rem 1.25rem;color:#272c31;white-space:nowrap}.ontario-navbar .sc-menu-dropdown .sc-menu-link:hover,.ontario-navbar .sc-menu-dropdown .sc-menu-link:focus-visible{background:#eef4fb;color:var(--ontario-blue)}body:has(.ontario-page-top) .ontario-navbar{background:#fff;box-shadow:0 1px 0 rgba(10,34,78,.08)}body:has(.ontario-page-top) .ontario-wordmark-light{display:none}body:has(.ontario-page-top) .ontario-wordmark-dark{display:block}body:has(.ontario-page-top) .ontario-navbar .sc-menu-link{color:#4b4f54}body:has(.ontario-page-top) .ontario-navbar .sc-menu-link:hover,body:has(.ontario-page-top) .ontario-navbar .sc-menu-link:focus-visible{color:var(--ontario-blue-dark)}
-.ontario-hero{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:flex-start;background:url(assets/main_header.jpg) center top/cover no-repeat;color:#fff;overflow:hidden}.ontario-photo-mask{position:absolute;inset:0;background:rgba(10,34,78,.64);mix-blend-mode:multiply}.ontario-hero-content{position:relative;z-index:2;text-align:center;padding-top:clamp(6rem,12vh,9rem);padding-bottom:9rem}.ontario-round-logo{display:block;width:clamp(145px,15vw,210px);aspect-ratio:1;object-fit:contain;margin:0 auto 1.25rem}.ontario-hero h1{font-size:clamp(3rem,5vw,4.5rem);letter-spacing:.025em;margin:0}.ontario-hero h2{max-width:32rem;margin:.6rem auto 0;line-height:1.35}.ontario-edge{position:absolute;left:0;right:0;bottom:-1px;z-index:4;height:7.5rem;overflow:hidden;pointer-events:none}.ontario-edge:after{content:"";position:absolute;inset:55% 0 -1px;background:#fff}.ontario-edge-blob{position:absolute;bottom:-4.6rem;width:58%;height:10rem;background:#fff;border-radius:50% 50% 0 0}.ontario-edge-blob--one{left:-9%;transform:rotate(5deg)}.ontario-edge-blob--two{left:25%;bottom:-5.6rem;width:54%;transform:rotate(-5deg)}.ontario-edge-blob--three{right:-13%;bottom:-4.4rem;transform:rotate(7deg)}
-.ontario-compact-hero{position:relative;min-height:360px;display:flex;align-items:center;padding:7rem 0 8rem;background:url(assets/mockups/scout-planning-v1.webp) center/cover no-repeat;color:#fff;overflow:hidden}.ontario-compact-hero>.container{position:relative;z-index:2}.ontario-about{background:#fff}.ontario-about .row,.ontario-contact .row{margin-left:0;margin-right:0}.ontario-mockup{display:block;width:100%;max-height:480px;object-fit:cover;border-radius:48% 52% 45% 55%/55% 45% 55% 45%}.ontario-photo-frame{position:relative;margin:0;overflow:hidden;isolation:isolate;background:var(--ontario-blue)}.ontario-photo-frame img{display:block;width:100%;mix-blend-mode:multiply}.ontario-photo-tint{filter:saturate(.78) contrast(1.04)}.btn-skaut{font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase;border-radius:0}.ontario-posts{background:#f8f9fa}.ontario-card{height:100%;overflow:hidden;border:1px solid #d9e0e6;border-radius:var(--ontario-radius);box-shadow:0 .65rem 1.2rem rgba(10,34,78,.12)!important}.ontario-post-card .card-img-top{height:210px;object-fit:cover;background:var(--ontario-blue-pale)}.ontario-card .card-body{position:relative;padding:1.75rem}.ontario-card .card-title{color:#07366c}.ontario-meta{display:block;margin-bottom:1rem;color:#68717a}.ontario-read-more{color:var(--ontario-blue);font-weight:700;text-decoration:none}.ontario-feed>.sc-pagination,.sc-pagination{justify-content:flex-end;padding-top:1.25rem;border-top:1px solid #d9e0e6}.sc-pagination-link,.sc-pagination-current{border-color:#d5dde5;border-radius:0!important}.sc-pagination-current{background:var(--ontario-blue);color:#fff}
+html,body{overflow-x:clip}body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;font-family:"TheMix",Arial,sans-serif;color:#252b31}body>main{flex:1 0 auto;display:flex;flex-direction:column}.skaut,.ontario-footer .sc-menu-heading{font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase}.ontario-icon{width:1.4em;text-align:center}.ontario-page-top{padding-top:5rem}.ontario-section{position:relative;padding:5.5rem 0}.ontario-section-lead{margin:0 auto 2.25rem;max-width:42rem}.ontario-reading{max-width:820px}.ontario-empty{grid-column:1/-1;padding:3rem;text-align:center;background:var(--ontario-cream);border-radius:var(--ontario-radius)}
+@keyframes ontario-nav-scroll{from{background:rgba(10,34,78,0);box-shadow:0 1px 0 rgba(10,34,78,0)}to{background:var(--sc-nav-scrolled,#0a224e);box-shadow:0 1px 0 rgba(255,255,255,.14)}}@keyframes ontario-dropdown-in{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:translateY(0)}}@keyframes ontario-menu-in{from{opacity:0;transform:translateX(2rem)}to{opacity:1;transform:translateX(0)}}
+.ontario-navbar{position:sticky;top:0;z-index:100;margin-bottom:-4.75rem;padding:.7rem 0;background:rgba(10,34,78,.88);box-shadow:0 1px 0 rgba(255,255,255,.1)}.ontario-navbar-inner{display:flex;align-items:center;justify-content:space-between;max-width:1300px}.ontario-wordmark{display:block;width:118px;height:auto}.ontario-wordmark-dark{display:none}.ontario-desktop-menu{display:flex;align-items:center}.ontario-menu-shell{display:none}.ontario-menu-panel{display:flex;align-items:center}.ontario-menu-tools{display:none}.ontario-navbar .sc-menu-list{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:.1rem;margin:0}.ontario-navbar .sc-menu-item{position:relative;list-style:none}.ontario-navbar .sc-menu-details>summary{list-style:none}.ontario-navbar .sc-menu-details>summary::-webkit-details-marker{display:none}.ontario-navbar .sc-menu-link{display:flex;align-items:center;gap:.45rem;padding:.45rem .65rem;color:rgba(255,255,255,.82);font-size:.96rem;text-decoration:none;cursor:pointer;transition:color .16s ease,background-color .16s ease}.ontario-navbar .sc-menu-item:hover>.sc-menu-link,.ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link{color:#fff}.ontario-navbar .sc-menu-link:focus-visible,.ontario-navbar summary:focus-visible{color:#fff;outline:2px solid currentColor;outline-offset:2px}.ontario-navbar .sc-menu-details>summary:after{content:"";width:.55rem;height:.55rem;margin-top:-.2rem;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .18s ease}.ontario-navbar .sc-menu-details[open]>summary:after{transform:rotate(225deg);margin-top:.2rem}.ontario-navbar .sc-menu-dropdown{display:none;position:absolute;top:100%;left:0;z-index:110;min-width:13.5rem;margin:0;padding:.4rem 0;background:#fff;border:1px solid rgba(10,34,78,.08);box-shadow:0 .75rem 1.6rem rgba(10,34,78,.15)}.ontario-navbar .sc-menu-item:hover .sc-menu-dropdown,.ontario-navbar .sc-menu-item:focus-within .sc-menu-dropdown,.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{display:block;animation:ontario-dropdown-in .18s ease-out both}.ontario-navbar .sc-menu-dropdown .sc-menu-link{padding:.6rem 1.1rem;color:#272c31;white-space:nowrap}.ontario-navbar .sc-menu-dropdown .sc-menu-link:hover,.ontario-navbar .sc-menu-dropdown .sc-menu-link:focus-visible{background:#eef4fb;color:var(--ontario-blue)}body:has(.ontario-page-top) .ontario-navbar{animation:none;background:#fff;box-shadow:0 1px 0 rgba(10,34,78,.08)}body:has(.ontario-page-top) .ontario-wordmark-light{display:none}body:has(.ontario-page-top) .ontario-wordmark-dark{display:block}body:has(.ontario-page-top) .ontario-navbar .sc-menu-link{color:#4b4f54}body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-link:focus-visible{color:var(--ontario-blue-dark)}@supports(animation-timeline:scroll()){body:not(:has(.ontario-page-top)) .ontario-navbar{background:transparent;box-shadow:none;animation:ontario-nav-scroll linear both;animation-timeline:scroll(root block);animation-range:0 8rem}}
+.ontario-hero{position:relative;min-height:100vh;min-height:100svh;display:flex;align-items:flex-start;background:url(assets/main_header.jpg) center top/cover no-repeat;color:#fff;overflow:hidden;--sc-hero-tint:#0a224e;--sc-hero-tint-opacity:.64}.ontario-photo-mask{position:absolute;inset:0;background:var(--sc-hero-tint,#0a224e);opacity:var(--sc-hero-tint-opacity,.64);mix-blend-mode:multiply}.ontario-hero-content{position:relative;z-index:2;text-align:center;padding-top:clamp(6rem,12vh,9rem);padding-bottom:9rem}.ontario-round-logo{display:block;width:clamp(145px,15vw,210px);aspect-ratio:1;object-fit:contain;margin:0 auto 1.25rem}.ontario-hero h1{font-size:clamp(3rem,5vw,4.5rem);letter-spacing:.025em;margin:0}.ontario-hero h2{max-width:32rem;margin:.6rem auto 0;line-height:1.35}.ontario-edge{position:absolute;left:0;right:0;bottom:-1px;z-index:4;height:7.5rem;overflow:hidden;pointer-events:none}.ontario-edge:after{content:"";position:absolute;inset:55% 0 -1px;background:#fff}.ontario-edge-blob{position:absolute;bottom:-4.6rem;width:58%;height:10rem;background:#fff;border-radius:50% 50% 0 0}.ontario-edge-blob--one{left:-9%;transform:rotate(5deg)}.ontario-edge-blob--two{left:25%;bottom:-5.6rem;width:54%;transform:rotate(-5deg)}.ontario-edge-blob--three{right:-13%;bottom:-4.4rem;transform:rotate(7deg)}
+.sc-edge-soft,.sc-edge-rolling,.sc-edge-diagonal,.sc-edge-peaks{position:relative;isolation:isolate;--sc-edge-fill:#fff;--sc-edge-height:6rem}.sc-edge-sm{--sc-edge-height:3.5rem}.sc-edge-md{--sc-edge-height:6rem}.sc-edge-lg{--sc-edge-height:8rem}.sc-edge-white{--sc-edge-fill:#fff}.sc-edge-cream{--sc-edge-fill:var(--ontario-cream)}.sc-edge-blue{--sc-edge-fill:var(--ontario-blue-dark)}.sc-edge-soft:after,.sc-edge-rolling:after,.sc-edge-diagonal:after,.sc-edge-peaks:after{content:"";position:absolute;left:0;right:0;bottom:-1px;z-index:5;height:var(--sc-edge-height);background:var(--sc-edge-fill);pointer-events:none}.sc-edge-top:after{top:-1px;bottom:auto;transform:rotate(180deg)}.sc-edge-soft:after{clip-path:ellipse(76% 58% at 50% 100%)}.sc-edge-rolling:after{left:-5%;right:-5%;border-radius:48% 52% 0 0/75% 60% 0 0;transform:rotate(-1.5deg)}.sc-edge-top.sc-edge-rolling:after{transform:rotate(178.5deg)}.sc-edge-diagonal:after{clip-path:polygon(0 58%,100% 4%,100% 100%,0 100%)}.sc-edge-peaks:after{clip-path:polygon(0 62%,16% 36%,34% 66%,54% 28%,75% 62%,100% 38%,100% 100%,0 100%)}
+.ontario-compact-hero{position:relative;min-height:360px;display:flex;align-items:center;padding:7rem 0 8rem;background:url(assets/mockups/scout-planning-v1.webp) center/cover no-repeat;color:#fff;overflow:hidden;--sc-hero-tint:#0a224e;--sc-hero-tint-opacity:.64}.ontario-compact-hero>.container{position:relative;z-index:2}.ontario-about{background:#fff}.ontario-about .row,.ontario-contact .row{margin-left:0;margin-right:0}.ontario-mockup{display:block;width:100%;max-height:480px;object-fit:cover;border-radius:48% 52% 45% 55%/55% 45% 55% 45%}.ontario-photo-frame{position:relative;margin:0;overflow:hidden;isolation:isolate;background:var(--ontario-blue)}.ontario-photo-frame img{display:block;width:100%;mix-blend-mode:multiply}.ontario-photo-tint{filter:saturate(.78) contrast(1.04)}.sc-shape-soft{border-radius:42% 58% 46% 54%/55% 42% 58% 45%!important}.sc-shape-blob{border-radius:61% 39% 48% 52%/44% 58% 42% 56%!important}.sc-shape-oval{border-radius:50%!important}.sc-shape-rounded{border-radius:1rem!important}.btn-skaut{font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase}.sc-mask-button-soft,.sc-mask-button-flow,.sc-mask-button-pebble,.sc-mask-button-natural,.sc-mask-button-rugged{-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-position:center;mask-repeat:no-repeat;mask-size:100% 100%;border:0!important;border-radius:0!important;padding:.8em 1.55em}.sc-mask-button-soft{-webkit-mask-image:url(assets/masks/button-soft.svg);mask-image:url(assets/masks/button-soft.svg)}.sc-mask-button-flow{-webkit-mask-image:url(assets/masks/button-flow.svg);mask-image:url(assets/masks/button-flow.svg)}.sc-mask-button-pebble{-webkit-mask-image:url(assets/masks/button-pebble.svg);mask-image:url(assets/masks/button-pebble.svg)}.sc-mask-button-natural,.sc-mask-button-rugged{-webkit-mask-image:url(assets/masks/button-natural.svg);mask-image:url(assets/masks/button-natural.svg)}.ontario-posts{background:#f8f9fa}.ontario-card{height:100%;overflow:hidden;border:1px solid #d9e0e6;border-radius:var(--ontario-radius);box-shadow:0 .65rem 1.2rem rgba(10,34,78,.12)!important}.ontario-post-card .card-img-top{height:210px;object-fit:cover;background:var(--ontario-blue-pale)}.ontario-card .card-body{position:relative;padding:1.75rem}.ontario-card .card-title{color:#07366c}.ontario-card-meta{display:flex;flex-wrap:wrap;gap:.45rem 1rem;margin-bottom:1rem;color:#68717a;font-size:.92rem}.ontario-card-meta>span{display:inline-flex;align-items:center;gap:.35rem}.ontario-card-meta .ontario-icon{width:auto}.ontario-read-more{color:var(--ontario-blue);font-weight:700;text-decoration:none}.ontario-feed>.sc-pagination,.sc-pagination{justify-content:flex-end;padding-top:1.25rem;border-top:1px solid #d9e0e6}.sc-pagination-link,.sc-pagination-current{border-color:#d5dde5;border-radius:0!important}.sc-pagination-current{background:var(--ontario-blue);color:#fff}
 .ontario-team-heading-inner{display:flex;align-items:center;gap:2rem}.ontario-team-avatar{width:150px;height:150px;object-fit:cover;border:5px solid #111;border-radius:50%}.ontario-agenda{border-top:4px solid var(--ontario-blue)}.ontario-agenda-item{display:grid;grid-template-columns:minmax(10rem,14rem) 1fr;gap:1.5rem;align-items:start;padding:1.2rem}.ontario-agenda-date{font-weight:700;color:var(--ontario-blue)}.ontario-agenda-copy{display:grid;gap:.3rem}.ontario-contact{padding-bottom:10rem;background:var(--ontario-cream);overflow:hidden}.ontario-contact-list{display:grid;gap:.6rem;margin-top:2rem}.ontario-contact-list p{display:flex;gap:.75rem;align-items:baseline;margin:0}.ontario-gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.ontario-gallery-item{margin:0}.ontario-gallery-item img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover}.ontario-gallery-item figcaption{padding:.5rem 0;color:#68717a}.ontario-accordion{border-top:1px solid #d9e0e6}.ontario-accordion:last-child{border-bottom:1px solid #d9e0e6}.ontario-accordion summary{padding:1.2rem 0;font-family:"SKAUT Bold","TheMix",sans-serif;font-size:1.15rem;cursor:pointer}.ontario-accordion p{padding-bottom:1.25rem}
+.ontario-media-link{position:relative;display:grid;min-height:270px;overflow:hidden;color:#fff;text-decoration:none;isolation:isolate}.ontario-media-link-image,.ontario-media-link-mask{position:absolute;inset:0;width:100%;height:100%}.ontario-media-link-image{object-fit:cover;transition:transform .3s ease}.ontario-media-link-mask{z-index:1;background:#081a3b;opacity:.62}.ontario-media-link-content{position:relative;z-index:2;display:grid;place-content:center;padding:2rem;text-align:center}.ontario-media-link:hover{color:#fff}.ontario-media-link:hover .ontario-media-link-image{transform:scale(1.035)}.ontario-media-link:focus-visible{outline:4px solid var(--ontario-yellow);outline-offset:3px}.ontario-person-photo{display:block;width:180px;height:180px;margin:auto;object-fit:cover}.ontario-person a{color:var(--ontario-blue-dark)}.ontario-resource-card{border:1px solid #d9e0e6;box-shadow:0 .45rem .9rem rgba(10,34,78,.1)}.ontario-resource-card .card-body{display:flex;flex-direction:column;align-items:flex-start;gap:.75rem;padding:1.5rem}.ontario-resource-card .btn{margin-top:auto}
+.sc-progress-thin{height:.35rem}.sc-progress-large{height:1.75rem}
 .ontario-footer{padding:4.25rem 0 0;background:var(--ontario-dark)!important}.ontario-footer-grid{display:grid;grid-template-columns:240px 1fr;gap:5rem;align-items:start;padding-bottom:5rem}.ontario-footer-logo{display:block;width:190px;height:auto}.ontario-footer .sc-menu-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3rem;margin-left:0;margin-right:0;width:100%}.ontario-footer .sc-menu-heading{display:block;padding:0 0 .65rem;color:#fff!important;text-decoration:none!important;font-weight:700}.ontario-footer .sc-menu-item{list-style:none}.ontario-footer .sc-menu-list>.sc-menu-item>.sc-menu-link{font-family:"SKAUT Bold","TheMix",sans-serif;color:#fff;text-transform:uppercase;font-weight:700;padding:0 0 .65rem}.ontario-footer .sc-menu-dropdown{display:block!important;position:static!important;min-width:0;padding:0!important;background:transparent!important;box-shadow:none!important}.ontario-footer .sc-menu-dropdown .sc-menu-link{display:block;padding:.25rem 0;color:var(--ontario-link);text-decoration:none}.ontario-footer .sc-menu-dropdown .sc-menu-link:hover{color:#fff}.ontario-copyright{display:block;padding:1.4rem 0;border-top:1px solid rgba(255,255,255,.08);color:#8fa1b1}
-@media(max-width:991.98px){.ontario-page-top{padding-top:4.5rem}.ontario-navbar{position:absolute;padding:.9rem 0}.ontario-wordmark{width:116px}.ontario-desktop-menu{display:none}.ontario-menu-shell{display:block}.ontario-menu-shell>summary{display:flex;align-items:center;justify-content:center;position:relative;z-index:202;width:44px;height:44px;color:#fff;list-style:none;cursor:pointer}body:has(.ontario-page-top) .ontario-menu-shell>summary{color:var(--ontario-blue-dark)}.ontario-menu-shell>summary::-webkit-details-marker{display:none}.ontario-menu-shell>summary:before{content:"☰";font-size:1.55rem}.ontario-menu-shell[open]>summary{position:fixed;top:.75rem;right:1rem;width:auto;padding:.5rem;color:var(--ontario-blue-dark)}.ontario-menu-shell[open]>summary:before{content:"×  Zavřít";font-family:"TheMix",Arial,sans-serif;font-size:1rem;font-weight:400}.ontario-menu-panel{display:none}.ontario-menu-shell[open]>.ontario-menu-panel{display:block;position:fixed;inset:0;z-index:200;overflow-y:auto;padding:5.25rem 0 2rem;background:#fff;color:var(--ontario-blue-dark)}.ontario-menu-tools{display:block;width:13.6rem;margin:0 auto 1.2rem;padding:0 0 1.4rem;border-bottom:1px solid #d9e0e6;text-align:center}.ontario-menu-close-label{display:none}.ontario-navbar .sc-menu{width:100%}.ontario-navbar .sc-menu-list{display:block;width:100%;padding:0;margin:0}.ontario-navbar .sc-menu-item{border-bottom:1px solid #e3e5e8}.ontario-navbar .sc-menu-link{min-height:72px;padding:1rem 1.5rem;color:#111;font-size:1.22rem}.ontario-navbar .sc-menu-link:focus-visible,.ontario-navbar summary:focus-visible{color:var(--ontario-blue);outline-offset:-4px}.ontario-navbar .sc-menu-details>summary{justify-content:space-between}.ontario-navbar .sc-menu-dropdown,.ontario-navbar .sc-menu-item:hover .sc-menu-dropdown,.ontario-navbar .sc-menu-item:focus-within .sc-menu-dropdown{display:none;position:static;min-width:0;padding:0;background:#f5f5f5;border:0;box-shadow:none}.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{display:block}.ontario-navbar .sc-menu-details[open]>summary{color:#06f;background:#f0f5fd}.ontario-navbar .sc-menu-dropdown .sc-menu-link{min-height:60px;padding-left:2.5rem;color:#111}.ontario-navbar .sc-menu-dropdown .sc-menu-item:last-child{border-bottom:0}.ontario-wordmark-dark{display:none}.ontario-hero-content{padding-top:7rem}.ontario-footer-grid{grid-template-columns:1fr;gap:2.5rem}.ontario-footer .sc-menu-list{grid-template-columns:repeat(2,minmax(0,1fr))}.ontario-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ontario-footer{margin-top:auto}
+@media(max-width:991.98px){.ontario-page-top{padding-top:4.5rem}.ontario-navbar{padding:.65rem 0}.ontario-wordmark{width:112px}.ontario-desktop-menu{display:none}.ontario-menu-shell{display:block}.ontario-menu-shell>summary{display:flex;align-items:center;justify-content:center;position:relative;z-index:202;width:44px;height:44px;color:#fff;list-style:none;cursor:pointer}body:has(.ontario-page-top) .ontario-menu-shell>summary{color:var(--ontario-blue-dark)}.ontario-menu-shell>summary::-webkit-details-marker{display:none}.ontario-menu-shell>summary:before{content:"☰";font-size:1.55rem}.ontario-menu-shell[open]>summary{position:fixed;top:.75rem;right:1rem;width:auto;padding:.5rem;color:var(--ontario-blue-dark)}.ontario-menu-shell[open]>summary:before{content:"×  Zavřít";font-family:"TheMix",Arial,sans-serif;font-size:1rem;font-weight:400}.ontario-menu-panel{display:none}.ontario-menu-shell[open]>.ontario-menu-panel{display:block;position:fixed;inset:0;z-index:200;overflow-y:auto;padding:5.25rem 0 2rem;background:#fff;color:var(--ontario-blue-dark)}.ontario-menu-tools{display:block;width:13.6rem;margin:0 auto 1.2rem;padding:0 0 1.4rem;border-bottom:1px solid #d9e0e6;text-align:center}.ontario-menu-close-label{display:none}.ontario-navbar .sc-menu{width:100%}.ontario-navbar .sc-menu-list{display:block;width:100%;padding:0;margin:0}.ontario-navbar .sc-menu-item{border-bottom:1px solid #e3e5e8}.ontario-navbar .sc-menu-link{min-height:64px;padding:.85rem 1.5rem;color:#111;font-size:1.12rem}.ontario-navbar .sc-menu-item:hover>.sc-menu-link,.ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link{color:#111}.ontario-navbar .sc-menu-link:focus-visible,.ontario-navbar summary:focus-visible{color:var(--ontario-blue);outline-offset:-4px}.ontario-navbar .sc-menu-details>summary{justify-content:space-between}.ontario-navbar .sc-menu-dropdown,.ontario-navbar .sc-menu-item:hover .sc-menu-dropdown,.ontario-navbar .sc-menu-item:focus-within .sc-menu-dropdown{display:none;position:static;min-width:0;padding:0;background:#f5f5f5;border:0;box-shadow:none}.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{display:block}.ontario-navbar .sc-menu-details[open]>summary,.ontario-navbar .sc-menu-details[open]>summary:hover{color:var(--ontario-blue);background:#f0f5fd}.ontario-navbar .sc-menu-dropdown .sc-menu-link,.ontario-navbar .sc-menu-dropdown .sc-menu-link:hover{min-height:56px;padding-left:2.5rem;color:#111;background:#f5f5f5}.ontario-navbar .sc-menu-dropdown .sc-menu-item:last-child{border-bottom:0}.ontario-wordmark-dark{display:none}.ontario-hero-content{padding-top:7rem}.ontario-footer-grid{grid-template-columns:1fr;gap:2.5rem}.ontario-footer .sc-menu-list{grid-template-columns:repeat(2,minmax(0,1fr))}.ontario-gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:991.98px){.ontario-navbar{position:sticky;inset:auto;top:0;margin-bottom:-4.5rem}.ontario-menu-shell>summary{gap:.35rem;width:auto;min-width:44px}.ontario-menu-shell>summary:before,.ontario-menu-shell[open]>summary:before{content:none}.ontario-menu-shell>summary .fa-xmark,.ontario-menu-shell>summary .ontario-menu-close-label{display:none}.ontario-menu-shell[open]>summary .fa-bars{display:none}.ontario-menu-shell[open]>summary .fa-xmark,.ontario-menu-shell[open]>summary .ontario-menu-close-label{display:inline-block}.ontario-menu-shell[open]>.ontario-menu-panel{padding-top:4.75rem;animation:ontario-menu-in .22s ease-out both}.ontario-navbar .sc-menu-details>summary:after{display:none}.ontario-navbar .sc-menu-chevron{display:inline-block;width:1rem;transition:transform .18s ease}.ontario-navbar .sc-menu-details[open]>summary .sc-menu-chevron{transform:rotate(180deg)}.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{animation:ontario-dropdown-in .18s ease-out both}.ontario-navbar .sc-menu-details[open]>summary{color:var(--ontario-blue)}.ontario-menu-tools{display:none}}
 @media(max-width:575.98px){.ontario-section{padding:4rem 0}.ontario-hero{min-height:100svh}.ontario-hero-content{padding-top:6.2rem}.ontario-round-logo{width:145px}.ontario-hero h1{font-size:3rem}.ontario-edge{height:6.5rem}.ontario-team-heading-inner{align-items:flex-start;flex-direction:column}.ontario-team-avatar{width:124px;height:124px}.ontario-agenda-item{grid-template-columns:1fr;gap:.35rem}.ontario-gallery-grid{grid-template-columns:1fr}.ontario-footer .sc-menu-list{grid-template-columns:1fr;gap:1.75rem}}
+/* Ontario layout corrections and reusable scout primitives. Keep navigation
+   in normal flow on inner pages; only the home hero intentionally sits under
+   its transparent sticky navigation. */
+html,body{margin:0}.ontario-page-top{padding-top:0}
+.ontario-navbar{margin-bottom:0;background:rgb(10,34,78);box-shadow:0 1px 0 rgba(255,255,255,.12)}
+.ontario-wordmark-light{display:block}.ontario-wordmark-dark{display:none!important}
+body:has(.ontario-page-top) .ontario-navbar{animation:none;background:rgb(10,34,78);box-shadow:0 1px 0 rgba(255,255,255,.12)}
+body:has(.ontario-page-top) .ontario-wordmark-light{display:block}
+body:has(.ontario-page-top) .ontario-navbar .sc-menu-link{color:rgba(255,255,255,.84)}
+body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-link:focus-visible{color:#fff}
+body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;margin-bottom:0;background:transparent;box-shadow:none}
+@supports(animation-timeline:scroll()){body:not(:has(.ontario-page-top)) .ontario-navbar{animation:ontario-nav-scroll linear both;animation-timeline:scroll(root block);animation-range:0 8rem}}
+.ontario-footer{background:rgb(10,34,78)!important}
+
+/* Gentle organic edges never extend beyond the viewport and therefore cannot
+   expose a second, detached white band. */
+.sc-edge-soft,.sc-edge-rolling,.sc-edge-diagonal,.sc-edge-peaks{--sc-edge-height:3.25rem}
+.sc-edge-sm{--sc-edge-height:1.75rem}.sc-edge-md{--sc-edge-height:3.25rem}.sc-edge-lg{--sc-edge-height:4.75rem}
+.sc-edge-pale{--sc-edge-fill:var(--ontario-blue-pale)}
+.sc-edge-soft:after,.sc-edge-rolling:after,.sc-edge-diagonal:after,.sc-edge-peaks:after{left:0;right:0;transform:none;border-radius:0}
+.sc-edge-soft:after,.sc-edge-rolling:after{-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-position:center;mask-repeat:no-repeat;mask-size:100% 100%;clip-path:none}
+.sc-edge-soft:after{-webkit-mask-image:url(assets/masks/edge-soft.svg);mask-image:url(assets/masks/edge-soft.svg)}
+.sc-edge-rolling:after{-webkit-mask-image:url(assets/masks/edge-rolling.svg);mask-image:url(assets/masks/edge-rolling.svg)}
+.sc-edge-diagonal:after{clip-path:polygon(0 62%,100% 30%,100% 100%,0 100%)}
+.sc-edge-peaks:after{clip-path:polygon(0 55%,9% 45%,17% 58%,27% 43%,38% 56%,49% 42%,61% 57%,72% 44%,84% 58%,93% 46%,100% 54%,100% 100%,0 100%)}
+.sc-edge-top:after{top:-1px;bottom:auto;transform:rotate(180deg)}
+.ontario-hero{min-height:100vh;min-height:100svh}.ontario-hero-content{padding-bottom:clamp(6rem,12vh,9rem)}
+
+.sc-shape-soft{border-radius:1.75rem 2.2rem 1.6rem 2rem/2rem 1.6rem 2.2rem 1.7rem!important}
+.sc-shape-blob{border-radius:2.8rem 1.8rem 2.5rem 2rem/2rem 2.6rem 1.8rem 2.4rem!important}
+.btn:not(.btn-close),.sc-button{display:inline-flex;align-items:center;justify-content:center;font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase;font-weight:700;border-radius:.65rem .9rem .7rem .85rem;padding:.62em 1.15em;transition:transform .16s ease,box-shadow .16s ease,background-color .16s ease}
+.btn:not(.btn-close):hover,.sc-button:hover{transform:translateY(-1px);box-shadow:0 .35rem .8rem rgba(10,34,78,.16)}
+.btn i[data-sc-button-icon],.sc-button i[data-sc-button-icon]{flex:0 0 auto;line-height:1}.btn:has(i[data-sc-button-icon]),.sc-button:has(i[data-sc-button-icon]){gap:.55em;min-height:44px}.btn.sc-button-icon-right i[data-sc-button-icon],.sc-button.sc-button-icon-right i[data-sc-button-icon],i[data-sc-button-icon].sc-button-icon-right{order:2}.btn.sc-button-icon-only,.sc-button.sc-button-icon-only,[data-sc-button-icon-only="true"]{min-width:44px;min-height:44px;padding:.65rem}
+.sc-mask-button-rounded-asymmetric,.sc-mask-button-soft-capsule,.sc-mask-button-oval-wave{-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-position:center;mask-repeat:no-repeat;mask-size:100% 100%;border:0!important;border-radius:0!important;padding:.82em 1.7em}.sc-mask-button-rounded-asymmetric{-webkit-mask-image:url(assets/masks/button-rounded-asymmetric.svg);mask-image:url(assets/masks/button-rounded-asymmetric.svg)}.sc-mask-button-soft-capsule{-webkit-mask-image:url(assets/masks/button-soft-capsule.svg);mask-image:url(assets/masks/button-soft-capsule.svg)}.sc-mask-button-oval-wave{-webkit-mask-image:url(assets/masks/button-oval-wave.svg);mask-image:url(assets/masks/button-oval-wave.svg)}
+.ontario-post-card .card-text{display:-webkit-box;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:4;min-height:5.6em}
+
+.ontario-detail .web-post{max-width:100%}.ontario-detail .web-post-cover{display:block;width:100%;max-width:100%;height:auto;max-height:min(60vh,42rem);margin:1.5rem auto 2rem;object-fit:contain;background:var(--ontario-cream)}.ontario-detail .web-post-body,.ontario-detail .web-post-body img{max-width:100%}.ontario-detail .web-post-body img{height:auto}
+
+.ontario-contact-page{background:#fff}.ontario-contact-hero{position:relative;min-height:410px;display:grid;place-items:center;overflow:hidden;background:url(assets/main_header.jpg) center 38%/cover no-repeat;color:#fff}.ontario-contact-hero .ontario-photo-mask{background:#0a224e;opacity:.78;mix-blend-mode:multiply}.ontario-contact-hero-content{position:relative;z-index:2;padding:5rem 1rem;text-align:center}.ontario-contact-hero h1{margin-bottom:1rem}.ontario-contact-hero h2{margin:0}.ontario-leaders{padding-bottom:8rem;background:#fff}.ontario-leader-grid{max-width:680px;margin:3.5rem auto 0}.ontario-competencies{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.45rem;margin:.25rem auto 0}.ontario-badge-magenta{background:#b00075}.ontario-council{background:var(--ontario-blue-pale)}.ontario-person{height:100%}.ontario-person-photo{width:clamp(150px,15vw,210px);height:clamp(150px,15vw,210px);border-radius:48% 52% 46% 54%/52% 47% 53% 48%!important}.ontario-person-role{margin-top:1rem;color:#59616a}.ontario-person h3{margin:.25rem 0 .45rem}.ontario-person-contact{margin:.2rem 0}.ontario-person-contact a{font-weight:700;text-decoration:none}
+
+.ontario-socials{text-align:center}.ontario-social-page-title{margin-bottom:7rem}.ontario-social-row{display:flex;justify-content:center;gap:.85rem;margin:1.5rem 0 8rem}.ontario-social-link{display:inline-grid;width:3.75rem;height:3.75rem;place-items:center;border-radius:50%;background:var(--ontario-social-color,#255c9e);color:#fff;font-size:1.85rem;text-decoration:none;transition:transform .18s ease}.ontario-social-instagram{--ontario-social-color:#cf347e}.ontario-social-youtube{--ontario-social-color:#e52329}.ontario-social-github{--ontario-social-color:#111}.ontario-social-link:hover,.ontario-social-link:focus-visible{color:#fff;transform:translateY(-3px) rotate(-2deg)}.ontario-related-title{margin-bottom:2.5rem}.ontario-related-links{max-width:800px;margin-inline:auto}.ontario-related-link{display:grid;justify-items:center;gap:1rem;color:var(--ontario-blue-dark);text-decoration:none}.ontario-related-logo,.ontario-related-link>.ontario-icon{width:112px;height:112px;object-fit:contain}.ontario-related-link>.ontario-icon{display:grid;place-items:center;border-radius:50%;background:var(--ontario-blue-pale);font-size:3.25rem}
+
+.ontario-btn-organic{border-radius:1rem 1.45rem .95rem 1.3rem/1.25rem .95rem 1.35rem 1rem!important}.ontario-btn-organic:focus-visible{outline:3px solid var(--ontario-yellow);outline-offset:3px}.ontario-card-author{display:inline-flex!important;align-items:center;gap:.45rem}.ontario-author-avatar,.web-detail-author-avatar{display:block;width:28px;height:28px;flex:0 0 28px;border-radius:50%;object-fit:cover}.ontario-author-avatar:not([src]){display:none}.ontario-author-avatar[src]+.ontario-author-fallback{display:none}.ontario-author-fallback,.web-detail-author-fallback{display:inline-grid;width:28px;height:28px;flex:0 0 28px;place-items:center;border-radius:50%;background:var(--ontario-blue-pale);color:var(--ontario-blue-dark)}.ontario-author-fallback .ontario-icon{width:auto}.web-detail-meta{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem 1rem;margin:0 0 1.5rem;color:#68717a}.web-detail-author{display:inline-flex;align-items:center;gap:.5rem}.web-detail-author-avatar:not([src]){display:none}.web-detail-author-avatar[src]+.web-detail-author-fallback{display:none}.ontario-footer .sc-menu-list{align-items:start}.ontario-footer .sc-menu-column{align-self:start}.ontario-copyright a{color:inherit;text-decoration:underline;text-underline-offset:.18em}.ontario-copyright a:hover,.ontario-copyright a:focus-visible{color:#fff}
+
+/* Shared editor-facing overlay contract. Background declarations remain on the
+   host; only its dedicated mask layer is coloured and faded. */
+[data-sc-overlay="true"]{--sc-overlay-color:var(--sc-hero-tint,#0a224e);--sc-overlay-opacity:var(--sc-hero-tint-opacity,.64)}
+.ontario-contact-hero[data-sc-overlay="true"]{--sc-overlay-opacity:var(--sc-hero-tint-opacity,.78)}.ontario-media-link[data-sc-overlay="true"]{--sc-overlay-color:var(--sc-hero-tint,#081a3b);--sc-overlay-opacity:var(--sc-hero-tint-opacity,.62)}
+:is(.ontario-hero,.ontario-compact-hero,.ontario-contact-hero)[data-sc-overlay="true"]>.ontario-photo-mask{display:block;background:var(--sc-overlay-color);opacity:var(--sc-overlay-opacity)}
+.ontario-media-link[data-sc-overlay="true"] .ontario-media-link-mask{display:block;background:var(--sc-overlay-color);opacity:var(--sc-overlay-opacity)}
+.ontario-photo-frame[data-sc-overlay="true"]:after{content:"";position:absolute;inset:0;z-index:1;background:var(--sc-overlay-color);opacity:var(--sc-overlay-opacity);pointer-events:none}.ontario-photo-frame[data-sc-overlay="true"] img{position:relative;z-index:0;mix-blend-mode:normal}
+:is(.ontario-hero,.ontario-compact-hero,.ontario-contact-hero)[data-sc-overlay-enabled="false"]>.ontario-photo-mask,.ontario-media-link[data-sc-overlay-enabled="false"] .ontario-media-link-mask{display:none}.ontario-photo-frame[data-sc-overlay-enabled="false"]:after{opacity:0}
+
+/* A removed template logo is replaced by bound, selectable text rather than a
+   pseudo-element, so the site title remains semantic and editable. */
+[data-sc-template-logo-fallback]{display:none}
+img[data-sc-template-logo-hidden="true"]{display:none!important}
+img[data-sc-template-logo-hidden="true"]+[data-sc-template-logo-fallback]{display:inline-flex}
+.ontario-wordmark-fallback{align-items:center;min-height:44px;color:inherit;font-size:1.25rem;line-height:1;text-transform:uppercase}.ontario-wordmark-fallback-dark{display:none!important}.ontario-hero-logo-fallback{margin:0 auto 1.25rem}.ontario-footer-logo-fallback{color:#fff;font-size:1.7rem}
+
+@media(max-width:991.98px){.ontario-page-top{padding-top:0}.ontario-navbar{margin-bottom:0}.ontario-menu-shell>summary,body:has(.ontario-page-top) .ontario-menu-shell>summary{color:#fff}body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;margin-bottom:0}.ontario-menu-shell[open]>summary{color:var(--ontario-blue-dark)}.ontario-contact-hero{min-height:360px}.ontario-social-row{margin-bottom:5rem}}
+@media(max-width:575.98px){.sc-edge-lg{--sc-edge-height:3.5rem}.ontario-contact-hero{min-height:320px}.ontario-contact-hero-content{padding:4rem 1rem}.ontario-leaders{padding-bottom:6rem}.ontario-social-page-title{margin-bottom:4rem}.ontario-social-link{width:3.25rem;height:3.25rem;font-size:1.55rem}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 """
 
@@ -584,6 +810,17 @@ def _copy_assets(version: WebThemeVersion, db: Session) -> None:
     for stale in db.query(WebThemeAsset).filter_by(theme_version_id=version.id).all():
         if stale.relative_path not in expected:
             db.delete(stale)
+    # A bundled version can be reseeded while developing or upgrading the
+    # application. Keep its physical package in lockstep with the manifest;
+    # otherwise an asset removed from the bundle is exported as an undeclared
+    # ZIP member and the otherwise valid theme cannot be reinstalled.
+    for target in sorted(target_root.rglob("*"), reverse=True):
+        if target.is_file():
+            relative = (Path("assets") / target.relative_to(target_root)).as_posix()
+            if relative not in expected:
+                target.unlink()
+        elif target.is_dir() and not any(target.iterdir()):
+            target.rmdir()
 
 
 def seed_ontario_theme(db: Session) -> WebThemeVersion:
@@ -626,13 +863,25 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "author": "Ontario / ScoutComp",
         "description": ONTARIO_THEME_DESCRIPTION,
         "license": "Apache-2.0",
+        "config": {
+            "nav_scrolled": {
+                "type": "color", "label": "Barva navigace po posunutí", "default": "#0a224e",
+            },
+        },
+        "editor": {
+            "font_sets": [
+                {"id": "themix", "label": "TheMix", "value": '"TheMix", Arial, sans-serif'},
+                {"id": "skaut", "label": "SKAUT Bold", "value": '"SKAUT Bold", "TheMix", sans-serif'},
+            ],
+        },
     }
     tokens = {
         "colors": {
             "primary": "#255c9e", "primary-dark": "#0a224e",
-            "accent": "#f9b200", "cream": "#f6ebd8", "footer": "#212529",
+            "accent": "#f9b200", "cream": "#f6ebd8", "footer": "#0a224e",
         },
         "typography": {"font-family": '"TheMix",Arial,sans-serif'},
+        "nav_scrolled": "#0a224e",
     }
     if version is None:
         version = WebThemeVersion(
@@ -667,6 +916,7 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "meetings": "Ontario – seznam schůzek",
         "calendar": "Ontario – kalendář",
         "contact": "Ontario – kontakt",
+        "contact-hero": "Kontaktní hero",
         "gallery": "Ontario – galerie",
         "support": "Ontario – jak nás podpořit",
         "downloads": "Ontario – ke stažení",
@@ -676,10 +926,14 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "posts": "Aktuality",
         "header": "Horní navigace",
         "footer": "Patička",
-        "edge": "Organický skautský okraj",
         "compact-hero": "Kompaktní hero",
         "faq": "Časté otázky",
         "team-heading": "Záhlaví družiny",
+        "gallery-hub": "Galerijní rozcestník",
+        "leaders": "Vedoucí oddílu",
+        "council": "Oddílová rada",
+        "social-links": "Sociální sítě a odkazy",
+        "download-cards": "Materiály ke stažení",
         "post-card": "Karta aktuality",
         "meeting-card": "Karta schůzky",
         "scout-logo": "Skautské logo",
@@ -690,6 +944,10 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "breadcrumb": "Bootstrap drobečková navigace",
         "accordion": "Rozbalovací panel",
         "progress": "Bootstrap průběh",
+        "media-link-card": "Fotografická odkazová karta",
+        "person-card": "Karta vedoucího",
+        "download-card": "Karta dokumentu",
+        "social-icon": "Ikona sociální sítě",
     }
 
     for key, project in ONTARIO_THEME_TEMPLATES.items():

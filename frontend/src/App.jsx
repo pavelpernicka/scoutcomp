@@ -44,6 +44,7 @@ const WebEditorPage = React.lazy(() => import("./modules/web/editor/WebEditorPag
 export default function App() {
   const location = useLocation();
   const isWebEditor = /^\/admin\/web\/(?:pages\/\d+|design\/(?:templates|components|sections)\/\d+)\/editor\/?$/.test(location.pathname);
+  const isAuthRoute = location.pathname === "/login";
 
   const routes = (
     <Suspense fallback={<div className="loader">Loading…</div>}>
@@ -149,5 +150,5 @@ export default function App() {
       </Suspense>
   );
 
-  return isWebEditor ? routes : <Layout>{routes}</Layout>;
+  return isWebEditor || isAuthRoute ? routes : <Layout>{routes}</Layout>;
 }

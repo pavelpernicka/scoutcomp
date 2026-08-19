@@ -5,6 +5,20 @@ import { grapesI18nConfig } from "./i18n";
 
 const cssContent = (value) => JSON.stringify(String(value || ""));
 
+const SYSTEM_FONT_SETS = [
+  { id: "system", label: "System UI", value: "system-ui, sans-serif" },
+  { id: "serif", label: "Serif", value: "Georgia, serif" },
+  { id: "mono", label: "Monospace", value: "ui-monospace, monospace" },
+];
+
+export const fontFamilyOptions = (fontSets = []) => {
+  const seen = new Set();
+  return [...SYSTEM_FONT_SETS, ...(Array.isArray(fontSets) ? fontSets : [])]
+    .filter((item) => item && typeof item.value === "string" && typeof item.label === "string")
+    .filter((item) => !seen.has(item.value) && seen.add(item.value))
+    .map((item) => ({ id: item.value, label: item.label }));
+};
+
 export const editorCanvasCss = (translate = (key) => key) => `
 [data-sc-type="slot"][data-sc-slot="content"] {
   box-sizing: border-box !important;
@@ -43,6 +57,10 @@ export const editorCanvasCss = (translate = (key) => key) => `
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
 }
+.sc-shape-soft { border-radius: 1.75rem 2.2rem 1.6rem 2rem / 2rem 1.6rem 2.2rem 1.7rem !important; }
+.sc-shape-blob { border-radius: 2.8rem 1.8rem 2.5rem 2rem / 2rem 2.6rem 1.8rem 2.4rem !important; }
+.sc-shape-oval { border-radius: 50% !important; }
+.sc-shape-rounded { border-radius: 1rem !important; }
 /* Transparent Bootstrap headers need a deliberate canvas-only backdrop when
    their hero sibling is not part of the resource being edited. */
 .navbar:has([data-sc-menu-preview]) {
@@ -58,6 +76,7 @@ export function createEditorConfig({
   container,
   devices,
   styleSectors,
+  fontSets = [],
   canvasStyles = [],
   language = "cs",
   translate = (key) => key,
@@ -73,6 +92,13 @@ export function createEditorConfig({
   };
   clonedSectors.forEach((sector) => {
     if (sectorNames[sector.id]) sector.name = sectorNames[sector.id];
+    if (sector.id === "typography") {
+      sector.properties = sector.properties.map((property) => property === "font-family" ? {
+        property: "font-family",
+        type: "select",
+        options: fontFamilyOptions(fontSets),
+      } : property);
+    }
   });
   // Build inline canvas CSS from the same source the public renderer uses.
   // GrapesJS places `baseCss` into a <style> element inside the iframe body,
@@ -133,5 +159,65 @@ export function createEditorConfig({
 export function configureEditor(editor, options = {}) {
   registerScoutCompTypes(editor, options.translate);
   registerBuilderBlocks(editor, options);
+  // Keep disclosures collapsed by default so mobile menus and accordions do
+  // not cover the canvas. Selecting a details element (or one of its children
+  // through the layer tree) opens only its nearest disclosure in the canvas.
+  // This is view state only; Project Data and the public `open` attribute are
+  // untouched.
+  const authoredDisclosures = new WeakSet();
+  const disclosureDocuments = new WeakSet();
+  const disclosurePointerState = new WeakMap();
+  const componentElement = (component) => component?.getView?.()?.el || component?.view?.el;
+  const revealSelectedDisclosure = (component) => {
+    const element = componentElement(component);
+    const disclosure = element?.matches?.("details") ? element : element?.closest?.("details");
+    const doc = editor.Canvas?.getDocument?.();
+    doc?.querySelectorAll?.("details[data-sc-editor-disclosure]").forEach((item) => {
+      if (item !== disclosure && (!disclosure || !item.contains(disclosure)) && !authoredDisclosures.has(item)) item.open = false;
+    });
+    // A summary click owns its native toggle. Opening it here first would make
+    // the browser's default action immediately close it again.
+    if (disclosure && element?.tagName?.toLowerCase() !== "summary") {
+      disclosure.setAttribute("data-sc-editor-disclosure", "selected");
+      disclosure.open = true;
+    }
+  };
+  const registerDisclosure = (component) => {
+    if (String(component?.get?.("tagName") || "").toLowerCase() !== "details") return;
+    const element = componentElement(component);
+    if (!element) return;
+    const attributes = component.getAttributes?.() || {};
+    if (Object.prototype.hasOwnProperty.call(attributes, "open")) authoredDisclosures.add(element);
+    else authoredDisclosures.delete(element);
+    element.setAttribute?.("data-sc-editor-disclosure", "ready");
+  };
+  editor.on?.("component:mount", registerDisclosure);
+  editor.on?.("component:update:attributes", registerDisclosure);
+  editor.on?.("component:selected", revealSelectedDisclosure);
+  const bindDisclosureClicks = () => {
+    const doc = editor.Canvas?.getDocument?.();
+    if (!doc || disclosureDocuments.has(doc)) return;
+    disclosureDocuments.add(doc);
+    doc.addEventListener("pointerdown", (event) => {
+      const summary = event.target?.closest?.("summary");
+      const details = summary?.parentElement;
+      if (details?.matches?.("details")) disclosurePointerState.set(details, details.open);
+    }, true);
+    doc.addEventListener("click", (event) => {
+      const summary = event.target?.closest?.("summary");
+      const details = summary?.parentElement;
+      if (!details?.matches?.("details")) return;
+      // Selection may open a disclosure between pointerdown and click. Own the
+      // canvas interaction explicitly so one click always means one toggle.
+      event.preventDefault();
+      const initial = disclosurePointerState.has(details)
+        ? disclosurePointerState.get(details)
+        : details.open;
+      disclosurePointerState.delete(details);
+      details.open = !initial;
+    });
+  };
+  editor.on?.("load", bindDisclosureClicks);
+  editor.on?.("canvas:frame:load", bindDisclosureClicks);
   return editor;
 }

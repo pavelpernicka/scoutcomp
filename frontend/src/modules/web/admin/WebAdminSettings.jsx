@@ -11,6 +11,7 @@ import { cmsApi } from "../api/cms";
 
 const EMPTY_SETTINGS = {
   site_title: "",
+  title_pattern: "{page} | {site}",
   site_tagline: "",
   site_meta: "",
   site_logo: "",
@@ -31,7 +32,7 @@ export default function WebAdminSettings() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState(null);
-  const [mediaPickerField, setMediaPickerField] = useState(null); // "favicon" | "og_image"
+  const [mediaPickerField, setMediaPickerField] = useState(null); // "site_logo" | "favicon" | "og_image"
 
   const { data: settingsData, isLoading } = useQuery({
     queryKey: ["web", "settings"],
@@ -117,6 +118,11 @@ export default function WebAdminSettings() {
                   <input className="form-control" value={form.site_title} onChange={(e) => setField("site_title", e.target.value)} />
                 </div>
                 <div className="mb-3">
+                  <label className="form-label small fw-semibold">{t("web.settingsTitlePattern")}</label>
+                  <input className="form-control font-monospace" value={form.title_pattern} onChange={(e) => setField("title_pattern", e.target.value)} placeholder="{page} | {site}" />
+                  <div className="form-text">{t("web.settingsTitlePatternHint", { example: form.title_pattern.replaceAll("{page}", t("web.settingsTitlePatternExamplePage")).replaceAll("{site}", form.site_title || "Ontario") })}</div>
+                </div>
+                <div className="mb-3">
                   <label className="form-label small fw-semibold">{t("web.settingsTagline")}</label>
                   <input className="form-control" value={form.site_tagline} onChange={(e) => setField("site_tagline", e.target.value)} />
                 </div>
@@ -130,7 +136,10 @@ export default function WebAdminSettings() {
                 </div>
                 <div className="mb-0">
                   <label className="form-label small fw-semibold">{t("web.settingsLogo")}</label>
-                  <input className="form-control" value={form.site_logo} onChange={(e) => setField("site_logo", e.target.value)} placeholder="https://…/logo.png" />
+                  <div className="input-group">
+                    <input className="form-control" value={form.site_logo} onChange={(e) => setField("site_logo", e.target.value)} placeholder="https://…/logo.png" />
+                    <button type="button" className="btn btn-outline-secondary" onClick={() => setMediaPickerField("site_logo")} title={t("web.chooseFromMedia")}><i className="fas fa-images" /></button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -233,7 +242,7 @@ export default function WebAdminSettings() {
 
       {mediaPickerField && (
         <MediaPickerModal
-          title={mediaPickerField === "favicon" ? t("web.settingsFavicon") : t("web.settingsOgImage")}
+          title={t({ favicon: "web.settingsFavicon", site_logo: "web.settingsLogo", og_image: "web.settingsOgImage" }[mediaPickerField])}
           onSelect={pickMedia}
           onClose={() => setMediaPickerField(null)}
         />

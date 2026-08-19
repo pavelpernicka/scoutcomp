@@ -23,22 +23,30 @@ describe("builder primitive blocks", () => {
     expect(blockIds).not.toContain("sc-template-part");
     expect(blockIds).not.toContain("sc-global-part");
     expect(blockIds).toContain("sc-menu");
+    expect(blockIds).toContain("sc-calendar");
     expect(blocks.every((block) => block.media?.includes("fa-"))).toBe(true);
   });
 
-  it("keeps structural blocks free of publishable placeholder content and styles", () => {
+  it("inserts the calendar with stable public renderer props", () => {
+    const calendar = createPrimitiveBlocks((key) => key).find((block) => block.id === "sc-calendar");
+
+    expect(calendar.content).toEqual({
+      type: "sc-calendar",
+      kind: "all",
+      teamId: "",
+      firstDayOfWeek: "monday",
+      showDescription: true,
+    });
+    expect(calendar.media).toContain("fa-calendar-days");
+  });
+
+  it("inserts structural blocks with editable sample content", () => {
     const blocks = createPrimitiveBlocks((key) => key);
 
     for (const id of STRUCTURAL_IDS) {
       const block = blocks.find((item) => item.id === id);
       expect(block, id).toBeDefined();
-      // The drop surface must not be modeled as a placeholder child: it would
-      // be serialized into the public Project Data and published.
-      expect(block.content.components, id).toBeUndefined();
-      // Editor-only affordances live in `baseCss` (editorCanvasCss), not in
-      // component styles that GrapesJS persists into the project CSS.
-      expect(block.content.style, id).toBeUndefined();
-      expect(block.content.attributes, id).toBeUndefined();
+      expect(block.content.components?.length, id).toBeGreaterThan(0);
     }
   });
 
@@ -47,8 +55,10 @@ describe("builder primitive blocks", () => {
 
     expect(ids).toEqual(expect.arrayContaining([
       "sc-fa-icon",
-      "sc-organic-edge",
       "sc-photo-mask",
+      "layout-media-split",
+      "block-section-heading",
+      "block-hero",
       "bs-alert",
       "bs-badge",
       "bs-breadcrumb",
@@ -62,6 +72,30 @@ describe("builder primitive blocks", () => {
       "bs-progress",
       "bs-callout",
     ]));
+  });
+
+  it("offers the extended graphic blocks and editorial layouts", () => {
+    const ids = createPrimitiveBlocks((key) => key).map((block) => block.id);
+
+    expect(ids).toEqual(expect.arrayContaining([
+      "block-organic-photo",
+      "block-portrait-quote",
+      "block-colored-cta",
+      "block-contact-row",
+      "layout-photo-cta",
+      "layout-collage-2-1",
+      "layout-media-alternating",
+      "layout-contact-split",
+    ]));
+  });
+
+  it("marks image-overlay starters with the shared overlay contract", () => {
+    const blocks = createPrimitiveBlocks((key) => key);
+
+    for (const id of ["sc-photo-mask", "block-hero", "block-contact-hero", "block-organic-photo", "layout-photo-cta"]) {
+      const block = blocks.find((item) => item.id === id);
+      expect(block?.content?.attributes?.["data-sc-overlay"], id).toBe("true");
+    }
   });
 
   it("adds a native tooltip to data-source blocks", () => {
@@ -95,6 +129,8 @@ describe("builder primitive blocks", () => {
     expect(postRepeat.components[0].components[0].scBindings.src.field).toBe("cover_url");
     expect(postRepeat.params.page).toEqual({ $scBinding: { scope: "page", field: "query.page" } });
     expect(pagination.type).toBe("sc-pagination");
+    expect(pagination).toMatchObject({ bindTo: "nearest", pageSize: 6, mode: "simple" });
+    expect(pagination.source).toBeUndefined();
     expect(meeting.content.params).toEqual({ limit: 6, kind: "meeting" });
   });
 });

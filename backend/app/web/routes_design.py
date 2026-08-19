@@ -24,6 +24,7 @@ from .url_schemes import (
     DEFAULT_POST_URL_PATTERN,
     validate_url_pattern,
 )
+from .site_identity import DEFAULT_TITLE_PATTERN, validate_title_pattern
 from .linked_resources import validate_linked_resource_instances
 from .resource_props import (
     ResourcePropsError,
@@ -37,6 +38,7 @@ from .resource_props import (
 def _site_settings(db: Session) -> dict:
     return {
         "site_title": get_config_value(db, "web.site_title") or "Naše skautská střediska",
+        "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
         "site_tagline": get_config_value(db, "web.site_tagline"),
         "site_meta": get_config_value(db, "web.site_meta"),
         "site_logo": get_config_value(db, "web.site_logo"),
@@ -138,6 +140,7 @@ def get_site_settings(db: Session = Depends(get_db), current_user: User = Depend
 
 class SettingsPayload(BaseModel):
     site_title: str | None = None
+    title_pattern: str | None = None
     site_tagline: str | None = None
     site_meta: str | None = None
     site_logo: str | None = None
@@ -157,6 +160,11 @@ class SettingsPayload(BaseModel):
 @router.put("/settings")
 def update_site_settings(payload: SettingsPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.settings.manage")
+    if "title_pattern" in payload.model_fields_set:
+        try:
+            validate_title_pattern(payload.title_pattern)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
     if "post_url_pattern" in payload.model_fields_set:
         validate_url_pattern(payload.post_url_pattern, "slug", label="Article")
     if "meeting_url_pattern" in payload.model_fields_set:
@@ -387,6 +395,8 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
     tokens = (style.published_tokens if style else {}) or {}
     css = (style.published_css if style else "") or ""
     base_css = ""
+    font_sets = []
+    font_awesome_icons = []
     if style and style.active_theme_version_id:
         version = db.query(WebThemeVersion).filter_by(id=style.active_theme_version_id).one_or_none()
         if version:
@@ -395,6 +405,15 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
             # Merge the active theme's default tokens underneath the site-level
             # overrides, exactly like the public renderer does.
             tokens = _deep_merge_tokens(version.default_tokens or {}, tokens)
+            editor_metadata = (version.manifest or {}).get("editor") or {}
+            if isinstance(editor_metadata, dict) and isinstance(editor_metadata.get("font_sets"), list):
+                font_sets = editor_metadata["font_sets"][:50]
+            # Theme CSS is the source of truth for available Font Awesome
+            # glyphs. Returning the bounded names lets the inspector build a
+            # visual searchable picker without maintaining a second list.
+            font_awesome_icons = sorted(set(re.findall(
+                r"\.fa-([a-z0-9][a-z0-9-]{0,79})(?=[:,])", base_css,
+            )))[:3000]
 
     # Flatten tokens to CSS custom properties. The segment conversion must
     # match render_document exactly so the editor preview and the public
@@ -422,6 +441,8 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
     return {
         "css": f"{token_css}\n{base_css}\n{css}",
         "active_theme_version_id": style.active_theme_version_id if style else None,
+        "font_sets": font_sets,
+        "font_awesome_icons": font_awesome_icons,
     }
 
 

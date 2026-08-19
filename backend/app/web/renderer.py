@@ -7,8 +7,9 @@ template expression is evaluated.
 """
 from __future__ import annotations
 
+import calendar as calendar_module
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from html import escape
 import json
 import re
@@ -36,7 +37,10 @@ VOID_TAGS = {"br", "col", "hr", "img", "source"}
 SAFE_ATTRS = {
     "alt", "aria-label", "aria-current", "aria-describedby", "aria-hidden",
     "class", "colspan", "datetime", "height", "id", "loading", "rel", "role",
-    "rowspan", "src", "srcset", "target", "title", "width",
+    "rowspan", "src", "srcset", "target", "title", "width", "open", "download",
+    "data-sc-button-icon", "data-sc-button-icon-only", "data-sc-overlay",
+    "data-sc-overlay-enabled", "data-sc-template-logo",
+    "data-sc-template-logo-fallback", "data-sc-template-logo-hidden",
 }
 MEDIA_ID = re.compile(r"^[1-9][0-9]{0,9}$")
 URL_ATTRS = {"href", "src"}
@@ -61,6 +65,10 @@ SAFE_CSS_PROPERTIES = {
     "background-size", "background-blend-mode", "object-position",
     "grid-template-rows", "grid-column", "grid-row", "grid-gap",
     "clip-path", "filter", "mix-blend-mode", "isolation",
+    # Theme-owned authoring shortcuts. Keep the allow-list explicit so a
+    # custom property cannot smuggle arbitrary declarations into public CSS.
+    "--sc-edge-fill", "--sc-hero-tint", "--sc-hero-tint-opacity",
+    "--sc-overlay-color", "--sc-overlay-opacity",
 }
 CONDITION_OPERATORS = {"eq", "neq", "in", "not_in", "exists", "empty", "gt", "gte", "lt", "lte"}
 BIND_TARGETS = {
@@ -89,6 +97,9 @@ SLOT_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,49}$")
 BUILDER_LAYOUT_CSS = (
     ".sc-layout-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}"
     "@media (max-width:575px){.sc-layout-columns{grid-template-columns:1fr}}"
+    ".sc-shape-soft{border-radius:1.75rem 2.2rem 1.6rem 2rem/2rem 1.6rem 2.2rem 1.7rem!important}"
+    ".sc-shape-blob{border-radius:2.8rem 1.8rem 2.5rem 2rem/2rem 2.6rem 1.8rem 2.4rem!important}"
+    ".sc-shape-oval{border-radius:50%!important}.sc-shape-rounded{border-radius:1rem!important}"
     ".sc-menu,.sc-menu ul{margin:0;padding:0;list-style:none}"
     ".sc-menu-list{display:flex;flex-wrap:wrap;align-items:center;gap:.25rem}"
     ".sc-menu-item{position:relative}.sc-menu-link{display:block;padding:.45rem .65rem;text-decoration:none}"
@@ -99,7 +110,20 @@ BUILDER_LAYOUT_CSS = (
     ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
     "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
     ".sc-pagination{display:flex;align-items:center;gap:.5rem;margin:1.5rem 0}.sc-pagination-link,.sc-pagination-current{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .85rem;border:1px solid currentColor;border-radius:.25rem;text-decoration:none}.sc-pagination-current{font-weight:700}"
+    ".sc-calendar{margin:1.5rem 0}.sc-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}"
+    ".sc-calendar-title{margin:0;text-align:center}.sc-calendar-nav{display:inline-flex;min-width:2.75rem;min-height:2.75rem;align-items:center;justify-content:center;border:1px solid currentColor;border-radius:.35rem;text-decoration:none}"
+    ".sc-calendar-table{width:100%;table-layout:fixed;border-collapse:collapse}.sc-calendar-table th{padding:.55rem;text-align:center}.sc-calendar-day{height:7.5rem;padding:.35rem;border:1px solid currentColor;vertical-align:top}"
+    ".sc-calendar-day--outside{opacity:.55}.sc-calendar-day--today{background:color-mix(in srgb,currentColor 8%,transparent)}.sc-calendar-day-number{display:block;margin-bottom:.35rem;font-weight:700}"
+    ".sc-calendar-events{display:grid;gap:.25rem;list-style:none;margin:0;padding:0}.sc-calendar-event{display:block;padding:.25rem .35rem;border-radius:.25rem;background:var(--sc-calendar-event-color,#176b44);color:#fff;text-decoration:none;overflow-wrap:anywhere}"
+    ".sc-calendar-event-time{font-weight:700}.sc-calendar-agenda{display:none}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
+    "@media (max-width:700px){.sc-calendar-table{display:none}.sc-calendar-agenda{display:grid;gap:1rem}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(5rem,7rem) 1fr;gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent)}.sc-calendar-agenda-event a{font-weight:700}.sc-calendar-agenda-description{margin:.25rem 0 0}}"
 )
+
+CZECH_MONTHS = (
+    "", "Leden", "Únor", "Březen", "Duben", "Květen", "Červen",
+    "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
+)
+CZECH_WEEKDAYS_MONDAY = ("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
 
 
 class CompileError(ValueError):
@@ -167,6 +191,12 @@ def _safe_url(value: Any, *, image: bool = False) -> str:
         return ""
     parsed = urlparse(text)
     if parsed.scheme:
+        if image and parsed.scheme.lower() == "data":
+            # Public data sources expose profile/team images as data URLs.
+            # Reuse the same decoded-signature boundary as those resolvers;
+            # SVG and MIME-spoofed payloads remain rejected.
+            from .data_sources import safe_public_avatar
+            return safe_public_avatar(text) or ""
         allowed = {"http", "https"} if image else {"http", "https", "mailto", "tel"}
         if parsed.scheme.lower() not in allowed:
             return ""
@@ -201,7 +231,7 @@ def _normalise_binding(value: Any) -> dict[str, Any]:
             raise CompileError("Binding source is invalid")
         result["source"] = source
         result["params"] = value.get("params") if isinstance(value.get("params"), dict) else {}
-    if value.get("format") in {"date", "datetime", "time", "number", "url"}:
+    if value.get("format") in {"date", "datetime", "date_short", "datetime_short", "time", "number", "url"}:
         result["format"] = value["format"]
     return result
 
@@ -235,6 +265,16 @@ def _normalise_condition(value: Any) -> dict[str, Any]:
     if isinstance(right, (dict, list)) and operator not in {"in", "not_in"}:
         raise CompileError("Condition value must be scalar")
     return {"left": left, "operator": operator, "right": right}
+
+
+def _normalise_calendar_boolean(value: Any, *, default: bool) -> bool:
+    if value in (None, ""):
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in {"true", "false"}:
+        return value.strip().lower() == "true"
+    raise CompileError("Calendar boolean parameter is invalid")
 
 
 def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, Any]:
@@ -289,7 +329,8 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
             source = ""
         elif not isinstance(source, str) or not re.fullmatch(r"[a-z][a-z0-9_-]*\.[a-z][a-z0-9_.-]*", source):
             raise CompileError("Pagination data source is invalid")
-        limit = node.get("limit", 10)
+        configured_page_size = node.get("pageSize") if "pageSize" in node else node.get("limit")
+        limit = configured_page_size if configured_page_size not in (None, "") else 10
         if isinstance(limit, bool):
             raise CompileError("Pagination limit is invalid")
         try:
@@ -297,9 +338,53 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         except (TypeError, ValueError) as exc:
             raise CompileError("Pagination limit is invalid") from exc
         params = node.get("params") if isinstance(node.get("params"), dict) else {}
+        mode = str(node.get("mode") or "simple").strip().lower()
+        if mode not in {"simple", "numbers", "compact"}:
+            raise CompileError("Pagination mode is invalid")
+        bind_to = str(node.get("bindTo") or "nearest").strip().lower()
+        if bind_to not in {"nearest", "manual"}:
+            raise CompileError("Pagination binding mode is invalid")
+        previous_label = str(node.get("previousLabel") or "Předchozí").strip()[:60]
+        next_label = str(node.get("nextLabel") or "Další").strip()[:60]
         result.update(source=source, limit=limit, params={
             str(key): _normalise_repeat_param(value) for key, value in params.items() if len(str(key)) <= 80
-        })
+        }, bindTo=bind_to, mode=mode, previousLabel=previous_label, nextLabel=next_label)
+        # Kept only until the structural pairing pass below. A missing value
+        # means "inherit the nearest Repeat limit" rather than an authored 10.
+        result["_configuredPageSize"] = limit if configured_page_size not in (None, "") else None
+    elif component_type == "sc-calendar":
+        source = node.get("source", node.get("dataSource", "core.events"))
+        if source in (None, ""):
+            source = "core.events"
+        if source != "core.events":
+            raise CompileError("Calendar data source must be core.events")
+        kind = str(node.get("kind") or "all").strip().lower()
+        if kind not in {"all", "meeting", "trip", "other"}:
+            raise CompileError("Calendar event kind is invalid")
+        raw_team_id = node.get("teamId", node.get("team_id"))
+        team_id: int | None = None
+        if raw_team_id not in (None, ""):
+            if isinstance(raw_team_id, bool):
+                raise CompileError("Calendar team is invalid")
+            try:
+                team_id = int(raw_team_id)
+            except (TypeError, ValueError) as exc:
+                raise CompileError("Calendar team is invalid") from exc
+            if team_id < 1 or team_id > 1_000_000_000 or str(raw_team_id).strip() != str(team_id):
+                raise CompileError("Calendar team is invalid")
+        first_day = str(node.get("firstDayOfWeek") or "monday").strip().lower()
+        if first_day not in {"monday", "sunday"}:
+            raise CompileError("Calendar first day is invalid")
+        result.update(
+            source="core.events",
+            kind=kind,
+            teamId=team_id,
+            firstDayOfWeek=first_day,
+            # GrapesJS omits properties equal to their component defaults;
+            # the editor default is true and the compiler must preserve it.
+            showDescription=_normalise_calendar_boolean(node.get("showDescription"), default=True),
+        )
+        children = []
     elif component_type == "sc-condition":
         result["condition"] = _normalise_condition(node.get("condition"))
     elif component_type == "sc-bind":
@@ -436,9 +521,21 @@ def _normalise_styles(project: dict[str, Any]) -> str:
         selector_parts = []
         if isinstance(selectors, list):
             for selector in selectors:
-                name = selector.get("name") if isinstance(selector, dict) else str(selector)
-                if CLASS_TOKEN.fullmatch(name or ""):
-                    selector_parts.append(f".{name}")
+                if isinstance(selector, dict):
+                    name = str(selector.get("name") or "")
+                    selector_type = selector.get("type", 1)
+                    if selector_type in (2, "2") and ID_TOKEN.fullmatch(name):
+                        selector_parts.append(f"#{name}")
+                    elif selector_type in (None, 1, "1") and CLASS_TOKEN.fullmatch(name):
+                        selector_parts.append(f".{name}")
+                else:
+                    raw = str(selector)
+                    if raw.startswith("#") and ID_TOKEN.fullmatch(raw[1:]):
+                        selector_parts.append(raw)
+                    elif raw.startswith(".") and CLASS_TOKEN.fullmatch(raw[1:]):
+                        selector_parts.append(raw)
+                    elif CLASS_TOKEN.fullmatch(raw):
+                        selector_parts.append(f".{raw}")
         if not selector_parts:
             continue
         declarations = []
@@ -449,6 +546,10 @@ def _normalise_styles(project: dict[str, Any]) -> str:
                 continue
             if len(text) > 500 or UNSAFE_CSS.search(text) or CSS_TAG_BREAKOUT.search(text) or CSS_VALUE_BREAKOUT.search(text):
                 raise CompileError(f"CSS value for '{prop}' violates the public rendering policy")
+            if prop in {"--sc-edge-fill", "--sc-hero-tint", "--sc-overlay-color"} and not SAFE_COLOR.fullmatch(text):
+                raise CompileError(f"CSS value for '{prop}' must be a safe color")
+            if prop in {"--sc-hero-tint-opacity", "--sc-overlay-opacity"} and not re.fullmatch(r"(?:0(?:\.\d+)?|1(?:\.0+)?)", text):
+                raise CompileError(f"CSS value for '{prop}' must be between 0 and 1")
             declarations.append(f"{prop}:{text}")
         if declarations:
             state = str(rule.get("state") or "").strip().lower()
@@ -474,10 +575,72 @@ def _normalise_styles(project: dict[str, Any]) -> str:
     return "\n".join(rules)
 
 
+def _bind_paginations_to_nearest_repeats(tree: dict[str, Any]) -> None:
+    """Pair every automatic paginator with the nearest preceding Repeat.
+
+    Authors naturally place pagination after a card grid, while the Repeat is
+    often one level deeper inside that grid. A flat sibling lookup therefore
+    misses the intended source. We use document reading order: the last Repeat
+    before the paginator wins, with the first following Repeat as a fallback
+    when the paginator was intentionally inserted before its collection.
+
+    The pairing owns the page parameter and page size on both nodes. This is
+    what makes the displayed records and the navigation ask the same data
+    source for the same page instead of drifting apart as two copied configs.
+    """
+    nodes: list[tuple[tuple[int, ...], int, dict[str, Any]]] = []
+
+    def visit(node: dict[str, Any], path: tuple[int, ...]) -> None:
+        order = len(nodes)
+        if node.get("type") in {"sc-repeat", "sc-pagination"}:
+            nodes.append((path, order, node))
+        for index, child in enumerate(node.get("components", [])):
+            if isinstance(child, dict):
+                visit(child, (*path, index))
+
+    visit(tree, ())
+    repeats = [(path, order, node) for path, order, node in nodes if node.get("type") == "sc-repeat"]
+    page_binding = {"$scBinding": {"scope": "page", "field": "query.page"}}
+
+    for _pagination_path, pagination_order, pagination in (
+        item for item in nodes if item[2].get("type") == "sc-pagination"
+    ):
+        configured_size = pagination.pop("_configuredPageSize", None)
+        if pagination.get("bindTo") != "nearest" or not repeats:
+            pagination["limit"] = configured_size or pagination.get("limit", 10)
+            continue
+
+        preceding = [item for item in repeats if item[1] < pagination_order]
+        pool = preceding or [item for item in repeats if item[1] > pagination_order]
+        if not pool:
+            continue
+        _, _, repeat = preceding[-1] if preceding else pool[0]
+        repeat_params = dict(repeat.get("params") or {})
+        inherited_size = repeat_params.get("limit")
+        try:
+            page_size = int(configured_size or inherited_size or pagination.get("limit") or 10)
+        except (TypeError, ValueError):
+            page_size = 10
+        page_size = max(1, min(page_size, MAX_REPEAT, 50))
+        repeat_params.update(limit=page_size, page=page_binding)
+        repeat["params"] = repeat_params
+
+        pagination["source"] = repeat.get("source") or ""
+        pagination["limit"] = page_size
+        pagination["params"] = dict(repeat_params)
+
+    # Manual paginations do not enter the pairing branch, but their temporary
+    # marker must never leak into immutable compiled project data.
+    for _, _, node in nodes:
+        if node.get("type") == "sc-pagination":
+            node.pop("_configuredPageSize", None)
+
+
 def compile_project(project: dict[str, Any]) -> CompiledProject:
     """Validate and deterministically normalise a GrapesJS project."""
     root = _project_root(project)
     tree = _normalise_node(root, depth=0, counter=[0])
+    _bind_paginations_to_nearest_repeats(tree)
     return CompiledProject(tree=tree, css=_normalise_styles(project))
 
 
@@ -495,6 +658,10 @@ def _format_value(value: Any, format_name: str | None) -> str:
     if value is None:
         return ""
     if isinstance(value, (datetime, date)):
+        if format_name == "date_short":
+            return f"{value.day}. {value.month}. {value.year}"
+        if format_name == "datetime_short" and isinstance(value, datetime):
+            return f"{value.day}. {value.month}. {value.year} {value.hour}:{value.minute:02d}"
         if format_name == "date":
             return value.strftime("%Y-%m-%d")
         if format_name == "time" and isinstance(value, datetime):
@@ -647,7 +814,8 @@ def _render_menu_items(
             # JavaScript.  Desktop CSS keeps the familiar hover/focus dropdown.
             rows.append(
                 f'<li class="{item_class}"><details class="sc-menu-details">'
-                f'<summary class="{link_class}"><span>{label}</span></summary>'
+                f'<summary class="{link_class}"><span>{label}</span>'
+                '<i class="fa-solid fa-chevron-down sc-menu-chevron" aria-hidden="true"></i></summary>'
                 f'<ul class="{submenu_class}">{children}</ul>'
                 "</details></li>"
             )
@@ -694,6 +862,154 @@ def _render_nodes(nodes: list[dict[str, Any]], state: _RenderState, context: Any
     return "".join(_render_node(node, state, context, depth) for node in nodes)
 
 
+def _shift_month(value: date, months: int) -> date:
+    absolute = value.year * 12 + value.month - 1 + months
+    return date(absolute // 12, absolute % 12 + 1, 1)
+
+
+def _calendar_month(value: Any, today: date) -> date:
+    text = str(value or "").strip()
+    if not re.fullmatch(r"\d{4}-\d{2}", text):
+        return today.replace(day=1)
+    try:
+        selected = datetime.strptime(text, "%Y-%m").date()
+    except ValueError:
+        return today.replace(day=1)
+    return selected if 1900 <= selected.year <= 2100 else today.replace(day=1)
+
+
+def _calendar_event_markup(event: dict[str, Any], *, agenda: bool, show_description: bool) -> str:
+    title = escape(_format_value(event.get("title"), None))
+    href = _safe_url(event.get("url"))
+    starts_at = event.get("start_at")
+    time_text = starts_at.strftime("%H:%M") if isinstance(starts_at, datetime) else ""
+    datetime_attr = starts_at.isoformat() if isinstance(starts_at, datetime) else ""
+    time_html = (
+        f'<time class="sc-calendar-event-time" datetime="{escape(datetime_attr, quote=True)}">'
+        f"{escape(time_text)}</time> "
+        if time_text else ""
+    )
+    title_html = (
+        f'<a href="{escape(href, quote=True)}">{title}</a>' if agenda and href else
+        title if agenda else
+        f'{time_html}<span>{title}</span>'
+    )
+    if not agenda and href:
+        title_html = f'<a class="sc-calendar-event" href="{escape(href, quote=True)}">{title_html}</a>'
+    elif not agenda:
+        title_html = f'<span class="sc-calendar-event">{title_html}</span>'
+    description = escape(_format_value(event.get("description"), None))
+    description_html = (
+        f'<p class="sc-calendar-agenda-description">{description}</p>'
+        if agenda and show_description and description else ""
+    )
+    color = str(event.get("color") or "").strip()
+    style = (
+        f' style="--sc-calendar-event-color:{escape(color, quote=True)}"'
+        if SAFE_COLOR.fullmatch(color) else ""
+    )
+    class_name = "sc-calendar-agenda-event" if agenda else "sc-calendar-event-item"
+    agenda_time = time_html if agenda else ""
+    return f'<li class="{class_name}"{style}>{agenda_time}{title_html}{description_html}</li>'
+
+
+def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
+    today = date.today()
+    selected = _calendar_month(_lookup(state.page, "query.month"), today)
+    first_weekday = 0 if node.get("firstDayOfWeek") == "monday" else 6
+    weeks = calendar_module.Calendar(firstweekday=first_weekday).monthdatescalendar(selected.year, selected.month)
+    visible_start, visible_end = weeks[0][0], weeks[-1][-1]
+    params: dict[str, Any] = {
+        "from": datetime.combine(visible_start, time.min),
+        "to": datetime.combine(visible_end, time.max),
+        "limit": 50,
+        "sort": "start_at_asc",
+    }
+    if node.get("kind") != "all":
+        params["kind"] = node["kind"]
+    if node.get("teamId") is not None:
+        params["team_id"] = node["teamId"]
+    records = state.resolve_source("core.events", params)
+    records = records if isinstance(records, (list, tuple)) else []
+    by_day: dict[date, list[dict[str, Any]]] = {}
+    for record in records[:50]:
+        if not isinstance(record, dict) or not isinstance(record.get("start_at"), datetime):
+            continue
+        by_day.setdefault(record["start_at"].date(), []).append(record)
+
+    weekdays = list(CZECH_WEEKDAYS_MONDAY)
+    if first_weekday == 6:
+        weekdays = weekdays[-1:] + weekdays[:-1]
+    headings = "".join(f'<th scope="col">{label}</th>' for label in weekdays)
+    rows: list[str] = []
+    for week in weeks:
+        cells: list[str] = []
+        for day_value in week:
+            modifiers = []
+            if day_value.month != selected.month:
+                modifiers.append("sc-calendar-day--outside")
+            if day_value == today:
+                modifiers.append("sc-calendar-day--today")
+            current_attr = ' aria-current="date"' if day_value == today else ""
+            class_name = "sc-calendar-day" + (" " + " ".join(modifiers) if modifiers else "")
+            items = "".join(
+                _calendar_event_markup(item, agenda=False, show_description=False)
+                for item in by_day.get(day_value, [])
+            )
+            cells.append(
+                f'<td class="{class_name}" data-date="{day_value.isoformat()}">'
+                f'<time class="sc-calendar-day-number" datetime="{day_value.isoformat()}"{current_attr}>{day_value.day}</time>'
+                + (f'<ul class="sc-calendar-events">{items}</ul>' if items else "")
+                + "</td>"
+            )
+        rows.append(f'<tr>{"".join(cells)}</tr>')
+
+    agenda_days: list[str] = []
+    for day_value in sorted(by_day):
+        if day_value.month != selected.month:
+            continue
+        items = "".join(
+            _calendar_event_markup(
+                item, agenda=True, show_description=bool(node.get("showDescription")),
+            )
+            for item in by_day[day_value]
+        )
+        agenda_days.append(
+            '<section class="sc-calendar-agenda-day">'
+            f'<time class="sc-calendar-agenda-date" datetime="{day_value.isoformat()}">'
+            f'{day_value.day}. {day_value.month}.</time>'
+            f'<ul class="sc-calendar-agenda-events">{items}</ul></section>'
+        )
+    agenda = "".join(agenda_days) or '<p class="sc-calendar-empty">V tomto měsíci nejsou žádné akce.</p>'
+    previous_month = _shift_month(selected, -1).strftime("%Y-%m")
+    next_month = _shift_month(selected, 1).strftime("%Y-%m")
+    current_month = today.strftime("%Y-%m")
+    title = f"{CZECH_MONTHS[selected.month]} {selected.year}"
+    minimum_month = _shift_month(today.replace(day=1), -12)
+    maximum_month = _shift_month(today.replace(day=1), 18)
+    previous_control = (
+        f'<a class="sc-calendar-nav sc-calendar-nav--prev" rel="prev" href="?month={previous_month}" aria-label="Předchozí měsíc">‹</a>'
+        if selected > minimum_month else
+        '<span class="sc-calendar-nav sc-calendar-nav--prev" aria-hidden="true">‹</span>'
+    )
+    next_control = (
+        f'<a class="sc-calendar-nav sc-calendar-nav--next" rel="next" href="?month={next_month}" aria-label="Následující měsíc">›</a>'
+        if selected < maximum_month else
+        '<span class="sc-calendar-nav sc-calendar-nav--next" aria-hidden="true">›</span>'
+    )
+    return (
+        f'<section class="sc-calendar" data-sc-calendar-month="{selected.strftime("%Y-%m")}">'
+        '<div class="sc-calendar-toolbar">'
+        f'{previous_control}'
+        f'<div><h2 class="sc-calendar-title">{title}</h2>'
+        f'<a class="sc-calendar-today" href="?month={current_month}">Dnes</a></div>'
+        f'{next_control}'
+        f'</div><table class="sc-calendar-table" aria-label="Kalendář – {title}"><thead><tr>'
+        f'{headings}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+        f'<div class="sc-calendar-agenda">{agenda}</div></section>'
+    )
+
+
 def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth: int) -> str:
     state.nodes += 1
     if depth > MAX_DEPTH or state.nodes > MAX_NODES + MAX_REPEAT * 100:
@@ -721,27 +1037,55 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
             return ""
         params = state.resolve_params(node.get("params") or {})
         limit = node["limit"]
-        # Ask for one extra record solely to determine whether a next page
-        # exists.  The old >= limit check produced a phantom next link whenever
-        # the final page contained exactly `limit` records.
-        lookahead = dict(params)
-        lookahead["limit"] = min(limit + 1, 50)
-        records = state.resolve_source(node["source"], lookahead)
+        records = state.resolve_source(node["source"], params)
         records = records if isinstance(records, (list, tuple)) else []
         try:
             current = max(1, int(_lookup(state.page, "query.page") or 1))
         except (TypeError, ValueError):
             current = 1
         has_next = len(records) > limit
+        if not has_next and len(records) >= limit:
+            # Probe the next page with the *same* page size. Increasing limit
+            # here changes `(page - 1) * limit` in page-aware resolvers and
+            # shifts page 2 onward, making the final record unreachable.
+            next_params = dict(params)
+            if "page" in next_params:
+                next_params["page"] = current + 1
+            elif "offset" in next_params:
+                next_params["offset"] = int(next_params.get("offset") or 0) + limit
+            else:
+                next_params["page"] = current + 1
+            next_records = state.resolve_source(node["source"], next_params)
+            has_next = isinstance(next_records, (list, tuple)) and bool(next_records)
         if current == 1 and not has_next:
             return ""
-        links = []
+        mode = node.get("mode", "simple")
+        previous_label = escape(node.get("previousLabel") or "Předchozí")
+        next_label = escape(node.get("nextLabel") or "Další")
+        links: list[str] = []
         if current > 1:
-            links.append(f'<a class="sc-pagination-link" rel="prev" href="?page={current - 1}">Předchozí</a>')
-        links.append(f'<span class="sc-pagination-current" aria-current="page">{current}</span>')
+            links.append(
+                f'<a class="sc-pagination-link sc-pagination-prev" rel="prev" '
+                f'href="?page={current - 1}">{previous_label}</a>'
+            )
+        if mode == "numbers":
+            first = max(1, current - 2)
+            last = current + (1 if has_next else 0)
+            for number in range(first, last + 1):
+                if number == current:
+                    links.append(f'<span class="sc-pagination-current" aria-current="page">{number}</span>')
+                else:
+                    links.append(f'<a class="sc-pagination-link" href="?page={number}">{number}</a>')
+        elif mode == "simple":
+            links.append(f'<span class="sc-pagination-current" aria-current="page">{current}</span>')
         if has_next:
-            links.append(f'<a class="sc-pagination-link" rel="next" href="?page={current + 1}">Další</a>')
+            links.append(
+                f'<a class="sc-pagination-link sc-pagination-next" rel="next" '
+                f'href="?page={current + 1}">{next_label}</a>'
+            )
         return f'<nav class="sc-pagination" aria-label="Stránkování">{"".join(links)}</nav>'
+    if component_type == "sc-calendar":
+        return _render_calendar(node, state)
     if component_type == "sc-condition":
         return _render_nodes(node.get("components", []), state, context, depth + 1) if _condition_matches(node["condition"], state, context) else ""
     if component_type == "sc-bind":
@@ -928,7 +1272,7 @@ def has_runtime_bindings(node: dict[str, Any]) -> bool:
         if not isinstance(item, dict):
             continue
         component_type = str(item.get("type") or "default")
-        if component_type in {"sc-repeat", "sc-pagination", "sc-condition", "sc-menu", "sc-template-part", "sc-global-part", "sc-slot", "sc-detail-content"}:
+        if component_type in {"sc-repeat", "sc-pagination", "sc-calendar", "sc-condition", "sc-menu", "sc-template-part", "sc-global-part", "sc-slot", "sc-detail-content"}:
             return True
         if component_type == "sc-bind":
             binding = item.get("binding") or {}
@@ -1002,6 +1346,7 @@ def render_document(
     title: str,
     description: str = "",
     canonical_url: str = "",
+    favicon: str = "",
     noindex: bool = False,
     css: str = "",
     base_css: str = "",
@@ -1044,11 +1389,13 @@ def render_document(
     root_css = f":root{{{';'.join(token_css)}}}" if token_css else ""
     robots = '<meta name="robots" content="noindex,nofollow">' if noindex else ""
     canonical = f'<link rel="canonical" href="{escape(canonical_url, quote=True)}">' if canonical_url else ""
+    safe_favicon = _safe_url(favicon, image=True)
+    favicon_link = f'<link rel="icon" href="{escape(safe_favicon, quote=True)}">' if safe_favicon else ""
     return (
         "<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         f'<meta name="description" content="{escape(description, quote=True)}">'
-        f"{robots}{canonical}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
+        f"{robots}{canonical}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
         f"<body>{body}</body></html>"
     )

@@ -9,7 +9,7 @@ import { useAuth } from "../../../providers/AuthProvider";
 import api from "../../../services/api";
 import { cmsApi } from "../api/cms";
 import { cloneResourceComponents, filterCatalogResources, hydrateMenuComponents } from "../editor/resourceBlocks";
-import { DataBindings, ImageContentPanel, LinkedResourceProps, RepeatConfigurator } from "../editor/EditorInspector";
+import { DataBindings, ImageContentPanel, LinkedResourceProps, QuickContentPanel, RepeatConfigurator, TemplateLogosPanel } from "../editor/EditorInspector";
 import EditorNavigator from "../editor/EditorNavigator";
 import EditorBreadcrumbs from "../editor/EditorBreadcrumbs";
 import useGrapesEditor from "../editor/useGrapesEditor";
@@ -162,6 +162,7 @@ export default function DesignResourceEditorPage({ kind }) {
     dataSources: itemsFrom(sourcesQuery.data),
     blocks: editorBlocks,
     canvasStyles: canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [],
+    fontSets: canvasStylesQuery.data?.font_sets || [],
     translate: t,
     onDirtyChange: (dirty) => { if (dirty && !readOnly) setStatus("unsaved"); },
     onSelectionChange: () => setSelectionRevision((value) => value + 1),
@@ -187,18 +188,25 @@ export default function DesignResourceEditorPage({ kind }) {
   const handleMediaSelect = async (mediaItem) => {
     const target = mediaPickerTarget;
     setMediaPickerTarget(null);
-    if (!target || target.get?.("type") !== "image") return;
+    const targetComponent = target?.component || target;
+    if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
+    if (target?.mode === "background" && targetComponent?.addStyle) {
+      targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
+      markComponentChanged();
+      return;
+    }
+    if (!targetComponent || targetComponent.get?.("type") !== "image") return;
     let src = mediaItem.url;
     try {
       const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
       src = URL.createObjectURL(data);
     } catch { /* the durable media id still renders on the public site */ }
-    target.addAttributes?.({
+    targetComponent.addAttributes?.({
       src,
       alt: mediaItem.alt || "",
       "data-sc-media-id": String(mediaItem.id),
     });
-    target.set?.("src", src);
+    targetComponent.set?.("src", src);
     markComponentChanged();
   };
   const startResourceDrag = (event, blockId) => {
@@ -377,6 +385,10 @@ export default function DesignResourceEditorPage({ kind }) {
           : null}
         <div className={selectedLinkedResource ? "d-none" : ""}>
           {selectedComponent?.get?.("type") === "image" && <div className="web-editor-inspector-body"><ImageContentPanel selected={selectedComponent} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} /></div>}
+          {selectedComponent && selectedComponent.get?.("type") !== "image" && <div className="web-editor-inspector-body">
+            <TemplateLogosPanel selected={selectedComponent} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} />
+            <QuickContentPanel selected={selectedComponent} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || []} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} />
+          </div>}
           <div className="web-editor-trait-manager" />
         </div>
       </div>

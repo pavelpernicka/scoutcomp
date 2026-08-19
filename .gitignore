@@ -60,3 +60,5 @@ backend/uploads/
 
 .codex/
 .vexp/
+
+uploads/*

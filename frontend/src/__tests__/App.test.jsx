@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -9,9 +9,18 @@ import App from "../App";
 import { AuthProvider } from "../providers/AuthProvider";
 import { ConfigProvider } from "../providers/ConfigProvider";
 import i18n from "../i18n";
+import api from "../services/api";
 
 describe("App shell", () => {
-  it("renders login link when logged out", async () => {
+  it("redirects logged-out visitors to the standalone login route", async () => {
+    window.history.replaceState({}, "", "/");
+    const get = vi.spyOn(api, "get").mockImplementation(async (url) => ({
+      data: url === "/config"
+        ? { app_name: "ScoutComp" }
+        : url === "/auth/options"
+          ? { allow_member_registration: false, allow_admin_bootstrap: false }
+          : [],
+    }));
     const queryClient = new QueryClient();
 
     const { container } = render(
@@ -28,11 +37,11 @@ describe("App shell", () => {
       </I18nextProvider>
     );
 
-    // Wait for async operations to complete
     await waitFor(() => {
-      // Look for a link that goes to /login
-      const loginLink = container.querySelector('a[href="/login"]');
-      expect(loginLink).toBeInTheDocument();
+      expect(container.querySelector(".auth-page")).toBeInTheDocument();
     }, { timeout: 5000 });
+    expect(container.querySelector(".app-navbar")).not.toBeInTheDocument();
+    expect(container.querySelector(".app-content")).not.toBeInTheDocument();
+    get.mockRestore();
   });
 });

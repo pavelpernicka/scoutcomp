@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import json
 import re
 import uuid
@@ -539,13 +539,26 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
     variants: dict[str, str] = {}
     current = 2
     previous = default
-    while 'rel="next"' in previous and current <= 100:
+    pagination_next_marker = 'class="sc-pagination-link sc-pagination-next"'
+    while pagination_next_marker in previous and current <= 100:
         document = _render_revision(db, page, revision, query={"page": str(current)}, use_artifact=False)
         variants[f"page={current}"] = document
         previous = document
         current += 1
-    if 'rel="next"' in previous:
+    if pagination_next_marker in previous:
         raise HTTPException(422, "Pagination exceeds the publication limit of 100 pages")
+    # A calendar has a finite set of immutable month variants.  Generate them
+    # only when the actually rendered document contains the server component,
+    # including when it comes from a linked layout/resource.  This preserves
+    # the cheap publication path for every page without a calendar.
+    if '<section class="sc-calendar"' in default:
+        current_month = date.today().replace(day=1)
+        for offset in range(-12, 19):
+            absolute = current_month.year * 12 + current_month.month - 1 + offset
+            month = date(absolute // 12, absolute % 12 + 1, 1).strftime("%Y-%m")
+            variants[f"month={month}"] = _render_revision(
+                db, page, revision, query={"month": month}, use_artifact=False,
+            )
     revision.rendered_html = default
     revision.rendered_variants = variants
     revision.rendered_at = datetime.now(timezone.utc)

@@ -627,6 +627,8 @@ def render_site_page(
     social_links: list[tuple[str, str]] | None = None,
     footer_extra: str = "",
     body_override: str | None = None,
+    document_title: str = "",
+    favicon: str = "",
 ) -> str:
     """Render a WebPage into a complete standalone HTML document."""
     body = sanitize_legacy_html(_strip_styles(page.html or ""))
@@ -676,18 +678,22 @@ def render_site_page(
         styles = ""
     css = SITE_CSS if include_site_css else ""
     meta_description = (site_meta or site_tagline or f"{page.title} – {site_title}").strip()
+    safe_favicon = _safe_legacy_url(favicon, image=True)
+    favicon_link = f'<link rel="icon" href="{escape(safe_favicon, quote=True)}">\n' if safe_favicon else ""
+    rendered_title = document_title or f"{page.title} – {site_title}"
     return (
         "<!DOCTYPE html>\n"
         '<html lang="cs">\n'
         "<head>\n"
         '<meta charset="utf-8">\n'
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
-        f"<title>{escape(page.title)} – {escape(site_title)}</title>\n"
+        f"<title>{escape(rendered_title)}</title>\n"
         f'<meta name="description" content="{escape(meta_description)}">\n'
         f'<meta property="og:type" content="website">\n'
-        f'<meta property="og:title" content="{escape(page.title)} – {escape(site_title)}">\n'
+        f'<meta property="og:title" content="{escape(rendered_title)}">\n'
         f'<meta property="og:description" content="{escape(meta_description)}">\n'
         f'<link rel="canonical" href="/{escape(page.slug)}">\n'
+        f"{favicon_link}"
         f"{extra_head}\n"
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">\n'
         '<link rel="preconnect" href="https://fonts.googleapis.com">\n'

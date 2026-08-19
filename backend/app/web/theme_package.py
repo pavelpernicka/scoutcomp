@@ -20,6 +20,7 @@ import stat
 import tempfile
 import unicodedata
 import zipfile
+from xml.etree import ElementTree
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 from urllib.parse import quote
@@ -97,13 +98,14 @@ _RESOURCE_ALIASES = {
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif"}
 _FONT_EXTENSIONS = {".woff", ".woff2", ".otf", ".ttf"}
+_VECTOR_EXTENSIONS = {".svg"}
 _ALLOWED_PREFIX_EXTENSIONS = {
     "templates": {".json"},
     "components": {".json"},
     "sections": {".json"},
     "patterns": {".json"},
     "styles": {".css"},
-    "assets": _IMAGE_EXTENSIONS | _FONT_EXTENSIONS,
+    "assets": _IMAGE_EXTENSIONS | _FONT_EXTENSIONS | _VECTOR_EXTENSIONS,
     "previews": _IMAGE_EXTENSIONS,
 }
 _IMAGE_MAGIC = {
@@ -117,7 +119,7 @@ _IMAGE_MAGIC = {
 _MANIFEST_KEYS = {
     "schema_version", "package_schema_version", "id", "name", "version",
     "author", "description", "license", "compatible_scoutcomp",
-    "scoutcomp_version", "resources", "preview", "config", "site_resources",
+    "scoutcomp_version", "resources", "preview", "config", "site_resources", "editor",
 }
 _CONFIG_TYPES = {"text", "color", "number", "select"}
 _THEME_KEYS = {"schema_version", "package_schema_version", "tokens", "default_tokens", "styles"}
@@ -399,10 +401,40 @@ def _validate_image(content: bytes, path: str) -> None:
 
 
 def _validate_asset(content: bytes, path: str) -> None:
-    """Validate declarative raster/font assets by their container signature."""
+    """Validate declarative raster, font, and inert vector assets."""
     extension = PurePosixPath(path).suffix.casefold()
     if extension in _IMAGE_EXTENSIONS:
         _validate_image(content, path)
+        return
+    if extension == ".svg":
+        try:
+            source = content.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise ThemePackageError(f"SVG is not valid UTF-8: {path}") from exc
+        lowered = source.casefold()
+        if any(marker in lowered for marker in (
+            "<!doctype", "<!entity", "<script", "foreignobject", "javascript:",
+            "data:", "url(", "<style", "<animate", "<set", "<use", "<image",
+        )):
+            _fail(f"SVG contains active or external content: {path}")
+        try:
+            root = ElementTree.fromstring(source)
+        except ElementTree.ParseError as exc:
+            raise ThemePackageError(f"SVG is not valid XML: {path}") from exc
+        allowed_tags = {"svg", "g", "path", "rect", "circle", "ellipse", "polygon", "polyline"}
+        allowed_attrs = {
+            "viewBox", "preserveAspectRatio", "width", "height", "fill", "fill-rule",
+            "clip-rule", "transform", "d", "x", "y", "x1", "y1", "x2", "y2",
+            "cx", "cy", "r", "rx", "ry", "points",
+        }
+        for element in root.iter():
+            tag = element.tag.rsplit("}", 1)[-1]
+            if tag not in allowed_tags or set(element.attrib) - allowed_attrs:
+                _fail(f"SVG contains unsupported markup: {path}")
+            if (element.text or "").strip() or (element.tail or "").strip():
+                _fail(f"SVG contains unsupported text: {path}")
+            if any(re.search(r"[<>]|(?:javascript|data|url)\s*:", value, re.I) for value in element.attrib.values()):
+                _fail(f"SVG contains an unsafe attribute: {path}")
         return
     signatures = {
         ".woff": (b"wOFF",),
@@ -683,6 +715,28 @@ def install_theme(
                 _fail(f"config entry for '{key}' has an invalid label")
             if "default" in spec and not isinstance(spec["default"], (str, int, float, bool)):
                 _fail(f"config entry for '{key}' has an invalid default")
+
+    # Editor metadata is declarative only. Font sets provide labels and safe
+    # CSS font-family values; actual font files remain validated theme assets
+    # referenced from the package stylesheet.
+    editor_metadata = manifest.get("editor")
+    if editor_metadata is not None:
+        if not isinstance(editor_metadata, dict) or set(editor_metadata) - {"font_sets"}:
+            _fail("manifest.json editor metadata is invalid")
+        font_sets = editor_metadata.get("font_sets", [])
+        if not isinstance(font_sets, list) or len(font_sets) > 50:
+            _fail("manifest.json editor.font_sets must be a bounded list")
+        for item in font_sets:
+            if not isinstance(item, dict) or set(item) != {"id", "label", "value"}:
+                _fail("editor font set is invalid")
+            if not _ID_RE.fullmatch(str(item.get("id", ""))):
+                _fail("editor font set id is invalid")
+            for field in ("label", "value"):
+                value = item.get(field)
+                if not isinstance(value, str) or not value.strip() or len(value) > 200:
+                    _fail(f"editor font set {field} is invalid")
+            if any(token in item["value"].lower() for token in ("url(", "@import", ";", "{")):
+                _fail("editor font set value is unsafe")
 
     entries = _resource_entries(manifest)
     declared_paths = {entry["file"] for values in entries.values() for entry in values}

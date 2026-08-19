@@ -13,6 +13,8 @@ server-side), so it needs no JavaScript and no login.
 """
 from __future__ import annotations
 
+import re
+from datetime import datetime
 from html import escape
 from pathlib import Path
 from urllib.parse import quote, urlparse
@@ -26,6 +28,7 @@ from .database import SessionLocal
 from .models import (
     RegisteredModule,
     ScoutEvent,
+    User,
     WebMedia,
     WebMenuItem,
     WebMenu,
@@ -44,7 +47,7 @@ from .modules.registration import register_all_modules
 from .routers.config import get_config_value
 from .web_render import render_article_body, render_site_page
 from .web.renderer import CompileError, compile_project, render_document, render_project
-from .web.data_sources import is_media_published
+from .web.data_sources import is_media_published, safe_public_avatar
 from .web.url_schemes import (
     DEFAULT_MEETING_URL_PATTERN,
     DEFAULT_POST_URL_PATTERN,
@@ -52,6 +55,7 @@ from .web.url_schemes import (
     meeting_url,
     post_url,
 )
+from .web.site_identity import DEFAULT_TITLE_PATTERN, format_document_title, public_asset_url
 
 register_all_modules()
 
@@ -103,9 +107,11 @@ def _site_settings(db: Session) -> dict:
             return default
     return {
         "site_title": _get("web.site_title", _site_title(db)),
+        "title_pattern": _get("web.title_pattern", DEFAULT_TITLE_PATTERN),
+        "favicon": public_asset_url(_get("web.favicon")),
         "site_tagline": _get("web.site_tagline"),
         "site_meta": _get("web.site_meta"),
-        "site_logo": _get("web.site_logo"),
+        "site_logo": public_asset_url(_get("web.site_logo")),
         "contact_address": _get("web.contact_address"),
         "contact_phone": _get("web.contact_phone"),
         "contact_email": _get("web.contact_email"),
@@ -238,12 +244,15 @@ def _detail_document(
     setting_key: str,
     detail_html: str,
     title: str,
+    seo_title: str | None = None,
     description: str = "",
     canonical_url: str = "",
     noindex: bool = False,
 ) -> str:
     """Render a safe article/event fragment through an optional layout."""
     raw_id = get_config_value(db, setting_key)
+    site_settings = _site_settings(db)
+    document_title = format_document_title(seo_title or title, site_settings["site_title"], site_settings["title_pattern"])
     try:
         template_id = int(raw_id) if raw_id else None
     except (TypeError, ValueError):
@@ -263,15 +272,45 @@ def _detail_document(
                 from .web.theme_package import rewrite_theme_asset_urls
                 template_css = rewrite_theme_asset_urls(template_css, template.theme_version_id)
             return render_document(
-                body, title=title, description=description, canonical_url=canonical_url, noindex=noindex,
+                body, title=document_title, description=description, canonical_url=canonical_url,
+                favicon=site_settings["favicon"], noindex=noindex,
                 css=f"{global_css}\n{'\n'.join(part_css)}\n{template_css}", base_css=base_css, tokens=tokens,
             )
         except CompileError:
             # A deleted/inconsistent setting must not take a public detail down.
             pass
     return render_document(
-        detail_html, title=title, description=description, canonical_url=canonical_url, noindex=noindex,
+        f'<main class="web-detail-fallback"><h1>{escape(title)}</h1>{detail_html}</main>',
+        title=document_title, description=description, canonical_url=canonical_url,
+        favicon=site_settings["favicon"], noindex=noindex,
         css=global_css, base_css=base_css, tokens=tokens,
+    )
+
+
+def _detail_meta(author: User | None, published_date: datetime | None, *, date_label: str) -> str:
+    """Render public author/date metadata from verified profile fields only."""
+    author_name = (author.real_name or author.username).strip() if author else "ScoutComp"
+    if not author_name:
+        author_name = "ScoutComp"
+    avatar = safe_public_avatar(author.avatar if author else None)
+    if avatar:
+        portrait = (
+            f'<img class="web-detail-author-avatar" src="{escape(avatar, quote=True)}" '
+            'alt="">'
+        )
+    else:
+        initial = next((character.upper() for character in author_name if character.isalnum()), "S")
+        portrait = f'<span class="web-detail-author-fallback" aria-hidden="true">{escape(initial)}</span>'
+    date_html = ""
+    if published_date is not None:
+        date_html = (
+            f'<time class="web-detail-date" datetime="{escape(published_date.isoformat(), quote=True)}">'
+            f'{escape(date_label)} {published_date.day}. {published_date.month}. {published_date.year}</time>'
+        )
+    return (
+        '<div class="web-detail-meta">'
+        f'<span class="web-detail-author">{portrait}<span>{escape(author_name)}</span></span>'
+        f'{date_html}</div>'
     )
 
 
@@ -295,6 +334,8 @@ def _render(db: Session, page: WebPage, extra_head: str = "", query: dict[str, s
         enabled_components=_enabled_components(db),
         social_links=_social_links(db, settings_data),
         footer_extra=_footer_extra(settings_data),
+        document_title=format_document_title(page.title, settings_data["site_title"], settings_data["title_pattern"]),
+        favicon=settings_data["favicon"],
         extra_head=extra_head,
     )
 
@@ -326,7 +367,19 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 def _artifact_query_key(query: dict[str, str] | None) -> str:
     """Canonical allowlisted public-document variant key."""
-    page = (query or {}).get("page")
+    supplied = dict(query or {})
+    page = supplied.get("page")
+    month = supplied.get("month")
+    if month not in (None, ""):
+        if page not in (None, "", "1") or not isinstance(month, str) or not re.fullmatch(r"\d{4}-\d{2}", month):
+            return "__invalid__"
+        try:
+            parsed_month = datetime.strptime(month, "%Y-%m")
+        except ValueError:
+            return "__invalid__"
+        if not 1900 <= parsed_month.year <= 2100:
+            return "__invalid__"
+        return f"month={month}"
     if page is None or page == "" or page == "1":
         return ""
     try:
@@ -417,11 +470,14 @@ def _render_revision(
     body = body.replace('"/api/web/media/', '"/media/')
     tokens, global_css, base_css = _published_style(db)
     linked_css = "\n".join(part_css)
+    settings_data = _site_settings(db)
+    page_title = revision.seo_title or revision.title or page.title
     return render_document(
         body,
-        title=revision.seo_title or revision.title or page.title,
+        title=format_document_title(page_title, settings_data["site_title"], settings_data["title_pattern"]),
         description=revision.meta_description or "",
         canonical_url=revision.canonical_url or "",
+        favicon=settings_data["favicon"],
         noindex=revision.noindex,
         css=f"{global_css}\n{linked_css}\n{css}",
         base_css=base_css,
@@ -537,10 +593,12 @@ def site_meeting(event_id: int):
             details.append(f'<p><strong>Konec:</strong> {escape(event.ends_at.isoformat(sep=" ", timespec="minutes"))}</p>')
         if event.location:
             details.append(f'<p><strong>Místo:</strong> {escape(event.location)}</p>')
+        author = session.query(User).filter(User.id == event.created_by_id).one_or_none() if event.created_by_id else None
+        meta = _detail_meta(author, event.starts_at, date_label="Koná se")
         body = (
-            '<article class="sc-event-detail"><header>'
-            f'<p>{escape(event.kind or "event")}</p><h1>{escape(event.title)}</h1>'
-            f'</header>{"".join(details)}<div>{render_article_body(event.description or "")}</div></article>'
+            '<article class="sc-event-detail">'
+            f'<p>{escape(event.kind or "event")}</p>'
+            f'{meta}{"".join(details)}<div>{render_article_body(event.description or "")}</div></article>'
         )
         return HTMLResponse(_detail_document(
             session, setting_key="web.meeting_detail_template_id", detail_html=body,
@@ -639,23 +697,33 @@ def site_post(slug: str):
             f'<img class="web-post-cover" src="/media/{cover_id}/file" alt="">'
             if cover_id else ""
         )
-        post_body = (
+        author = session.query(User).filter(User.id == post.created_by_id).one_or_none() if post.created_by_id else None
+        published_date = post.published_at or (revision.created_at if revision is not None else post.created_at)
+        meta = _detail_meta(author, published_date, date_label="Publikováno")
+        detail_body = (
             f'<article class="web-post">'
-            f'<h2 class="web-post-title">{escape(title)}</h2>'
-            f'{cover}<div class="web-post-body">{render_article_body(body_text)}</div>'
+            f'{meta}{cover}<div class="web-post-body">{render_article_body(body_text)}</div>'
             f'</article>'
         )
         if revision is not None:
             return HTMLResponse(_detail_document(
-                session, setting_key="web.post_detail_template_id", detail_html=post_body,
-                title=seo_title, description=description, canonical_url=canonical_url, noindex=noindex,
+                session, setting_key="web.post_detail_template_id", detail_html=detail_body,
+                title=title, seo_title=seo_title, description=description, canonical_url=canonical_url, noindex=noindex,
             ))
+        # Pre-snapshot compatibility has no linked layout to render the page
+        # heading, therefore it retains one semantic title of its own.
+        legacy_post_body = (
+            f'<article class="web-post"><h1 class="web-post-title">{escape(title)}</h1>'
+            f'{meta}{cover}<div class="web-post-body">{render_article_body(body_text)}</div></article>'
+        )
         return HTMLResponse(render_site_page(
             session, page, site_title=settings_data["site_title"],
             site_tagline=settings_data["site_tagline"], site_logo=settings_data["site_logo"],
             site_meta=settings_data["site_meta"], nav_items=_main_nav(session),
             enabled_components=_enabled_components(session), social_links=_social_links(session, settings_data),
-            footer_extra=_footer_extra(settings_data), body_override=post_body,
+            footer_extra=_footer_extra(settings_data), body_override=legacy_post_body,
+            document_title=format_document_title(seo_title, settings_data["site_title"], settings_data["title_pattern"]),
+            favicon=settings_data["favicon"],
         ))
     finally:
         session.close()

@@ -44,4 +44,47 @@ describe("ScoutComp component types", () => {
     expect(defaults).toMatchObject({ tagName: "nav", droppable: false, location: "main" });
     expect(defaults.traits[0].name).toBe("location");
   });
+
+  it("registers pagination as a nearest-repeat binding instead of a copied source", () => {
+    const definitions = new Map();
+    registerScoutCompTypes({ Components: { addType: (id, definition) => definitions.set(id, definition) } });
+
+    const defaults = definitions.get("sc-pagination").model.defaults;
+    expect(defaults).toMatchObject({
+      bindTo: "nearest",
+      source: "",
+      pageSize: null,
+      mode: "simple",
+      params: {},
+    });
+  });
+
+  it("registers an atomic calendar with configurable renderer props and an editor preview", () => {
+    const definitions = new Map();
+    registerScoutCompTypes({ Components: { addType: (id, definition) => definitions.set(id, definition) } });
+
+    const definition = definitions.get("sc-calendar");
+    expect(definition.model.defaults).toMatchObject({
+      tagName: "section",
+      droppable: false,
+      editable: false,
+      kind: "all",
+      teamId: "",
+      firstDayOfWeek: "monday",
+      showDescription: true,
+    });
+    expect(definition.view.onRender).toBeTypeOf("function");
+
+    const values = { ...definition.model.defaults };
+    const view = {
+      el: document.createElement("section"),
+      model: { get: (key) => values[key] },
+    };
+    definition.view.renderCalendar.call(view);
+    expect(view.el.querySelector("[data-sc-calendar-preview]")).not.toBeNull();
+    expect(view.el.textContent).toContain("web.editor.calendar.sampleMeetingDescription");
+    values.showDescription = false;
+    definition.view.renderCalendar.call(view);
+    expect(view.el.textContent).not.toContain("web.editor.calendar.sampleMeetingDescription");
+  });
 });

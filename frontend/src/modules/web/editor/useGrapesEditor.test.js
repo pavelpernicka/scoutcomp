@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { clampCanvasToolbar, subscribeToEditorChanges } from "./useGrapesEditor";
+import { calculateFitZoom, clampCanvasToolbar, subscribeToEditorChanges } from "./useGrapesEditor";
 
 const emitter = () => {
   const listeners = new Map();
@@ -44,5 +44,12 @@ describe("GrapesJS change tracking", () => {
     expect(toolbar.style.left).toBe("142px");
     expect(toolbar.style.top).toBe("8px");
     expect(toolbar.style.maxWidth).toBe("184px");
+  });
+
+  it("fits a real mobile viewport into the available canvas without changing its logical width", () => {
+    expect(calculateFitZoom(782, 375)).toBe(200);
+    expect(calculateFitZoom(1400, 375)).toBe(240);
+    expect(calculateFitZoom(280, 375)).toBe(66);
+    expect(calculateFitZoom(0, 375)).toBe(100);
   });
 });

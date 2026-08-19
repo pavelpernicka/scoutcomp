@@ -217,9 +217,13 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         tagName: "nav",
         name: translate("web.editor.component.pagination"),
         attributes: { "data-sc-type": "pagination" },
-        source: "core.posts",
-        limit: 6,
-        params: { limit: 6 },
+        bindTo: "nearest",
+        source: "",
+        pageSize: null,
+        mode: "simple",
+        previousLabel: translate("web.editor.pagination.previousDefault"),
+        nextLabel: translate("web.editor.pagination.nextDefault"),
+        params: {},
         droppable: false,
         editable: false,
         content: "← Předchozí · 1 · Další →",
@@ -338,6 +342,167 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
     },
   });
 
+  // ── sc-calendar ─────────────────────────────────────────────────────
+  // Calendar data is resolved only by the safe public renderer. The editor
+  // view is intentionally a realistic, inert sample so authors can judge its
+  // density without leaking private events into GrapesJS Project Data.
+  components.addType(SC_COMPONENT_TYPES.calendar, {
+    isComponent: matchesType("calendar"),
+    model: {
+      defaults: {
+        tagName: "section",
+        name: translate("web.editor.component.calendar"),
+        attributes: { "data-sc-type": "calendar" },
+        droppable: false,
+        editable: false,
+        kind: "all",
+        teamId: "",
+        firstDayOfWeek: "monday",
+        showDescription: true,
+        content: "",
+        style: {
+          display: "block",
+          minHeight: "420px",
+          overflow: "hidden",
+          border: "1px solid #d9dfdb",
+          background: "#fffdfa",
+          color: "#314139",
+          fontFamily: "system-ui, sans-serif",
+        },
+        traits: [],
+      },
+    },
+    view: {
+      init() {
+        this.listenTo(
+          this.model,
+          "change:kind change:teamId change:firstDayOfWeek change:showDescription",
+          this.renderCalendar,
+        );
+      },
+      onRender() {
+        this.renderCalendar();
+      },
+      renderCalendar() {
+        const documentRef = this.el?.ownerDocument;
+        if (!documentRef) return;
+        let preview = this.el.querySelector?.(":scope > [data-sc-calendar-preview]");
+        if (!preview) {
+          preview = documentRef.createElement("div");
+          preview.dataset.scCalendarPreview = "true";
+          this.el.appendChild(preview);
+        }
+        preview.replaceChildren();
+        Object.assign(preview.style, {
+          display: "grid",
+          gridTemplateRows: "auto auto 1fr",
+          minHeight: "420px",
+          background: "#fffdfa",
+          color: "#314139",
+          pointerEvents: "none",
+        });
+
+        const toolbar = documentRef.createElement("div");
+        Object.assign(toolbar.style, {
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "12px",
+          padding: "14px 16px",
+          borderBottom: "1px solid #d9dfdb",
+          background: "#f8f4eb",
+        });
+        const viewLabel = documentRef.createElement("strong");
+        viewLabel.textContent = translate("web.editor.calendar.monthView");
+        viewLabel.style.color = "#17603f";
+        const navigation = documentRef.createElement("div");
+        Object.assign(navigation.style, { display: "flex", alignItems: "center", gap: "7px" });
+        const previous = documentRef.createElement("span");
+        previous.textContent = "‹";
+        const today = documentRef.createElement("span");
+        today.textContent = translate("web.editor.calendar.today");
+        const next = documentRef.createElement("span");
+        next.textContent = "›";
+        [previous, today, next].forEach((control) => Object.assign(control.style, {
+          display: "grid",
+          minWidth: control === today ? "auto" : "28px",
+          minHeight: "28px",
+          padding: control === today ? "4px 9px" : "1px",
+          placeItems: "center",
+          border: "1px solid #9aa9a1",
+          borderRadius: "4px",
+          background: "#fffdfa",
+          fontSize: "13px",
+          fontWeight: "650",
+        }));
+        const month = documentRef.createElement("strong");
+        month.textContent = translate("web.editor.calendar.previewMonth");
+        Object.assign(month.style, { color: "#17603f", fontSize: "18px", whiteSpace: "nowrap" });
+        navigation.append(previous, today, next, month);
+        const filter = documentRef.createElement("span");
+        const kind = this.model.get("kind") || "all";
+        const teamId = String(this.model.get("teamId") || "").trim();
+        filter.textContent = teamId
+          ? `${translate(`web.editor.calendar.kinds.${kind}`)} · ${translate("web.editor.calendar.teamShort")} ${teamId}`
+          : translate(`web.editor.calendar.kinds.${kind}`);
+        Object.assign(filter.style, { marginLeft: "auto", color: "#63716a", fontSize: "12px" });
+        toolbar.append(viewLabel, navigation, filter);
+
+        const weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+        if (this.model.get("firstDayOfWeek") === "sunday") weekdays.unshift(weekdays.pop());
+        const weekdayRow = documentRef.createElement("div");
+        Object.assign(weekdayRow.style, { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", background: "#17603f", color: "white" });
+        weekdays.forEach((day) => {
+          const cell = documentRef.createElement("strong");
+          cell.textContent = translate(`web.editor.calendar.weekdays.${day}`);
+          Object.assign(cell.style, { padding: "7px 4px", borderRight: "1px solid rgba(255,255,255,.35)", fontSize: "11px", textAlign: "center" });
+          weekdayRow.appendChild(cell);
+        });
+
+        const grid = documentRef.createElement("div");
+        Object.assign(grid.style, { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gridAutoRows: "minmax(64px, 1fr)" });
+        const mondayFirst = this.model.get("firstDayOfWeek") !== "sunday";
+        const leadingDays = mondayFirst ? [27, 28, 29, 30] : [26, 27, 28, 29, 30];
+        const days = [
+          ...leadingDays.map((day) => ({ day, muted: true })),
+          ...Array.from({ length: 31 }, (_, index) => ({ day: index + 1, muted: false })),
+        ];
+        const trailingCount = (7 - (days.length % 7)) % 7;
+        days.push(...Array.from({ length: trailingCount }, (_, index) => ({ day: index + 1, muted: true })));
+        const samples = {
+          meeting: { day: 8, label: translate("web.editor.calendar.sampleMeeting"), description: translate("web.editor.calendar.sampleMeetingDescription") },
+          trip: { day: 12, label: translate("web.editor.calendar.sampleTrip"), description: translate("web.editor.calendar.sampleTripDescription") },
+          other: { day: 19, label: translate("web.editor.calendar.sampleOther"), description: translate("web.editor.calendar.sampleOtherDescription") },
+        };
+        days.forEach(({ day, muted }) => {
+          const cell = documentRef.createElement("div");
+          Object.assign(cell.style, { position: "relative", minWidth: "0", padding: "5px", borderRight: "1px solid #d9dfdb", borderBottom: "1px solid #d9dfdb", background: muted ? "#f1f3f2" : day === 19 ? "#e4f2e5" : "#fffdfa" });
+          const number = documentRef.createElement("span");
+          number.textContent = String(day);
+          Object.assign(number.style, { color: muted ? "#aab1ad" : day === 19 ? "#167344" : "#52635a", fontSize: "11px", fontWeight: day === 19 ? "750" : "500" });
+          cell.appendChild(number);
+          const sample = !muted && Object.values(samples).find((item) => item.day === day);
+          if (sample && (kind === "all" || sample === samples[kind])) {
+            const event = documentRef.createElement("div");
+            Object.assign(event.style, { marginTop: "5px", padding: "3px 5px", overflow: "hidden", borderRadius: "3px", background: kind === "trip" || sample === samples.trip ? "#d99a2b" : "#17704a", color: "white", fontSize: "10px", fontWeight: "700", lineHeight: "1.25", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+            const title = documentRef.createElement("span");
+            title.textContent = sample.label;
+            event.appendChild(title);
+            if (this.model.get("showDescription")) {
+              const description = documentRef.createElement("small");
+              description.textContent = sample.description;
+              Object.assign(description.style, { display: "block", marginTop: "2px", overflow: "hidden", fontSize: "9px", fontWeight: "500", opacity: ".84", textOverflow: "ellipsis", whiteSpace: "nowrap" });
+              event.appendChild(description);
+            }
+            cell.appendChild(event);
+          }
+          grid.appendChild(cell);
+        });
+        preview.append(toolbar, weekdayRow, grid);
+      },
+    },
+  });
+
   // ── sc-menu ─────────────────────────────────────────────────────────
   // A menu is a first-class data component rather than a hand-built repeat:
   // this preserves its nested tree and gives published sites accessible,
@@ -404,7 +569,13 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           this.el.appendChild(preview);
         }
         preview.replaceChildren();
-        preview.style.pointerEvents = "none";
+        // The preview remains one atomic GrapesJS component, but its native
+        // disclosures are interactive so authors can inspect nested menus
+        // without detaching or editing generated child markup.
+        preview.style.pointerEvents = "auto";
+        preview.onclick = (event) => {
+          if (event.target.closest("a")) event.preventDefault();
+        };
         const presentation = this.model.get("presentation") || "";
         const items = Array.isArray(this.model.get("menuItems")) ? this.model.get("menuItems") : [];
         const renderFooter = (rows) => {
@@ -430,12 +601,26 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
             const children = Array.isArray(item.children) ? item.children : [];
             const li = documentRef.createElement("li");
             li.className = `sc-menu-item nav-item${children.length ? " dropdown has-children" : ""}`;
-            const link = documentRef.createElement("a");
-            link.className = `sc-menu-link ${level ? "dropdown-item" : "nav-link"}${children.length && !level ? " dropdown-toggle" : ""}`;
-            link.textContent = String(item.label || "");
-            link.setAttribute("href", "#");
-            li.appendChild(link);
-            if (children.length) li.appendChild(renderItems(children, level + 1));
+            if (children.length) {
+              const details = documentRef.createElement("details");
+              details.className = "sc-menu-details";
+              const summary = documentRef.createElement("summary");
+              summary.className = `sc-menu-link ${level ? "dropdown-item" : "nav-link"}`;
+              summary.append(String(item.label || ""));
+              const chevron = documentRef.createElement("i");
+              chevron.className = "fa-solid fa-chevron-down sc-menu-chevron";
+              chevron.setAttribute("aria-hidden", "true");
+              summary.appendChild(chevron);
+              details.append(summary, renderItems(children, level + 1));
+              li.appendChild(details);
+            }
+            else {
+              const link = documentRef.createElement("a");
+              link.className = `sc-menu-link ${level ? "dropdown-item" : "nav-link"}`;
+              link.textContent = String(item.label || "");
+              link.setAttribute("href", "#");
+              li.appendChild(link);
+            }
             list.appendChild(li);
           });
           return list;

@@ -6,6 +6,8 @@ through the declared public schema before it reaches a page or a preview.
 """
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass, field
 from datetime import datetime
 from html import unescape
@@ -14,10 +16,10 @@ import re
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from ..models import Config, RegisteredModule, ScoutEvent, Team, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
+from ..models import Config, RegisteredModule, ScoutEvent, Team, User, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
 from .url_schemes import meeting_url, post_url
 
 
@@ -387,8 +389,11 @@ def published_media_ids(db: Session) -> set[int]:
         if revision.og_image_id is not None:
             result.add(revision.og_image_id)
 
-    logo = db.query(Config.value).filter_by(key="web.site_logo").scalar()
-    result.update(_media_references(logo))
+    identity_assets = db.query(Config.value).filter(
+        Config.key.in_(("web.site_logo", "web.favicon", "web.og_image")),
+    ).all()
+    for (asset_url,) in identity_assets:
+        result.update(_media_references(asset_url))
     return result
 
 
@@ -400,6 +405,41 @@ def _plain_public_text(value: str | None, *, limit: int = 500) -> str:
     """Project legacy rich text to safe readable text for repeat/card data."""
     text = re.sub(r"<[^>]*>", " ", value or "")
     return re.sub(r"\s+", " ", unescape(text)).strip()[:limit]
+
+
+_PUBLIC_AVATAR = re.compile(
+    r"^data:image/(?P<format>png|jpeg|webp|gif);base64,(?P<data>[A-Za-z0-9+/=\r\n]+)$",
+    re.I,
+)
+
+
+def safe_public_avatar(value: Any) -> str | None:
+    """Return a verified raster data URL, never an SVG or executable URL.
+
+    The API stores avatars as user-managed text.  Public CMS data is a
+    separate trust boundary, so both the declared MIME type and the decoded
+    file signature are checked before an avatar reaches rendered pages.
+    """
+    text = value.strip() if isinstance(value, str) else ""
+    match = _PUBLIC_AVATAR.fullmatch(text)
+    if not match:
+        return None
+    encoded = re.sub(r"\s+", "", match.group("data"))
+    try:
+        payload = base64.b64decode(encoded, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    image_format = match.group("format").lower()
+    valid_signature = (
+        (image_format == "png" and payload.startswith(b"\x89PNG\r\n\x1a\n"))
+        or (image_format == "jpeg" and payload.startswith(b"\xff\xd8\xff"))
+        or (image_format == "gif" and payload.startswith((b"GIF87a", b"GIF89a")))
+        or (
+            image_format == "webp" and len(payload) >= 12
+            and payload.startswith(b"RIFF") and payload[8:12] == b"WEBP"
+        )
+    )
+    return text if valid_signature else None
 
 
 def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
@@ -420,7 +460,15 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     order = ScoutEvent.starts_at.desc() if params.get("sort") == "start_at_desc" else ScoutEvent.starts_at.asc()
     limit = params.get("limit", 10)
     offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
-    events = query.order_by(order).offset(offset).limit(limit).all()
+    events = (
+        query
+        .outerjoin(User, User.id == ScoutEvent.created_by_id)
+        .with_entities(ScoutEvent, User.real_name, User.username, User.avatar)
+        .order_by(order)
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
     return [{
         "id": event.id,
         "title": event.title,
@@ -430,7 +478,9 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         "end_at": event.ends_at,
         "url": meeting_url(db, event.id),
         "color": event.color,
-    } for event in events]
+        "author": real_name or username or "ScoutComp",
+        "author_avatar": safe_public_avatar(avatar),
+    } for event, real_name, username, avatar in events]
 
 
 def _plain_public_excerpt(value: str | None) -> str:
@@ -439,14 +489,16 @@ def _plain_public_excerpt(value: str | None) -> str:
 
 
 def _posts_source(db: Session, params: Mapping[str, Any], context: ResolveContext) -> list[dict[str, Any]]:
-    order = WebPostRevision.created_at.asc() if params.get("sort") == "published_at_asc" else WebPostRevision.created_at.desc()
+    publication_time = func.coalesce(WebPost.published_at, WebPostRevision.created_at)
+    order = publication_time.asc() if params.get("sort") == "published_at_asc" else publication_time.desc()
     limit = params.get("limit", 10)
     # ``page`` is author-facing pagination. Offset remains available for
     # integrations, but an explicit page deliberately wins for site blocks.
     offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
     posts = (
-        db.query(WebPostRevision)
+        db.query(WebPostRevision, WebPost.published_at, User.real_name, User.username, User.avatar)
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
+        .outerjoin(User, User.id == WebPost.created_by_id)
         .filter(WebPost.deleted_at.is_(None), WebPostRevision.is_publication.is_(True))
         .order_by(order)
         .offset(offset)
@@ -457,11 +509,16 @@ def _posts_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         "id": post.post_id,
         "title": post.title,
         "slug": post.slug,
-        "excerpt": _plain_public_excerpt(post.excerpt),
-        "published_at": post.created_at,
+        # Authors often leave the optional excerpt empty. Cards must still
+        # have useful copy, so derive a safe, bounded fallback from the
+        # published article body instead of rendering an empty paragraph.
+        "excerpt": _plain_public_excerpt(post.excerpt or post.body),
+        "published_at": published_at or post.created_at,
+        "author": real_name or username or "ScoutComp",
+        "author_avatar": safe_public_avatar(avatar),
         "url": post_url(db, post.slug),
         "cover_url": f"/media/{post.cover_media_id}/file" if post.cover_media_id else None,
-    } for post in posts]
+    } for post, published_at, real_name, username, avatar in posts]
 
 
 _SAFE_TEAM_LOGO = re.compile(r"^data:image/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$", re.I)
@@ -475,7 +532,9 @@ def _teams_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     from their own page/menu configuration.
     """
     order = Team.name.desc() if params.get("sort") == "name_desc" else Team.name.asc()
-    teams = db.query(Team).order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 24)).all()
+    limit = params.get("limit", 24)
+    offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
+    teams = db.query(Team).order_by(order).offset(offset).limit(limit).all()
     return [{
         "id": team.id,
         "name": team.name,
@@ -494,7 +553,9 @@ def _media_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     if params.get("album"):
         query = query.filter(WebMedia.album == params["album"])
     order = WebMedia.created_at.asc() if params.get("sort") == "created_at_asc" else WebMedia.created_at.desc()
-    media = query.order_by(order).offset(params.get("offset", 0)).limit(params.get("limit", 24)).all()
+    limit = params.get("limit", 24)
+    offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
+    media = query.order_by(order).offset(offset).limit(limit).all()
     return [{
         "id": item.id,
         "filename": item.filename,
@@ -523,6 +584,8 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
         "kind": PublicField("string", "Kind", nullable=False),
         "start_at": PublicField("datetime", "Starts at", nullable=False),
         "end_at": PublicField("datetime", "Ends at"),
+        "author": PublicField("string", "Author", nullable=False),
+        "author_avatar": PublicField("url", "Author avatar"),
         "url": PublicField("url", "URL"),
         "color": PublicField("string", "Color"),
     },
@@ -545,7 +608,8 @@ POSTS_DATA_SOURCE = WebDataSourceManifest(
         "id": PublicField("integer", "ID", nullable=False), "title": PublicField("string", "Title", nullable=False),
         "slug": PublicField("string", "Slug", nullable=False), "excerpt": PublicField("string", "Excerpt"),
         "published_at": PublicField("datetime", "Published at"), "url": PublicField("url", "URL", nullable=False),
-        "cover_url": PublicField("url", "Cover image URL"),
+        "cover_url": PublicField("url", "Cover image URL"), "author": PublicField("string", "Author", nullable=False),
+        "author_avatar": PublicField("url", "Author avatar"),
     },
     parameters={
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
@@ -567,6 +631,7 @@ TEAMS_DATA_SOURCE = WebDataSourceManifest(
     parameters={
         "limit": QueryParameter("integer", "Limit", default=24, minimum=1, maximum=50),
         "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
+        "page": QueryParameter("integer", "Page", minimum=1, maximum=10_000),
         "sort": QueryParameter("string", "Sort", default="name_asc", choices=("name_asc", "name_desc")),
     }, resolver=_teams_source, cache_ttl_seconds=60,
     label_key="web.dataSources.teams.label", description_key="web.dataSources.teams.description",
@@ -584,6 +649,7 @@ MEDIA_DATA_SOURCE = WebDataSourceManifest(
         "album": QueryParameter("string", "Album"),
         "limit": QueryParameter("integer", "Limit", default=24, minimum=1, maximum=100),
         "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
+        "page": QueryParameter("integer", "Page", minimum=1, maximum=10_000),
         "sort": QueryParameter("string", "Sort", default="created_at_desc", choices=("created_at_asc", "created_at_desc")),
     }, resolver=_media_source, cache_ttl_seconds=300,
     label_key="web.dataSources.media.label", description_key="web.dataSources.media.description",

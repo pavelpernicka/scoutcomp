@@ -5,6 +5,7 @@ import "grapesjs/dist/css/grapes.min.css";
 import {
   configureEditor,
   createEditorConfig,
+  fontFamilyOptions,
   getEditorSnapshot,
   loadEditorProject,
   registerBuilderBlocks,
@@ -63,6 +64,14 @@ export const clampCanvasToolbar = (editor, inset = 8) => {
   return Boolean(shiftX || shiftY);
 };
 
+/** Keep the device viewport real while making narrow previews useful to edit. */
+export const calculateFitZoom = (availableWidth, deviceWidth, { maximum = 240, gutter = 32 } = {}) => {
+  const available = Number(availableWidth);
+  const logical = Number(deviceWidth);
+  if (!Number.isFinite(available) || !Number.isFinite(logical) || available <= 0 || logical <= 0) return 100;
+  return Math.round(Math.max(50, Math.min(maximum, ((available - gutter) / logical) * 100)));
+};
+
 /**
  * Owns one GrapesJS 0.21.9 instance for a mounted editor shell.
  *
@@ -81,6 +90,7 @@ export function useGrapesEditor({
   language = "cs",
   devices,
   styleSectors,
+  fontSets = [],
   canvasStyles = [],
   editorConfig,
   preferContentSlotInsertion = false,
@@ -106,6 +116,7 @@ export function useGrapesEditor({
   const [selected, setSelected] = useState(null);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [canvasZoom, setCanvasZoom] = useState(100);
 
   inputRef.current = { projectData, legacyHtml, legacyCss, loadKey };
   catalogueRef.current = { dataSources, blocks, translate, language };
@@ -163,6 +174,7 @@ export function useGrapesEditor({
         container,
         devices,
         styleSectors,
+        fontSets,
         canvasStyles,
         language: catalogueRef.current.language,
         translate: catalogueRef.current.translate,
@@ -249,6 +261,13 @@ export function useGrapesEditor({
     if (!editor || !isReady) return;
     registerBuilderBlocks(editor, { dataSources, blocks, translate });
   }, [blocks, dataSources, isReady, translate]);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !isReady) return;
+    const property = editor.StyleManager?.getProperty?.("typography", "font-family");
+    property?.set?.("options", fontFamilyOptions(fontSets));
+  }, [fontSets, isReady]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -356,6 +375,27 @@ export function useGrapesEditor({
     );
     return manager.select(device || deviceId);
   }, []);
+  const fitDevice = useCallback((deviceId) => {
+    const editor = editorRef.current;
+    const manager = editor?.Devices;
+    const canvas = editor?.Canvas;
+    if (!manager || !canvas) return 100;
+    const requested = String(deviceId || "desktop").toLowerCase();
+    const device = manager.getAll().find((item) =>
+      String(item.id || item.get?.("id") || item.get?.("name")).toLowerCase() === requested
+      || String(item.get?.("name") || "").toLowerCase() === requested,
+    );
+    const width = String(device?.get?.("width") || device?.width || "");
+    const logicalWidth = Number.parseFloat(width);
+    const availableWidth = canvas.getElement?.()?.clientWidth || containerRef?.current?.clientWidth || 0;
+    const zoom = requested === "mobile"
+      ? calculateFitZoom(availableWidth, logicalWidth || 375)
+      : 100;
+    canvas.setZoom?.(zoom);
+    editor.refresh?.({ tools: true });
+    setCanvasZoom(zoom);
+    return zoom;
+  }, [containerRef]);
   const addBlock = useCallback((blockId) => {
     const editor = editorRef.current;
     const block = editor?.BlockManager.get(blockId);
@@ -373,12 +413,14 @@ export function useGrapesEditor({
     selected,
     canUndo,
     canRedo,
+    canvasZoom,
     loadProject,
     getSnapshot,
     markSaved,
     undo,
     redo,
     setDevice,
+    fitDevice,
     addBlock,
   };
 }

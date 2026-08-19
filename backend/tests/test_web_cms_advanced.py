@@ -140,12 +140,174 @@ def test_pagination_does_not_render_phantom_next_link_on_exact_final_page(db_ses
         "type": "sc-pagination", "source": "core.posts", "limit": 2,
         "params": {"limit": 2, "page": {"$scBinding": {"scope": "page", "field": "query.page"}}},
     }))
+    def resolver(_db, _source, params, *_args):
+        return [{"id": 1}, {"id": 2}] if int(params["page"]) == 2 else []
+
     rendered = render_project(
-        db_session, compiled.tree, page={"query": {"page": "2"}},
-        resolver=lambda *_: [{"id": 1}, {"id": 2}],
+        db_session, compiled.tree, page={"query": {"page": "2"}}, resolver=resolver,
     )
     assert 'rel="prev" href="?page=1"' in rendered
     assert 'rel="next"' not in rendered
+
+
+def test_pagination_binds_to_nearest_repeat_and_owns_its_page_size():
+    compiled = compile_project(project(
+        {"type": "sc-repeat", "source": "core.posts", "params": {"limit": 3}},
+        {
+            "type": "default", "tagName": "div", "components": [{
+                "type": "sc-repeat", "source": "core.events",
+                "params": {"limit": 9, "kind": "meeting"},
+                "components": [{"type": "text", "content": "Post"}],
+            }],
+        },
+        {
+            "type": "sc-pagination", "bindTo": "nearest",
+            "pageSize": 4, "mode": "numbers",
+        },
+    ))
+
+    repeat = compiled.tree["components"][1]["components"][0]
+    pagination = compiled.tree["components"][2]
+    expected_page = {"$scBinding": {"scope": "page", "field": "query.page"}}
+    assert repeat["params"] == {
+        "limit": 4, "kind": "meeting", "page": expected_page,
+    }
+    assert pagination["source"] == "core.events"
+    assert pagination["limit"] == 4
+    assert pagination["params"] == repeat["params"]
+    assert pagination["mode"] == "numbers"
+
+
+def test_pagination_lookahead_keeps_page_size_so_the_last_record_is_reachable(db_session):
+    compiled = compile_project(project(
+        {
+            "type": "sc-repeat", "source": "core.posts",
+            "components": [{
+                "type": "sc-bind", "tagName": "span",
+                "binding": {"scope": "context", "field": "title"},
+            }],
+        },
+        {"type": "sc-pagination", "bindTo": "nearest", "pageSize": 2},
+    ))
+    records = [{"title": f"Post {index}"} for index in range(1, 6)]
+
+    def resolver(_db, _source, params, *_args):
+        limit = int(params["limit"])
+        page_number = int(params["page"])
+        offset = (page_number - 1) * limit
+        return records[offset:offset + limit]
+
+    second_page = render_project(
+        db_session, compiled.tree, page={"query": {"page": "2"}}, resolver=resolver,
+    )
+    third_page = render_project(
+        db_session, compiled.tree, page={"query": {"page": "3"}}, resolver=resolver,
+    )
+
+    assert "Post 3" in second_page and "Post 4" in second_page
+    assert 'rel="next" href="?page=3"' in second_page
+    assert "Post 5" in third_page
+    assert 'rel="next"' not in third_page
+
+
+def test_pagination_numbered_and_compact_modes(db_session):
+    numbered = compile_project(project({
+        "type": "sc-pagination", "source": "core.posts", "limit": 2,
+        "mode": "numbers", "previousLabel": "Zpět", "nextLabel": "Vpřed",
+        "params": {"limit": 2, "page": {"$scBinding": {"scope": "page", "field": "query.page"}}},
+    }))
+    numbered_html = render_project(
+        db_session, numbered.tree, page={"query": {"page": "3"}},
+        resolver=lambda *_: [{"id": 1}, {"id": 2}, {"id": 3}],
+    )
+    assert '>Zpět<' in numbered_html
+    assert 'href="?page=1">1<' in numbered_html
+    assert 'aria-current="page">3<' in numbered_html
+    assert 'href="?page=4">4<' in numbered_html
+    assert '>Vpřed<' in numbered_html
+
+    compact = compile_project(project({
+        "type": "sc-pagination", "source": "core.posts", "limit": 2,
+        "mode": "compact", "params": {"limit": 2},
+    }))
+    compact_html = render_project(
+        db_session, compact.tree, resolver=lambda *_: [{"id": 1}, {"id": 2}, {"id": 3}],
+    )
+    assert 'aria-current="page"' not in compact_html
+    assert 'rel="next"' in compact_html
+
+
+def test_calendar_component_normalises_configuration_and_renders_accessible_month(db_session):
+    compiled = compile_project(project({
+        "type": "sc-calendar", "dataSource": "core.events", "kind": "meeting",
+        "teamId": "7", "firstDayOfWeek": "monday", "showDescription": "true",
+        "components": [text("must not render")],
+    }))
+    calendar = compiled.tree["components"][0]
+    assert calendar == {
+        "type": "sc-calendar", "source": "core.events", "kind": "meeting",
+        "teamId": 7, "firstDayOfWeek": "monday", "showDescription": True,
+        "components": [],
+    }
+    seen = {}
+
+    def resolver(_db, source, params, *_args):
+        seen.update(source=source, params=params)
+        return [{
+            "title": "Schůzka <bez skriptu>", "description": "Program & hry",
+            "start_at": datetime(2026, 5, 19, 20, 0), "url": "/meeting/12", "color": "#176b44",
+        }]
+
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"month": "2026-05"}}, resolver=resolver,
+    )
+
+    assert seen["source"] == "core.events"
+    assert seen["params"]["kind"] == "meeting" and seen["params"]["team_id"] == 7
+    assert seen["params"]["limit"] == 50
+    assert 'data-sc-calendar-month="2026-05"' in rendered
+    assert "Květen 2026" in rendered
+    assert 'href="?month=2026-04"' in rendered
+    assert 'href="?month=2026-06"' in rendered
+    assert '<table class="sc-calendar-table" aria-label="Kalendář – Květen 2026">' in rendered
+    assert '<div class="sc-calendar-agenda">' in rendered
+    assert "Schůzka &lt;bez skriptu&gt;" in rendered
+    assert "Program &amp; hry" in rendered
+    assert "/meeting/12" in rendered
+
+
+@pytest.mark.parametrize("payload", [
+    {"type": "sc-calendar", "source": "private.events"},
+    {"type": "sc-calendar", "kind": "secret"},
+    {"type": "sc-calendar", "teamId": "01"},
+    {"type": "sc-calendar", "firstDayOfWeek": "friday"},
+    {"type": "sc-calendar", "showDescription": "yes"},
+])
+def test_calendar_component_rejects_untrusted_configuration(payload):
+    with pytest.raises(CompileError):
+        compile_project(project(payload))
+
+
+def test_public_image_binding_accepts_verified_avatar_but_rejects_svg(db_session):
+    compiled = compile_project(project({
+        "type": "sc-repeat", "source": "core.events", "components": [{
+            "type": "image", "tagName": "img", "attributes": {"alt": "Autor"},
+            "scBindings": {"src": {"scope": "context", "field": "author_avatar"}},
+        }],
+    }))
+
+    valid = render_project(
+        db_session, compiled.tree,
+        resolver=lambda *_: [{"author_avatar": "data:image/gif;base64,R0lGODlh"}],
+    )
+    unsafe = render_project(
+        db_session, compiled.tree,
+        resolver=lambda *_: [{"author_avatar": "data:image/svg+xml;base64,PHN2Zz4="}],
+    )
+
+    assert 'src="data:image/gif;base64,R0lGODlh"' in valid
+    assert "data:image/svg+xml" not in unsafe
+    assert " src=" not in unsafe
 
 
 def test_hierarchical_menu_component_preserves_children_and_safe_links(db_session):
@@ -320,6 +482,29 @@ def test_renderer_preserves_bounded_responsive_css():
             "style": {"display": "none"},
             "atRuleType": "media",
             "mediaText": "screen and (orientation: landscape)",
+        }]))
+
+
+def test_renderer_allows_bounded_overlay_custom_properties(db_session):
+    component = {
+        "type": "default",
+        "tagName": "section",
+        "attributes": {"class": "photo-hero", "data-sc-overlay": "true", "data-sc-overlay-enabled": "false"},
+        "components": [text("overlay")],
+    }
+    compiled = compile_project(project(component, styles=[{
+        "selectors": [{"name": "photo-hero"}],
+        "style": {"--sc-overlay-color": "#142a4dcc", "--sc-overlay-opacity": "0.62"},
+    }]))
+    assert compiled.css == ".photo-hero{--sc-overlay-color:#142a4dcc;--sc-overlay-opacity:0.62}"
+    rendered = render_project(db_session, compiled.tree)
+    assert 'data-sc-overlay="true"' in rendered
+    assert 'data-sc-overlay-enabled="false"' in rendered
+
+    with pytest.raises(CompileError):
+        compile_project(project(text("invalid overlay"), styles=[{
+            "selectors": [{"name": "photo-hero"}],
+            "style": {"--sc-overlay-opacity": "1.5"},
         }]))
 
 
@@ -1015,7 +1200,11 @@ def test_public_post_route_uses_published_revision_slug(db_session, monkeypatch)
     db_session.commit()
     monkeypatch.setattr(site_module, "SessionLocal", sessionmaker(bind=db_session.bind))
 
-    assert "Published body" in site_module.site_post("live-slug").body.decode()
+    document = site_module.site_post("live-slug").body.decode()
+    assert "Published body" in document
+    assert 'class="web-detail-meta"' in document
+    assert 'class="web-detail-author-fallback"' in document
+    assert 'class="web-detail-date"' in document
     with pytest.raises(HTTPException) as caught:
         site_module.site_post("new-draft-slug")
     assert caught.value.status_code == 404
@@ -1046,14 +1235,27 @@ def test_public_site_resolves_custom_article_url_schema(db_session, monkeypatch)
 def test_public_meeting_detail_requires_public_event_and_renders_it(db_session, monkeypatch):
     from app import site_app as site_module
 
-    event = ScoutEvent(title="Veřejná schůzka", description="Sraz u klubovny", kind="meeting", starts_at=datetime.now(), is_public=True)
+    author = User(
+        username="meeting-author", real_name="Vedoucí", password_hash="x",
+        avatar="data:image/gif;base64,R0lGODlh",
+    )
+    db_session.add(author); db_session.flush()
+    event = ScoutEvent(
+        title="Veřejná schůzka", description="Sraz u klubovny", kind="meeting",
+        starts_at=datetime(2026, 5, 19, 18, 30), is_public=True, created_by_id=author.id,
+    )
     db_session.add(event); db_session.commit()
     monkeypatch.setattr(site_module, "SessionLocal", sessionmaker(bind=db_session.bind))
 
     response = site_module.site_meeting(event.id)
 
     assert response.status_code == 200
-    assert "Veřejná schůzka" in response.body.decode()
+    document = response.body.decode()
+    assert "Veřejná schůzka" in document
+    assert 'class="web-detail-meta"' in document
+    assert 'class="web-detail-author-avatar"' in document
+    assert "Vedoucí" in document
+    assert "Koná se 19. 5. 2026" in document
 
 
 def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
@@ -1681,6 +1883,43 @@ def test_page_publication_materialises_an_immutable_document_artifact(db_session
     assert _render_revision(db_session, page, revision) == revision.rendered_html
 
 
+def test_calendar_publication_materialises_only_a_bounded_month_window(db_session):
+    page = WebPage(
+        slug="calendar-artifact", path_segment="calendar-artifact", path="/calendar-artifact",
+        title="Kalendář", data=project({"type": "sc-calendar"}), draft_version=1,
+    )
+    db_session.add(page)
+    db_session.commit()
+
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+    month_variants = {
+        key: value for key, value in (revision.rendered_variants or {}).items()
+        if key.startswith("month=")
+    }
+
+    assert len(month_variants) == 31
+    assert all('<section class="sc-calendar"' in document for document in month_variants.values())
+    current_key = datetime.now().strftime("month=%Y-%m")
+    assert current_key in month_variants
+    from app.site_app import _render_revision
+    assert _render_revision(
+        db_session, page, revision, query={"month": current_key.removeprefix("month=")},
+    ) == month_variants[current_key]
+
+
+def test_non_calendar_publication_does_not_generate_month_variants(db_session):
+    page = WebPage(
+        slug="plain-artifact", path_segment="plain-artifact", path="/plain-artifact",
+        title="Běžná stránka", data=project(text("Obsah")), draft_version=1,
+    )
+    db_session.add(page)
+    db_session.commit()
+
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+
+    assert not any(key.startswith("month=") for key in (revision.rendered_variants or {}))
+
+
 def test_public_renderer_rejects_missing_new_publication_artifact(db_session):
     page = WebPage(slug="not-built", path_segment="not-built", path="/not-built", title="Not built", draft_version=1)
     db_session.add(page); db_session.flush()
@@ -1878,7 +2117,8 @@ def test_ontario_seed_refreshes_only_untouched_bundled_resources(db_session):
     refreshed = str(home.project_data)
     assert "ontario-search" not in refreshed
     assert "ontario-menu-shell" in refreshed
-    assert "Powered by Vyveh" in refreshed
+    assert "https://scoutcomp.pernicka.cz" in refreshed
+    assert "ScoutComp" in refreshed
 
     # Once an author has saved a draft, the bundled baseline must no longer
     # replace it during routine startup/catalog seeding.

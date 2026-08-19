@@ -69,11 +69,45 @@ def test_events_are_public_only_and_projected_through_allowlist(db_session):
     )
 
     assert [item["title"] for item in result] == ["Public"]
-    assert set(result[0]) == {"id", "title", "description", "kind", "start_at", "end_at", "url", "color"}
+    assert set(result[0]) == {
+        "id", "title", "description", "kind", "start_at", "end_at", "url", "color",
+        "author", "author_avatar",
+    }
     with pytest.raises(DataSourceValidationError):
         resolve_data_source(db_session, "core.events", {"private": True})
     with pytest.raises(DataSourceValidationError):
         resolve_data_source(db_session, "core.events", {"limit": 500})
+
+
+def test_public_author_avatar_requires_a_real_allowlisted_raster_image(db_session):
+    _seed(db_session)
+    valid = User(
+        username="valid-avatar", real_name="Valid Avatar", password_hash="x",
+        avatar="data:image/gif;base64,R0lGODlh",
+    )
+    unsafe = User(
+        username="unsafe-avatar", real_name="Unsafe Avatar", password_hash="x",
+        avatar="data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+",
+    )
+    spoofed = User(
+        username="spoofed-avatar", real_name="Spoofed Avatar", password_hash="x",
+        avatar="data:image/png;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==",
+    )
+    db_session.add_all([valid, unsafe, spoofed]); db_session.flush()
+    now = _now()
+    db_session.add_all([
+        ScoutEvent(title="Valid", kind="meeting", starts_at=now, is_public=True, created_by_id=valid.id),
+        ScoutEvent(title="Unsafe", kind="meeting", starts_at=now + timedelta(minutes=1), is_public=True, created_by_id=unsafe.id),
+        ScoutEvent(title="Spoofed", kind="meeting", starts_at=now + timedelta(minutes=2), is_public=True, created_by_id=spoofed.id),
+    ])
+    db_session.commit()
+
+    records = resolve_data_source(db_session, "core.events", {"kind": "meeting"})
+
+    assert records[0]["author"] == "Valid Avatar"
+    assert records[0]["author_avatar"] == "data:image/gif;base64,R0lGODlh"
+    assert records[1]["author_avatar"] is None
+    assert records[2]["author_avatar"] is None
 
 
 def test_events_are_public_by_event_flag_not_by_cms_page(db_session):

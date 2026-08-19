@@ -5,6 +5,7 @@ from copy import deepcopy
 from .resource_props import ResourcePropsError
 from .renderer import component_slot_name
 from .pages import _extract_page_content
+from .site_identity import DEFAULT_TITLE_PATTERN, format_document_title
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -318,11 +319,13 @@ def _render_compiled_page(
             from .theme_package import rewrite_theme_asset_urls
             template_css = rewrite_theme_asset_urls(template_css or "", template.theme_version_id, api=True)
     linked_css = "\n".join(part_css).replace("/theme-assets/", "/api/web/theme-assets/")
+    settings_data = _site_settings(db)
     return render_document(
         body,
-        title=seo_title or title,
+        title=format_document_title(seo_title or title, settings_data["site_title"], settings_data["title_pattern"]),
         description=meta_description or "",
         canonical_url=canonical_url or "",
+        favicon=settings_data["favicon"],
         noindex=noindex or not published,
         css=f"{global_css}\n{linked_css}\n{template_css or ''}\n{compiled.css}",
         base_css=base_css,
@@ -617,6 +620,8 @@ def restore_page_revision(page_id: int, revision_id: int, db: Session = Depends(
 def _site_settings(db: Session) -> dict:
     return {
         "site_title": get_config_value(db, "web.site_title") or "Naše skautská střediska",
+        "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
+        "favicon": get_config_value(db, "web.favicon"),
         "site_tagline": get_config_value(db, "web.site_tagline"),
         "site_meta": get_config_value(db, "web.site_meta"),
         "site_logo": get_config_value(db, "web.site_logo"),
