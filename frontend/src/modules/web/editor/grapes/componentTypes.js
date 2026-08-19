@@ -460,44 +460,86 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         });
 
         const grid = documentRef.createElement("div");
-        Object.assign(grid.style, { display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", gridAutoRows: "minmax(64px, 1fr)" });
+        grid.className = "sc-calendar-editor-grid";
+        grid.dataset.showDescriptions = this.model.get("showDescription") ? "true" : "false";
+        Object.assign(grid.style, { display: "grid" });
         const mondayFirst = this.model.get("firstDayOfWeek") !== "sunday";
-        const leadingDays = mondayFirst ? [27, 28, 29, 30] : [26, 27, 28, 29, 30];
+        const leadingDays = mondayFirst ? [27, 28, 29, 30, 31] : [26, 27, 28, 29, 30, 31];
         const days = [
           ...leadingDays.map((day) => ({ day, muted: true })),
           ...Array.from({ length: 31 }, (_, index) => ({ day: index + 1, muted: false })),
         ];
         const trailingCount = (7 - (days.length % 7)) % 7;
         days.push(...Array.from({ length: trailingCount }, (_, index) => ({ day: index + 1, muted: true })));
-        const samples = {
-          meeting: { day: 8, label: translate("web.editor.calendar.sampleMeeting"), description: translate("web.editor.calendar.sampleMeetingDescription") },
-          trip: { day: 12, label: translate("web.editor.calendar.sampleTrip"), description: translate("web.editor.calendar.sampleTripDescription") },
-          other: { day: 19, label: translate("web.editor.calendar.sampleOther"), description: translate("web.editor.calendar.sampleOtherDescription") },
-        };
-        days.forEach(({ day, muted }) => {
-          const cell = documentRef.createElement("div");
-          Object.assign(cell.style, { position: "relative", minWidth: "0", padding: "5px", borderRight: "1px solid #d9dfdb", borderBottom: "1px solid #d9dfdb", background: muted ? "#f1f3f2" : day === 19 ? "#e4f2e5" : "#fffdfa" });
-          const number = documentRef.createElement("span");
-          number.textContent = String(day);
-          Object.assign(number.style, { color: muted ? "#aab1ad" : day === 19 ? "#167344" : "#52635a", fontSize: "11px", fontWeight: day === 19 ? "750" : "500" });
-          cell.appendChild(number);
-          const sample = !muted && Object.values(samples).find((item) => item.day === day);
-          if (sample && (kind === "all" || sample === samples[kind])) {
-            const event = documentRef.createElement("div");
-            Object.assign(event.style, { marginTop: "5px", padding: "3px 5px", overflow: "hidden", borderRadius: "3px", background: kind === "trip" || sample === samples.trip ? "#d99a2b" : "#17704a", color: "white", fontSize: "10px", fontWeight: "700", lineHeight: "1.25", textOverflow: "ellipsis", whiteSpace: "nowrap" });
-            const title = documentRef.createElement("span");
-            title.textContent = sample.label;
-            event.appendChild(title);
-            if (this.model.get("showDescription")) {
-              const description = documentRef.createElement("small");
-              description.textContent = sample.description;
-              Object.assign(description.style, { display: "block", marginTop: "2px", overflow: "hidden", fontSize: "9px", fontWeight: "500", opacity: ".84", textOverflow: "ellipsis", whiteSpace: "nowrap" });
-              event.appendChild(description);
+        const augustOffset = leadingDays.length;
+        const samples = [
+          { id: "meeting-early", kind: "meeting", start: augustOffset + 7, end: augustOffset + 7, label: translate("web.editor.calendar.sampleMeeting"), color: "#17704a" },
+          { id: "trip", kind: "trip", start: augustOffset + 17, end: augustOffset + 21, label: translate("web.editor.calendar.sampleTrip"), color: "#bc7b12" },
+          { id: "meeting", kind: "meeting", start: augustOffset + 20, end: augustOffset + 20, label: translate("web.editor.calendar.sampleMeeting"), color: "#17704a" },
+          { id: "other", kind: "other", start: augustOffset + 20, end: augustOffset + 20, label: translate("web.editor.calendar.sampleOther"), color: "#247b91" },
+          { id: "extra-1", kind: "meeting", start: augustOffset + 20, end: augustOffset + 20, label: translate("web.editor.calendar.sampleMeeting"), color: "#17704a" },
+          { id: "extra-2", kind: "other", start: augustOffset + 20, end: augustOffset + 21, label: translate("web.editor.calendar.sampleOther"), color: "#247b91" },
+        ].filter((event) => kind === "all" || event.kind === kind);
+        for (let weekStart = 0; weekStart < days.length; weekStart += 7) {
+          const week = documentRef.createElement("div");
+          week.className = "sc-calendar-editor-week";
+          Object.assign(week.style, { position: "relative", display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", minHeight: "110px" });
+          const weekEnd = weekStart + 6;
+          const segments = samples
+            .filter((event) => event.end >= weekStart && event.start <= weekEnd)
+            .map((event) => ({ ...event, startCol: Math.max(0, event.start - weekStart), endCol: Math.min(6, event.end - weekStart), continuesBefore: event.start < weekStart, continuesAfter: event.end > weekEnd }))
+            .sort((left, right) => left.startCol - right.startCol || (right.endCol - right.startCol) - (left.endCol - left.startCol) || left.id.localeCompare(right.id));
+          const laneEnds = [];
+          segments.forEach((event) => {
+            const availableLane = laneEnds.findIndex((endColumn) => endColumn < event.startCol);
+            event.lane = availableLane === -1 ? laneEnds.length : availableLane;
+            laneEnds[event.lane] = event.endCol;
+          });
+          days.slice(weekStart, weekStart + 7).forEach(({ day, muted }, column) => {
+            const cell = documentRef.createElement("div");
+            cell.className = `sc-calendar-editor-day${muted ? " is-outside" : ""}${!muted && day === 19 ? " is-today" : ""}`;
+            Object.assign(cell.style, { position: "relative", minWidth: "0", padding: "5px", overflow: "hidden", borderRight: "1px solid #d9dfdb", borderBottom: "1px solid #d9dfdb", background: muted ? "#f1f3f2" : day === 19 ? "#e4f2e5" : "#fffdfa" });
+            const number = documentRef.createElement("span");
+            number.textContent = String(day);
+            Object.assign(number.style, { color: muted ? "#aab1ad" : day === 19 ? "#167344" : "#52635a", fontSize: "11px", fontWeight: day === 19 ? "750" : "500" });
+            cell.appendChild(number);
+            const hidden = segments.filter((event) => event.lane >= 3 && column >= event.startCol && column <= event.endCol).length;
+            if (hidden) {
+              const more = documentRef.createElement("small");
+              more.className = "sc-calendar-editor-more";
+              more.textContent = `+${hidden} ${translate("web.editor.calendar.more")}`;
+              Object.assign(more.style, { position: "absolute", bottom: "4px", display: "block", color: "#63716a", fontSize: "9px" });
+              cell.appendChild(more);
             }
-            cell.appendChild(event);
-          }
-          grid.appendChild(cell);
-        });
+            week.appendChild(cell);
+          });
+          segments.filter((event) => event.lane < 3).forEach((event) => {
+            const bar = documentRef.createElement("div");
+            bar.className = "sc-calendar-editor-event";
+            bar.dataset.multiday = event.start !== event.end ? "true" : "false";
+            bar.textContent = `${event.continuesBefore ? "‹ " : ""}${event.label}${event.continuesAfter ? " ›" : ""}`;
+            Object.assign(bar.style, {
+              position: "absolute",
+              left: `${event.startCol * (100 / 7)}%`,
+              width: `${(event.endCol - event.startCol + 1) * (100 / 7)}%`,
+              top: `${27 + event.lane * 25}px`,
+              zIndex: "2",
+              height: "23px",
+              padding: "3px 6px",
+              overflow: "hidden",
+              borderRadius: "3px",
+              background: event.color,
+              color: "#fff",
+              fontSize: "10px",
+              fontWeight: "700",
+              lineHeight: "17px",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            });
+            week.appendChild(bar);
+          });
+          grid.appendChild(week);
+        }
         preview.append(toolbar, weekdayRow, grid);
       },
     },

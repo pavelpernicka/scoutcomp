@@ -82,9 +82,11 @@ describe("ScoutComp component types", () => {
     };
     definition.view.renderCalendar.call(view);
     expect(view.el.querySelector("[data-sc-calendar-preview]")).not.toBeNull();
-    expect(view.el.textContent).toContain("web.editor.calendar.sampleMeetingDescription");
+    expect(view.el.querySelector('[data-multiday="true"]')).not.toBeNull();
+    expect(view.el.textContent).toContain("web.editor.calendar.more");
+    expect(view.el.querySelector(".sc-calendar-editor-grid")).toHaveAttribute("data-show-descriptions", "true");
     values.showDescription = false;
     definition.view.renderCalendar.call(view);
-    expect(view.el.textContent).not.toContain("web.editor.calendar.sampleMeetingDescription");
+    expect(view.el.querySelector(".sc-calendar-editor-grid")).toHaveAttribute("data-show-descriptions", "false");
   });
 });

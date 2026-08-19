@@ -50,6 +50,11 @@ const BLOCK_ICONS = {
   "bs-ratio": "fa-display",
   "bs-progress": "fa-bars-progress",
   "bs-callout": "fa-bullhorn",
+  "bs-nav-pills": "fa-folder-tree",
+  "bs-card-grid": "fa-table-cells-large",
+  "bs-dropdown": "fa-caret-down",
+  "bs-description-list": "fa-list-check",
+  "bs-accordion-group": "fa-bars-staggered",
   "layout-single": "fa-square",
   "layout-reading": "fa-align-left",
   "layout-two-equal": "fa-columns",
@@ -323,7 +328,7 @@ export function createPrimitiveBlocks(translate = (key) => key) {
         tagName: "section",
         name: translate("web.editor.block.photoCta"),
         attributes: {
-          class: "ontario-contact-hero sc-edge-soft sc-edge-bottom sc-edge-white",
+          class: "ontario-contact-hero sc-edge-soft sc-edge-bottom sc-edge-white sc-edge-subtle",
           "data-sc-overlay": "true",
           "aria-label": "Výzva s fotografií",
         },
@@ -731,6 +736,65 @@ export function createPrimitiveBlocks(translate = (key) => key) {
         { type: "text", tagName: "h3", content: translate("web.editor.placeholder.heading") },
         text(translate("web.editor.placeholder.text")),
       ] },
+    },
+    {
+      id: "bs-nav-pills",
+      label: translate("web.editor.block.bootstrapNavPills"),
+      category: structure,
+      content: { type: "default", tagName: "nav", attributes: { class: "nav nav-pills flex-column flex-sm-row gap-1", "aria-label": translate("web.editor.block.bootstrapNavPills") }, components: [
+        { type: "link", attributes: { class: "nav-link active", href: "#", "aria-current": "page" }, content: translate("web.editor.placeholder.currentPage") },
+        { type: "link", attributes: { class: "nav-link", href: "#" }, content: translate("web.editor.placeholder.heading") },
+        { type: "link", attributes: { class: "nav-link", href: "#" }, content: translate("web.editor.placeholder.heading") },
+      ] },
+    },
+    {
+      id: "bs-card-grid",
+      label: translate("web.editor.block.bootstrapCardGrid"),
+      category,
+      content: { type: "default", tagName: "section", attributes: { class: "row row-cols-1 row-cols-md-3 g-4" }, components: [1, 2, 3].map(() => ({
+        type: "default", tagName: "div", attributes: { class: "col" }, components: [{
+          type: "default", tagName: "article", attributes: { class: "card h-100" }, components: [
+            { type: "default", tagName: "div", attributes: { class: "card-body" }, components: [
+              { type: "text", tagName: "h3", attributes: { class: "card-title h5" }, content: translate("web.editor.placeholder.heading") },
+              { type: "text", tagName: "p", attributes: { class: "card-text" }, content: translate("web.editor.placeholder.text") },
+            ] },
+          ],
+        }],
+      })) },
+    },
+    {
+      id: "bs-dropdown",
+      label: translate("web.editor.block.bootstrapDropdown"),
+      category,
+      content: { type: "default", tagName: "details", attributes: { class: "dropdown" }, components: [
+        { type: "text", tagName: "summary", attributes: { class: "btn btn-outline-primary dropdown-toggle" }, content: translate("web.editor.placeholder.button") },
+        { type: "default", tagName: "div", attributes: { class: "dropdown-menu show position-static mt-2" }, components: [
+          { type: "link", attributes: { class: "dropdown-item", href: "#" }, content: translate("web.editor.placeholder.listItem") },
+          { type: "link", attributes: { class: "dropdown-item", href: "#" }, content: translate("web.editor.placeholder.listItem") },
+        ] },
+      ] },
+    },
+    {
+      id: "bs-description-list",
+      label: translate("web.editor.block.bootstrapDescriptionList"),
+      category: structure,
+      content: { type: "default", tagName: "dl", attributes: { class: "row mb-0" }, components: [
+        { type: "text", tagName: "dt", attributes: { class: "col-sm-4" }, content: translate("web.editor.placeholder.heading") },
+        { type: "text", tagName: "dd", attributes: { class: "col-sm-8" }, content: translate("web.editor.placeholder.text") },
+        { type: "text", tagName: "dt", attributes: { class: "col-sm-4" }, content: translate("web.editor.placeholder.heading") },
+        { type: "text", tagName: "dd", attributes: { class: "col-sm-8" }, content: translate("web.editor.placeholder.text") },
+      ] },
+    },
+    {
+      id: "bs-accordion-group",
+      label: translate("web.editor.block.bootstrapAccordionGroup"),
+      category,
+      content: { type: "default", tagName: "section", attributes: { class: "d-grid gap-2", "aria-label": translate("web.editor.block.bootstrapAccordionGroup") }, components: [1, 2, 3].map(() => ({
+        type: "default", tagName: "details", attributes: { class: "ontario-accordion border rounded px-3" }, components: [
+          { type: "text", tagName: "summary", attributes: { class: "fw-semibold" }, content: translate("web.editor.placeholder.accordionTitle") },
+          { type: "text", tagName: "p", attributes: { class: "mb-3" }, content: translate("web.editor.placeholder.text") },
+        ],
+      })) },
     },
     ...["article", "header", "footer", "main", "nav", "aside"].map((tagName) => ({
       id: `sc-semantic-${tagName}`,

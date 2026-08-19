@@ -454,7 +454,17 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     if params.get("team_id") is not None:
         query = query.filter(ScoutEvent.team_id == params["team_id"])
     if params.get("from"):
-        query = query.filter(ScoutEvent.starts_at >= params["from"])
+        if params.get("overlap"):
+            # Calendar windows include events which started before the first
+            # visible day but are still in progress. An end exactly at the
+            # boundary is excluded: both the internal and public calendars
+            # treat midnight as the exclusive end of a multi-day event.
+            query = query.filter(or_(
+                ScoutEvent.starts_at >= params["from"],
+                ScoutEvent.ends_at > params["from"],
+            ))
+        else:
+            query = query.filter(ScoutEvent.starts_at >= params["from"])
     if params.get("to"):
         query = query.filter(ScoutEvent.starts_at <= params["to"])
     order = ScoutEvent.starts_at.desc() if params.get("sort") == "start_at_desc" else ScoutEvent.starts_at.asc()
@@ -592,11 +602,18 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
     parameters={
         "kind": QueryParameter("string", "Kind", choices=("meeting", "trip", "other")),
         "team_id": QueryParameter("integer", "Team", minimum=1),
-        "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),
+        # Repeats are compiler-capped at 100. The slightly larger resolver
+        # bound lets the calendar fetch 500 events plus one overflow sentinel
+        # in a single deterministic publication query.
+        "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=501),
         "offset": QueryParameter("integer", "Offset", default=0, minimum=0, maximum=10_000),
         "page": QueryParameter("integer", "Page", minimum=1, maximum=10_000),
         "from": QueryParameter("datetime", "From"),
         "to": QueryParameter("datetime", "To"),
+        # Opt-in keeps the long-standing list/repeat meaning of ``from``
+        # (starts within the interval) while calendars can request interval
+        # overlap semantics for multi-day events.
+        "overlap": QueryParameter("boolean", "Include overlapping events", default=False),
         "sort": QueryParameter("string", "Sort", default="start_at_asc", choices=("start_at_asc", "start_at_desc")),
     }, resolver=_event_source, cache_ttl_seconds=60,
     label_key="web.dataSources.events.label", description_key="web.dataSources.events.description",

@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import EditorInspector, { findNearestRepeat, replaceComponentCss } from "./EditorInspector";
+import EditorInspector, { findNearestRepeat, IconPicker, replaceComponentCss } from "./EditorInspector";
 
 class FakeSelected {
   constructor(values) {
@@ -51,6 +51,19 @@ class FakeSelected {
 }
 
 describe("EditorInspector linked props", () => {
+  it("offers a keyboard accessible icon autocomplete with a visual preview", () => {
+    const onChange = vi.fn();
+    render(<IconPicker label="Ikona tlačítka" value="compass" icons={["tent", "arrow-right"]} allowNone onChange={onChange} />);
+
+    const search = screen.getByRole("combobox", { name: "Ikona tlačítka" });
+    expect(screen.getByText("fa-compass")).toBeInTheDocument();
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "tent" } });
+    expect(search).toHaveAttribute("aria-expanded", "true");
+    fireEvent.keyDown(search, { key: "Enter" });
+    expect(onChange).toHaveBeenCalledWith("tent");
+  });
+
   it("keeps native content and style mounts available before a selection", () => {
     const { container } = render(<EditorInspector
       selected={null}
@@ -359,7 +372,10 @@ describe("EditorInspector linked props", () => {
       onContentChange={onContentChange}
     />);
 
-    fireEvent.change(screen.getByLabelText(/Ikona tlačítka|Button icon/), { target: { value: "arrow-right" } });
+    const iconSearch = screen.getByLabelText(/Ikona tlačítka|Button icon/);
+    fireEvent.focus(iconSearch);
+    fireEvent.change(iconSearch, { target: { value: "arrow-right" } });
+    fireEvent.click(screen.getByRole("option", { name: "arrow-right" }));
     const icon = selected.children.find((child) => child.values.attributes?.["data-sc-button-icon"] !== undefined);
     const label = selected.children.find((child) => child.getClasses().includes("sc-button-label"));
     expect(icon.getClasses()).toEqual(expect.arrayContaining(["fa-solid", "fa-arrow-right", "sc-button-icon"]));

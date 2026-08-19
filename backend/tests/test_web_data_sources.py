@@ -76,7 +76,42 @@ def test_events_are_public_only_and_projected_through_allowlist(db_session):
     with pytest.raises(DataSourceValidationError):
         resolve_data_source(db_session, "core.events", {"private": True})
     with pytest.raises(DataSourceValidationError):
-        resolve_data_source(db_session, "core.events", {"limit": 500})
+        resolve_data_source(db_session, "core.events", {"limit": 502})
+
+
+def test_event_calendar_window_can_include_multiday_overlaps_without_changing_lists(db_session):
+    _seed(db_session)
+    window_start = datetime(2026, 5, 1)
+    window_end = datetime(2026, 5, 31, 23, 59, 59)
+    db_session.add_all([
+        ScoutEvent(
+            title="Probíhající tábor", kind="trip", is_public=True,
+            starts_at=datetime(2026, 4, 28, 9), ends_at=datetime(2026, 5, 3, 18),
+        ),
+        ScoutEvent(
+            title="Skončil o půlnoci", kind="trip", is_public=True,
+            starts_at=datetime(2026, 4, 30, 9), ends_at=window_start,
+        ),
+        ScoutEvent(
+            title="Květnová schůzka", kind="meeting", is_public=True,
+            starts_at=datetime(2026, 5, 2, 17), ends_at=None,
+        ),
+    ])
+    db_session.commit()
+
+    list_result = resolve_data_source(
+        db_session, "core.events", {"from": window_start, "to": window_end, "limit": 10},
+    )
+    calendar_result = resolve_data_source(
+        db_session, "core.events", {
+            "from": window_start, "to": window_end, "overlap": True, "limit": 10,
+        },
+    )
+
+    assert [item["title"] for item in list_result] == ["Květnová schůzka"]
+    assert [item["title"] for item in calendar_result] == [
+        "Probíhající tábor", "Květnová schůzka",
+    ]
 
 
 def test_public_author_avatar_requires_a_real_allowlisted_raster_image(db_session):

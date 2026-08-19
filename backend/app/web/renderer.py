@@ -110,13 +110,14 @@ BUILDER_LAYOUT_CSS = (
     ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
     "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
     ".sc-pagination{display:flex;align-items:center;gap:.5rem;margin:1.5rem 0}.sc-pagination-link,.sc-pagination-current{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .85rem;border:1px solid currentColor;border-radius:.25rem;text-decoration:none}.sc-pagination-current{font-weight:700}"
-    ".sc-calendar{margin:1.5rem 0}.sc-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}"
-    ".sc-calendar-title{margin:0;text-align:center}.sc-calendar-nav{display:inline-flex;min-width:2.75rem;min-height:2.75rem;align-items:center;justify-content:center;border:1px solid currentColor;border-radius:.35rem;text-decoration:none}"
-    ".sc-calendar-table{width:100%;table-layout:fixed;border-collapse:collapse}.sc-calendar-table th{padding:.55rem;text-align:center}.sc-calendar-day{height:7.5rem;padding:.35rem;border:1px solid currentColor;vertical-align:top}"
-    ".sc-calendar-day--outside{opacity:.55}.sc-calendar-day--today{background:color-mix(in srgb,currentColor 8%,transparent)}.sc-calendar-day-number{display:block;margin-bottom:.35rem;font-weight:700}"
-    ".sc-calendar-events{display:grid;gap:.25rem;list-style:none;margin:0;padding:0}.sc-calendar-event{display:block;padding:.25rem .35rem;border-radius:.25rem;background:var(--sc-calendar-event-color,#176b44);color:#fff;text-decoration:none;overflow-wrap:anywhere}"
-    ".sc-calendar-event-time{font-weight:700}.sc-calendar-agenda{display:none}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
-    "@media (max-width:700px){.sc-calendar-table{display:none}.sc-calendar-agenda{display:grid;gap:1rem}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(5rem,7rem) 1fr;gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent)}.sc-calendar-agenda-event a{font-weight:700}.sc-calendar-agenda-description{margin:.25rem 0 0}}"
+    ".sc-calendar{--sc-calendar-accent:#198754;--sc-calendar-line:#d7dedb;--sc-calendar-surface:#fff;margin:1.5rem 0;color:#33433b}.sc-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem;padding:.9rem 1rem;border:1px solid var(--sc-calendar-line);background:var(--sc-calendar-surface)}"
+    ".sc-calendar-title{margin:0;color:var(--sc-calendar-accent);text-align:center}.sc-calendar-today{display:inline-block;margin-top:.15rem;color:var(--sc-calendar-accent);font-weight:700;text-underline-offset:.15em}.sc-calendar-nav{display:inline-flex;min-width:2.75rem;min-height:2.75rem;align-items:center;justify-content:center;border:1px solid #83928b;border-radius:.45rem;color:var(--sc-calendar-accent);background:var(--sc-calendar-surface);font-size:1.25rem;text-decoration:none}.sc-calendar-nav:hover,.sc-calendar-nav:focus-visible{border-color:var(--sc-calendar-accent);background:#eef7f2}.sc-calendar-nav:focus-visible,.sc-calendar-event:focus-visible{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-nav[aria-hidden=true]{opacity:.35}"
+    ".sc-calendar-table{width:100%;overflow:visible;border:1px solid var(--sc-calendar-line);background:var(--sc-calendar-surface)}.sc-calendar-head,.sc-calendar-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.sc-calendar-head{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-heading{padding:.6rem .4rem;border-inline-end:1px solid rgba(255,255,255,.35);text-align:center;font-weight:700}.sc-calendar-week{position:relative;min-height:7rem}.sc-calendar-day{min-width:0;height:7rem;padding:.35rem;border-inline-end:1px solid var(--sc-calendar-line);border-block-end:1px solid var(--sc-calendar-line);background:var(--sc-calendar-surface)}"
+    ".sc-calendar-day--outside{background:#f5f7f6}.sc-calendar-day--outside .sc-calendar-day-number{opacity:.55}.sc-calendar-day--today{background:#d8f3dc;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent)}.sc-calendar-day-number{display:block;margin-bottom:.35rem;font-weight:700}"
+    ".sc-calendar-event{display:block;min-width:0;padding:.2rem .35rem;border-radius:.3rem;background:var(--sc-calendar-event-color,#176b44);color:var(--sc-calendar-event-text,#fff);font-weight:700;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:filter .14s ease,box-shadow .14s ease}.sc-calendar-event:hover,.sc-calendar-event:focus-visible{filter:brightness(1.06);box-shadow:0 .18rem .45rem rgba(0,0,0,.18)}.sc-calendar-event-bar{position:absolute;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .15rem);top:calc(2rem + (var(--sc-calendar-lane) - 1) * 1.65rem);width:calc((100% / 7) * var(--sc-calendar-span) - .3rem);height:1.45rem;line-height:1.05rem;z-index:2}.sc-calendar-event-bar--continues-before{border-top-left-radius:.08rem;border-bottom-left-radius:.08rem}.sc-calendar-event-bar--continues-after{border-top-right-radius:.08rem;border-bottom-right-radius:.08rem}"
+    ".sc-calendar-event-time{font-weight:800}.sc-calendar-continuation{font-weight:800}.sc-calendar-overflow{position:relative;z-index:12;float:right;margin-top:-1.9rem}.sc-calendar-overflow>summary{display:grid;min-width:3.25rem;min-height:1.55rem;place-items:center;padding:0 .35rem;border:1px solid #83928b;border-radius:.3rem;background:var(--sc-calendar-surface);color:#43534b;cursor:pointer;font-size:.78em;font-weight:800;list-style:none}.sc-calendar-overflow>summary::-webkit-details-marker{display:none}.sc-calendar-overflow>summary:hover,.sc-calendar-overflow>summary:focus-visible{border-color:var(--sc-calendar-accent);color:var(--sc-calendar-accent);outline:2px solid color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent);outline-offset:1px}.sc-calendar-overflow-list{position:absolute;inset-block-start:calc(100% + .25rem);inset-inline-start:0;display:grid;width:min(18rem,75vw);max-height:16rem;gap:.4rem;margin:0;padding:.55rem;overflow:auto;border:1px solid var(--sc-calendar-line);border-radius:.35rem;background:var(--sc-calendar-surface);box-shadow:0 .55rem 1.35rem rgba(0,0,0,.2);list-style:none}.sc-calendar-day:nth-child(n+5) .sc-calendar-overflow-list{inset-inline-start:auto;inset-inline-end:0}.sc-calendar-overflow-list .sc-calendar-agenda-event{padding:.45rem .55rem;border-inline-start:.25rem solid var(--sc-calendar-event-color,#176b44);background:#f5f7f6}.sc-calendar-overflow-list .sc-calendar-agenda-range{display:block;margin-top:.1rem;font-size:.82em}"
+    ".sc-calendar-view-switch{display:flex;align-items:center;margin:0 0 .75rem;padding:0;border:0}.sc-calendar-view-switch legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.sc-calendar-view-input{position:absolute;opacity:0;pointer-events:none}.sc-calendar-view-label{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .8rem;border:1px solid var(--sc-calendar-accent);color:var(--sc-calendar-accent);cursor:pointer;font-weight:700}.sc-calendar-view-label:first-of-type{border-radius:.35rem 0 0 .35rem}.sc-calendar-view-label:last-of-type{border-left:0;border-radius:0 .35rem .35rem 0}.sc-calendar-view-input:checked+.sc-calendar-view-label{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-view-input:focus-visible+.sc-calendar-view-label{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-count{margin-inline-start:auto;color:#53625b;font-size:.9em;font-weight:700}.sc-calendar-agenda{display:none;gap:1rem}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(4.75rem,6rem) minmax(0,1fr);gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent);min-width:0}.sc-calendar-agenda-event a{font-weight:700}.sc-calendar-agenda-range{display:block;margin-top:.15rem;font-size:.9em}.sc-calendar-agenda-description{margin:.25rem 0 0}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table{display:none}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-agenda{display:grid}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
+    "@media (max-width:700px){.sc-calendar-view-switch{display:none}.sc-calendar-toolbar{align-items:flex-start}.sc-calendar-table{display:none}.sc-calendar-agenda{display:grid}}"
 )
 
 CZECH_MONTHS = (
@@ -124,6 +125,9 @@ CZECH_MONTHS = (
     "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec",
 )
 CZECH_WEEKDAYS_MONDAY = ("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
+CALENDAR_MAX_LANES = 3
+CALENDAR_MAX_EVENTS = 500
+CALENDAR_FETCH_LIMIT = CALENDAR_MAX_EVENTS + 1
 
 
 class CompileError(ValueError):
@@ -878,39 +882,214 @@ def _calendar_month(value: Any, today: date) -> date:
     return selected if 1900 <= selected.year <= 2100 else today.replace(day=1)
 
 
-def _calendar_event_markup(event: dict[str, Any], *, agenda: bool, show_description: bool) -> str:
+@dataclass(frozen=True)
+class _CalendarEventSpan:
+    event: dict[str, Any]
+    starts_at: datetime
+    ends_at: datetime | None
+    start_day: date
+    end_day: date
+
+
+@dataclass(frozen=True)
+class _CalendarWeekSegment:
+    span: _CalendarEventSpan
+    start_column: int
+    end_column: int
+    lane: int
+
+
+def _calendar_event_span(event: Any) -> _CalendarEventSpan | None:
+    if not isinstance(event, dict) or not isinstance(event.get("start_at"), datetime):
+        return None
+    starts_at = event["start_at"]
+    ends_at = event.get("end_at") if isinstance(event.get("end_at"), datetime) else None
+    start_day = starts_at.date()
+    end_day = ends_at.date() if ends_at is not None else start_day
+    # Match EventMonthCalendar: midnight is an exclusive endpoint, so an event
+    # ending at 00:00 occupies the preceding day rather than an empty next day.
+    if ends_at is not None and ends_at.time() == time.min:
+        end_day -= timedelta(days=1)
+    if end_day < start_day:
+        end_day = start_day
+    return _CalendarEventSpan(event, starts_at, ends_at, start_day, end_day)
+
+
+def _calendar_week_segments(
+    spans: list[_CalendarEventSpan], week: list[date],
+) -> list[_CalendarWeekSegment]:
+    week_start, week_end = week[0], week[-1]
+    candidates = [
+        span for span in spans
+        if span.end_day >= week_start and span.start_day <= week_end
+    ]
+    # Deterministic ordering keeps an event in the same lane throughout a
+    # week, independent of database tie ordering. Longer events win a lane
+    # before shorter events which begin at the same time.
+    candidates.sort(key=lambda span: (
+        max(span.start_day, week_start),
+        span.starts_at.isoformat(),
+        -(span.end_day - span.start_day).days,
+        str(span.event.get("id") or ""),
+        str(span.event.get("title") or ""),
+    ))
+    lane_ends: list[int] = []
+    segments: list[_CalendarWeekSegment] = []
+    for span in candidates:
+        start_column = max(0, (span.start_day - week_start).days)
+        end_column = min(6, (span.end_day - week_start).days)
+        lane = next(
+            (index for index, previous_end in enumerate(lane_ends) if previous_end < start_column),
+            len(lane_ends),
+        )
+        if lane == len(lane_ends):
+            lane_ends.append(end_column)
+        else:
+            lane_ends[lane] = end_column
+        segments.append(_CalendarWeekSegment(span, start_column, end_column, lane))
+    return segments
+
+
+def _calendar_range_text(span: _CalendarEventSpan) -> str:
+    start = span.starts_at
+    end = span.ends_at
+    if end is None:
+        return start.strftime("%H:%M")
+    if start.date() == end.date():
+        return f'{start.strftime("%H:%M")}–{end.strftime("%H:%M")}'
+    return (
+        f'{start.day}. {start.month}. {start.year} {start.strftime("%H:%M")} – '
+        f'{end.day}. {end.month}. {end.year} {end.strftime("%H:%M")}'
+    )
+
+
+def _calendar_event_text_color(color: str) -> str:
+    """Choose readable text for opaque hex event colours; fail safe to white."""
+    match = re.fullmatch(r"#([0-9a-f]{3}|[0-9a-f]{6})(?:[0-9a-f]{1,2})?", color, re.I)
+    if not match:
+        return "#fff"
+    value = match.group(1)
+    if len(value) == 3:
+        value = "".join(character * 2 for character in value)
+    channels = [int(value[index:index + 2], 16) / 255 for index in (0, 2, 4)]
+    linear = [
+        channel / 12.92 if channel <= .04045 else ((channel + .055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    luminance = .2126 * linear[0] + .7152 * linear[1] + .0722 * linear[2]
+    dark_luminance = .0056  # approximately #111
+    dark_contrast = (luminance + .05) / (dark_luminance + .05)
+    light_contrast = 1.05 / (luminance + .05)
+    return "#111" if dark_contrast >= light_contrast else "#fff"
+
+
+def _calendar_event_bar_markup(
+    segment: _CalendarWeekSegment, *, week_start: date, week_end: date,
+) -> str:
+    span = segment.span
+    event = span.event
     title = escape(_format_value(event.get("title"), None))
     href = _safe_url(event.get("url"))
-    starts_at = event.get("start_at")
-    time_text = starts_at.strftime("%H:%M") if isinstance(starts_at, datetime) else ""
-    datetime_attr = starts_at.isoformat() if isinstance(starts_at, datetime) else ""
+    continues_before = span.start_day < week_start
+    continues_after = span.end_day > week_end
     time_html = (
-        f'<time class="sc-calendar-event-time" datetime="{escape(datetime_attr, quote=True)}">'
-        f"{escape(time_text)}</time> "
-        if time_text else ""
+        f'<time class="sc-calendar-event-time" datetime="{escape(span.starts_at.isoformat(), quote=True)}">'
+        f'{span.starts_at.strftime("%H:%M")}</time> '
+        if not continues_before else
+        '<span class="sc-calendar-continuation" aria-hidden="true">‹ </span>'
     )
-    title_html = (
-        f'<a href="{escape(href, quote=True)}">{title}</a>' if agenda and href else
-        title if agenda else
-        f'{time_html}<span>{title}</span>'
+    continuation_after = (
+        '<span class="sc-calendar-continuation" aria-hidden="true"> ›</span>'
+        if continues_after else ""
     )
-    if not agenda and href:
-        title_html = f'<a class="sc-calendar-event" href="{escape(href, quote=True)}">{title_html}</a>'
-    elif not agenda:
-        title_html = f'<span class="sc-calendar-event">{title_html}</span>'
-    description = escape(_format_value(event.get("description"), None))
-    description_html = (
-        f'<p class="sc-calendar-agenda-description">{description}</p>'
-        if agenda and show_description and description else ""
+    accessible_label = escape(
+        f'{_format_value(event.get("title"), None)}, {_calendar_range_text(span)}', quote=True,
     )
     color = str(event.get("color") or "").strip()
     style = (
-        f' style="--sc-calendar-event-color:{escape(color, quote=True)}"'
+        f'--sc-calendar-event-color:{escape(color, quote=True)};'
+        f'--sc-calendar-event-text:{_calendar_event_text_color(color)};'
         if SAFE_COLOR.fullmatch(color) else ""
     )
-    class_name = "sc-calendar-agenda-event" if agenda else "sc-calendar-event-item"
-    agenda_time = time_html if agenda else ""
-    return f'<li class="{class_name}"{style}>{agenda_time}{title_html}{description_html}</li>'
+    style += (
+        f'--sc-calendar-start:{segment.start_column};'
+        f'--sc-calendar-span:{segment.end_column - segment.start_column + 1};'
+        f'--sc-calendar-lane:{segment.lane + 1}'
+    )
+    modifiers = (
+        (" sc-calendar-event-bar--continues-before" if continues_before else "")
+        + (" sc-calendar-event-bar--continues-after" if continues_after else "")
+    )
+    content = f'{time_html}<span>{title}</span>{continuation_after}'
+    if href:
+        return (
+            f'<a class="sc-calendar-event sc-calendar-event-bar{modifiers}" '
+            f'data-calendar-lane="{segment.lane + 1}" '
+            f'data-calendar-start="{segment.start_column}" '
+            f'data-calendar-span="{segment.end_column - segment.start_column + 1}" '
+            f'href="{escape(href, quote=True)}" aria-label="{accessible_label}" '
+            f'title="{accessible_label}" style="{style}">{content}</a>'
+        )
+    return (
+        f'<span class="sc-calendar-event sc-calendar-event-bar{modifiers}" '
+        f'data-calendar-lane="{segment.lane + 1}" '
+        f'data-calendar-start="{segment.start_column}" '
+        f'data-calendar-span="{segment.end_column - segment.start_column + 1}" '
+        f'aria-label="{accessible_label}" title="{accessible_label}" '
+        f'style="{style}">{content}</span>'
+    )
+
+
+def _calendar_agenda_event_markup(
+    span: _CalendarEventSpan,
+    *,
+    day_value: date,
+    show_description: bool,
+) -> str:
+    event = span.event
+    title = escape(_format_value(event.get("title"), None))
+    href = _safe_url(event.get("url"))
+    starts_at = span.starts_at
+    continuing = day_value > span.start_day
+    datetime_attr = starts_at.isoformat()
+    full_range_text = _calendar_range_text(span)
+    if continuing:
+        end_day = span.end_day
+        end_label = (
+            f"{end_day.day}. {end_day.month}. {end_day.year}"
+            if end_day.year != day_value.year else
+            f"{end_day.day}. {end_day.month}."
+        )
+        range_text = f"Pokračuje do {end_label}"
+    else:
+        range_text = full_range_text
+    accessible_label = escape(
+        f'{_format_value(event.get("title"), None)}, {full_range_text}', quote=True,
+    )
+    title_html = (
+        f'<a href="{escape(href, quote=True)}" aria-label="{accessible_label}">{title}</a>'
+        if href else f'<strong>{title}</strong>'
+    )
+    range_html = (
+        f'<time class="sc-calendar-agenda-range" datetime="{escape(datetime_attr, quote=True)}">'
+        f'{escape(range_text)}</time>'
+    )
+    description = escape(_format_value(event.get("description"), None))
+    description_html = (
+        f'<p class="sc-calendar-agenda-description">{description}</p>'
+        if show_description and not continuing and description else ""
+    )
+    color = str(event.get("color") or "").strip()
+    style = (
+        f'--sc-calendar-event-color:{escape(color, quote=True)};'
+        if SAFE_COLOR.fullmatch(color) else ""
+    )
+    style_attribute = f' style="{style}"' if style else ""
+    modifier = " sc-calendar-agenda-event--continuing" if continuing else ""
+    return (
+        f'<li class="sc-calendar-agenda-event{modifier}"{style_attribute}>'
+        f'{title_html}{range_html}{description_html}</li>'
+    )
 
 
 def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
@@ -922,7 +1101,8 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
     params: dict[str, Any] = {
         "from": datetime.combine(visible_start, time.min),
         "to": datetime.combine(visible_end, time.max),
-        "limit": 50,
+        "overlap": True,
+        "limit": CALENDAR_FETCH_LIMIT,
         "sort": "start_at_asc",
     }
     if node.get("kind") != "all":
@@ -931,20 +1111,46 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         params["team_id"] = node["teamId"]
     records = state.resolve_source("core.events", params)
     records = records if isinstance(records, (list, tuple)) else []
-    by_day: dict[date, list[dict[str, Any]]] = {}
-    for record in records[:50]:
-        if not isinstance(record, dict) or not isinstance(record.get("start_at"), datetime):
-            continue
-        by_day.setdefault(record["start_at"].date(), []).append(record)
+    if len(records) > CALENDAR_MAX_EVENTS:
+        raise CompileError(
+            f"Calendar month exceeds the limit of {CALENDAR_MAX_EVENTS} events"
+        )
+    spans = [
+        span for record in records
+        if (span := _calendar_event_span(record)) is not None
+    ]
+    by_day: dict[date, list[_CalendarEventSpan]] = {}
+    for span in spans:
+        first_day = max(span.start_day, visible_start)
+        last_day = min(span.end_day, visible_end)
+        for offset in range((last_day - first_day).days + 1):
+            by_day.setdefault(first_day + timedelta(days=offset), []).append(span)
 
     weekdays = list(CZECH_WEEKDAYS_MONDAY)
     if first_weekday == 6:
         weekdays = weekdays[-1:] + weekdays[:-1]
-    headings = "".join(f'<th scope="col">{label}</th>' for label in weekdays)
+    headings = "".join(
+        f'<div class="sc-calendar-heading" role="columnheader">{label}</div>'
+        for label in weekdays
+    )
     rows: list[str] = []
     for week in weeks:
+        segments = _calendar_week_segments(spans, week)
+        bars_by_column: dict[int, list[str]] = {}
+        hidden_by_day: dict[date, int] = {}
+        for segment in segments:
+            if segment.lane < CALENDAR_MAX_LANES:
+                bars_by_column.setdefault(segment.start_column, []).append(
+                    _calendar_event_bar_markup(
+                        segment, week_start=week[0], week_end=week[-1],
+                    )
+                )
+            else:
+                for column in range(segment.start_column, segment.end_column + 1):
+                    day_value = week[column]
+                    hidden_by_day[day_value] = hidden_by_day.get(day_value, 0) + 1
         cells: list[str] = []
-        for day_value in week:
+        for column, day_value in enumerate(week):
             modifiers = []
             if day_value.month != selected.month:
                 modifiers.append("sc-calendar-day--outside")
@@ -952,27 +1158,46 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
                 modifiers.append("sc-calendar-day--today")
             current_attr = ' aria-current="date"' if day_value == today else ""
             class_name = "sc-calendar-day" + (" " + " ".join(modifiers) if modifiers else "")
-            items = "".join(
-                _calendar_event_markup(item, agenda=False, show_description=False)
-                for item in by_day.get(day_value, [])
-            )
+            bars = "".join(bars_by_column.get(column, []))
+            hidden = hidden_by_day.get(day_value, 0)
+            more = ""
+            if hidden:
+                overflow_items = "".join(
+                    _calendar_agenda_event_markup(
+                        span, day_value=day_value, show_description=False,
+                    )
+                    for span in by_day.get(day_value, [])
+                )
+                more = (
+                    '<details class="sc-calendar-overflow">'
+                    f'<summary aria-label="{hidden} další akce dne '
+                    f'{day_value.day}. {day_value.month}. {day_value.year}">'
+                    f'+{hidden} další</summary>'
+                    f'<ul class="sc-calendar-overflow-list">{overflow_items}</ul>'
+                    '</details>'
+                )
             cells.append(
-                f'<td class="{class_name}" data-date="{day_value.isoformat()}">'
+                f'<div class="{class_name}" role="gridcell" data-date="{day_value.isoformat()}" '
+                f'aria-label="{day_value.day}. {day_value.month}. {day_value.year}">'
                 f'<time class="sc-calendar-day-number" datetime="{day_value.isoformat()}"{current_attr}>{day_value.day}</time>'
-                + (f'<ul class="sc-calendar-events">{items}</ul>' if items else "")
-                + "</td>"
+                f'{bars}{more}</div>'
             )
-        rows.append(f'<tr>{"".join(cells)}</tr>')
+        rows.append(
+            f'<div class="sc-calendar-week" role="row" '
+            f'aria-label="Týden od {week[0].day}. {week[0].month}. {week[0].year}">'
+            f'{"".join(cells)}</div>'
+        )
 
     agenda_days: list[str] = []
     for day_value in sorted(by_day):
         if day_value.month != selected.month:
             continue
         items = "".join(
-            _calendar_event_markup(
-                item, agenda=True, show_description=bool(node.get("showDescription")),
+            _calendar_agenda_event_markup(
+                span, day_value=day_value,
+                show_description=bool(node.get("showDescription")),
             )
-            for item in by_day[day_value]
+            for span in by_day[day_value]
         )
         agenda_days.append(
             '<section class="sc-calendar-agenda-day">'
@@ -985,6 +1210,12 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
     next_month = _shift_month(selected, 1).strftime("%Y-%m")
     current_month = today.strftime("%Y-%m")
     title = f"{CZECH_MONTHS[selected.month]} {selected.year}"
+    view_name = f"sc-calendar-view-{state.nodes}"
+    month_view_id = f"{view_name}-month"
+    list_view_id = f"{view_name}-list"
+    event_count_label = (
+        "akce" if len(spans) == 1 or len(spans) % 100 in {2, 3, 4} else "akcí"
+    )
     minimum_month = _shift_month(today.replace(day=1), -12)
     maximum_month = _shift_month(today.replace(day=1), 18)
     previous_control = (
@@ -999,13 +1230,24 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
     )
     return (
         f'<section class="sc-calendar" data-sc-calendar-month="{selected.strftime("%Y-%m")}">'
+        '<fieldset class="sc-calendar-view-switch">'
+        '<legend>Zobrazení kalendáře</legend>'
+        f'<input class="sc-calendar-view-input sc-calendar-view-month" type="radio" '
+        f'id="{month_view_id}" name="{view_name}" checked>'
+        f'<label class="sc-calendar-view-label" for="{month_view_id}">▦ Měsíc</label>'
+        f'<input class="sc-calendar-view-input sc-calendar-view-list" type="radio" '
+        f'id="{list_view_id}" name="{view_name}">'
+        f'<label class="sc-calendar-view-label" for="{list_view_id}">☷ Seznam</label>'
+        f'<span class="sc-calendar-count">{len(spans)} {event_count_label}</span>'
+        '</fieldset>'
         '<div class="sc-calendar-toolbar">'
         f'{previous_control}'
         f'<div><h2 class="sc-calendar-title">{title}</h2>'
         f'<a class="sc-calendar-today" href="?month={current_month}">Dnes</a></div>'
         f'{next_control}'
-        f'</div><table class="sc-calendar-table" aria-label="Kalendář – {title}"><thead><tr>'
-        f'{headings}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
+        f'</div><div class="sc-calendar-table" role="grid" aria-label="Kalendář – {title}" '
+        f'aria-colcount="7" aria-rowcount="{len(weeks) + 1}">'
+        f'<div class="sc-calendar-head" role="row">{headings}</div>{"".join(rows)}</div>'
         f'<div class="sc-calendar-agenda">{agenda}</div></section>'
     )
 
@@ -1252,12 +1494,17 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
 _ALLOWED_THEME_URL = re.compile(
     r"url\(\s*([\'\"]?)/(?:api/web/)?theme-assets/\d+/assets/[A-Za-z0-9%._~!$&'()*+,;=:@/-]+\1\s*\)", re.I,
 )
+# Ontario 1.1.0 used an empty URL only as a `mask-image` feature-test
+# value. It cannot address an external resource, so keep old immutable theme
+# versions previewable while newer bundled CSS uses `mask-image:none`.
+_EMPTY_CSS_URL = re.compile(r"url\(\s*(?:\"\"|'')?\s*\)", re.I)
 _UNSAFE_URL = re.compile(r"url\s*\(", re.I)
 
 
 def validate_render_css(css: str) -> None:
     """Reject CSS that violates the public rendering boundary."""
-    cleaned = _ALLOWED_THEME_URL.sub("", css or "")
+    cleaned = _EMPTY_CSS_URL.sub("", css or "")
+    cleaned = _ALLOWED_THEME_URL.sub("", cleaned)
     if _UNSAFE_URL.search(cleaned):
         raise CompileError("CSS violates the public rendering policy")
     if UNSAFE_CSS.search(cleaned) or CSS_TAG_BREAKOUT.search(cleaned):

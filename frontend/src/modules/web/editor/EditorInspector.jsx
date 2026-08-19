@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 import { createBindingTargetOptions, getComponentBindings, removeComponentBinding, setComponentBinding } from "./grapes";
@@ -147,6 +147,100 @@ const BUTTON_MASKS = ["none", "soft", "flow", "pebble", "natural", "rounded-asym
 const ORGANIC_SHAPES = ["none", "soft", "blob", "oval", "rounded"];
 const ICON_SIZES = ["default", "xs", "sm", "lg", "xl", "2xl"];
 
+const normalizedIconOptions = (icons = []) => [...new Set([...icons, ...ICON_CHOICES]
+  .map((name) => String(name).replace(/^fa-/, "").trim())
+  .filter((name) => name && !["solid", "regular", "brands", "fw", "spin", "xs", "sm", "lg", "xl", "2xl"].includes(name)))]
+  .sort();
+
+/** Searchable Font Awesome chooser shared by buttons and standalone icons. */
+export function IconPicker({ label, value, style = "solid", icons = [], allowNone = false, onChange }) {
+  const { t } = useTranslation();
+  const inputId = useId();
+  const listboxId = `${inputId}-results`;
+  const options = useMemo(() => normalizedIconOptions(icons), [icons]);
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLocaleLowerCase();
+    return options
+      .filter((name) => !needle || name.toLocaleLowerCase().includes(needle))
+      .sort((left, right) => {
+        if (!needle) return left.localeCompare(right);
+        const leftScore = left === needle ? 0 : left.startsWith(needle) ? 1 : left.split("-").some((part) => part.startsWith(needle)) ? 2 : 3;
+        const rightScore = right === needle ? 0 : right.startsWith(needle) ? 1 : right.split("-").some((part) => part.startsWith(needle)) ? 2 : 3;
+        return leftScore - rightScore || left.localeCompare(right);
+      })
+      .slice(0, 120);
+  }, [options, query]);
+  const current = value && value !== "none" ? value : null;
+  const select = (name) => {
+    onChange(name);
+    setQuery(name === "none" ? "" : name);
+    setOpen(false);
+  };
+  const onKeyDown = (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setOpen(true);
+      if (!filtered.length) return;
+      const direction = event.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex((index) => (index + direction + filtered.length) % filtered.length);
+    } else if (event.key === "Enter" && open && filtered[activeIndex]) {
+      event.preventDefault();
+      select(filtered[activeIndex]);
+    } else if ((event.key === "Home" || event.key === "End") && open && filtered.length) {
+      event.preventDefault();
+      setActiveIndex(event.key === "Home" ? 0 : filtered.length - 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+    }
+  };
+  useEffect(() => setActiveIndex(0), [query]);
+  return <div className="web-editor-icon-picker" onBlur={(event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+  }}>
+    <div className="web-editor-icon-current" aria-live="polite">
+      <span className="web-editor-icon-preview" aria-hidden="true">{current ? <i className={`fa-${style} fa-${current} fa-xl`} /> : <i className="fas fa-ban" />}</span>
+      <code>{current ? `fa-${current}` : t("web.editor.quick.noIcon")}</code>
+      {allowNone && current && <button type="button" className="web-editor-icon-clear" onClick={() => select("none")}>{t("web.editor.quick.noIcon")}</button>}
+    </div>
+    <label htmlFor={inputId}><span>{label}</span></label>
+    <input
+      id={inputId}
+      type="search"
+      role="combobox"
+      value={query}
+      autoComplete="off"
+      aria-autocomplete="list"
+      aria-expanded={open}
+      aria-controls={listboxId}
+      aria-activedescendant={open && filtered[activeIndex] ? `${listboxId}-${activeIndex}` : undefined}
+      placeholder="compass, user, tent…"
+      onFocus={() => setOpen(true)}
+      onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
+      onKeyDown={onKeyDown}
+    />
+    {open && <div id={listboxId} className="web-editor-icon-grid" role="listbox" aria-label={label}>
+      {filtered.map((name, index) => <button
+        id={`${listboxId}-${index}`}
+        key={name}
+        type="button"
+        role="option"
+        aria-selected={name === current}
+        className={`${name === current ? "active " : ""}${index === activeIndex ? "is-highlighted" : ""}`.trim()}
+        title={`fa-${name}`}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setActiveIndex(index)}
+        onClick={() => select(name)}
+      ><i className={`fa-${style} fa-${name}`} aria-hidden="true" /><span>{name}</span></button>)}
+      {!filtered.length && <p className="web-editor-icon-empty">{t("web.editor.quick.noIconResults")}</p>}
+    </div>}
+  </div>;
+}
+IconPicker.propTypes = { label: PropTypes.string.isRequired, value: PropTypes.string, style: PropTypes.string, icons: PropTypes.arrayOf(PropTypes.string), allowNone: PropTypes.bool, onChange: PropTypes.func.isRequired };
+
 function QuickPanel({ icon, title, children, open = true }) {
   return <details className="web-editor-quick-section" open={open}>
     <summary><i className={`fas fa-${icon}`} /><span>{title}</span><i className="fas fa-chevron-down" /></summary>
@@ -231,12 +325,9 @@ const setBooleanAttribute = (selected, name, enabled) => {
 function IconContentPanel({ selected, fontAwesomeIcons = [], onContentChange }) {
   const { t } = useTranslation();
   const [, refresh] = useState(0);
-  const [query, setQuery] = useState("");
   const classes = classNames(selected);
   const style = classes.includes("fa-brands") ? "brands" : classes.includes("fa-regular") ? "regular" : "solid";
-  const available = [...new Set([...(fontAwesomeIcons || []), ...ICON_CHOICES])]
-    .filter((name) => !["solid", "regular", "brands", "fw", "spin", "xs", "sm", "lg", "xl", "2xl"].includes(name))
-    .sort();
+  const available = normalizedIconOptions(fontAwesomeIcons);
   const utility = new Set(["fa-solid", "fa-regular", "fa-brands", "fa-fw", "fa-spin", ...ICON_SIZES.filter((value) => value !== "default").map((value) => `fa-${value}`)]);
   const icon = classes.find((name) => name.startsWith("fa-") && !utility.has(name) && available.includes(name.slice(3)))?.slice(3) || "compass";
   const size = ICON_SIZES.find((value) => value !== "default" && classes.includes(`fa-${value}`)) || "default";
@@ -251,11 +342,8 @@ function IconContentPanel({ selected, fontAwesomeIcons = [], onContentChange }) 
     refresh((value) => value + 1);
     onContentChange?.();
   };
-  const filtered = available.filter((name) => name.includes(query.trim().toLowerCase())).slice(0, 160);
   return <QuickPanel icon="icons" title={t("web.editor.quick.icon")}>
-    <div className="web-editor-icon-current"><i className={`fa-${style} fa-${icon} fa-2xl`} /><code>fa-{icon}</code></div>
-    <label><span>{t("web.editor.quick.searchIcon")}</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="compass, user, tent…" /></label>
-    <div className="web-editor-icon-grid" role="listbox" aria-label={t("web.editor.quick.iconName")}>{filtered.map((name) => <button key={name} type="button" role="option" aria-selected={name === icon} className={name === icon ? "active" : ""} title={`fa-${name}`} onClick={() => updateIcon(style, name)}><i className={`fa-${style} fa-${name}`} /><span>{name}</span></button>)}</div>
+    <IconPicker label={t("web.editor.quick.searchIcon")} value={icon} style={style} icons={available} onChange={(name) => updateIcon(style, name)} />
     <label><span>{t("web.editor.quick.iconStyle")}</span><select value={style} onChange={(event) => updateIcon(event.target.value, icon)}><option value="solid">Solid</option><option value="regular">Regular</option><option value="brands">Brands</option></select></label>
     <label><span>{t("web.editor.quick.iconSize")}</span><select value={size} onChange={(event) => { replaceClasses(selected, (name) => ICON_SIZES.slice(1).some((value) => name === `fa-${value}`), event.target.value === "default" ? [] : [`fa-${event.target.value}`]); refresh((value) => value + 1); onContentChange?.(); }}>{ICON_SIZES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
     <label className="web-editor-repeat-checkbox"><input type="checkbox" checked={decorative} onChange={(event) => {
@@ -379,10 +467,8 @@ function ButtonContentPanel({ selected, fontAwesomeIcons = [], onContentChange }
   const icon = iconChild?.getAttributes?.()["data-sc-button-icon"]
     || iconClasses.find((name) => name.startsWith("fa-") && !["fa-solid", "fa-regular", "fa-brands"].includes(name))?.slice(3)
     || "none";
-  const availableIcons = [...new Set([...(fontAwesomeIcons || []), ...ICON_CHOICES])]
-    .map((name) => String(name).replace(/^fa-/, ""))
-    .filter(Boolean)
-    .sort();
+  const iconStyle = iconClasses.includes("fa-brands") ? "brands" : iconClasses.includes("fa-regular") ? "regular" : "solid";
+  const availableIcons = normalizedIconOptions(fontAwesomeIcons);
   const label = buttonLabel(selected);
   const hasLabel = Boolean(label.trim());
   const variantClass = classes.find((name) => BOOTSTRAP_VARIANTS.some((variant) => name === `btn-${variant}` || name === `btn-outline-${variant}`)) || "btn-primary";
@@ -403,14 +489,14 @@ function ButtonContentPanel({ selected, fontAwesomeIcons = [], onContentChange }
     ]);
     refresh((current) => current + 1); onContentChange?.();
   };
-  const updateIcon = (nextIcon) => {
+  const updateIcon = (nextIcon, nextStyle = iconStyle) => {
     const normalized = normalizeButtonContent(selected);
     if (!normalized.icon) return;
     normalized.icon.addAttributes?.({ "data-sc-button-icon": nextIcon, "aria-hidden": "true" });
     replaceClasses(
       normalized.icon,
       () => true,
-      nextIcon === "none" ? ["sc-button-icon", "d-none"] : ["fa-solid", `fa-${nextIcon}`, "sc-button-icon"],
+      nextIcon === "none" ? ["sc-button-icon", "d-none"] : [`fa-${nextStyle}`, `fa-${nextIcon}`, "sc-button-icon"],
     );
     replaceClasses(
       selected,
@@ -440,10 +526,8 @@ function ButtonContentPanel({ selected, fontAwesomeIcons = [], onContentChange }
   };
   return <QuickPanel icon="hand-pointer" title={t("web.editor.quick.button")}>
     <label><span>{t("web.editor.quick.label")}</span><input value={label} onChange={(event) => updateLabel(event.target.value)} /></label>
-    <label><span>{t("web.editor.quick.buttonIcon")}</span><select value={icon} onChange={(event) => updateIcon(event.target.value)}>
-      <option value="none">{t("web.editor.quick.noIcon")}</option>
-      {availableIcons.map((name) => <option key={name} value={name}>{name}</option>)}
-    </select></label>
+    <IconPicker label={t("web.editor.quick.buttonIcon")} value={icon} style={iconStyle} icons={availableIcons} allowNone onChange={(name) => updateIcon(name, iconStyle)} />
+    {icon !== "none" && <label><span>{t("web.editor.quick.iconStyle")}</span><select value={iconStyle} onChange={(event) => updateIcon(icon, event.target.value)}><option value="solid">Solid</option><option value="regular">Regular</option><option value="brands">Brands</option></select></label>}
     {icon !== "none" && <label><span>{t("web.editor.quick.iconPosition")}</span><select value={classes.includes("sc-button-icon-right") ? "right" : "left"} onChange={(event) => {
       replaceClasses(selected, (name) => name === "sc-button-icon-right", event.target.value === "right" ? ["sc-button-icon-right"] : []);
       refresh((current) => current + 1);
@@ -591,7 +675,7 @@ function SectionContentPanel({ selected, onContentChange }) {
   const edge = EDGE_VARIANTS.find((item) => classes.includes(`sc-edge-${item}`)) || "none";
   const placement = EDGE_PLACEMENTS.find((item) => classes.includes(`sc-edge-${item}`)) || "bottom";
   const color = EDGE_COLORS.find((item) => classes.includes(`sc-edge-${item}`)) || "white";
-  const edgeSize = ["sm", "md", "lg"].find((item) => classes.includes(`sc-edge-${item}`)) || "md";
+  const edgeSize = ["subtle", "sm", "md", "lg"].find((item) => classes.includes(`sc-edge-${item}`)) || "md";
   const style = selected.getStyle?.() || {};
   const updateEdge = (nextEdge, nextPlacement = placement, nextColor = color) => {
     replaceClasses(selected, (name) => name.startsWith("sc-edge-"), nextEdge === "none" ? [] : [`sc-edge-${nextEdge}`, `sc-edge-${nextPlacement}`, `sc-edge-${nextColor}`, `sc-edge-${edgeSize}`]);
@@ -605,7 +689,7 @@ function SectionContentPanel({ selected, onContentChange }) {
       <label><span>{t("web.editor.quick.edgePlacement")}</span><select value={placement} onChange={(event) => updateEdge(edge, event.target.value, color)}>{EDGE_PLACEMENTS.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
       <label><span>{t("web.editor.quick.edgeColor")}</span><select value={color} onChange={(event) => { selected.removeStyle?.("--sc-edge-fill"); updateEdge(edge, placement, event.target.value); }}>{EDGE_COLORS.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
       <label><span>{t("web.editor.quick.customColor")}</span><div className="web-editor-color-row"><input type="color" value={customEdge} onChange={(event) => updateStyle({ "--sc-edge-fill": event.target.value })} /><code>{customEdge}</code></div></label>
-      <label><span>{t("web.editor.quick.edgeSize")}</span><select value={edgeSize} onChange={(event) => { replaceClasses(selected, (name) => ["sc-edge-sm", "sc-edge-md", "sc-edge-lg"].includes(name), [`sc-edge-${event.target.value}`]); refresh((value) => value + 1); onContentChange?.(); }}><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option></select></label>
+      <label><span>{t("web.editor.quick.edgeSize")}</span><select value={edgeSize} onChange={(event) => { replaceClasses(selected, (name) => ["sc-edge-subtle", "sc-edge-sm", "sc-edge-md", "sc-edge-lg"].includes(name), [`sc-edge-${event.target.value}`]); refresh((value) => value + 1); onContentChange?.(); }}><option value="subtle">Subtle</option><option value="sm">Small</option><option value="md">Medium</option><option value="lg">Large</option></select></label>
     </>}
   </QuickPanel>;
 }

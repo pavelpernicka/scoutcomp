@@ -71,6 +71,11 @@ describe("builder primitive blocks", () => {
       "bs-ratio",
       "bs-progress",
       "bs-callout",
+      "bs-nav-pills",
+      "bs-card-grid",
+      "bs-dropdown",
+      "bs-description-list",
+      "bs-accordion-group",
     ]));
   });
 
@@ -87,6 +92,18 @@ describe("builder primitive blocks", () => {
       "layout-media-alternating",
       "layout-contact-split",
     ]));
+  });
+
+  it("keeps the new Bootstrap starters declarative and usable without theme JavaScript", () => {
+    const blocks = createPrimitiveBlocks((key) => key);
+    const dropdown = blocks.find((block) => block.id === "bs-dropdown");
+    const cardGrid = blocks.find((block) => block.id === "bs-card-grid");
+    const accordionGroup = blocks.find((block) => block.id === "bs-accordion-group");
+
+    expect(dropdown.content.tagName).toBe("details");
+    expect(cardGrid.content.components).toHaveLength(3);
+    expect(accordionGroup.content.components).toHaveLength(3);
+    expect(accordionGroup.content.components.every((component) => component.tagName === "details")).toBe(true);
   });
 
   it("marks image-overlay starters with the shared overlay contract", () => {

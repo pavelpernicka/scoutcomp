@@ -264,16 +264,118 @@ def test_calendar_component_normalises_configuration_and_renders_accessible_mont
 
     assert seen["source"] == "core.events"
     assert seen["params"]["kind"] == "meeting" and seen["params"]["team_id"] == 7
-    assert seen["params"]["limit"] == 50
+    assert seen["params"]["overlap"] is True
+    assert seen["params"]["limit"] == 501
     assert 'data-sc-calendar-month="2026-05"' in rendered
     assert "Květen 2026" in rendered
     assert 'href="?month=2026-04"' in rendered
     assert 'href="?month=2026-06"' in rendered
-    assert '<table class="sc-calendar-table" aria-label="Kalendář – Květen 2026">' in rendered
+    assert '<legend>Zobrazení kalendáře</legend>' in rendered
+    assert '▦ Měsíc</label>' in rendered and '☷ Seznam</label>' in rendered
+    assert '<span class="sc-calendar-count">1 akce</span>' in rendered
+    assert '<div class="sc-calendar-table" role="grid" aria-label="Kalendář – Květen 2026"' in rendered
+    assert 'role="columnheader">Po</div>' in rendered
+    assert 'role="gridcell" data-date="2026-05-19"' in rendered
     assert '<div class="sc-calendar-agenda">' in rendered
     assert "Schůzka &lt;bez skriptu&gt;" in rendered
     assert "Program &amp; hry" in rendered
     assert "/meeting/12" in rendered
+
+
+def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db_session):
+    compiled = compile_project(project({
+        "type": "sc-calendar", "showDescription": True,
+    }))
+
+    def event(identifier, title, starts_at, ends_at=None):
+        return {
+            "id": identifier, "title": title, "description": f"Popis {title}",
+            "start_at": starts_at, "end_at": ends_at,
+            "url": f"/schuzky/{identifier}", "color": "#176b44",
+        }
+
+    records = [
+        # Midnight is exclusive, matching the internal EventMonthCalendar:
+        # this event occupies 18, 19 and 20 May, but not 21 May.
+        event(1, "Tábor", datetime(2026, 5, 18, 9), datetime(2026, 5, 21, 0)),
+        event(2, "Schůzka A", datetime(2026, 5, 19, 10), datetime(2026, 5, 19, 12))
+        | {"color": "#f8e8a0"},
+        event(3, "Schůzka B", datetime(2026, 5, 19, 11), datetime(2026, 5, 19, 13)),
+        event(4, "Schůzka C", datetime(2026, 5, 19, 12), datetime(2026, 5, 19, 14)),
+        event(5, "Schůzka D", datetime(2026, 5, 19, 13), datetime(2026, 5, 19, 15)),
+    ]
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"month": "2026-05"}},
+        resolver=lambda *_: records,
+    )
+
+    # The long event is one real bar across three columns, not three unrelated
+    # per-day labels. Midnight is exclusive, so it does not span 21 May.
+    assert rendered.count('data-calendar-span="3"') == 1
+    camp_bar = rendered.split('aria-label="Tábor,', 1)[0].rsplit(
+        '<a class="sc-calendar-event sc-calendar-event-bar', 1,
+    )[1]
+    assert 'data-calendar-lane="1"' in camp_bar
+    assert 'data-calendar-start="0"' in camp_bar
+
+    # Four concurrent one-day events compete with the long event. Desktop
+    # mirrors the internal three-lane cap, while the mobile agenda retains all
+    # events instead of silently dropping them.
+    may_nineteenth = rendered.split('data-date="2026-05-19"', 1)[1].split("</div>", 1)[0]
+    assert '+2 další' in may_nineteenth
+    assert '<details class="sc-calendar-overflow">' in may_nineteenth
+    assert 'aria-label="2 další akce dne 19. 5. 2026"' in may_nineteenth
+    assert all(title in may_nineteenth for title in (
+        "Tábor", "Schůzka A", "Schůzka B", "Schůzka C", "Schůzka D",
+    ))
+    assert '--sc-calendar-event-color:#f8e8a0;--sc-calendar-event-text:#111' in rendered
+    agenda_nineteenth = rendered.split(
+        '<time class="sc-calendar-agenda-date" datetime="2026-05-19">', 1,
+    )[1].split("</section>", 1)[0]
+    assert all(title in agenda_nineteenth for title in (
+        "Tábor", "Schůzka A", "Schůzka B", "Schůzka C", "Schůzka D",
+    ))
+    assert "Pokračuje do 20. 5." in agenda_nineteenth
+    assert "Popis Tábor" not in agenda_nineteenth
+    agenda_eighteenth = rendered.split(
+        '<time class="sc-calendar-agenda-date" datetime="2026-05-18">', 1,
+    )[1].split("</section>", 1)[0]
+    assert "Popis Tábor" in agenda_eighteenth
+    assert 'aria-label="Tábor, 18. 5. 2026 09:00 – 21. 5. 2026 00:00"' in rendered
+
+
+def test_calendar_splits_multiday_bar_once_at_each_week_boundary(db_session):
+    compiled = compile_project(project({"type": "sc-calendar"}))
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"month": "2026-05"}},
+        resolver=lambda *_: [{
+            "id": 7, "title": "Výprava přes víkend",
+            "start_at": datetime(2026, 5, 22, 8),
+            "end_at": datetime(2026, 5, 26, 18),
+            "url": "/schuzky/7", "color": "#176b44",
+        }],
+    )
+
+    # Monday-first weeks: Fri-Sun (columns 4..6) and Mon-Tue (0..1).
+    assert rendered.count('class="sc-calendar-event sc-calendar-event-bar') == 2
+    assert 'data-calendar-start="4" data-calendar-span="3"' in rendered
+    assert 'data-calendar-start="0" data-calendar-span="2"' in rendered
+    assert "sc-calendar-event-bar--continues-after" in rendered
+    assert "sc-calendar-event-bar--continues-before" in rendered
+
+
+def test_calendar_rejects_months_above_bounded_event_limit(db_session):
+    compiled = compile_project(project({"type": "sc-calendar"}))
+    records = [{
+        "id": index, "title": f"Akce {index}",
+        "start_at": datetime(2026, 5, 19, 18),
+    } for index in range(501)]
+
+    with pytest.raises(CompileError, match="limit of 500 events"):
+        render_project(
+            db_session, compiled.tree, page={"query": {"month": "2026-05"}},
+            resolver=lambda *_: records,
+        )
 
 
 @pytest.mark.parametrize("payload", [
@@ -466,6 +568,19 @@ def test_renderer_rejects_xss_unsafe_urls_and_css_breakout(db_session):
         render_document("", title="x", css="</style><script>alert(1)</script>")
     with pytest.raises(CompileError):
         render_document("", title="x", tokens={"color": "red;</style><script>"})
+
+
+def test_renderer_accepts_legacy_empty_feature_test_url_but_not_external_css_url():
+    document = render_document(
+        "", title="x",
+        css='@supports (mask-image:url("")){.shape{mask-image:none}}',
+    )
+    assert '@supports (mask-image:url(""))' in document
+    with pytest.raises(CompileError):
+        render_document(
+            "", title="x",
+            css=".tracked{background-image:url(https://evil.example/track.gif)}",
+        )
 
 
 def test_renderer_preserves_bounded_responsive_css():
