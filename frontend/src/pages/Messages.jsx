@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
@@ -27,10 +28,16 @@ export default function Messages() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
+  const [searchParams] = useSearchParams();
   const userId = profile?.user?.id;
   const receiveMessages = profile?.user?.receive_messages !== false;
+  const requestedUserId = searchParams.get("user");
+  const requestedMessageId = Number(searchParams.get("message")) || null;
+  const requestedSystemView = searchParams.get("view") === "system";
 
-  const [selectedId, setSelectedId] = useState(null); // null | "system" | user id
+  const [selectedId, setSelectedId] = useState(() => (
+    requestedSystemView ? "system" : requestedUserId || null
+  )); // null | "system" | user id
   const [pickedUser, setPickedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [body, setBody] = useState("");
@@ -100,6 +107,16 @@ export default function Messages() {
   );
 
   useEffect(() => {
+    if (requestedSystemView) {
+      setSelectedId("system");
+      setPickedUser(null);
+    } else if (requestedUserId) {
+      setSelectedId(requestedUserId);
+      setPickedUser(null);
+    }
+  }, [requestedSystemView, requestedUserId]);
+
+  useEffect(() => {
     setOlderMessages([]);
     setHasMoreOlder(threadPage?.has_more ?? false);
   }, [selectedId, threadPage?.messages.length]);
@@ -111,6 +128,20 @@ export default function Messages() {
     }
     threadEndRef.current?.scrollIntoView({ block: "end" });
   }, [thread, selectedId]);
+
+  useEffect(() => {
+    if (!requestedMessageId || !thread.some((message) => Number(message.id) === requestedMessageId)) {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      const target = threadScrollRef.current?.querySelector(
+        `[data-message-id="${requestedMessageId}"]`
+      );
+      target?.scrollIntoView({ block: "center" });
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [requestedMessageId, thread]);
 
   const loadOlder = async () => {
     const oldestId = thread[0]?.id;
@@ -466,7 +497,9 @@ export default function Messages() {
                         return (
                           <div
                             key={message.id}
-                            className={`d-flex ${mine ? "justify-content-end" : "justify-content-start"}`}
+                            className={`message-thread-row d-flex ${mine ? "justify-content-end" : "justify-content-start"} ${Number(message.id) === requestedMessageId ? "message-thread-row--target" : ""}`}
+                            data-message-id={message.id}
+                            tabIndex={Number(message.id) === requestedMessageId ? -1 : undefined}
                           >
                             <div
                               className={`px-3 py-2 rounded-4 shadow-sm ${

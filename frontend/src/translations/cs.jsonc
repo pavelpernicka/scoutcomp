@@ -884,6 +884,7 @@
     "today": "Dnes",
     "eventsCount": "akcí",
     "more": "další",
+    "noEventsOnDay": "V tento den nejsou žádné akce.",
     "noEventsInMonth": "V tomto měsíci nejsou žádné akce.",
     "upcoming": "Nadcházející",
     "past": "Proběhlé",

@@ -152,6 +152,11 @@ a.active {
   height: 100%;
 }
 
+.message-thread-row--target > div {
+  outline: 3px solid color-mix(in srgb, var(--scout-ochre, #f9b200) 70%, transparent);
+  outline-offset: 2px;
+}
+
 @media (min-width: 992px) {
   .messages-card {
     height: calc(100vh - 300px);

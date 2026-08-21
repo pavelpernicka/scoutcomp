@@ -552,7 +552,11 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
     # only when the actually rendered document contains the server component,
     # including when it comes from a linked layout/resource.  This preserves
     # the cheap publication path for every page without a calendar.
-    if '<section class="sc-calendar"' in default:
+    # The renderer may add semantic attributes (for example the modal target
+    # id) before ``class``.  Detect the stable component class instead of a
+    # particular attribute order, otherwise a valid calendar publication is
+    # committed without month variants and navigation returns HTTP 503.
+    if 'class="sc-calendar"' in default:
         current_month = datetime.now(application_timezone()).date().replace(day=1)
         for offset in range(-12, 19):
             absolute = current_month.year * 12 + current_month.month - 1 + offset

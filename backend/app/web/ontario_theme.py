@@ -8,6 +8,7 @@ intentionally excluded.
 from __future__ import annotations
 
 import hashlib
+import json
 import mimetypes
 import re
 import shutil
@@ -22,6 +23,7 @@ from ..models import (
     WebMenuItem,
     WebMenuRevision,
     WebSection,
+    WebSiteStyle,
     WebTemplate,
     WebTheme,
     WebThemeAsset,
@@ -721,14 +723,21 @@ body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;
 .ontario-detail .sc-event-detail{--sc-accent:var(--ontario-blue);--sc-event-facts-bg:#eef3f6;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:1.25rem 3rem;align-items:start}.ontario-detail .sc-event-facts{grid-column:2;grid-row:1/span 2;display:grid;gap:1.15rem;padding:1.35rem 1.5rem;border-inline-start:.38rem solid var(--ontario-blue);background:var(--sc-event-facts-bg)}.ontario-detail .sc-event-facts:empty{display:none}.ontario-detail .sc-event-fact{grid-template-columns:1.4rem minmax(0,1fr);gap:.75rem}.ontario-detail .sc-event-fact>i{font-size:1rem}.ontario-detail .sc-event-date-points{display:grid;gap:1rem}.ontario-detail .sc-event-date-point{display:grid;gap:.18rem}.ontario-detail .sc-event-fact-label{font-size:.76rem}.ontario-detail .sc-event-fact time,.ontario-detail .sc-event-fact div>span:last-child{font-size:1.02rem;line-height:1.38}.ontario-detail .web-detail-meta{grid-column:1;grid-row:1;align-self:end;margin:.15rem 0 0;padding-bottom:1rem;border-bottom:1px solid #d9e0e6}.ontario-detail .sc-event-description{grid-column:1;grid-row:2;max-width:68ch;font-size:1.06rem;line-height:1.72}.ontario-detail .sc-event-description img{max-width:100%;height:auto}
 
 /* Compact, information-first calendar treatment for the Ontario page. */
-.ontario-calendar>.container{max-width:1180px}.ontario-calendar.ontario-section{padding:3.75rem 0 4.5rem}.ontario-calendar .ontario-section-lead{max-width:44rem;margin:.4rem 0 2rem}.ontario-calendar .sc-calendar{--sc-calendar-accent:var(--ontario-blue);--sc-calendar-line:#cfd9df;--sc-calendar-surface:#fff;margin-top:1.25rem}.ontario-calendar .sc-calendar-view-switch{margin-bottom:.75rem}.ontario-calendar .sc-calendar-count{color:#68717a;font-size:.88rem}.ontario-calendar .sc-calendar-toolbar{min-height:4.5rem;margin-bottom:.75rem;padding:.65rem .85rem;background:#f7f9fa}.ontario-calendar .sc-calendar-title{color:var(--ontario-blue-dark);font-size:1.8rem;line-height:1.1}.ontario-calendar .sc-calendar-today{font-size:.9rem}.ontario-calendar .sc-calendar-nav{min-width:2.75rem;min-height:2.75rem;border-color:#91a2ad;color:var(--ontario-blue-dark)}.ontario-calendar .sc-calendar-head{background:var(--ontario-blue)}.ontario-calendar .sc-calendar-heading{padding:.65rem .35rem;font-size:.92rem}.ontario-calendar .sc-calendar-week{min-height:6.25rem}.ontario-calendar .sc-calendar-day{height:6.25rem;padding:.38rem .42rem}.ontario-calendar .sc-calendar-day:nth-child(6),.ontario-calendar .sc-calendar-day:nth-child(7){background:#fbfcfd}.ontario-calendar .sc-calendar-day--outside{background:#f3f5f5!important}.ontario-calendar .sc-calendar-day--today{background:#eef6fa!important;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--ontario-blue) 38%,transparent)}.ontario-calendar .sc-calendar-day-number{width:1.75rem;height:1.75rem;margin:0 0 .2rem;padding-top:.18rem;text-align:center;font-size:.9rem}.ontario-calendar .sc-calendar-day-number[aria-current=date]{border-radius:50%;background:var(--ontario-blue);color:#fff}.ontario-calendar .sc-calendar-event-bar{top:calc(1.85rem + (var(--sc-calendar-lane) - 1) * 1.45rem);height:1.28rem;line-height:.94rem;font-size:.82rem}.ontario-calendar .sc-calendar-agenda{gap:.85rem}.ontario-calendar .sc-calendar-agenda-title{color:var(--ontario-blue-dark)}.ontario-calendar .sc-calendar-agenda-event{background:#f3f6f8}
+.ontario-calendar>.container{max-width:1180px}.ontario-calendar.ontario-section{padding:3.75rem 0 4.5rem}.ontario-calendar .ontario-section-lead{max-width:44rem;margin:.4rem 0 2rem}.ontario-calendar .sc-calendar{--sc-calendar-accent:var(--ontario-blue);--sc-calendar-line:#cfd9df;--sc-calendar-surface:#fff;margin-top:1.25rem}.ontario-calendar .sc-calendar-view-switch{margin-bottom:.75rem}.ontario-calendar .sc-calendar-count{color:#68717a;font-size:.88rem}.ontario-calendar .sc-calendar-toolbar{min-height:4.5rem;margin-bottom:.75rem;padding:.65rem .85rem;background:#f7f9fa}.ontario-calendar .sc-calendar-title{color:var(--ontario-blue-dark);font-size:1.8rem;line-height:1.1}.ontario-calendar .sc-calendar-today{font-size:.9rem}.ontario-calendar .sc-calendar-nav{min-width:2.75rem;min-height:2.75rem;border-color:#91a2ad;color:var(--ontario-blue-dark)}.ontario-calendar .sc-calendar-head{background:var(--ontario-blue)}.ontario-calendar .sc-calendar-heading{padding:.65rem .35rem;font-size:.92rem}.ontario-calendar .sc-calendar-week{min-height:6.25rem}.ontario-calendar .sc-calendar-day{height:6.25rem;padding:.38rem .42rem}.ontario-calendar .sc-calendar-day:nth-child(6),.ontario-calendar .sc-calendar-day:nth-child(7){background:#fbfcfd}.ontario-calendar .sc-calendar-day--outside{background:#f3f5f5!important}.ontario-calendar .sc-calendar-day--today{background:#eef6fa!important;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--ontario-blue) 38%,transparent)}.ontario-calendar .sc-calendar-day-number{width:1.75rem;height:1.75rem;margin:0 0 .2rem;padding-top:.18rem;text-align:center;font-size:.9rem}.ontario-calendar .sc-calendar-day-number[aria-current=date]{border-radius:50%;background:var(--ontario-blue);color:#fff}.ontario-calendar .sc-calendar-event-bar{top:calc(1.85rem + (var(--sc-calendar-lane) - 1) * 1.45rem);height:1.28rem;line-height:.94rem;font-size:.82rem}.ontario-calendar .sc-calendar-agenda{gap:.85rem}.ontario-calendar .sc-calendar-agenda-title{color:var(--ontario-blue-dark)}.ontario-calendar .sc-calendar-agenda-event{background:#f3f6f8}.ontario-calendar .sc-calendar-day-modal{z-index:10000!important}
 
 /* Keep dropdown links readable even when an older broad inner-page navbar
    rule is present later in an installed theme artifact. */
 .ontario-desktop-menu .sc-menu-dropdown .sc-menu-link{color:#252b31!important}.ontario-desktop-menu .sc-menu-dropdown .sc-menu-link:hover,.ontario-desktop-menu .sc-menu-dropdown .sc-menu-link:focus-visible{color:var(--ontario-blue-dark)!important;background:#eef4fb}
 @media(max-width:899px){.ontario-detail .sc-event-detail{grid-template-columns:1fr;gap:1.4rem}.ontario-detail .sc-event-facts,.ontario-detail .web-detail-meta,.ontario-detail .sc-event-description{grid-column:1;grid-row:auto}.ontario-detail .sc-event-facts{order:1}.ontario-detail .web-detail-meta{order:2}.ontario-detail .sc-event-description{order:3}}
-@media(max-width:991.98px){.ontario-calendar>.container{max-width:none;padding-inline:1.5rem}.ontario-calendar .sc-calendar-week,.ontario-calendar .sc-calendar-day{min-height:5.85rem;height:5.85rem}}
-@media(max-width:575.98px){.ontario-detail .ontario-section{padding:2.75rem 0 3.5rem}.ontario-detail .ontario-reading{padding-inline:1.25rem}.ontario-detail .ontario-reading>h1{font-size:clamp(2.35rem,12vw,2.75rem)}.ontario-detail .sc-event-facts{padding:1.05rem 1.1rem}.ontario-calendar.ontario-section{padding:3rem 0 3.75rem}.ontario-calendar>.container{padding-inline:1rem}.ontario-calendar .sc-calendar-view-switch{flex-wrap:wrap;row-gap:.45rem}.ontario-calendar .sc-calendar-count{flex-basis:100%;margin-inline-start:0}}
+/* Three event lanes need 6.03rem including their vertical offset.  Keep a
+   small safety gap on narrow screens so the last lane cannot overlap the
+   following calendar week. */
+@media(max-width:991.98px){.ontario-calendar>.container{max-width:none;padding-inline:1.5rem}.ontario-calendar .sc-calendar-week,.ontario-calendar .sc-calendar-day{min-height:6.25rem;height:6.25rem}}
+/* The month grid stays seven columns wide, but every column is allowed to
+   shrink.  The !important guards the bundled theme against older published
+   builder CSS which used a fixed 42rem mobile grid and forced page scrolling. */
+@media(max-width:700px){.ontario-calendar .sc-calendar-table{width:100%!important;max-width:100%!important;overflow:visible!important}.ontario-calendar .sc-calendar-head,.ontario-calendar .sc-calendar-week{grid-template-columns:repeat(7,minmax(0,1fr))!important;width:100%!important;min-width:0!important}.ontario-calendar .sc-calendar-heading,.ontario-calendar .sc-calendar-day{min-width:0!important}.ontario-calendar .sc-calendar-heading{overflow:hidden;padding:.5rem .08rem;font-size:.72rem;white-space:nowrap}.ontario-calendar .sc-calendar-day{padding:.2rem}.ontario-calendar .sc-calendar-day-number{width:auto;height:auto;padding:0;font-size:.78rem}.ontario-calendar .sc-calendar-event-bar{box-sizing:border-box;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .08rem);width:calc((100% / 7) * var(--sc-calendar-span) - .16rem);padding:.12rem .18rem;font-size:.68rem}.ontario-calendar .sc-calendar-overflow{min-width:0;width:100%;padding-inline:.08rem;font-size:.65rem}}
+@media(max-width:575.98px){.ontario-detail .ontario-section{padding:2.75rem 0 3.5rem}.ontario-detail>.ontario-reading,.ontario-detail .container.ontario-reading{box-sizing:border-box;width:100%;padding-inline:1.25rem!important}.ontario-detail .ontario-reading>h1{font-size:clamp(2.35rem,12vw,2.75rem);overflow-wrap:anywhere}.ontario-detail .sc-event-facts{padding:1.05rem 1.1rem}.ontario-calendar.ontario-section{padding:3rem 0 3.75rem}.ontario-calendar>.container{padding-inline:1rem}.ontario-calendar .sc-calendar-view-switch{flex-wrap:wrap;row-gap:.45rem}.ontario-calendar .sc-calendar-count{flex-basis:100%;margin-inline-start:0}}
 
 .ontario-contact-page{background:#fff}.ontario-contact-hero{position:relative;min-height:410px;display:grid;place-items:center;overflow:hidden;background:url(assets/main_header.jpg) center 38%/cover no-repeat;color:#fff}.ontario-contact-hero .ontario-photo-mask{background:var(--ontario-blue-dark);opacity:.78;mix-blend-mode:multiply}.ontario-contact-hero-content{position:relative;z-index:2;padding:5rem 1rem;text-align:center}.ontario-contact-hero h1{margin-bottom:1rem}.ontario-contact-hero h2{margin:0}.ontario-leaders{padding-bottom:8rem;background:#fff}.ontario-leader-grid{max-width:680px;margin:3.5rem auto 0}.ontario-competencies{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.45rem;margin:.25rem auto 0}.ontario-badge-magenta{background:#b00075}.ontario-council{background:var(--ontario-blue-pale)}.ontario-person{height:100%}.ontario-person-photo{width:clamp(150px,15vw,210px);height:clamp(150px,15vw,210px);border-radius:48% 52% 46% 54%/52% 47% 53% 48%!important}.ontario-person-role{margin-top:1rem;color:#59616a}.ontario-person h3{margin:.25rem 0 .45rem}.ontario-person-contact{margin:.2rem 0}.ontario-person-contact a{font-weight:700;text-decoration:none}
 
@@ -860,14 +869,26 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         theme.description = ONTARIO_THEME_DESCRIPTION
 
     base_css = ontario_css()
+    declarative_source = json.dumps(
+        {
+            "templates": ONTARIO_THEME_TEMPLATES,
+            "sections": ONTARIO_THEME_SECTIONS,
+            "components": ONTARIO_THEME_COMPONENTS,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
     package_hash = hashlib.sha256(
         (f"{ONTARIO_THEME_ID}:{ONTARIO_THEME_VERSION}\n{base_css}").encode()
+        + declarative_source
         + b"".join(path.read_bytes() for path in sorted(_ASSET_ROOT.rglob("*")) if path.is_file())
     ).hexdigest()
     version = db.query(WebThemeVersion).filter_by(
         theme_id=theme.id,
         version=ONTARIO_THEME_VERSION,
     ).one_or_none()
+    source_changed = version is not None and version.package_hash != package_hash
     manifest = {
         "schema_version": 1,
         "id": ONTARIO_THEME_ID,
@@ -1083,6 +1104,15 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
                     row.published_version = max(row.published_version or 0, 1)
                 row.theme_version_id = version.id
                 row.is_locked = False
+    db.flush()
+    style = db.get(WebSiteStyle, 1)
+    if source_changed and style is not None and style.active_theme_version_id == version.id:
+        # Published pages are immutable artifacts.  Refresh them when the
+        # bundled theme source changes so style/template upgrades and newly
+        # required calendar variants become visible atomically after restart.
+        from .pages import rebuild_published_page_artifacts
+
+        rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(version)
     return version

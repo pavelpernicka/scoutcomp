@@ -117,11 +117,11 @@ BUILDER_LAYOUT_CSS = (
     ".sc-calendar-title{margin:0;color:var(--sc-calendar-accent);text-align:center}.sc-calendar-today{display:inline-block;margin-top:.15rem;color:var(--sc-calendar-accent);font-weight:700;text-underline-offset:.15em}.sc-calendar-nav{display:inline-flex;min-width:2.75rem;min-height:2.75rem;align-items:center;justify-content:center;border:1px solid #83928b;border-radius:.45rem;color:var(--sc-calendar-accent);background:var(--sc-calendar-surface);font-size:1.25rem;text-decoration:none}.sc-calendar-nav:hover,.sc-calendar-nav:focus-visible{border-color:var(--sc-calendar-accent);background:#eef7f2}.sc-calendar-nav:focus-visible,.sc-calendar-event:focus-visible{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-nav[aria-hidden=true]{opacity:.35}"
     ".sc-calendar-table{width:100%;overflow:visible;border:1px solid var(--sc-calendar-line);background:var(--sc-calendar-surface)}.sc-calendar-head,.sc-calendar-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.sc-calendar-head{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-heading{padding:.6rem .4rem;border-inline-end:1px solid rgba(255,255,255,.35);text-align:center;font-weight:700}.sc-calendar-week{position:relative;min-height:7rem}.sc-calendar-day{min-width:0;height:7rem;padding:.35rem;border-inline-end:1px solid var(--sc-calendar-line);border-block-end:1px solid var(--sc-calendar-line);background:var(--sc-calendar-surface)}"
     ".sc-calendar-day--outside{background:#f5f7f6}.sc-calendar-day--outside .sc-calendar-day-number{opacity:.55}.sc-calendar-day--today{background:#d8f3dc;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent)}.sc-calendar-day-number{display:block;margin-bottom:.35rem;font-weight:700}"
-    ".sc-calendar-event{display:block;min-width:0;padding:.2rem .35rem;border-radius:.3rem;background:var(--sc-calendar-event-color,#176b44);color:var(--sc-calendar-event-text,#fff);font-weight:700;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:filter .14s ease,box-shadow .14s ease}.sc-calendar-event:hover,.sc-calendar-event:focus-visible{filter:brightness(1.06);box-shadow:0 .18rem .45rem rgba(0,0,0,.18)}.sc-calendar-event-bar{position:absolute;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .15rem);top:calc(2rem + (var(--sc-calendar-lane) - 1) * 1.65rem);width:calc((100% / 7) * var(--sc-calendar-span) - .3rem);height:1.45rem;line-height:1.05rem;z-index:2}.sc-calendar-event-bar--continues-before{border-top-left-radius:.08rem;border-bottom-left-radius:.08rem}.sc-calendar-event-bar--continues-after{border-top-right-radius:.08rem;border-bottom-right-radius:.08rem}"
-    ".sc-calendar-event-time{font-weight:800}.sc-calendar-continuation{font-weight:800}.sc-calendar-overflow{position:relative;z-index:12;float:right;margin-top:-1.9rem}.sc-calendar-overflow>summary{display:grid;min-width:3.25rem;min-height:1.55rem;place-items:center;padding:0 .35rem;border:1px solid #83928b;border-radius:.3rem;background:var(--sc-calendar-surface);color:#43534b;cursor:pointer;font-size:.78em;font-weight:800;list-style:none}.sc-calendar-overflow>summary::-webkit-details-marker{display:none}.sc-calendar-overflow>summary:hover,.sc-calendar-overflow>summary:focus-visible{border-color:var(--sc-calendar-accent);color:var(--sc-calendar-accent);outline:2px solid color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent);outline-offset:1px}.sc-calendar-overflow-list{position:absolute;inset-block-start:calc(100% + .25rem);inset-inline-start:0;display:grid;width:min(18rem,75vw);max-height:16rem;gap:.4rem;margin:0;padding:.55rem;overflow:auto;border:1px solid var(--sc-calendar-line);border-radius:.35rem;background:var(--sc-calendar-surface);box-shadow:0 .55rem 1.35rem rgba(0,0,0,.2);list-style:none}.sc-calendar-day:nth-child(n+5) .sc-calendar-overflow-list{inset-inline-start:auto;inset-inline-end:0}.sc-calendar-overflow-list .sc-calendar-agenda-event{padding:.45rem .55rem;border-inline-start:.25rem solid var(--sc-calendar-event-color,#176b44);background:#f5f7f6}.sc-calendar-overflow-list .sc-calendar-agenda-range{display:block;margin-top:.1rem;font-size:.82em}"
-    ".sc-calendar-view-switch{display:flex;align-items:center;margin:0 0 .75rem;padding:0;border:0}.sc-calendar-view-switch legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.sc-calendar-view-input{position:absolute;opacity:0;pointer-events:none}.sc-calendar-view-label{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .8rem;border:1px solid var(--sc-calendar-accent);color:var(--sc-calendar-accent);cursor:pointer;font-weight:700}.sc-calendar-view-label:first-of-type{border-radius:.35rem 0 0 .35rem}.sc-calendar-view-label:last-of-type{border-left:0;border-radius:0 .35rem .35rem 0}.sc-calendar-view-input:checked+.sc-calendar-view-label{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-view-input:focus-visible+.sc-calendar-view-label{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-count{margin-inline-start:auto;color:#53625b;font-size:.9em;font-weight:700}.sc-calendar-upcoming-count{display:none}.sc-calendar-agenda{display:none;gap:1rem}.sc-calendar-agenda-title{margin:0 0 .4rem;color:var(--sc-calendar-accent)}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(4.75rem,6rem) minmax(0,1fr);gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent);min-width:0}.sc-calendar-agenda-event a{color:var(--sc-calendar-accent);font-weight:700;text-underline-offset:.14em}.sc-calendar-agenda-range{display:block;margin-top:.15rem;font-size:.9em}.sc-calendar-agenda-description{margin:.25rem 0 0}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table,.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-month-count{display:none}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-agenda{display:grid}.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-upcoming-count{display:inline}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
+    ".sc-calendar-event{display:block;min-width:0;padding:.2rem .35rem;border-radius:.3rem;background:var(--sc-calendar-event-color,#176b44);color:var(--sc-calendar-event-text,#fff);font-weight:700;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:filter .14s ease,box-shadow .14s ease}.sc-calendar-event:hover,.sc-calendar-event:focus-visible{filter:brightness(1.06);box-shadow:0 .18rem .45rem rgba(0,0,0,.18)}.sc-calendar-event-bar{position:absolute;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .15rem);top:calc(2rem + (var(--sc-calendar-lane) - 1) * 1.65rem);width:calc((100% / 7) * var(--sc-calendar-span) - .3rem);height:1.45rem;line-height:1.05rem;z-index:2;pointer-events:none}.sc-calendar-event-bar--continues-before{border-top-left-radius:.08rem;border-bottom-left-radius:.08rem}.sc-calendar-event-bar--continues-after{border-top-right-radius:.08rem;border-bottom-right-radius:.08rem}.sc-calendar-day-open{position:absolute;inset-block:0;inset-inline-start:calc((100% / 7) * var(--sc-calendar-day-column));width:calc(100% / 7);z-index:1;background:transparent}.sc-calendar-day-open:hover{background:color-mix(in srgb,var(--sc-calendar-accent) 7%,transparent)}.sc-calendar-day-open:focus-visible{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 42%,transparent);outline-offset:-3px}"
+    ".sc-calendar-event-time{font-weight:800}.sc-calendar-continuation{font-weight:800}.sc-calendar-overflow{position:relative;z-index:3;float:right;display:grid;min-width:3.25rem;min-height:1.55rem;place-items:center;margin-top:-1.9rem;padding:0 .35rem;border:1px solid #83928b;border-radius:.3rem;background:var(--sc-calendar-surface);color:#43534b;font-size:.78em;font-weight:800;text-decoration:none}.sc-calendar-overflow:hover,.sc-calendar-overflow:focus-visible{border-color:var(--sc-calendar-accent);color:var(--sc-calendar-accent);outline:2px solid color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent);outline-offset:1px}"
+    ".sc-calendar-view-switch{display:flex;align-items:center;margin:0 0 .75rem;padding:0;border:0}.sc-calendar-view-switch legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.sc-calendar-view-input{position:absolute;opacity:0;pointer-events:none}.sc-calendar-view-label{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .8rem;border:1px solid var(--sc-calendar-accent);color:var(--sc-calendar-accent);cursor:pointer;font-weight:700}.sc-calendar-view-label:first-of-type{border-radius:.35rem 0 0 .35rem}.sc-calendar-view-label:last-of-type{border-left:0;border-radius:0 .35rem .35rem 0}.sc-calendar-view-input:checked+.sc-calendar-view-label{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-view-input:focus-visible+.sc-calendar-view-label{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-count{margin-inline-start:auto;color:#53625b;font-size:.9em;font-weight:700}.sc-calendar-upcoming-count{display:none}.sc-calendar-agenda{display:none;gap:1rem}.sc-calendar-agenda-title{margin:0 0 .4rem;color:var(--sc-calendar-accent)}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(4.75rem,6rem) minmax(0,1fr);gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent);min-width:0}.sc-calendar-agenda-event a{color:var(--sc-calendar-accent);font-weight:700;text-underline-offset:.14em}.sc-calendar-agenda-range{display:block;margin-top:.15rem;font-size:.9em}.sc-calendar-agenda-description{margin:.25rem 0 0}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table,.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-month-count{display:none}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-agenda{display:grid}.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-upcoming-count{display:inline}.sc-calendar-empty{margin:.75rem 0;color:inherit}.sc-calendar-day-modal{position:fixed;inset:0;z-index:10000;display:none;place-items:center;padding:1rem}.sc-calendar-day-modal:target{display:grid}.sc-calendar-day-modal-backdrop{position:absolute;inset:0;background:rgba(14,25,20,.68)}.sc-calendar-day-modal-panel{position:relative;z-index:1;width:min(34rem,100%);max-height:min(80vh,42rem);overflow:auto;border:1px solid var(--sc-calendar-line);border-radius:.45rem;background:var(--sc-calendar-surface);box-shadow:0 1rem 3rem rgba(0,0,0,.28)}.sc-calendar-day-modal-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1rem 1.1rem;border-bottom:1px solid var(--sc-calendar-line)}.sc-calendar-day-modal-title{margin:0;color:var(--sc-calendar-accent);font-size:1.2rem}.sc-calendar-day-modal-close{display:grid;width:2.75rem;height:2.75rem;place-items:center;border:1px solid var(--sc-calendar-line);border-radius:.35rem;color:inherit;font-size:1.4rem;text-decoration:none}.sc-calendar-day-modal-close:hover,.sc-calendar-day-modal-close:focus-visible{border-color:var(--sc-calendar-accent);color:var(--sc-calendar-accent)}.sc-calendar-day-modal-list{display:grid;gap:.65rem;margin:0;padding:1rem;list-style:none}.sc-calendar-day-modal-list .sc-calendar-agenda-event{position:relative;background:#f5f7f6}.sc-calendar-day-modal-list .sc-calendar-agenda-event a{display:block}.sc-calendar-day-modal-list .sc-calendar-agenda-event a::after{content:\"\";position:absolute;inset:0}.sc-calendar-day-modal-list .sc-calendar-agenda-event:has(a):hover{background:#eef7f2}.sc-calendar-day-modal-list .sc-calendar-agenda-event:has(a):focus-within{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent);outline-offset:1px}body:has(.sc-calendar-day-modal:target){overflow:hidden}"
     ".sc-event-detail{display:grid;gap:1.5rem}.sc-event-facts{display:grid;gap:1rem;padding:1.25rem 1.4rem;border-inline-start:.3rem solid var(--sc-accent,#255c9e);background:var(--sc-event-facts-bg,#f5f7f8)}.sc-event-fact{display:grid;grid-template-columns:1.5rem minmax(0,1fr);gap:.75rem;align-items:start}.sc-event-fact>i{margin-top:.2rem;color:var(--sc-accent,#255c9e);text-align:center}.sc-event-fact>div{display:grid;gap:.15rem}.sc-event-date-points{display:grid;gap:1rem}.sc-event-date-point{display:grid;min-width:0;gap:.2rem}.sc-event-fact-label{color:#66717a;font-size:.78rem;font-weight:700;letter-spacing:.055em;text-transform:uppercase}.sc-event-fact time,.sc-event-fact div>span:last-child{font-size:1.05rem;font-weight:700}.sc-event-detail .web-detail-meta{order:2;margin:0}.sc-event-description{order:3;max-width:72ch}.sc-event-description>:last-child{margin-bottom:0}"
-    "@media (max-width:700px){.sc-calendar-view-switch{display:flex}.sc-calendar-count{font-size:.8em}.sc-calendar-toolbar{padding:.65rem}.sc-calendar-table{display:block;max-width:100%;overflow-x:auto}.sc-calendar-head,.sc-calendar-week{min-width:42rem}.sc-calendar-agenda-day{grid-template-columns:4.25rem minmax(0,1fr)}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table{display:none}}"
+    "@media (max-width:700px){.sc-calendar-view-switch{display:flex}.sc-calendar-count{font-size:.8em}.sc-calendar-toolbar{gap:.35rem;padding:.55rem}.sc-calendar-table{display:block;width:100%;max-width:100%;overflow:visible}.sc-calendar-head,.sc-calendar-week{min-width:0}.sc-calendar-heading{min-width:0;padding:.5rem .08rem;font-size:.72rem}.sc-calendar-day{min-width:0;padding:.2rem}.sc-calendar-day-number{font-size:.78rem}.sc-calendar-event{box-sizing:border-box;padding:.12rem .18rem}.sc-calendar-event-bar{inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .08rem);width:calc((100% / 7) * var(--sc-calendar-span) - .16rem);font-size:.68rem}.sc-calendar-overflow{float:none;margin-top:-1.75rem}.sc-calendar-overflow{min-width:0;width:100%;min-height:1.3rem;padding:0 .08rem;overflow:hidden;font-size:.65rem;text-overflow:ellipsis;white-space:nowrap}.sc-calendar-agenda-day{grid-template-columns:4.25rem minmax(0,1fr)}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table{display:none}}"
 )
 
 CZECH_MONTHS = (
@@ -1001,14 +1001,16 @@ def _calendar_event_bar_markup(
     span = segment.span
     event = span.event
     title = escape(_format_value(event.get("title"), None))
-    href = _safe_url(event.get("url"))
     continues_before = span.start_day < week_start
     continues_after = span.end_day > week_end
-    time_html = (
-        f'<time class="sc-calendar-event-time" datetime="{escape(span.starts_at.isoformat(), quote=True)}">'
-        f'{span.starts_at.strftime("%H:%M")}</time> '
-        if not continues_before else
+    leading_continuation = (
         '<span class="sc-calendar-continuation" aria-hidden="true">‹ </span>'
+        if continues_before else ""
+    )
+    time_html = (
+        f' <time class="sc-calendar-event-time" datetime="{escape(span.starts_at.isoformat(), quote=True)}">'
+        f'{span.starts_at.strftime("%H:%M")}</time>'
+        if not continues_before else ""
     )
     continuation_after = (
         '<span class="sc-calendar-continuation" aria-hidden="true"> ›</span>'
@@ -1032,16 +1034,7 @@ def _calendar_event_bar_markup(
         (" sc-calendar-event-bar--continues-before" if continues_before else "")
         + (" sc-calendar-event-bar--continues-after" if continues_after else "")
     )
-    content = f'{time_html}<span>{title}</span>{continuation_after}'
-    if href:
-        return (
-            f'<a class="sc-calendar-event sc-calendar-event-bar{modifiers}" '
-            f'data-calendar-lane="{segment.lane + 1}" '
-            f'data-calendar-start="{segment.start_column}" '
-            f'data-calendar-span="{segment.end_column - segment.start_column + 1}" '
-            f'href="{escape(href, quote=True)}" aria-label="{accessible_label}" '
-            f'title="{accessible_label}" style="{style}">{content}</a>'
-        )
+    content = f'{leading_continuation}<span>{title}</span>{time_html}{continuation_after}'
     return (
         f'<span class="sc-calendar-event sc-calendar-event-bar{modifiers}" '
         f'data-calendar-lane="{segment.lane + 1}" '
@@ -1057,6 +1050,7 @@ def _calendar_agenda_event_markup(
     *,
     day_value: date,
     show_description: bool,
+    full_range: bool = False,
 ) -> str:
     event = span.event
     title = escape(_format_value(event.get("title"), None))
@@ -1065,7 +1059,7 @@ def _calendar_agenda_event_markup(
     continuing = day_value > span.start_day
     datetime_attr = starts_at.isoformat()
     full_range_text = _calendar_range_text(span)
-    if continuing:
+    if continuing and not full_range:
         end_day = span.end_day
         end_label = (
             f"{end_day.day}. {end_day.month}. {end_day.year}"
@@ -1154,6 +1148,8 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         last_day = min(span.end_day, visible_end)
         for offset in range((last_day - first_day).days + 1):
             by_day.setdefault(first_day + timedelta(days=offset), []).append(span)
+    calendar_id = f"sc-calendar-{state.nodes}"
+    day_modals: list[str] = []
 
     # The agenda is intentionally independent from the selected table month.
     # Fetch every ongoing/future event in deterministic batches; overlap=True
@@ -1228,28 +1224,62 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
             current_attr = ' aria-current="date"' if day_value == today else ""
             class_name = "sc-calendar-day" + (" " + " ".join(modifiers) if modifiers else "")
             bars = "".join(bars_by_column.get(column, []))
+            day_spans = by_day.get(day_value, [])
+            day_open = ""
+            modal_id = ""
+            if day_value.month == selected.month and day_spans:
+                modal_id = f"{calendar_id}-day-{day_value.isoformat()}"
+                day_label = f"{day_value.day}. {day_value.month}. {day_value.year}"
+                day_open = (
+                    f'<a class="sc-calendar-day-open" href="#{modal_id}" '
+                    f'aria-label="Zobrazit akce dne {day_label}" '
+                    f'style="--sc-calendar-day-column:{column}"></a>'
+                )
+                modal_items = "".join(
+                    _calendar_agenda_event_markup(
+                        span,
+                        day_value=day_value,
+                        show_description=False,
+                        full_range=True,
+                    )
+                    for span in day_spans
+                )
+                day_modals.append(
+                    f'<section id="{modal_id}" class="sc-calendar-day-modal" role="dialog" '
+                    f'aria-modal="true" aria-labelledby="{modal_id}-title" '
+                    f'data-calendar-modal-date="{day_value.isoformat()}" tabindex="-1">'
+                    f'<a class="sc-calendar-day-modal-backdrop" href="#{calendar_id}" '
+                    f'aria-label="Zavřít přehled akcí"></a>'
+                    '<div class="sc-calendar-day-modal-panel">'
+                    '<header class="sc-calendar-day-modal-header">'
+                    f'<h3 id="{modal_id}-title" class="sc-calendar-day-modal-title">{day_label}</h3>'
+                    f'<a class="sc-calendar-day-modal-close" href="#{calendar_id}" '
+                    f'aria-label="Zavřít přehled akcí">×</a></header>'
+                    f'<ul class="sc-calendar-day-modal-list">{modal_items}</ul>'
+                    '</div></section>'
+                )
             hidden = hidden_by_day.get(day_value, 0)
             more = ""
             if hidden:
-                overflow_items = "".join(
-                    _calendar_agenda_event_markup(
-                        span, day_value=day_value, show_description=False,
+                label = (
+                    f"{hidden} další akce dne "
+                    f"{day_value.day}. {day_value.month}. {day_value.year}"
+                )
+                if modal_id:
+                    more = (
+                        f'<a class="sc-calendar-overflow" href="#{modal_id}" '
+                        f'aria-label="{label}">+{hidden} další</a>'
                     )
-                    for span in by_day.get(day_value, [])
-                )
-                more = (
-                    '<details class="sc-calendar-overflow">'
-                    f'<summary aria-label="{hidden} další akce dne '
-                    f'{day_value.day}. {day_value.month}. {day_value.year}">'
-                    f'+{hidden} další</summary>'
-                    f'<ul class="sc-calendar-overflow-list">{overflow_items}</ul>'
-                    '</details>'
-                )
+                else:
+                    more = (
+                        f'<span class="sc-calendar-overflow" '
+                        f'aria-label="{label}">+{hidden} další</span>'
+                    )
             cells.append(
                 f'<div class="{class_name}" role="gridcell" data-date="{day_value.isoformat()}" '
                 f'aria-label="{day_value.day}. {day_value.month}. {day_value.year}">'
                 f'<time class="sc-calendar-day-number" datetime="{day_value.isoformat()}"{current_attr}>{day_value.day}</time>'
-                f'{bars}{more}</div>'
+                f'{day_open}{bars}{more}</div>'
             )
         rows.append(
             f'<div class="sc-calendar-week" role="row" '
@@ -1309,7 +1339,7 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         '<span class="sc-calendar-nav sc-calendar-nav--next" aria-hidden="true">›</span>'
     )
     return (
-        f'<section class="sc-calendar" data-sc-calendar-month="{selected.strftime("%Y-%m")}">'
+        f'<section id="{calendar_id}" class="sc-calendar" data-sc-calendar-month="{selected.strftime("%Y-%m")}">'
         '<fieldset class="sc-calendar-view-switch">'
         '<legend>Zobrazení kalendáře</legend>'
         f'<input class="sc-calendar-view-input sc-calendar-view-month" type="radio" '
@@ -1329,6 +1359,7 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         f'</div><div class="sc-calendar-table" role="grid" aria-label="Kalendář – {title}" '
         f'aria-colcount="7" aria-rowcount="{len(weeks) + 1}">'
         f'<div class="sc-calendar-head" role="row">{headings}</div>{"".join(rows)}</div>'
+        f'{"".join(day_modals)}'
         f'<div class="sc-calendar-agenda">{agenda}</div></section>'
     )
 

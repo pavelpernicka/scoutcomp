@@ -874,6 +874,7 @@
     "today": "Today",
     "eventsCount": "events",
     "more": "more",
+    "noEventsOnDay": "There are no events on this day.",
     "noEventsInMonth": "No events in this month.",
     "upcoming": "Upcoming",
     "past": "Past",

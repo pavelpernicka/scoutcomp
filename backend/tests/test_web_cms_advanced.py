@@ -332,21 +332,34 @@ def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db
     # per-day labels. Midnight is exclusive, so it does not span 21 May.
     assert rendered.count('data-calendar-span="3"') == 1
     camp_bar = rendered.split('aria-label="Tábor,', 1)[0].rsplit(
-        '<a class="sc-calendar-event sc-calendar-event-bar', 1,
+        '<span class="sc-calendar-event sc-calendar-event-bar', 1,
     )[1]
     assert 'data-calendar-lane="1"' in camp_bar
     assert 'data-calendar-start="0"' in camp_bar
+    assert "href=" not in camp_bar
 
     # Four concurrent one-day events compete with the long event. Desktop
     # mirrors the internal three-lane cap, while the list retains all events
     # exactly once instead of silently dropping or repeating them.
     may_nineteenth = rendered.split('data-date="2026-05-19"', 1)[1].split("</div>", 1)[0]
     assert '+2 další' in may_nineteenth
-    assert '<details class="sc-calendar-overflow">' in may_nineteenth
+    assert '<details class="sc-calendar-overflow">' not in rendered
+    assert 'class="sc-calendar-overflow" href="#sc-calendar-' in may_nineteenth
     assert 'aria-label="2 další akce dne 19. 5. 2026"' in may_nineteenth
-    assert all(title in may_nineteenth for title in (
+    assert all(title in may_nineteenth for title in ("Schůzka A", "Schůzka B"))
+    assert all(title not in may_nineteenth for title in ("Schůzka C", "Schůzka D"))
+    title_position = rendered.index("<span>Schůzka A</span>")
+    time_position = rendered.index(">10:00</time>", title_position)
+    assert title_position < time_position
+    assert 'class="sc-calendar-day-open"' in may_nineteenth
+    day_modal = rendered.split(
+        'data-calendar-modal-date="2026-05-19"', 1,
+    )[1].split("</section>", 1)[0]
+    assert 'class="sc-calendar-day-modal" role="dialog"' in rendered
+    assert all(title in day_modal for title in (
         "Tábor", "Schůzka A", "Schůzka B", "Schůzka C", "Schůzka D",
     ))
+    assert "18. 5. 2026 09:00 – 21. 5. 2026 00:00" in day_modal
     assert '--sc-calendar-event-color:#f8e8a0;--sc-calendar-event-text:#111' in rendered
     agenda_nineteenth = rendered.split(
         '<time class="sc-calendar-agenda-date" datetime="2026-05-19">', 1,
@@ -2145,6 +2158,13 @@ def test_column_primitive_has_a_public_grid_fallback():
     assert ".sc-layout-columns{display:grid" in document
 
 
+def test_public_calendar_grid_fits_narrow_viewports_without_horizontal_scroll():
+    document = render_document("<main><div class=\"sc-calendar\"></div></main>", title="Calendar")
+    assert ".sc-calendar-table{display:block;width:100%;max-width:100%;overflow:visible}" in document
+    assert ".sc-calendar-head,.sc-calendar-week{min-width:0}" in document
+    assert ".sc-calendar-head,.sc-calendar-week{min-width:42rem}" not in document
+
+
 def test_whole_site_export_keeps_site_owned_designs_and_metadata(db_session, monkeypatch):
     from app.web import routes_design
 
@@ -2202,7 +2222,7 @@ def test_calendar_publication_materialises_only_a_bounded_month_window(db_sessio
     }
 
     assert len(month_variants) == 31
-    assert all('<section class="sc-calendar"' in document for document in month_variants.values())
+    assert all('class="sc-calendar"' in document for document in month_variants.values())
     current_key = datetime.now().strftime("month=%Y-%m")
     assert current_key in month_variants
     from app.site_app import _render_revision
