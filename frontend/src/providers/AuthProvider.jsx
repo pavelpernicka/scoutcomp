@@ -100,7 +100,10 @@ export function AuthProvider({ children }) {
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);
-    await fetchProfile();
+    // Pass the new token explicitly.  Reading it from the render closure here
+    // races with the state update above and can start a second profile request
+    // under the previous (or empty) authentication state.
+    await fetchProfile(nextTokens.accessToken);
   };
 
   const changePassword = async ({ username, oldPassword, newPassword, rememberMe = false }) => {
@@ -118,7 +121,7 @@ export function AuthProvider({ children }) {
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);
-    await fetchProfile();
+    await fetchProfile(nextTokens.accessToken);
   };
 
   const logout = async () => {
@@ -152,7 +155,7 @@ export function AuthProvider({ children }) {
     };
     persistTokens(nextTokens);
     setAuthTokens(nextTokens);
-    await fetchProfile();
+    await fetchProfile(nextTokens.accessToken);
   };
 
   const role = profile?.user?.role ?? null;

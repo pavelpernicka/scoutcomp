@@ -72,6 +72,11 @@ export default function LoginPage() {
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
   const [isSubmittingPasswordChange, setIsSubmittingPasswordChange] = useState(false);
 
+  const updateLoginField = (field, value) => {
+    setLoginError(null);
+    setLoginState((previous) => ({ ...previous, [field]: value }));
+  };
+
   const { data: options } = useQuery({
     queryKey: ["auth", "options"],
     queryFn: async () => {
@@ -215,7 +220,12 @@ export default function LoginPage() {
                     type="button"
                     className={activeTab === tab.id ? "is-active" : ""}
                     aria-pressed={activeTab === tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setLoginError(null);
+                      memberRegistration.reset();
+                      adminRegistration.reset();
+                    }}
                   >
                     {tab.label}
                   </button>
@@ -295,7 +305,7 @@ export default function LoginPage() {
                     autoComplete="username"
                     placeholder={t("login.usernamePlaceholder")}
                     value={loginState.username}
-                    onChange={(event) => setLoginState((previous) => ({ ...previous, username: event.target.value }))}
+                    onChange={(event) => updateLoginField("username", event.target.value)}
                     disabled={isSubmittingLogin || isLoading}
                     required
                   />
@@ -309,7 +319,7 @@ export default function LoginPage() {
                     autoComplete="current-password"
                     placeholder={t("login.passwordPlaceholder")}
                     value={loginState.password}
-                    onChange={(event) => setLoginState((previous) => ({ ...previous, password: event.target.value }))}
+                    onChange={(event) => updateLoginField("password", event.target.value)}
                     disabled={isSubmittingLogin || isLoading}
                     required
                   />
@@ -319,7 +329,7 @@ export default function LoginPage() {
                     id="login-remember-me"
                     type="checkbox"
                     checked={loginState.rememberMe}
-                    onChange={(event) => setLoginState((previous) => ({ ...previous, rememberMe: event.target.checked }))}
+                    onChange={(event) => updateLoginField("rememberMe", event.target.checked)}
                     disabled={isSubmittingLogin || isLoading}
                   />
                   <span><strong>{t("login.rememberMe")}</strong><small>{t("login.rememberMeHint")}</small></span>

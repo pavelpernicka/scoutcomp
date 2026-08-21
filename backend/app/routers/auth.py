@@ -83,6 +83,9 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
         preferred_language=payload.preferred_language or settings.app.default_language,
         role=role,
         team_id=team_id,
+        # The registrant chose this password themselves.  Forced password
+        # changes are reserved for credentials assigned by somebody else.
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     from ..modules import registry
     member = registry.member_group(db)
