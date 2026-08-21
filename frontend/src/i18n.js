@@ -34,6 +34,10 @@ export async function initializeI18n() {
   return i18n;
 }
 
-initializeI18n().catch(console.error);
+// Tests and other consumers that render immediately after importing i18n must
+// be able to wait until the asynchronously loaded catalogues are installed.
+// Keeping one shared promise also prevents duplicate initialisation.
+export const i18nReady = initializeI18n();
+i18nReady.catch(console.error);
 
 export default i18n;

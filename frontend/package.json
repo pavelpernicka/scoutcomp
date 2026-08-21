@@ -8,6 +8,7 @@
     "build": "node scripts/build-translations.js && vite build",
     "preview": "vite preview",
     "lint": "eslint \"src/**/*.{js,jsx,ts,tsx}\"",
+    "pretest": "node scripts/build-translations.js",
     "test": "vitest",
     "translations:extract": "node scripts/extract-translations.js && node scripts/build-translations.js",
     "translations:check": "node scripts/extract-translations.js --check",
