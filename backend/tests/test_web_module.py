@@ -71,6 +71,9 @@ def _seed_and_login(client, db_session, role: RoleEnum):
 
 
 def test_web_data_sources_and_templates_catalogue(client, db_session):
+    from app.web.routes_templates import seed_default_theme
+
+    seed_default_theme(db_session)
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     sources = client.get("/web/data-sources", headers=_headers(token))
     assert sources.status_code == 200
@@ -80,8 +83,8 @@ def test_web_data_sources_and_templates_catalogue(client, db_session):
 
     templates = client.get("/web/templates", headers=_headers(token))
     assert templates.status_code == 200
-    keys = {item["key"] for item in templates.json()}
-    assert {"blank", "main", "group", "events"} <= keys
+    keys = {item["qualified_key"].rsplit(":", 1)[-1] for item in templates.json()}
+    assert {"main", "news", "scout-home", "scout-detail"} <= keys
 
 
 def test_web_page_crud_and_site_render(client, db_session):
@@ -133,6 +136,9 @@ def test_web_page_crud_and_site_render(client, db_session):
 
 
 def test_web_template_crud_and_delete_guards(client, db_session):
+    from app.web.routes_templates import seed_default_theme
+
+    seed_default_theme(db_session)
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     headers = _headers(token)
 
@@ -170,7 +176,7 @@ def test_web_template_crud_and_delete_guards(client, db_session):
         if item["is_system"]
     }
     some_system_id = next(iter(system_ids))
-    assert client.delete(f"/web/templates/{some_system_id}", headers=headers).status_code == 400
+    assert client.delete(f"/web/templates/{some_system_id}", headers=headers).status_code == 409
 
     page = client.post("/web/pages", headers=headers, json={"title": "Sablona", "template": "custom"})
     assert page.status_code == 201
@@ -502,21 +508,20 @@ def test_web_media_metadata(client, db_session, monkeypatch):
         meta = client.put(
             f"/web/media/{media_id}",
             headers=headers,
-            json={"album": "Tábor", "alt": "Fotka z tábora", "caption": "Společná fotka"},
+            json={"note": "Fotka z tábora – společná fotka"},
         )
         assert meta.status_code == 200
-        assert meta.json()["album"] == "Tábor"
-
-        albums = client.get("/web/media/albums", headers=headers)
-        assert albums.status_code == 200
-        assert "Tábor" in albums.json()
+        assert meta.json()["note"] == "Fotka z tábora – společná fotka"
 
         listed = client.get("/web/media", headers=headers).json()["items"]
-        assert listed[0]["alt"] == "Fotka z tábora"
+        assert listed[0]["note"] == "Fotka z tábora – společná fotka"
     settings.app.web_media_dir = original
 
 def test_web_design_resource_clone(client, db_session):
     """Clone creates a site-owned copy of a theme resource with origin metadata."""
+    from app.web.routes_templates import seed_default_theme
+
+    seed_default_theme(db_session)
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     headers = _headers(token)
 
@@ -531,7 +536,7 @@ def test_web_design_resource_clone(client, db_session):
         "variants": [{"id": "big", "label": "Big", "props": {"x": "Big"}}],
     }
     res = client.post("/web/design/components", headers=headers, json=payload)
-    assert res.status_code == 201
+    assert res.status_code == 201, res.text
     src = res.json()
     assert src["qualified_key"] == "site:clone-source"
     assert src["draft_version"] == 1
@@ -549,7 +554,7 @@ def test_web_design_resource_clone(client, db_session):
     assert clone["draft_version"] == 1
     assert clone["published_version"] == 0
     assert clone["is_locked"] is False
-    assert clone.get("theme_version_id") is None
+    assert clone.get("theme_version_id") == src["theme_version_id"]
     assert clone["project_data"] == payload["project_data"]
     assert clone["prop_schema"] == payload["prop_schema"]
     assert clone["variants"] == payload["variants"]
@@ -579,6 +584,9 @@ def test_web_design_resource_clone(client, db_session):
 
 def test_web_design_resource_materialize(client, db_session):
     """materialize returns a detached HTML+CSS fragment with props applied."""
+    from app.web.routes_templates import seed_default_theme
+
+    seed_default_theme(db_session)
     token = _seed_and_login(client, db_session, RoleEnum.ADMIN)
     headers = _headers(token)
 
@@ -596,7 +604,7 @@ def test_web_design_resource_materialize(client, db_session):
         "variants": [],
     }
     res = client.post("/web/design/components", headers=headers, json=payload)
-    assert res.status_code == 201
+    assert res.status_code == 201, res.text
     src = res.json()
 
     mat = client.post(

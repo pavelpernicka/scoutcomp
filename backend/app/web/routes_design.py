@@ -44,6 +44,8 @@ def _site_settings(db: Session) -> dict:
         "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
         "site_tagline": get_config_value(db, "web.site_tagline"),
         "site_meta": get_config_value(db, "web.site_meta"),
+        "social_facebook": get_config_value(db, "web.social_facebook"),
+        "social_instagram": get_config_value(db, "web.social_instagram"),
         "site_logo": get_config_value(db, "web.site_logo"),
         "favicon": get_config_value(db, "web.favicon"),
         "meta_description": get_config_value(db, "web.meta_description"),
@@ -150,6 +152,8 @@ class SettingsPayload(BaseModel):
     title_pattern: str | None = None
     site_tagline: str | None = None
     site_meta: str | None = None
+    social_facebook: str | None = None
+    social_instagram: str | None = None
     site_logo: str | None = None
     favicon: str | None = None
     meta_description: str | None = None

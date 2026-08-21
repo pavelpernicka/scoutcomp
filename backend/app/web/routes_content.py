@@ -103,7 +103,14 @@ def create_menu(payload: MenuPayload, db: Session = Depends(get_db), current_use
     db.add(menu)
     db.commit()
     db.refresh(menu)
-    return {"id": menu.id, "name": menu.name, "location": menu.location, "items": []}
+    return {
+        "id": menu.id,
+        "name": menu.name,
+        "location": menu.location,
+        "items": [],
+        "draft_version": menu.draft_version,
+        "published_revision_id": menu.published_revision_id,
+    }
 
 
 @router.delete("/menus/{menu_id}", status_code=204)

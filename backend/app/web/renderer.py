@@ -1761,18 +1761,23 @@ def render_document(
     social_description = (og_description or description).strip()
     social_type = og_type.strip().lower() if re.fullmatch(r"[a-z][a-z0-9._-]{0,39}", og_type.strip().lower()) else "website"
     safe_og_image = _safe_url(og_image, image=True)
+    safe_site_name = escape(site_name, quote=True) if site_name else ""
+    safe_social_url = escape(safe_canonical, quote=True) if safe_canonical else ""
+    safe_social_image = escape(safe_og_image, quote=True) if safe_og_image else ""
+    site_name_meta = f'<meta property="og:site_name" content="{safe_site_name}">' if safe_site_name else ""
+    social_url_meta = f'<meta property="og:url" content="{safe_social_url}">' if safe_social_url else ""
+    og_image_meta = f'<meta property="og:image" content="{safe_social_image}">' if safe_social_image else ""
+    twitter_image_meta = f'<meta name="twitter:image" content="{safe_social_image}">' if safe_social_image else ""
     social_meta = (
         f'<meta property="og:locale" content="cs_CZ">'
         f'<meta property="og:type" content="{escape(social_type, quote=True)}">'
         f'<meta property="og:title" content="{escape(social_title, quote=True)}">'
         f'<meta property="og:description" content="{escape(social_description, quote=True)}">'
-        f'{f"<meta property=\"og:site_name\" content=\"{escape(site_name, quote=True)}\">" if site_name else ""}'
-        f'{f"<meta property=\"og:url\" content=\"{escape(safe_canonical, quote=True)}\">" if safe_canonical else ""}'
-        f'{f"<meta property=\"og:image\" content=\"{escape(safe_og_image, quote=True)}\">" if safe_og_image else ""}'
+        f'{site_name_meta}{social_url_meta}{og_image_meta}'
         f'<meta name="twitter:card" content="{"summary_large_image" if safe_og_image else "summary"}">'
         f'<meta name="twitter:title" content="{escape(social_title, quote=True)}">'
         f'<meta name="twitter:description" content="{escape(social_description, quote=True)}">'
-        f'{f"<meta name=\"twitter:image\" content=\"{escape(safe_og_image, quote=True)}\">" if safe_og_image else ""}'
+        f'{twitter_image_meta}'
     )
     return (
         "<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\">"

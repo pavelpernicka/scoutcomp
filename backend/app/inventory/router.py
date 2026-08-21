@@ -500,10 +500,11 @@ def create_loan(
 @router.post("/loans/{loan_id}/return", response_model=InventoryItemPublic)
 def return_loan(
     loan_id: int,
-    payload: InventoryLoanReturn,
+    payload: InventoryLoanReturn | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin_or_group_admin),
 ) -> InventoryItemPublic:
+    payload = payload or InventoryLoanReturn()
     loan = db.get(InventoryLoan, loan_id)
     if not loan:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loan not found")

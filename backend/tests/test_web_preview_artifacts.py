@@ -236,12 +236,15 @@ def test_preview_html_resolves_linked_resources_with_database_session(
 
 def test_theme_preview_inlines_package_images_and_fonts(db_session, preview_context):
     from app.models import WebTemplate, WebTheme, WebThemeVersion
+    from app.web.ontario_theme import ONTARIO_THEME_VERSION
 
     theme = db_session.query(WebTheme).filter_by(stable_key="ontario").one()
-    version = db_session.query(WebThemeVersion).filter_by(theme_id=theme.id, version="1.0.0").one()
+    version = db_session.query(WebThemeVersion).filter_by(
+        theme_id=theme.id, version=ONTARIO_THEME_VERSION,
+    ).one()
     template = db_session.query(WebTemplate).filter_by(
         theme_version_id=version.id,
-        qualified_key="ontario@1.0.0:templates:home",
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:templates:home",
     ).one()
 
     rendered = previews.render_html_preview(

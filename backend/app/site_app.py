@@ -370,6 +370,7 @@ def _detail_document(
             if template.theme_version_id:
                 from .web.theme_package import rewrite_theme_asset_urls
                 template_css = rewrite_theme_asset_urls(template_css, template.theme_version_id)
+            linked_part_css = "\n".join(part_css)
             return render_document(
                 body, title=document_title, description=effective_description, canonical_url=effective_canonical,
                 favicon=site_settings["favicon"], noindex=noindex,
@@ -378,7 +379,7 @@ def _detail_document(
                 og_image=effective_image,
                 og_type=og_type or site_settings["og_type"],
                 site_name=site_settings["site_title"],
-                css=f"{global_css}\n{'\n'.join(part_css)}\n{template_css}", base_css=base_css, tokens=tokens,
+                css=f"{global_css}\n{linked_part_css}\n{template_css}", base_css=base_css, tokens=tokens,
             )
         except CompileError:
             # A deleted/inconsistent setting must not take a public detail down.

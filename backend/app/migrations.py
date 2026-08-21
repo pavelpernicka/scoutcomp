@@ -2097,6 +2097,46 @@ def _add_page_source_template_columns(conn: Connection) -> None:
     ))
 
 
+def _remove_legacy_page_template_provenance(conn: Connection) -> None:
+    """Remove the obsolete Page Template columns and their stale foreign key.
+
+    Early consolidation migrations added ``page_template_id`` with a foreign
+    key to ``web_page_templates`` and later dropped that table.  SQLite keeps
+    the foreign-key clause in ``web_pages``; subsequent inserts then fail with
+    ``no such table: main.web_page_templates`` on a clean installation.  Copy
+    any still-recoverable provenance first, then remove both legacy columns.
+    """
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_pages" not in tables:
+        return
+    columns = {column["name"] for column in inspector.get_columns("web_pages")}
+    legacy_columns = {"page_template_id", "page_template_version"} & columns
+    if not legacy_columns:
+        return
+
+    _add_page_source_template_columns(conn)
+    if "page_template_id" in columns and "web_page_templates" in tables:
+        _add_template_usage_mode(conn)
+        _migrate_page_templates_into_web_templates(conn)
+        conn.execute(text(
+            "UPDATE web_pages SET "
+            "source_template_id = COALESCE(source_template_id, ("
+            "SELECT wt.id FROM web_page_templates pt "
+            "JOIN web_templates wt ON wt.qualified_key = pt.qualified_key "
+            "WHERE pt.id = web_pages.page_template_id LIMIT 1)), "
+            "source_template_version = COALESCE(source_template_version, page_template_version) "
+            "WHERE page_template_id IS NOT NULL"
+        ))
+
+    conn.execute(text("DROP INDEX IF EXISTS ix_web_pages_page_template_id"))
+    # SQLite >= 3.35 and PostgreSQL both remove the column-owned FK together
+    # with the column.  The production Python 3.11 image ships newer SQLite.
+    for column_name in ("page_template_version", "page_template_id"):
+        if column_name in legacy_columns:
+            conn.execute(text(f"ALTER TABLE web_pages DROP COLUMN {column_name}"))
+
+
 def _add_web_page_revision_team_snapshot(conn: Connection) -> None:
     """Freeze the team association along with each page publication."""
     inspector = inspect(conn)
@@ -2814,6 +2854,11 @@ MIGRATIONS: List[Migration] = [
         "20260819_generalize_public_event_settings",
         _generalize_public_event_settings,
         "Copy legacy meeting URL and detail settings to event settings",
+    ),
+    Migration(
+        "20260821_remove_legacy_page_template_provenance",
+        _remove_legacy_page_template_provenance,
+        "Remove obsolete page-template columns and their stale foreign key",
     ),
 ]
 

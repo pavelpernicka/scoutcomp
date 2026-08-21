@@ -339,7 +339,8 @@ def test_executable_or_active_asset_types_are_rejected(db_session, tmp_path, ext
     files["manifest.json"] = json.dumps(_manifest(resources=resources)).encode()
     del files["assets/marker.png"]
     files[f"assets/payload{extension}"] = b"<script>alert(1)</script>"
-    with pytest.raises(ThemePackageError, match="Disallowed file type"):
+    message = "SVG contains active or external content" if extension == ".svg" else "Disallowed file type"
+    with pytest.raises(ThemePackageError, match=message):
         install_theme(db_session, _zip(files), storage_root=tmp_path / "themes")
 
 
