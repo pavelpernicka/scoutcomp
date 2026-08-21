@@ -23,9 +23,9 @@ const EMPTY_SETTINGS = {
   og_type: "",
   canonical_url: "",
   post_url_pattern: "/post/{slug}",
-  meeting_url_pattern: "/meeting/{id}",
+  event_url_pattern: "/event/{id}",
   post_detail_template_id: "",
-  meeting_detail_template_id: "",
+  event_detail_template_id: "",
 };
 
 export default function WebAdminSettings() {
@@ -173,9 +173,9 @@ export default function WebAdminSettings() {
                   <div className="form-text">{t("web.settingsPostUrlHint")}</div>
                 </div>
                 <div className="mb-0">
-                  <label className="form-label small fw-semibold">{t("web.settingsMeetingUrl")}</label>
-                  <input className="form-control" value={form.meeting_url_pattern} onChange={(e) => setField("meeting_url_pattern", e.target.value)} />
-                  <div className="form-text">{t("web.settingsMeetingUrlHint")}</div>
+                  <label className="form-label small fw-semibold">{t("web.settingsEventUrl")}</label>
+                  <input className="form-control" value={form.event_url_pattern} onChange={(e) => setField("event_url_pattern", e.target.value)} />
+                  <div className="form-text">{t("web.settingsEventUrlHint")}</div>
                 </div>
                 <hr />
                 <div className="mb-3">
@@ -186,8 +186,8 @@ export default function WebAdminSettings() {
                   </select>
                 </div>
                 <div className="mb-0">
-                  <label className="form-label small fw-semibold">{t("web.settingsMeetingDetailTemplate")}</label>
-                  <select className="form-select" value={form.meeting_detail_template_id} onChange={(e) => setField("meeting_detail_template_id", e.target.value)}>
+                  <label className="form-label small fw-semibold">{t("web.settingsEventDetailTemplate")}</label>
+                  <select className="form-select" value={form.event_detail_template_id} onChange={(e) => setField("event_detail_template_id", e.target.value)}>
                     <option value="">{t("web.settingsNoDetailTemplate")}</option>
                     {detailTemplates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
                   </select>

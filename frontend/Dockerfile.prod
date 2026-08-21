@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 
 WORKDIR /app
 COPY package*.json ./
@@ -13,22 +13,65 @@ FROM nginx:alpine
 
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Create nginx config for React Router
+# Internal SPA gateway. It is deliberately origin-relative: the same image can
+# run on any HTTPS hostname without embedding a deployment URL.
 RUN echo 'server { \
     listen 80; \
-    location /assets/ { \
-        root /usr/share/nginx/html; \
+    server_tokens off; \
+    root /usr/share/nginx/html; \
+    \
+    location = /sw.js { \
         try_files $uri =404; \
+        default_type application/javascript; \
+        add_header Cache-Control "no-cache, no-store, must-revalidate" always; \
+        add_header Service-Worker-Allowed "/" always; \
+    } \
+    location = /manifest.webmanifest { \
+        try_files $uri =404; \
+        default_type application/manifest+json; \
+        add_header Cache-Control "public, max-age=300" always; \
+    } \
+    location = /pwa-192.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
+    } \
+    location = /pwa-512.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
     } \
     location = /favicon.svg { \
-        root /usr/share/nginx/html; \
         try_files $uri =404; \
     } \
-    location / { \
-        proxy_pass http://backend:8000/app-shell; \
+    location /assets/ { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=31536000, immutable" always; \
+    } \
+    location = /robots.txt { \
+        default_type text/plain; \
+        add_header Cache-Control "public, max-age=3600" always; \
+        return 200 "User-agent: *\\nDisallow: /\\n"; \
+    } \
+    location /api/ { \
+        proxy_pass http://backend:8000/; \
+        proxy_http_version 1.1; \
+        proxy_set_header Connection ""; \
         proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
-        proxy_set_header X-Forwarded-Proto $scheme; \
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto; \
+        proxy_read_timeout 60s; \
+    } \
+    location / { \
+        rewrite ^ /app-shell break; \
+        proxy_pass http://backend:8000; \
+        proxy_http_version 1.1; \
+        proxy_set_header Connection ""; \
+        proxy_set_header Host $host; \
+        proxy_set_header X-Real-IP $remote_addr; \
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for; \
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto; \
+        add_header Cache-Control "no-store" always; \
+        add_header X-Robots-Tag "noindex, nofollow" always; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 

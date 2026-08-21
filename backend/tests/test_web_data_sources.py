@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.models import (
+    Config,
     DirectUserPermission,
     DirectUserPermissionDeny,
     PermissionDefinition,
@@ -216,11 +217,11 @@ def test_public_content_urls_follow_validated_site_schemes(db_session):
     event = ScoutEvent(title="Schůzka", kind="meeting", starts_at=_now(), is_public=True)
     db_session.add(event)
     set_config_value(db_session, "web.post_url_pattern", "/aktuality/{slug}")
-    set_config_value(db_session, "web.meeting_url_pattern", "/schuzky/{id}")
+    set_config_value(db_session, "web.event_url_pattern", "/udalosti/{id}")
     db_session.commit()
 
     assert resolve_data_source(db_session, "core.posts")[0]["url"] == "/aktuality/clanek"
-    assert resolve_data_source(db_session, "core.events")[0]["url"] == f"/schuzky/{event.id}"
+    assert resolve_data_source(db_session, "core.events")[0]["url"] == f"/udalosti/{event.id}"
 
 
 def test_collection_sources_accept_a_bounded_offset_for_pagination(db_session):
@@ -400,3 +401,25 @@ def test_posts_source_projects_legacy_html_excerpt_to_plain_public_text(db_sessi
 
     assert _plain_public_excerpt('<p>Ahoj <img src="/api/web/media/2/file"> světe</p>') == "Ahoj světe"
     assert _plain_public_text('<p>Schůzka <img src="/api/web/media/2/file"> dnes</p>') == "Schůzka dnes"
+
+
+def test_explicit_empty_event_settings_do_not_restore_legacy_values(db_session):
+    from app.web.routes_design import _site_settings
+    from app.web.url_schemes import event_pattern
+
+    values = {
+        "web.meeting_url_pattern": "/schuzky/{id}",
+        "web.event_url_pattern": "",
+        "web.meeting_detail_template_id": "42",
+        "web.event_detail_template_id": "",
+    }
+    for key, value in values.items():
+        row = db_session.query(Config).filter_by(key=key).one_or_none()
+        if row is None:
+            db_session.add(Config(key=key, value=value))
+        else:
+            row.value = value
+    db_session.commit()
+
+    assert event_pattern(db_session) == "/event/{id}"
+    assert _site_settings(db_session)["event_detail_template_id"] == ""

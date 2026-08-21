@@ -57,6 +57,7 @@ def _app_shell(db: Session) -> str:
         template = (
             "<!doctype html><html lang=\"cs\"><head><meta charset=\"UTF-8\">"
             "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            '<meta name="robots" content="noindex,nofollow">'
             f"<title>{_APP_SHELL_TITLE}</title><link rel=\"icon\" href=\"{_APP_SHELL_ICON}\"></head>"
             "<body><div id=\"root\"></div><script type=\"module\" src=\"/src/main.jsx\"></script></body></html>"
         )
@@ -120,7 +121,10 @@ def healthcheck():
 @app.get("/app-shell", include_in_schema=False, response_class=HTMLResponse)
 def app_shell(db: Session = Depends(get_db)):
     """Server-rendered HTML shell used by the production SPA web server."""
-    return HTMLResponse(_app_shell(db), headers={"Cache-Control": "no-store"})
+    return HTMLResponse(
+        _app_shell(db),
+        headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+    )
 
 
 # Custom documentation endpoints

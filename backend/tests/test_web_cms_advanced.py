@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import io
 import json
 import zipfile
@@ -12,7 +13,7 @@ from app.config import settings
 from app.models import (
     DirectUserPermission, DirectUserPermissionDeny, PermissionDefinition,
     RegisteredModule, RoleEnum, ScoutEvent, User, WebMedia, WebMenu, WebMenuRevision,
-    WebPage, WebPageRevision, WebPost, WebPostRevision, WebReusableComponent,
+    WebPage, WebPageRevision, WebPost, WebPostRevision, WebReusableComponent, WebSiteStyle,
     WebTemplate, WebSection, WebTheme, WebThemeVersion,
 )
 from app.modules import registry
@@ -237,7 +238,12 @@ def test_pagination_numbered_and_compact_modes(db_session):
     assert 'rel="next"' in compact_html
 
 
-def test_calendar_component_normalises_configuration_and_renders_accessible_month(db_session):
+def test_calendar_component_normalises_configuration_and_renders_accessible_month(db_session, monkeypatch):
+    from app.web import renderer as renderer_module
+    monkeypatch.setattr(
+        renderer_module, "_calendar_now",
+        lambda: datetime(2026, 5, 19, 12, tzinfo=ZoneInfo("Europe/Prague")),
+    )
     compiled = compile_project(project({
         "type": "sc-calendar", "dataSource": "core.events", "kind": "meeting",
         "teamId": "7", "firstDayOfWeek": "monday", "showDescription": "true",
@@ -249,40 +255,53 @@ def test_calendar_component_normalises_configuration_and_renders_accessible_mont
         "teamId": 7, "firstDayOfWeek": "monday", "showDescription": True,
         "components": [],
     }
-    seen = {}
+    seen = []
 
     def resolver(_db, source, params, *_args):
-        seen.update(source=source, params=params)
+        seen.append((source, params))
         return [{
             "title": "Schůzka <bez skriptu>", "description": "Program & hry",
-            "start_at": datetime(2026, 5, 19, 20, 0), "url": "/meeting/12", "color": "#176b44",
+            "start_at": datetime(2026, 5, 19, 20, 0), "url": "/event/12", "color": "#176b44",
         }]
 
     rendered = render_project(
         db_session, compiled.tree, page={"query": {"month": "2026-05"}}, resolver=resolver,
     )
 
-    assert seen["source"] == "core.events"
-    assert seen["params"]["kind"] == "meeting" and seen["params"]["team_id"] == 7
-    assert seen["params"]["overlap"] is True
-    assert seen["params"]["limit"] == 501
+    assert len(seen) == 2
+    assert all(source == "core.events" for source, _params in seen)
+    month_params, upcoming_params = seen[0][1], seen[1][1]
+    assert month_params["kind"] == "meeting" and month_params["team_id"] == 7
+    assert month_params["overlap"] is True and month_params["limit"] == 501
+    assert "to" in month_params
+    assert upcoming_params["overlap"] is True and upcoming_params["limit"] == 501
+    assert "to" not in upcoming_params
+    # Noon in Prague is 10:00 UTC in May; database bounds follow the same UTC
+    # storage contract as the authenticated application calendar.
+    assert upcoming_params["from"] == datetime(2026, 5, 19, 10, 0)
     assert 'data-sc-calendar-month="2026-05"' in rendered
     assert "Květen 2026" in rendered
     assert 'href="?month=2026-04"' in rendered
     assert 'href="?month=2026-06"' in rendered
     assert '<legend>Zobrazení kalendáře</legend>' in rendered
     assert '▦ Měsíc</label>' in rendered and '☷ Seznam</label>' in rendered
-    assert '<span class="sc-calendar-count">1 akce</span>' in rendered
+    assert '<span class="sc-calendar-count sc-calendar-month-count">1 akce</span>' in rendered
+    assert "Probíhající a budoucí akce" in rendered
     assert '<div class="sc-calendar-table" role="grid" aria-label="Kalendář – Květen 2026"' in rendered
     assert 'role="columnheader">Po</div>' in rendered
     assert 'role="gridcell" data-date="2026-05-19"' in rendered
     assert '<div class="sc-calendar-agenda">' in rendered
     assert "Schůzka &lt;bez skriptu&gt;" in rendered
     assert "Program &amp; hry" in rendered
-    assert "/meeting/12" in rendered
+    assert "/event/12" in rendered
 
 
-def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db_session):
+def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db_session, monkeypatch):
+    from app.web import renderer as renderer_module
+    monkeypatch.setattr(
+        renderer_module, "_calendar_now",
+        lambda: datetime(2026, 5, 18, 8, tzinfo=ZoneInfo("Europe/Prague")),
+    )
     compiled = compile_project(project({
         "type": "sc-calendar", "showDescription": True,
     }))
@@ -297,12 +316,12 @@ def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db
     records = [
         # Midnight is exclusive, matching the internal EventMonthCalendar:
         # this event occupies 18, 19 and 20 May, but not 21 May.
-        event(1, "Tábor", datetime(2026, 5, 18, 9), datetime(2026, 5, 21, 0)),
-        event(2, "Schůzka A", datetime(2026, 5, 19, 10), datetime(2026, 5, 19, 12))
+        event(1, "Tábor", datetime(2026, 5, 18, 7), datetime(2026, 5, 20, 22)),
+        event(2, "Schůzka A", datetime(2026, 5, 19, 8), datetime(2026, 5, 19, 10))
         | {"color": "#f8e8a0"},
-        event(3, "Schůzka B", datetime(2026, 5, 19, 11), datetime(2026, 5, 19, 13)),
-        event(4, "Schůzka C", datetime(2026, 5, 19, 12), datetime(2026, 5, 19, 14)),
-        event(5, "Schůzka D", datetime(2026, 5, 19, 13), datetime(2026, 5, 19, 15)),
+        event(3, "Schůzka B", datetime(2026, 5, 19, 9), datetime(2026, 5, 19, 11)),
+        event(4, "Schůzka C", datetime(2026, 5, 19, 10), datetime(2026, 5, 19, 12)),
+        event(5, "Schůzka D", datetime(2026, 5, 19, 11), datetime(2026, 5, 19, 13)),
     ]
     rendered = render_project(
         db_session, compiled.tree, page={"query": {"month": "2026-05"}},
@@ -319,8 +338,8 @@ def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db
     assert 'data-calendar-start="0"' in camp_bar
 
     # Four concurrent one-day events compete with the long event. Desktop
-    # mirrors the internal three-lane cap, while the mobile agenda retains all
-    # events instead of silently dropping them.
+    # mirrors the internal three-lane cap, while the list retains all events
+    # exactly once instead of silently dropping or repeating them.
     may_nineteenth = rendered.split('data-date="2026-05-19"', 1)[1].split("</div>", 1)[0]
     assert '+2 další' in may_nineteenth
     assert '<details class="sc-calendar-overflow">' in may_nineteenth
@@ -333,14 +352,14 @@ def test_calendar_renders_multiday_events_in_stable_lanes_with_daily_overflow(db
         '<time class="sc-calendar-agenda-date" datetime="2026-05-19">', 1,
     )[1].split("</section>", 1)[0]
     assert all(title in agenda_nineteenth for title in (
-        "Tábor", "Schůzka A", "Schůzka B", "Schůzka C", "Schůzka D",
+        "Schůzka A", "Schůzka B", "Schůzka C", "Schůzka D",
     ))
-    assert "Pokračuje do 20. 5." in agenda_nineteenth
-    assert "Popis Tábor" not in agenda_nineteenth
+    assert "Tábor" not in agenda_nineteenth
     agenda_eighteenth = rendered.split(
         '<time class="sc-calendar-agenda-date" datetime="2026-05-18">', 1,
     )[1].split("</section>", 1)[0]
     assert "Popis Tábor" in agenda_eighteenth
+    assert rendered.split('<div class="sc-calendar-agenda">', 1)[1].count(">Tábor</a>") == 1
     assert 'aria-label="Tábor, 18. 5. 2026 09:00 – 21. 5. 2026 00:00"' in rendered
 
 
@@ -362,6 +381,67 @@ def test_calendar_splits_multiday_bar_once_at_each_week_boundary(db_session):
     assert 'data-calendar-start="0" data-calendar-span="2"' in rendered
     assert "sc-calendar-event-bar--continues-after" in rendered
     assert "sc-calendar-event-bar--continues-before" in rendered
+
+
+def test_calendar_grid_keeps_past_events_but_agenda_only_shows_current_and_future(db_session, monkeypatch):
+    from app.web import renderer as renderer_module
+    monkeypatch.setattr(
+        renderer_module, "_calendar_now",
+        lambda: datetime(2026, 5, 19, 12, tzinfo=ZoneInfo("Europe/Prague")),
+    )
+    compiled = compile_project(project({"type": "sc-calendar"}))
+    records = [
+        {"id": 1, "title": "Skončená", "start_at": datetime(2026, 5, 19, 7), "end_at": datetime(2026, 5, 19, 8)},
+        {"id": 2, "title": "Probíhající vícedenní", "start_at": datetime(2026, 5, 18, 9), "end_at": datetime(2026, 5, 20, 12)},
+        {"id": 3, "title": "Budoucí", "start_at": datetime(2026, 5, 20, 16)},
+        {"id": 4, "title": "Budoucí další rok", "start_at": datetime(2027, 6, 20, 16)},
+    ]
+
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"month": "2026-05"}},
+        resolver=lambda *_: records,
+    )
+
+    grid, agenda = rendered.split('<div class="sc-calendar-agenda">', 1)
+    assert "Skončená" in grid
+    assert "Skončená" not in agenda
+    assert "Probíhající vícedenní" in agenda
+    assert agenda.count("Probíhající vícedenní") == 1
+    assert "Pokračuje do 20. 5." in agenda
+    assert "Budoucí" in agenda
+    assert "Budoucí další rok" not in grid
+    assert "Budoucí další rok" in agenda
+    assert ">20. 6. 2027</time>" in agenda
+
+
+def test_calendar_agenda_evaluates_ongoing_boundaries_in_utc(db_session, monkeypatch):
+    from app.web import renderer as renderer_module
+    monkeypatch.setattr(
+        renderer_module, "_calendar_now",
+        lambda: datetime(2026, 5, 19, 12, 0, tzinfo=ZoneInfo("Europe/Prague")),
+    )
+    compiled = compile_project(project({"type": "sc-calendar"}))
+    records = [
+        {
+            "id": 1, "title": "Skončila před minutou",
+            "start_at": datetime(2026, 5, 18, 8),
+            "end_at": datetime(2026, 5, 19, 9, 59),
+        },
+        {
+            "id": 2, "title": "Stále probíhá",
+            "start_at": datetime(2026, 5, 18, 8),
+            "end_at": datetime(2026, 5, 19, 10, 30),
+        },
+    ]
+
+    rendered = render_project(
+        db_session, compiled.tree, page={"query": {"month": "2026-05"}},
+        resolver=lambda *_: records,
+    )
+    _grid, agenda = rendered.split('<div class="sc-calendar-agenda">', 1)
+
+    assert "Skončila před minutou" not in agenda
+    assert "Stále probíhá" in agenda
 
 
 def test_calendar_rejects_months_above_bounded_event_limit(db_session):
@@ -445,6 +525,7 @@ def test_menu_bootstrap_presentations_render_dropdowns_and_footer_columns(db_ses
     assert 'class="sc-menu-list navbar-nav"' in navbar_html
     assert "dropdown-toggle" in navbar_html
     assert "dropdown-menu" in navbar_html
+    assert 'class="sc-menu-link dropdown-item text-dark"' in navbar_html
     assert "<details" not in navbar_html
 
     mobile = compile_project(project({
@@ -465,6 +546,7 @@ def test_menu_bootstrap_presentations_render_dropdowns_and_footer_columns(db_ses
     assert 'class="sc-menu-list row"' in footer_html
     assert 'class="sc-menu-column col"' in footer_html
     assert "Lachtani" in footer_html
+    assert "dropdown-item text-dark" not in footer_html
 
 
 def test_theme_export_declares_user_resources_as_a_template_bundle(db_session):
@@ -1347,7 +1429,7 @@ def test_public_site_resolves_custom_article_url_schema(db_session, monkeypatch)
     assert "Obsah" in response.body.decode()
 
 
-def test_public_meeting_detail_requires_public_event_and_renders_it(db_session, monkeypatch):
+def test_public_event_detail_requires_public_event_and_renders_it(db_session, monkeypatch):
     from app import site_app as site_module
 
     author = User(
@@ -1361,8 +1443,9 @@ def test_public_meeting_detail_requires_public_event_and_renders_it(db_session, 
     )
     db_session.add(event); db_session.commit()
     monkeypatch.setattr(site_module, "SessionLocal", sessionmaker(bind=db_session.bind))
+    monkeypatch.setattr(site_module.settings.site, "public_url", "https://www.example.cz")
 
-    response = site_module.site_meeting(event.id)
+    response = site_module.site_event(event.id)
 
     assert response.status_code == 200
     document = response.body.decode()
@@ -1370,7 +1453,34 @@ def test_public_meeting_detail_requires_public_event_and_renders_it(db_session, 
     assert 'class="web-detail-meta"' in document
     assert 'class="web-detail-author-avatar"' in document
     assert "Vedoucí" in document
-    assert "Koná se 19. 5. 2026" in document
+    assert "<p>meeting</p>" not in document
+    assert "úterý 19. května 2026 · 20:30" in document
+    assert 'datetime="2026-05-19T20:30:00+02:00"' in document
+    assert f'<link rel="canonical" href="https://www.example.cz/event/{event.id}">' in document
+    assert f'<meta property="og:url" content="https://www.example.cz/event/{event.id}">' in document
+    assert '<meta name="twitter:card" content="summary">' in document
+
+    redirect = site_module.legacy_site_meeting(event.id)
+    assert redirect.status_code == 308
+    assert redirect.headers["location"] == f"/event/{event.id}"
+
+
+def test_multiday_event_schedule_separates_start_and_end_for_readability():
+    from app.site_app import _event_schedule
+
+    markup = _event_schedule(
+        datetime(2026, 8, 25, 0, tzinfo=ZoneInfo("Europe/Prague")),
+        datetime(2026, 8, 27, 1, tzinfo=ZoneInfo("Europe/Prague")),
+    )
+
+    assert 'class="sc-event-date-points"' in markup
+    assert "Začátek" in markup and "Konec" in markup
+    assert "Začátek</span> <time" in markup
+    assert "Konec</span> <time" in markup
+    assert "úterý 25. srpna 2026 · 00:00" in markup
+    assert "čtvrtek 27. srpna 2026 · 01:00" in markup
+    assert 'datetime="2026-08-25T00:00:00+02:00"' in markup
+    assert 'datetime="2026-08-27T01:00:00+02:00"' in markup
 
 
 def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
@@ -1877,6 +1987,85 @@ def test_linked_layout_save_reload_publish_preserves_page_css(db_session):
     assert "After" in render_project(db_session, revision.compiled_tree)
 
 
+def test_publishing_linked_layout_refreshes_existing_page_without_losing_css(
+    db_session, monkeypatch,
+):
+    from app.web import routes_templates
+    from app.web.routes_pages import PublishPayload
+
+    original_layout = project(
+        {"type": "text", "tagName": "header", "content": "Old header"},
+        {"type": "sc-slot", "name": "content", "components": []},
+        styles=[{"selectors": [{"name": "shell"}], "style": {"color": "navy"}}],
+    )
+    template = WebTemplate(
+        key="live-layout-update", qualified_key="site:template:live-layout-update",
+        name="Live layout", html="", usage_mode="linked_layout",
+        project_data=deepcopy(original_layout),
+        published_project_data=deepcopy(original_layout),
+        css="", published_css="", draft_version=1, published_version=1,
+    )
+    page = WebPage(
+        slug="linked-live", path_segment="linked-live", path="/linked-live",
+        title="Linked live", data=project(text("Page body")), draft_version=1,
+    )
+    db_session.add_all([template, page]); db_session.flush()
+    page.template_id = template.id
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+    assert "Old header" in revision.rendered_html
+    assert ".shell{color:navy}" in revision.rendered_html
+
+    updated_layout = project(
+        {"type": "text", "tagName": "header", "content": "New header"},
+        {"type": "sc-slot", "name": "content", "components": []},
+        styles=[{"selectors": [{"name": "shell"}], "style": {"color": "#b00075"}}],
+    )
+    template.project_data = updated_layout
+    template.draft_version = 2
+    db_session.commit()
+    monkeypatch.setattr(routes_templates, "_require_action", lambda *_args: None)
+    monkeypatch.setattr(routes_templates, "build_preview", lambda *_args, **_kwargs: {})
+
+    routes_templates.publish_template(
+        template.id, PublishPayload(expected_version=2), db_session, User(id=1, username="publisher"),
+    )
+    db_session.refresh(revision)
+
+    assert "New header" in revision.rendered_html
+    assert "Old header" not in revision.rendered_html
+    assert "Page body" in revision.rendered_html
+    assert ".shell{color:#b00075}" in revision.rendered_html
+
+
+def test_publishing_theme_tokens_refreshes_existing_page_artifact(db_session, monkeypatch):
+    from app.web import routes_design
+    from app.web.routes_pages import PublishPayload
+
+    style = db_session.get(WebSiteStyle, 1) or WebSiteStyle(id=1)
+    style.draft_tokens = {"primary_color": "#b00075"}
+    style.published_tokens = {"primary_color": "#255c9e"}
+    style.draft_css = ""
+    style.published_css = ""
+    style.draft_version = 2
+    style.published_version = 1
+    page = WebPage(
+        slug="token-page", path_segment="token-page", path="/token-page",
+        title="Token page", data=project(text("Styled body")), draft_version=1,
+    )
+    db_session.add_all([style, page]); db_session.commit()
+    revision = publish_page(db_session, page, expected_version=1, user_id=1)
+    assert "--sc-primary-color:#255c9e" in revision.rendered_html
+
+    monkeypatch.setattr(routes_design, "_require_action", lambda *_args: None)
+    routes_design.publish_global_styles(
+        PublishPayload(expected_version=2), db_session, User(id=1, username="publisher"),
+    )
+    db_session.refresh(revision)
+
+    assert "--sc-primary-color:#b00075" in revision.rendered_html
+    assert "--sc-primary-color:#255c9e" not in revision.rendered_html
+
+
 def test_switching_linked_layout_splits_against_the_editor_shell(db_session):
     from app.web.routes_pages import _merged_editor_project
 
@@ -2111,6 +2300,11 @@ def test_ontario_theme_is_seeded_with_assets_and_default_hierarchical_menus(db_s
     version = db_session.query(WebThemeVersion).filter_by(
         theme_id=theme.id, version=ONTARIO_THEME_VERSION,
     ).one()
+    assert version.manifest["config"]["primary_color"]["type"] == "color"
+    assert version.manifest["config"]["footer_color"]["default"] == "#212529"
+    assert version.default_tokens["primary_color"] == "#255c9e"
+    assert "var(--sc-primary-color,#255c9e)" in version.base_css
+    assert ".ontario-footer{background:var(--ontario-dark)!important}" in version.base_css
     assert db_session.get(WebSiteStyle, 1).active_theme_version_id != version.id
     assert db_session.query(WebTemplate).filter_by(theme_version_id=version.id).count() >= 16
     assert db_session.query(WebSection).filter_by(theme_version_id=version.id).count() >= 14

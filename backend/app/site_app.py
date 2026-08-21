@@ -20,12 +20,13 @@ from pathlib import Path
 from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import SessionLocal
 from .models import (
+    Config,
     RegisteredModule,
     ScoutEvent,
     User,
@@ -45,14 +46,15 @@ from .models import (
 from .modules import registry
 from .modules.registration import register_all_modules
 from .routers.config import get_config_value
+from .timezones import utc_storage_to_local
 from .web_render import render_article_body, render_site_page
 from .web.renderer import CompileError, compile_project, render_document, render_project
 from .web.data_sources import is_media_published, safe_public_avatar
 from .web.url_schemes import (
-    DEFAULT_MEETING_URL_PATTERN,
     DEFAULT_POST_URL_PATTERN,
+    event_url,
+    match_event_pattern,
     match_pattern,
-    meeting_url,
     post_url,
 )
 from .web.site_identity import DEFAULT_TITLE_PATTERN, format_document_title, public_asset_url
@@ -74,6 +76,20 @@ async def public_security_headers(request: Request, call_next):
         "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; "
         "font-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     )
+    # Public output contains no session-specific data. Short HTML caching lets
+    # an edge proxy absorb crawlers and traffic spikes while keeping publishes
+    # visible quickly; immutable theme assets retain their route-level policy.
+    if response.status_code == 200 and "Cache-Control" not in response.headers:
+        if request.url.path == "/robots.txt":
+            response.headers["Cache-Control"] = "public, max-age=3600"
+        elif request.url.path == "/sitemap.xml":
+            response.headers["Cache-Control"] = "public, max-age=300, stale-if-error=86400"
+        elif request.url.path.startswith("/media/"):
+            response.headers["Cache-Control"] = "public, max-age=3600, stale-if-error=86400"
+        elif response.headers.get("content-type", "").startswith("text/html"):
+            response.headers["Cache-Control"] = (
+                "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400"
+            )
     return response
 
 DEFAULT_SITE_TITLE = "ScoutComp"
@@ -112,6 +128,11 @@ def _site_settings(db: Session) -> dict:
         "site_tagline": _get("web.site_tagline"),
         "site_meta": _get("web.site_meta"),
         "site_logo": public_asset_url(_get("web.site_logo")),
+        "meta_description": _get("web.meta_description"),
+        "og_title": _get("web.og_title"),
+        "og_description": _get("web.og_description"),
+        "og_image": public_asset_url(_get("web.og_image")),
+        "og_type": _get("web.og_type", "website"),
         "contact_address": _get("web.contact_address"),
         "contact_phone": _get("web.contact_phone"),
         "contact_email": _get("web.contact_email"),
@@ -120,6 +141,72 @@ def _site_settings(db: Session) -> dict:
         "social_instagram": _get("web.social_instagram"),
         "social_whatsapp": _get("web.social_whatsapp"),
     }
+
+
+def _normalise_public_base(value: str | None) -> str:
+    """Return an absolute HTTP(S) origin, never a user-controlled path."""
+    parsed = urlparse(value or "")
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.netloc
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        return ""
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _public_site_base(db: Session, request: Request | None = None) -> str:
+    """Resolve the one deployment-owned public origin used by SEO output.
+
+    ``SCOUTCOMP_SITE_PUBLIC_URL`` is authoritative. The DB key is retained as
+    a migration fallback only. Request origin keeps local development usable,
+    but production should always configure the environment value so Host input
+    never becomes part of immutable publication artifacts.
+    """
+    configured = _normalise_public_base(settings.site.public_url)
+    if configured:
+        return configured
+    legacy = _normalise_public_base(get_config_value(db, "web.site_base_url"))
+    if legacy:
+        return legacy
+    return _normalise_public_base(str(request.base_url)) if request is not None else ""
+
+
+def _absolute_public_url(
+    db: Session,
+    path: str,
+    *,
+    explicit: str = "",
+    request: Request | None = None,
+) -> str:
+    """Resolve a safe explicit canonical or build a self-canonical URL."""
+    explicit_value = str(explicit or "").strip()
+    if explicit_value:
+        parsed = urlparse(explicit_value)
+        if parsed.scheme in {"http", "https"} and parsed.netloc and not parsed.username and not parsed.password:
+            return explicit_value
+        if explicit_value.startswith("/"):
+            base = _public_site_base(db, request)
+            return f"{base}{explicit_value}" if base else ""
+    base = _public_site_base(db, request)
+    safe_path = path if str(path or "").startswith("/") else f"/{path}"
+    return f"{base}{safe_path}" if base else ""
+
+
+def _absolute_public_asset(db: Session, value: str, request: Request | None = None) -> str:
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return value
+    if value.startswith("/"):
+        base = _public_site_base(db, request)
+        return f"{base}{value}" if base else value
+    return ""
 
 
 def _main_nav(db: Session) -> list[tuple[str, str]]:
@@ -247,12 +334,20 @@ def _detail_document(
     seo_title: str | None = None,
     description: str = "",
     canonical_url: str = "",
+    public_path: str = "/",
+    og_image: str = "",
+    og_type: str = "website",
     noindex: bool = False,
 ) -> str:
     """Render a safe article/event fragment through an optional layout."""
     raw_id = get_config_value(db, setting_key)
     site_settings = _site_settings(db)
     document_title = format_document_title(seo_title or title, site_settings["site_title"], site_settings["title_pattern"])
+    effective_description = description or site_settings["meta_description"]
+    effective_canonical = _absolute_public_url(
+        db, public_path, explicit=canonical_url,
+    )
+    effective_image = _absolute_public_asset(db, og_image or site_settings["og_image"])
     try:
         template_id = int(raw_id) if raw_id else None
     except (TypeError, ValueError):
@@ -261,19 +356,28 @@ def _detail_document(
     tokens, global_css, base_css = _published_style(db)
     if template and isinstance(template.published_project_data, dict):
         try:
-            tree = compile_project(template.published_project_data).tree
+            compiled_template = compile_project(template.published_project_data)
+            tree = compiled_template.tree
             part_css: list[str] = []
             body = render_project(
                 db, tree, slot_tree={"type": "sc-detail-content"},
                 page={"title": title, "detail_html": detail_html}, site=_site_settings(db), css_layers=part_css,
             )
-            template_css = template.published_css or ""
+            # GrapesJS can persist layout rules in Project Data, in the
+            # dedicated CSS field, or in both.  Both belong to the linked
+            # template publication and must survive template updates.
+            template_css = f"{compiled_template.css}\n{template.published_css or ''}"
             if template.theme_version_id:
                 from .web.theme_package import rewrite_theme_asset_urls
                 template_css = rewrite_theme_asset_urls(template_css, template.theme_version_id)
             return render_document(
-                body, title=document_title, description=description, canonical_url=canonical_url,
+                body, title=document_title, description=effective_description, canonical_url=effective_canonical,
                 favicon=site_settings["favicon"], noindex=noindex,
+                og_title=document_title,
+                og_description=site_settings["og_description"] or effective_description,
+                og_image=effective_image,
+                og_type=og_type or site_settings["og_type"],
+                site_name=site_settings["site_title"],
                 css=f"{global_css}\n{'\n'.join(part_css)}\n{template_css}", base_css=base_css, tokens=tokens,
             )
         except CompileError:
@@ -281,8 +385,13 @@ def _detail_document(
             pass
     return render_document(
         f'<main class="web-detail-fallback"><h1>{escape(title)}</h1>{detail_html}</main>',
-        title=document_title, description=description, canonical_url=canonical_url,
+        title=document_title, description=effective_description, canonical_url=effective_canonical,
         favicon=site_settings["favicon"], noindex=noindex,
+        og_title=document_title,
+        og_description=site_settings["og_description"] or effective_description,
+        og_image=effective_image,
+        og_type=og_type or site_settings["og_type"],
+        site_name=site_settings["site_title"],
         css=global_css, base_css=base_css, tokens=tokens,
     )
 
@@ -336,6 +445,9 @@ def _render(db: Session, page: WebPage, extra_head: str = "", query: dict[str, s
         footer_extra=_footer_extra(settings_data),
         document_title=format_document_title(page.title, settings_data["site_title"], settings_data["title_pattern"]),
         favicon=settings_data["favicon"],
+        canonical_url=_absolute_public_url(db, page.path or ("/" if page.slug == "main" else f"/{page.slug}")),
+        og_image=_absolute_public_asset(db, settings_data["og_image"]),
+        og_type=settings_data["og_type"],
         extra_head=extra_head,
     )
 
@@ -432,6 +544,16 @@ def _render_revision(
                 site_meta=settings_data["site_meta"], nav_items=_main_nav(db),
                 enabled_components=_enabled_components(db), social_links=_social_links(db, settings_data),
                 footer_extra=_footer_extra(settings_data),
+                canonical_url=_absolute_public_url(
+                    db,
+                    revision.path or page.path or f"/{revision.path_segment or page.slug}",
+                    explicit=revision.canonical_url or "",
+                ),
+                og_image=(
+                    _absolute_public_asset(db, f"/media/{revision.og_image_id}/file")
+                    if revision.og_image_id else _absolute_public_asset(db, settings_data["og_image"])
+                ),
+                og_type=settings_data["og_type"],
             )
     page_context = {
         "id": page.id,
@@ -449,9 +571,10 @@ def _render_revision(
             if revision.template_id else db.query(WebTemplate).filter_by(key=revision.template_key).one_or_none()
         )
         if template and template.published_project_data:
-            render_tree = compile_project(template.published_project_data).tree
+            compiled_template = compile_project(template.published_project_data)
+            render_tree = compiled_template.tree
             slot_tree = tree
-            template_css = template.published_css or ""
+            template_css = f"{compiled_template.css}\n{template.published_css or ''}"
             if template.theme_version_id:
                 from .web.theme_package import rewrite_theme_asset_urls
                 template_css = rewrite_theme_asset_urls(template_css, template.theme_version_id)
@@ -472,13 +595,31 @@ def _render_revision(
     linked_css = "\n".join(part_css)
     settings_data = _site_settings(db)
     page_title = revision.seo_title or revision.title or page.title
+    page_path = revision.path or page.path or f"/{revision.path_segment or page.slug}"
+    canonical_url = _absolute_public_url(
+        db, page_path, explicit=revision.canonical_url or "",
+    )
+    og_image = (
+        _absolute_public_asset(db, f"/media/{revision.og_image_id}/file")
+        if revision.og_image_id else _absolute_public_asset(db, settings_data["og_image"])
+    )
+    description = revision.meta_description or settings_data["meta_description"]
     return render_document(
         body,
         title=format_document_title(page_title, settings_data["site_title"], settings_data["title_pattern"]),
-        description=revision.meta_description or "",
-        canonical_url=revision.canonical_url or "",
+        description=description,
+        canonical_url=canonical_url,
         favicon=settings_data["favicon"],
         noindex=revision.noindex,
+        og_title=(
+            settings_data["og_title"]
+            if page_path == "/" and settings_data["og_title"]
+            else format_document_title(page_title, settings_data["site_title"], settings_data["title_pattern"])
+        ),
+        og_description=settings_data["og_description"] or description,
+        og_image=og_image,
+        og_type=settings_data["og_type"],
+        site_name=settings_data["site_title"],
         css=f"{global_css}\n{linked_css}\n{css}",
         base_css=base_css,
         tokens=tokens,
@@ -508,16 +649,11 @@ def homepage(request: Request):
         session.close()
 
 
-def _public_base(value: str | None) -> str:
-    parsed = urlparse(value or "")
-    return (value or "").rstrip("/") if parsed.scheme in {"http", "https"} and parsed.netloc else ""
-
-
 @app.get("/sitemap.xml")
-def sitemap():
+def sitemap(request: Request):
     session = SessionLocal()
     try:
-        base = _public_base(get_config_value(session, "web.site_base_url"))
+        base = _public_site_base(session, request)
         pages = session.query(WebPage).filter(
             WebPage.published.is_(True), WebPage.deleted_at.is_(None),
         ).order_by(WebPage.path.asc()).all()
@@ -549,7 +685,7 @@ def sitemap():
             urls.append(f"<url><loc>{escape((base or '').rstrip('/') + post_url(session, slug))}</loc></url>")
         events = session.query(ScoutEvent).filter(ScoutEvent.is_public.is_(True)).order_by(ScoutEvent.id.asc()).all()
         for event in events:
-            urls.append(f"<url><loc>{escape((base or '').rstrip('/') + meeting_url(session, event.id))}</loc></url>")
+            urls.append(f"<url><loc>{escape((base or '').rstrip('/') + event_url(session, event.id))}</loc></url>")
         body = (
             '<?xml version="1.0" encoding="UTF-8"?>'
             '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
@@ -561,10 +697,10 @@ def sitemap():
 
 
 @app.get("/robots.txt")
-def robots():
+def robots(request: Request):
     session = SessionLocal()
     try:
-        base = _public_base(get_config_value(session, "web.site_base_url"))
+        base = _public_site_base(session, request)
     finally:
         session.close()
     return Response(
@@ -575,8 +711,47 @@ def robots():
     )
 
 
-@app.get("/meeting/{event_id}", response_class=HTMLResponse)
-def site_meeting(event_id: int):
+_CZECH_WEEKDAYS = ("pondělí", "úterý", "středa", "čtvrtek", "pátek", "sobota", "neděle")
+_CZECH_MONTHS_GENITIVE = (
+    "", "ledna", "února", "března", "dubna", "května", "června",
+    "července", "srpna", "září", "října", "listopadu", "prosince",
+)
+
+
+def _event_schedule(start: datetime, end: datetime | None) -> str:
+    """Render one concise, timezone-aware event schedule."""
+    def visible_point(value: datetime) -> str:
+        return (
+            f"{_CZECH_WEEKDAYS[value.weekday()]} {value.day}. "
+            f"{_CZECH_MONTHS_GENITIVE[value.month]} {value.year} · {value:%H:%M}"
+        )
+
+    day = f"{_CZECH_WEEKDAYS[start.weekday()]} {start.day}. {_CZECH_MONTHS_GENITIVE[start.month]} {start.year}"
+    if end is None:
+        visible = f"{day} · {start:%H:%M}"
+    elif start.date() == end.date():
+        visible = f"{day} · {start:%H:%M}–{end:%H:%M}"
+    else:
+        return (
+            '<div class="sc-event-fact sc-event-fact--schedule">'
+            '<i class="fa-solid fa-calendar-days" aria-hidden="true"></i>'
+            '<div class="sc-event-date-points">'
+            '<div class="sc-event-date-point"><span class="sc-event-fact-label">Začátek</span> '
+            f'<time datetime="{escape(start.isoformat(), quote=True)}">{escape(visible_point(start))}</time></div>'
+            '<div class="sc-event-date-point"><span class="sc-event-fact-label">Konec</span> '
+            f'<time datetime="{escape(end.isoformat(), quote=True)}">{escape(visible_point(end))}</time></div>'
+            '</div></div>'
+        )
+    return (
+        '<div class="sc-event-fact">'
+        '<i class="fa-solid fa-calendar-days" aria-hidden="true"></i>'
+        '<div><span class="sc-event-fact-label">Termín</span>'
+        f'<time datetime="{escape(start.isoformat(), quote=True)}">{escape(visible)}</time></div></div>'
+    )
+
+
+@app.get("/event/{event_id}", response_class=HTMLResponse)
+def site_event(event_id: int):
     """Public detail of an event that is explicitly safe for the website."""
     session = SessionLocal()
     try:
@@ -585,27 +760,59 @@ def site_meeting(event_id: int):
             ScoutEvent.is_public.is_(True),
         ).one_or_none()
         if not event:
-            raise HTTPException(404, "Schůzka nebyla nalezena")
-        details = []
-        if event.starts_at:
-            details.append(f'<p><strong>Začátek:</strong> {escape(event.starts_at.isoformat(sep=" ", timespec="minutes"))}</p>')
-        if event.ends_at:
-            details.append(f'<p><strong>Konec:</strong> {escape(event.ends_at.isoformat(sep=" ", timespec="minutes"))}</p>')
+            raise HTTPException(404, "Událost nebyla nalezena")
+        starts_at = utc_storage_to_local(event.starts_at)
+        ends_at = utc_storage_to_local(event.ends_at)
+        details = [_event_schedule(starts_at, ends_at)] if starts_at else []
         if event.location:
-            details.append(f'<p><strong>Místo:</strong> {escape(event.location)}</p>')
+            details.append(
+                '<div class="sc-event-fact">'
+                '<i class="fa-solid fa-location-dot" aria-hidden="true"></i>'
+                '<div><span class="sc-event-fact-label">Místo</span>'
+                f'<span>{escape(event.location)}</span></div></div>'
+            )
         author = session.query(User).filter(User.id == event.created_by_id).one_or_none() if event.created_by_id else None
-        meta = _detail_meta(author, event.starts_at, date_label="Koná se")
+        meta = _detail_meta(author, None, date_label="")
+        description = render_article_body(event.description or "")
         body = (
             '<article class="sc-event-detail">'
-            f'<p>{escape(event.kind or "event")}</p>'
-            f'{meta}{"".join(details)}<div>{render_article_body(event.description or "")}</div></article>'
+            f'<div class="sc-event-facts">{"".join(details)}</div>'
+            f'{meta}'
+            f'<div class="sc-event-description">{description}</div>'
+            '</article>'
         )
+        event_template_setting = session.query(Config).filter_by(
+            key="web.event_detail_template_id",
+        ).one_or_none()
         return HTMLResponse(_detail_document(
-            session, setting_key="web.meeting_detail_template_id", detail_html=body,
-            title=event.title, description=(event.description or "")[:300],
+            session,
+            setting_key=(
+                "web.event_detail_template_id"
+                if event_template_setting is not None
+                else "web.meeting_detail_template_id"
+            ),
+            detail_html=body,
+            title=event.title,
+            description=(event.description or "")[:300],
+            public_path=event_url(session, event.id),
         ))
     finally:
         session.close()
+
+
+@app.get("/meeting/{event_id}", include_in_schema=False)
+def legacy_site_meeting(event_id: int):
+    """Preserve historic links while exposing /event as the canonical route."""
+    session = SessionLocal()
+    try:
+        return RedirectResponse(event_url(session, event_id), status_code=308)
+    finally:
+        session.close()
+
+
+# Compatibility for internal callers and older tests. It renders the canonical
+# event detail without leaking the historic meeting terminology publicly.
+site_meeting = site_event
 
 @app.get("/theme-assets/{theme_version_id}/{asset_path:path}")
 def site_theme_asset(theme_version_id: int, asset_path: str):
@@ -708,7 +915,14 @@ def site_post(slug: str):
         if revision is not None:
             return HTMLResponse(_detail_document(
                 session, setting_key="web.post_detail_template_id", detail_html=detail_body,
-                title=title, seo_title=seo_title, description=description, canonical_url=canonical_url, noindex=noindex,
+                title=title,
+                seo_title=seo_title,
+                description=description,
+                canonical_url=canonical_url,
+                public_path=post_url(session, revision.slug or post.slug),
+                og_image=(f"/media/{revision.og_image_id or cover_id}/file" if (revision.og_image_id or cover_id) else ""),
+                og_type="article",
+                noindex=noindex,
             ))
         # Pre-snapshot compatibility has no linked layout to render the page
         # heading, therefore it retains one semantic title of its own.
@@ -724,6 +938,14 @@ def site_post(slug: str):
             footer_extra=_footer_extra(settings_data), body_override=legacy_post_body,
             document_title=format_document_title(seo_title, settings_data["site_title"], settings_data["title_pattern"]),
             favicon=settings_data["favicon"],
+            canonical_url=_absolute_public_url(
+                session, post_url(session, post.slug), explicit=canonical_url,
+            ),
+            og_image=_absolute_public_asset(
+                session, f"/media/{post.og_image_id or cover_id}/file"
+                if (post.og_image_id or cover_id) else settings_data["og_image"],
+            ),
+            og_type="article",
         ))
     finally:
         session.close()
@@ -760,11 +982,9 @@ def nested_site_page(page_path: str, request: Request):
         )
         if post_slug is not None:
             return site_post(post_slug)
-        meeting_id = match_pattern(
-            session, "web.meeting_url_pattern", DEFAULT_MEETING_URL_PATTERN, "id", path, label="Meeting",
-        )
-        if meeting_id is not None:
-            return site_meeting(int(meeting_id))
+        event_id = match_event_pattern(session, path)
+        if event_id is not None:
+            return site_event(int(event_id))
         page = _find_published_page(session, f"/{page_path}")
         if not page:
             raise HTTPException(404, "Stránka nebyla nalezena")

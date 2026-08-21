@@ -85,6 +85,8 @@ Core options live in `config.yaml` and can be overridden with environment variab
 - global `SCOUTCOMP_SECRET_KEY` — JWT signing key (required for production)
 - global `SCOUTCOMP_DB_URL` — SQLAlchemy connection URL (defaults to local SQLite)
 - `app.default_language` / `app.supported_languages` — localization defaults
+- `app.timezone` or `SCOUTCOMP_TIMEZONE` — IANA timezone used for calendar display (defaults to `Europe/Prague`)
+- `app.push.*` or `SCOUTCOMP_PUSH_*` — optional stable VAPID configuration for browser notifications
 - `app.features.allow_self_registration` — enable member sign-up via join code
 - `app.developer_mode` or `SCOUTCOMP_DEVELOPER_MODE` — allow bootstrap of admin users when developing or on first run
 
@@ -130,6 +132,23 @@ docker-compose up
 ```
 
 ### Production Deployment
+
+Produkční Compose spouští tři oddělené služby nad jednou databází a adresářem
+`./data`:
+
+| Služba | Proces v kontejneru | Port v kontejneru | Výchozí port na hostu | Veřejné použití |
+| --- | --- | ---: | ---: | --- |
+| `backend` | FastAPI `app.main:app` | 8000 | `${SCOUTCOMP_BACKEND_PORT}` (např. 8001) | API pod `https://app…/api/` |
+| `frontend` | nginx se SPA/PWA | 80 | `${SCOUTCOMP_FRONTEND_PORT}` (např. 3200) | celé `https://app…/` kromě `/api/` |
+| `site` | FastAPI `app.site_app:app` | 8090 | `${SCOUTCOMP_SITE_PORT}` (např. 8090) | celé `https://www…/` |
+
+Všechny publikované porty jsou v `docker-compose.prod.yml` vázané pouze na
+`127.0.0.1`; do internetu se vystavuje jen edge nginx na 80/443. Hodnoty portů
+se nastavují v kořenovém `.env`. Stejné hodnoty musí být v `server` řádcích
+upstreamů v `deploy/nginx/scoutcomp.conf.example`. Porty uvnitř kontejnerů
+`8000`, `80` a `8090` neměňte, pokud zároveň neupravíte Compose, healthchecky a
+proxy konfiguraci.
+
 - Create `.env` file in projects top-level directory:
 ```bash
 SCOUTCOMP_SECRET_KEY=aaabbbccc
@@ -138,57 +157,75 @@ SCOUTCOMP_DEVELOPER_MODE=false
 SCOUTCOMP_BACKEND_PORT=8001
 SCOUTCOMP_FRONTEND_PORT=3200
 SCOUTCOMP_SITE_PORT=8090
-SCOUTCOMP_SITE_PUBLIC_URL="https://site.some.address.tld"
+SCOUTCOMP_SITE_PUBLIC_URL="https://www.example.cz"
+SCOUTCOMP_TIMEZONE="Europe/Prague"
+# Optional browser notifications (Web Push):
+SCOUTCOMP_PUSH_ENABLED=true
+SCOUTCOMP_PUSH_VAPID_PUBLIC_KEY="..."
+SCOUTCOMP_PUSH_VAPID_PRIVATE_KEY="..."
+SCOUTCOMP_PUSH_VAPID_SUBJECT="mailto:admin@some.address.tld"
+# Optional comma-separated override; defaults cover Chrome, Firefox, Safari and Edge:
+SCOUTCOMP_PUSH_ALLOWED_HOSTS="fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com"
 ```
 - Generate value of `SCOUTCOMP_SECRET_KEY` using f.e. `openssl rand -hex 32`
+- `SCOUTCOMP_SITE_PUBLIC_URL` is the canonical **origin of the public website**.
+  Use only `https://host` without a path, query or fragment. It is used for
+  absolute canonical links, `sitemap.xml` and `robots.txt`; after changing it,
+  run **Web → Regenerate public pages** because page HTML is an immutable
+  publication artifact.
+- The PWA does not have a configured target hostname. Its manifest, service
+  worker and API URLs are same-origin and therefore the same image can be
+  deployed at any HTTPS hostname, provided the app is mounted at `/`. PWA
+  installation and Web Push require HTTPS (localhost is the development
+  exception). Generate the VAPID key pair once and keep it stable.
 - Test current setup using `docker compose -f docker-compose.prod.yml up -d --build`
-- If it gives errors about ports in use, change them in environment
-- If it works, you can set-up autostart by changing `restart` to `allways` in `docker-compose.prod.yml` or f.e. using systemd service
-- Set up reverse proxy using nginx:
-  - Create config /etc/nginx/sites-available/scoutcomp:
-  ```bash
-  server {
-    server_name some.address.tld;
+- If a loopback port is already occupied, change the matching
+  `SCOUTCOMP_*_PORT` value in `.env` **and** its nginx upstream.
+- Containers already use `restart: unless-stopped`; Docker itself must be
+  enabled at boot (or the Compose project can be managed by systemd).
+- Put the authenticated app and public website on separate origins. The app
+  service worker owns scope `/` and must never control public website pages:
+  - `app.example.cz` → frontend/PWA; `/api/` → authenticated API
+  - `www.example.cz` → public SSR website only
+- A complete TLS, proxy-cache, rate-limit and upstream keepalive example is in
+  [`deploy/nginx/scoutcomp.conf.example`](deploy/nginx/scoutcomp.conf.example).
+  Replace hostnames/certificate paths, enable it, run `nginx -t`, and only then
+  reload nginx.
 
-    # Frontend
-    location / {
-      proxy_pass http://127.0.0.1:3200;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
+The authenticated app has no target-domain setting: navigation, API calls,
+manifest and service worker are same-origin. `SCOUTCOMP_SITE_PUBLIC_URL` is a
+different value—the canonical origin of the public SSR website used by search
+engines. A non-standard public HTTPS port is allowed as part of that origin,
+for example `https://www.example.cz:8443`, although port 443 is recommended.
 
-    # Backend
-    location /api/ {
-      proxy_pass http://127.0.0.1:8001/;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
+### Moving to another domain
 
-    listen 80;
-  }
+1. Point the new DNS name at the edge proxy and issue its TLS certificate.
+2. Change `SCOUTCOMP_SITE_PUBLIC_URL` for the public site, redeploy and run a
+   full public-page regeneration.
+3. Keep the old **public website** domain online and permanently redirect every
+   path/query to the new hostname. Submit the new sitemap in Search Console.
+4. A PWA installation, Cache Storage and Push subscription belong to a browser
+   origin. When the **app** hostname changes, browsers treat it as a new PWA;
+   users must open/install the new origin and enable notifications again. VAPID
+   keys may remain the same, but they cannot migrate an origin-bound subscription.
 
-  # Visitor-facing website uses a separate hostname and application.
-  server {
-    server_name site.some.address.tld;
+### Capacity and scaling
 
-    location / {
-      proxy_pass http://127.0.0.1:8090;
-      proxy_set_header Host $host;
-      proxy_set_header X-Real-IP $remote_addr;
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    listen 80;
-  }
-
-  ```
-  - Activate this config: `ln -s /etc/nginx/sites-available/scoutcomp /etc/nginx/sites-enabled/`
-  - Reload nginx: `systemctl reload nginx`
+- The included SQLite setup is intended for a small, single-node installation.
+  Connections use WAL, foreign-key enforcement and a 30-second busy timeout so
+  short publication/write bursts do not unnecessarily block public reads.
+  The sample nginx caches public GET/HEAD responses briefly, locks cache fills
+  and can serve stale pages during upstream failures, which absorbs normal
+  crawler traffic and short spikes.
+- For sustained traffic or multiple application replicas, use PostgreSQL,
+  shared media/object storage and a separate one-shot migration job before
+  starting multiple API/site workers. Do not scale SQLite writers horizontally.
+- Public page bodies are pre-rendered immutable artifacts, but post/event
+  details and media-publication checks still reach the database. Monitor request
+  latency, database locks, 5xx responses and nginx cache hit ratio before adding
+  replicas. A dependency-indexed artifact/media reference table is the next
+  architectural step for substantially larger sites.
   
 # Frontend Translation System
 

@@ -14,6 +14,7 @@ import api, {
   persistAuthTokens,
   setAuthTokens,
 } from "../services/api";
+import { removeCurrentPushSubscription } from "../utils/pushNotifications";
 
 export class PasswordChangeRequiredError extends Error {
   constructor(message) {
@@ -46,11 +47,15 @@ export function AuthProvider({ children }) {
         if (profileRequestRef.current?.promise === request) setProfile(data);
       } catch (error) {
         if (profileRequestRef.current?.promise !== request) return;
-        // An expired session is a normal state; clear it without a noisy console error.
-        if (error.response?.status !== 401) console.error("Unable to load profile", error);
-        persistTokens(null);
-        setProfile(null);
-        clearAuthTokens();
+        // Preserve the mobile/PWA session while offline; only an explicit auth
+        // rejection means the stored credentials are no longer usable.
+        if (error.response?.status === 401) {
+          persistTokens(null);
+          setProfile(null);
+          clearAuthTokens();
+        } else {
+          console.error("Unable to load profile", error);
+        }
       } finally {
         if (profileRequestRef.current?.promise === request) {
           profileRequestRef.current = null;
@@ -117,6 +122,12 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    // Give device cleanup a short chance while the bearer token is still
+    // present, but never let service-worker/provider availability block logout.
+    await Promise.race([
+      removeCurrentPushSubscription().catch(() => undefined),
+      new Promise((resolve) => window.setTimeout(resolve, 1000)),
+    ]);
     if (tokens?.refreshToken) {
       try {
         await api.post("/auth/logout", { refresh_token: tokens.refreshToken });

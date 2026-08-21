@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlparse
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -118,8 +118,10 @@ SITE_SETTING_KEYS = (
     "web.social_instagram",
     "web.social_whatsapp",
     "web.post_url_pattern",
+    "web.event_url_pattern",
     "web.meeting_url_pattern",
     "web.post_detail_template_id",
+    "web.event_detail_template_id",
     "web.meeting_detail_template_id",
 )
 

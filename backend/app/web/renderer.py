@@ -18,6 +18,8 @@ from urllib.parse import urlparse
 
 from sqlalchemy.orm import Session
 
+from ..timezones import application_timezone, local_to_utc_storage, utc_storage_to_local
+
 
 MAX_DEPTH = 40
 MAX_NODES = 5_000
@@ -106,6 +108,7 @@ BUILDER_LAYOUT_CSS = (
     ".sc-menu-dropdown{display:none;min-width:12rem;padding:.35rem;background:var(--sc-menu-surface,#fff);box-shadow:0 .5rem 1.25rem rgba(0,0,0,.16)}"
     ".sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:absolute;z-index:20;left:0;top:100%}"
     ".sc-menu-dropdown .sc-menu-dropdown{left:100%;top:0}"
+    "@media (min-width:576px){.sc-menu:not(.sc-menu--footer) .sc-menu-dropdown .sc-menu-link{color:var(--sc-menu-dropdown-text,#252b31)!important}}"
     ".sc-menu--footer .sc-menu-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.25rem 1rem}"
     ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
     "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
@@ -116,8 +119,9 @@ BUILDER_LAYOUT_CSS = (
     ".sc-calendar-day--outside{background:#f5f7f6}.sc-calendar-day--outside .sc-calendar-day-number{opacity:.55}.sc-calendar-day--today{background:#d8f3dc;box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent)}.sc-calendar-day-number{display:block;margin-bottom:.35rem;font-weight:700}"
     ".sc-calendar-event{display:block;min-width:0;padding:.2rem .35rem;border-radius:.3rem;background:var(--sc-calendar-event-color,#176b44);color:var(--sc-calendar-event-text,#fff);font-weight:700;text-decoration:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:filter .14s ease,box-shadow .14s ease}.sc-calendar-event:hover,.sc-calendar-event:focus-visible{filter:brightness(1.06);box-shadow:0 .18rem .45rem rgba(0,0,0,.18)}.sc-calendar-event-bar{position:absolute;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .15rem);top:calc(2rem + (var(--sc-calendar-lane) - 1) * 1.65rem);width:calc((100% / 7) * var(--sc-calendar-span) - .3rem);height:1.45rem;line-height:1.05rem;z-index:2}.sc-calendar-event-bar--continues-before{border-top-left-radius:.08rem;border-bottom-left-radius:.08rem}.sc-calendar-event-bar--continues-after{border-top-right-radius:.08rem;border-bottom-right-radius:.08rem}"
     ".sc-calendar-event-time{font-weight:800}.sc-calendar-continuation{font-weight:800}.sc-calendar-overflow{position:relative;z-index:12;float:right;margin-top:-1.9rem}.sc-calendar-overflow>summary{display:grid;min-width:3.25rem;min-height:1.55rem;place-items:center;padding:0 .35rem;border:1px solid #83928b;border-radius:.3rem;background:var(--sc-calendar-surface);color:#43534b;cursor:pointer;font-size:.78em;font-weight:800;list-style:none}.sc-calendar-overflow>summary::-webkit-details-marker{display:none}.sc-calendar-overflow>summary:hover,.sc-calendar-overflow>summary:focus-visible{border-color:var(--sc-calendar-accent);color:var(--sc-calendar-accent);outline:2px solid color-mix(in srgb,var(--sc-calendar-accent) 35%,transparent);outline-offset:1px}.sc-calendar-overflow-list{position:absolute;inset-block-start:calc(100% + .25rem);inset-inline-start:0;display:grid;width:min(18rem,75vw);max-height:16rem;gap:.4rem;margin:0;padding:.55rem;overflow:auto;border:1px solid var(--sc-calendar-line);border-radius:.35rem;background:var(--sc-calendar-surface);box-shadow:0 .55rem 1.35rem rgba(0,0,0,.2);list-style:none}.sc-calendar-day:nth-child(n+5) .sc-calendar-overflow-list{inset-inline-start:auto;inset-inline-end:0}.sc-calendar-overflow-list .sc-calendar-agenda-event{padding:.45rem .55rem;border-inline-start:.25rem solid var(--sc-calendar-event-color,#176b44);background:#f5f7f6}.sc-calendar-overflow-list .sc-calendar-agenda-range{display:block;margin-top:.1rem;font-size:.82em}"
-    ".sc-calendar-view-switch{display:flex;align-items:center;margin:0 0 .75rem;padding:0;border:0}.sc-calendar-view-switch legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.sc-calendar-view-input{position:absolute;opacity:0;pointer-events:none}.sc-calendar-view-label{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .8rem;border:1px solid var(--sc-calendar-accent);color:var(--sc-calendar-accent);cursor:pointer;font-weight:700}.sc-calendar-view-label:first-of-type{border-radius:.35rem 0 0 .35rem}.sc-calendar-view-label:last-of-type{border-left:0;border-radius:0 .35rem .35rem 0}.sc-calendar-view-input:checked+.sc-calendar-view-label{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-view-input:focus-visible+.sc-calendar-view-label{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-count{margin-inline-start:auto;color:#53625b;font-size:.9em;font-weight:700}.sc-calendar-agenda{display:none;gap:1rem}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(4.75rem,6rem) minmax(0,1fr);gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent);min-width:0}.sc-calendar-agenda-event a{font-weight:700}.sc-calendar-agenda-range{display:block;margin-top:.15rem;font-size:.9em}.sc-calendar-agenda-description{margin:.25rem 0 0}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table{display:none}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-agenda{display:grid}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
-    "@media (max-width:700px){.sc-calendar-view-switch{display:none}.sc-calendar-toolbar{align-items:flex-start}.sc-calendar-table{display:none}.sc-calendar-agenda{display:grid}}"
+    ".sc-calendar-view-switch{display:flex;align-items:center;margin:0 0 .75rem;padding:0;border:0}.sc-calendar-view-switch legend{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.sc-calendar-view-input{position:absolute;opacity:0;pointer-events:none}.sc-calendar-view-label{display:inline-flex;min-height:2.5rem;align-items:center;padding:0 .8rem;border:1px solid var(--sc-calendar-accent);color:var(--sc-calendar-accent);cursor:pointer;font-weight:700}.sc-calendar-view-label:first-of-type{border-radius:.35rem 0 0 .35rem}.sc-calendar-view-label:last-of-type{border-left:0;border-radius:0 .35rem .35rem 0}.sc-calendar-view-input:checked+.sc-calendar-view-label{background:var(--sc-calendar-accent);color:#fff}.sc-calendar-view-input:focus-visible+.sc-calendar-view-label{outline:3px solid color-mix(in srgb,var(--sc-calendar-accent) 40%,transparent);outline-offset:2px}.sc-calendar-count{margin-inline-start:auto;color:#53625b;font-size:.9em;font-weight:700}.sc-calendar-upcoming-count{display:none}.sc-calendar-agenda{display:none;gap:1rem}.sc-calendar-agenda-title{margin:0 0 .4rem;color:var(--sc-calendar-accent)}.sc-calendar-agenda-day{display:grid;grid-template-columns:minmax(4.75rem,6rem) minmax(0,1fr);gap:.75rem}.sc-calendar-agenda-date{font-weight:700}.sc-calendar-agenda-events{display:grid;gap:.5rem;list-style:none;margin:0;padding:0}.sc-calendar-agenda-event{padding:.65rem .75rem;border-left:.3rem solid var(--sc-calendar-event-color,#176b44);background:color-mix(in srgb,currentColor 6%,transparent);min-width:0}.sc-calendar-agenda-event a{color:var(--sc-calendar-accent);font-weight:700;text-underline-offset:.14em}.sc-calendar-agenda-range{display:block;margin-top:.15rem;font-size:.9em}.sc-calendar-agenda-description{margin:.25rem 0 0}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table,.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-month-count{display:none}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-agenda{display:grid}.sc-calendar:has(.sc-calendar-view-list:checked) .sc-calendar-upcoming-count{display:inline}.sc-calendar-empty{margin:.75rem 0;color:inherit}"
+    ".sc-event-detail{display:grid;gap:1.5rem}.sc-event-facts{display:grid;gap:1rem;padding:1.25rem 1.4rem;border-inline-start:.3rem solid var(--sc-accent,#255c9e);background:var(--sc-event-facts-bg,#f5f7f8)}.sc-event-fact{display:grid;grid-template-columns:1.5rem minmax(0,1fr);gap:.75rem;align-items:start}.sc-event-fact>i{margin-top:.2rem;color:var(--sc-accent,#255c9e);text-align:center}.sc-event-fact>div{display:grid;gap:.15rem}.sc-event-date-points{display:grid;gap:1rem}.sc-event-date-point{display:grid;min-width:0;gap:.2rem}.sc-event-fact-label{color:#66717a;font-size:.78rem;font-weight:700;letter-spacing:.055em;text-transform:uppercase}.sc-event-fact time,.sc-event-fact div>span:last-child{font-size:1.05rem;font-weight:700}.sc-event-detail .web-detail-meta{order:2;margin:0}.sc-event-description{order:3;max-width:72ch}.sc-event-description>:last-child{margin-bottom:0}"
+    "@media (max-width:700px){.sc-calendar-view-switch{display:flex}.sc-calendar-count{font-size:.8em}.sc-calendar-toolbar{padding:.65rem}.sc-calendar-table{display:block;max-width:100%;overflow-x:auto}.sc-calendar-head,.sc-calendar-week{min-width:42rem}.sc-calendar-agenda-day{grid-template-columns:4.25rem minmax(0,1fr)}.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-toolbar,.sc-calendar:has(.sc-calendar-view-list:checked)>.sc-calendar-table{display:none}}"
 )
 
 CZECH_MONTHS = (
@@ -128,6 +132,8 @@ CZECH_WEEKDAYS_MONDAY = ("Po", "Út", "St", "Čt", "Pá", "So", "Ne")
 CALENDAR_MAX_LANES = 3
 CALENDAR_MAX_EVENTS = 500
 CALENDAR_FETCH_LIMIT = CALENDAR_MAX_EVENTS + 1
+CALENDAR_UPCOMING_BATCH = 500
+CALENDAR_MAX_UPCOMING_EVENTS = 10_500
 
 
 class CompileError(ValueError):
@@ -787,6 +793,7 @@ def _rich_text(value: Any) -> str:
 
 def _render_menu_items(
     items: Any, *, level: int = 0, bootstrap: bool = False, disclosure: bool = False,
+    dark_submenu: bool = False,
 ) -> str:
     """Render a validated menu tree without flattening child relationships."""
     if not isinstance(items, (list, tuple)) or level > 8:
@@ -800,7 +807,7 @@ def _render_menu_items(
         target = ' target="_blank" rel="noopener noreferrer"' if item.get("target") == "_blank" else ""
         children = _render_menu_items(
             item.get("children"), level=level + 1,
-            bootstrap=bootstrap, disclosure=disclosure,
+            bootstrap=bootstrap, disclosure=disclosure, dark_submenu=dark_submenu,
         )
         has_children = bool(children)
         item_class = "sc-menu-item"
@@ -809,6 +816,8 @@ def _render_menu_items(
         if bootstrap:
             item_class += " nav-item" + (" dropdown has-children" if has_children else "")
             link_class += " " + ("dropdown-item" if level else "nav-link")
+            if level and dark_submenu:
+                link_class += " text-dark"
             if has_children and level == 0:
                 link_class += " dropdown-toggle"
             submenu_class += " dropdown-menu"
@@ -902,8 +911,11 @@ class _CalendarWeekSegment:
 def _calendar_event_span(event: Any) -> _CalendarEventSpan | None:
     if not isinstance(event, dict) or not isinstance(event.get("start_at"), datetime):
         return None
-    starts_at = event["start_at"]
-    ends_at = event.get("end_at") if isinstance(event.get("end_at"), datetime) else None
+    starts_at = utc_storage_to_local(event["start_at"])
+    ends_at = (
+        utc_storage_to_local(event.get("end_at"))
+        if isinstance(event.get("end_at"), datetime) else None
+    )
     start_day = starts_at.date()
     end_day = ends_at.date() if ends_at is not None else start_day
     # Match EventMonthCalendar: midnight is an exclusive endpoint, so an event
@@ -1092,15 +1104,32 @@ def _calendar_agenda_event_markup(
     )
 
 
+def _calendar_now() -> datetime:
+    return datetime.now(application_timezone())
+
+
+def _calendar_event_is_current_or_future(
+    span: _CalendarEventSpan, *, now: datetime,
+) -> bool:
+    """Compare event boundaries in UTC, including DST fold/offset changes."""
+    now_utc = local_to_utc_storage(now)
+    boundary = span.ends_at if span.ends_at is not None else span.starts_at
+    boundary_utc = local_to_utc_storage(boundary)
+    if now_utc is None or boundary_utc is None:
+        return False
+    return boundary_utc > now_utc if span.ends_at is not None else boundary_utc >= now_utc
+
+
 def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
-    today = date.today()
+    now = _calendar_now()
+    today = now.date()
     selected = _calendar_month(_lookup(state.page, "query.month"), today)
     first_weekday = 0 if node.get("firstDayOfWeek") == "monday" else 6
     weeks = calendar_module.Calendar(firstweekday=first_weekday).monthdatescalendar(selected.year, selected.month)
     visible_start, visible_end = weeks[0][0], weeks[-1][-1]
     params: dict[str, Any] = {
-        "from": datetime.combine(visible_start, time.min),
-        "to": datetime.combine(visible_end, time.max),
+        "from": local_to_utc_storage(datetime.combine(visible_start, time.min)),
+        "to": local_to_utc_storage(datetime.combine(visible_end, time.max)),
         "overlap": True,
         "limit": CALENDAR_FETCH_LIMIT,
         "sort": "start_at_asc",
@@ -1125,6 +1154,46 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         last_day = min(span.end_day, visible_end)
         for offset in range((last_day - first_day).days + 1):
             by_day.setdefault(first_day + timedelta(days=offset), []).append(span)
+
+    # The agenda is intentionally independent from the selected table month.
+    # Fetch every ongoing/future event in deterministic batches; overlap=True
+    # includes multi-day events that began before today and have not ended yet.
+    upcoming_records: list[Any] = []
+    upcoming_offset = 0
+    while True:
+        upcoming_params: dict[str, Any] = {
+            "from": local_to_utc_storage(now),
+            "overlap": True,
+            "limit": CALENDAR_UPCOMING_BATCH + 1,
+            "offset": upcoming_offset,
+            "sort": "start_at_asc",
+        }
+        if node.get("kind") != "all":
+            upcoming_params["kind"] = node["kind"]
+        if node.get("teamId") is not None:
+            upcoming_params["team_id"] = node["teamId"]
+        batch = state.resolve_source("core.events", upcoming_params)
+        batch = list(batch) if isinstance(batch, (list, tuple)) else []
+        upcoming_records.extend(batch[:CALENDAR_UPCOMING_BATCH])
+        if len(batch) <= CALENDAR_UPCOMING_BATCH:
+            break
+        upcoming_offset += CALENDAR_UPCOMING_BATCH
+        if upcoming_offset > 10_000:
+            raise CompileError(
+                f"Calendar agenda exceeds the limit of {CALENDAR_MAX_UPCOMING_EVENTS} events"
+            )
+    upcoming_spans = [
+        span for record in upcoming_records
+        if (span := _calendar_event_span(record)) is not None
+        and _calendar_event_is_current_or_future(span, now=now)
+    ]
+    upcoming_by_day: dict[date, list[_CalendarEventSpan]] = {}
+    for span in upcoming_spans:
+        # The list is an event list, not a second calendar grid: show every
+        # event exactly once.  An event that already started is grouped under
+        # today so multi-day events which are still running remain visible.
+        display_day = max(span.start_day, today)
+        upcoming_by_day.setdefault(display_day, []).append(span)
 
     weekdays = list(CZECH_WEEKDAYS_MONDAY)
     if first_weekday == 6:
@@ -1189,23 +1258,31 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         )
 
     agenda_days: list[str] = []
-    for day_value in sorted(by_day):
-        if day_value.month != selected.month:
-            continue
+    for day_value in sorted(upcoming_by_day):
+        visible_spans = upcoming_by_day[day_value]
         items = "".join(
             _calendar_agenda_event_markup(
                 span, day_value=day_value,
                 show_description=bool(node.get("showDescription")),
             )
-            for span in by_day[day_value]
+            for span in visible_spans
         )
+        date_label = f"{day_value.day}. {day_value.month}."
+        if day_value.year != today.year:
+            date_label += f" {day_value.year}"
         agenda_days.append(
             '<section class="sc-calendar-agenda-day">'
             f'<time class="sc-calendar-agenda-date" datetime="{day_value.isoformat()}">'
-            f'{day_value.day}. {day_value.month}.</time>'
+            f'{date_label}</time>'
             f'<ul class="sc-calendar-agenda-events">{items}</ul></section>'
         )
-    agenda = "".join(agenda_days) or '<p class="sc-calendar-empty">V tomto měsíci nejsou žádné akce.</p>'
+    agenda = "".join(agenda_days)
+    if not agenda:
+        agenda = '<p class="sc-calendar-empty">Nejsou naplánované žádné probíhající ani budoucí akce.</p>'
+    agenda = (
+        '<h2 class="sc-calendar-agenda-title">Probíhající a budoucí akce</h2>'
+        f'{agenda}'
+    )
     previous_month = _shift_month(selected, -1).strftime("%Y-%m")
     next_month = _shift_month(selected, 1).strftime("%Y-%m")
     current_month = today.strftime("%Y-%m")
@@ -1215,6 +1292,9 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
     list_view_id = f"{view_name}-list"
     event_count_label = (
         "akce" if len(spans) == 1 or len(spans) % 100 in {2, 3, 4} else "akcí"
+    )
+    upcoming_count_label = (
+        "akce" if len(upcoming_spans) == 1 or len(upcoming_spans) % 100 in {2, 3, 4} else "akcí"
     )
     minimum_month = _shift_month(today.replace(day=1), -12)
     maximum_month = _shift_month(today.replace(day=1), 18)
@@ -1238,7 +1318,8 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         f'<input class="sc-calendar-view-input sc-calendar-view-list" type="radio" '
         f'id="{list_view_id}" name="{view_name}">'
         f'<label class="sc-calendar-view-label" for="{list_view_id}">☷ Seznam</label>'
-        f'<span class="sc-calendar-count">{len(spans)} {event_count_label}</span>'
+        f'<span class="sc-calendar-count sc-calendar-month-count">{len(spans)} {event_count_label}</span>'
+        f'<span class="sc-calendar-count sc-calendar-upcoming-count">{len(upcoming_spans)} {upcoming_count_label}</span>'
         '</fieldset>'
         '<div class="sc-calendar-toolbar">'
         f'{previous_control}'
@@ -1351,6 +1432,7 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
                 items,
                 bootstrap=presentation in {"bootstrap-navbar", "ontario-mobile-navbar"},
                 disclosure=presentation == "ontario-mobile-navbar",
+                dark_submenu=presentation in {"bootstrap-navbar", "ontario-mobile-navbar"},
             )
         if not rendered_items:
             return ""
@@ -1595,6 +1677,11 @@ def render_document(
     canonical_url: str = "",
     favicon: str = "",
     noindex: bool = False,
+    og_title: str = "",
+    og_description: str = "",
+    og_image: str = "",
+    og_type: str = "website",
+    site_name: str = "",
     css: str = "",
     base_css: str = "",
     tokens: dict[str, Any] | None = None,
@@ -1635,14 +1722,32 @@ def render_document(
         token_css.append(f"--sc-{key}:{text}")
     root_css = f":root{{{';'.join(token_css)}}}" if token_css else ""
     robots = '<meta name="robots" content="noindex,nofollow">' if noindex else ""
-    canonical = f'<link rel="canonical" href="{escape(canonical_url, quote=True)}">' if canonical_url else ""
+    safe_canonical = _safe_url(canonical_url)
+    canonical = f'<link rel="canonical" href="{escape(safe_canonical, quote=True)}">' if safe_canonical else ""
     safe_favicon = _safe_url(favicon, image=True)
     favicon_link = f'<link rel="icon" href="{escape(safe_favicon, quote=True)}">' if safe_favicon else ""
+    social_title = (og_title or title).strip()
+    social_description = (og_description or description).strip()
+    social_type = og_type.strip().lower() if re.fullmatch(r"[a-z][a-z0-9._-]{0,39}", og_type.strip().lower()) else "website"
+    safe_og_image = _safe_url(og_image, image=True)
+    social_meta = (
+        f'<meta property="og:locale" content="cs_CZ">'
+        f'<meta property="og:type" content="{escape(social_type, quote=True)}">'
+        f'<meta property="og:title" content="{escape(social_title, quote=True)}">'
+        f'<meta property="og:description" content="{escape(social_description, quote=True)}">'
+        f'{f"<meta property=\"og:site_name\" content=\"{escape(site_name, quote=True)}\">" if site_name else ""}'
+        f'{f"<meta property=\"og:url\" content=\"{escape(safe_canonical, quote=True)}\">" if safe_canonical else ""}'
+        f'{f"<meta property=\"og:image\" content=\"{escape(safe_og_image, quote=True)}\">" if safe_og_image else ""}'
+        f'<meta name="twitter:card" content="{"summary_large_image" if safe_og_image else "summary"}">'
+        f'<meta name="twitter:title" content="{escape(social_title, quote=True)}">'
+        f'<meta name="twitter:description" content="{escape(social_description, quote=True)}">'
+        f'{f"<meta name=\"twitter:image\" content=\"{escape(safe_og_image, quote=True)}\">" if safe_og_image else ""}'
+    )
     return (
         "<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         f'<meta name="description" content="{escape(description, quote=True)}">'
-        f"{robots}{canonical}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
+        f"{robots}{canonical}{social_meta}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
         f"<body>{body}</body></html>"
     )

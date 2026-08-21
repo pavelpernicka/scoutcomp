@@ -109,7 +109,7 @@ const refreshAccessToken = async () => {
     processQueue(null, token);
     return token;
   } catch (error) {
-    clearAuthTokens();
+    if ([400, 401, 403].includes(error.response?.status)) clearAuthTokens();
     processQueue(error, null);
     throw error;
   } finally {

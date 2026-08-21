@@ -11,6 +11,7 @@ import DecoratedCard from "../components/DecoratedCard";
 import Input from "../components/Input";
 import Select from "../components/Select";
 import UserAvatar from "../components/UserAvatar";
+import PushNotificationSettings from "../components/PushNotificationSettings";
 import { processAvatarFile } from "../utils/avatar";
 import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../utils/username";
 
@@ -350,6 +351,9 @@ export default function UserSettingsPage() {
                       </label>
                       <div className="form-text">{t("userSettings.receiveMessagesHint")}</div>
                     </div>
+                  </div>
+                  <div className="col-12">
+                    <PushNotificationSettings />
                   </div>
                 </div>
                 <div className="mt-4">

@@ -20,7 +20,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..models import Config, RegisteredModule, ScoutEvent, Team, User, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
-from .url_schemes import meeting_url, post_url
+from ..timezones import utc_storage_to_local
+from .url_schemes import event_url, post_url
 
 
 class DataSourceError(ValueError):
@@ -467,14 +468,18 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
             query = query.filter(ScoutEvent.starts_at >= params["from"])
     if params.get("to"):
         query = query.filter(ScoutEvent.starts_at <= params["to"])
-    order = ScoutEvent.starts_at.desc() if params.get("sort") == "start_at_desc" else ScoutEvent.starts_at.asc()
+    order = (
+        (ScoutEvent.starts_at.desc(), ScoutEvent.id.desc())
+        if params.get("sort") == "start_at_desc"
+        else (ScoutEvent.starts_at.asc(), ScoutEvent.id.asc())
+    )
     limit = params.get("limit", 10)
     offset = (params["page"] - 1) * limit if params.get("page") else params.get("offset", 0)
     events = (
         query
         .outerjoin(User, User.id == ScoutEvent.created_by_id)
         .with_entities(ScoutEvent, User.real_name, User.username, User.avatar)
-        .order_by(order)
+        .order_by(*order)
         .offset(offset)
         .limit(limit)
         .all()
@@ -484,9 +489,9 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         "title": event.title,
         "description": _plain_public_text(event.description),
         "kind": event.kind,
-        "start_at": event.starts_at,
-        "end_at": event.ends_at,
-        "url": meeting_url(db, event.id),
+        "start_at": utc_storage_to_local(event.starts_at),
+        "end_at": utc_storage_to_local(event.ends_at),
+        "url": event_url(db, event.id),
         "color": event.color,
         "author": real_name or username or "ScoutComp",
         "author_avatar": safe_public_avatar(avatar),

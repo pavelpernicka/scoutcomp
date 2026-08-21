@@ -20,8 +20,8 @@ from .previews import (
 )
 from .routes_content import _serialize_menus, _serialize_post
 from .url_schemes import (
-    DEFAULT_MEETING_URL_PATTERN,
     DEFAULT_POST_URL_PATTERN,
+    event_pattern,
     validate_url_pattern,
 )
 from .site_identity import DEFAULT_TITLE_PATTERN, validate_title_pattern
@@ -36,6 +36,9 @@ from .resource_props import (
 
 
 def _site_settings(db: Session) -> dict:
+    event_template_setting = db.query(Config).filter_by(
+        key="web.event_detail_template_id",
+    ).one_or_none()
     return {
         "site_title": get_config_value(db, "web.site_title") or "Naše skautská střediska",
         "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
@@ -50,9 +53,13 @@ def _site_settings(db: Session) -> dict:
         "og_type": get_config_value(db, "web.og_type"),
         "canonical_url": get_config_value(db, "web.canonical_url"),
         "post_url_pattern": get_config_value(db, "web.post_url_pattern") or DEFAULT_POST_URL_PATTERN,
-        "meeting_url_pattern": get_config_value(db, "web.meeting_url_pattern") or DEFAULT_MEETING_URL_PATTERN,
+        "event_url_pattern": event_pattern(db),
         "post_detail_template_id": get_config_value(db, "web.post_detail_template_id"),
-        "meeting_detail_template_id": get_config_value(db, "web.meeting_detail_template_id"),
+        "event_detail_template_id": (
+            event_template_setting.value
+            if event_template_setting is not None
+            else get_config_value(db, "web.meeting_detail_template_id")
+        ),
     }
 
 
@@ -152,9 +159,9 @@ class SettingsPayload(BaseModel):
     og_type: str | None = None
     canonical_url: str | None = None
     post_url_pattern: str | None = None
-    meeting_url_pattern: str | None = None
+    event_url_pattern: str | None = None
     post_detail_template_id: int | None = None
-    meeting_detail_template_id: int | None = None
+    event_detail_template_id: int | None = None
 
 
 @router.put("/settings")
@@ -167,12 +174,12 @@ def update_site_settings(payload: SettingsPayload, db: Session = Depends(get_db)
             raise HTTPException(422, str(exc)) from exc
     if "post_url_pattern" in payload.model_fields_set:
         validate_url_pattern(payload.post_url_pattern, "slug", label="Article")
-    if "meeting_url_pattern" in payload.model_fields_set:
-        validate_url_pattern(payload.meeting_url_pattern, "id", label="Meeting")
+    if "event_url_pattern" in payload.model_fields_set:
+        validate_url_pattern(payload.event_url_pattern, "id", label="Event")
     if "post_detail_template_id" in payload.model_fields_set:
         validate_detail_template(db, payload.post_detail_template_id, label="Article detail template")
-    if "meeting_detail_template_id" in payload.model_fields_set:
-        validate_detail_template(db, payload.meeting_detail_template_id, label="Meeting detail template")
+    if "event_detail_template_id" in payload.model_fields_set:
+        validate_detail_template(db, payload.event_detail_template_id, label="Event detail template")
     # ``set_config_value`` commits each value, which would expose a partial
     # public configuration before its static documents are rebuilt. Keep this
     # whole settings publication in one transaction instead.
@@ -380,6 +387,9 @@ def publish_global_styles(payload: PublishPayload, db: Session = Depends(get_db)
     }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Global styles were changed by another editor")
+    # Make the same transaction's artifact rebuild observe the freshly
+    # published values rather than stale state left by the bulk update.
+    db.expire(item, ["published_tokens", "published_css", "published_version"])
     rebuild_published_page_artifacts(db)
     db.commit(); db.refresh(item)
     return get_global_styles(db, current_user)

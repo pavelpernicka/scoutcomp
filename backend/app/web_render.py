@@ -629,6 +629,9 @@ def render_site_page(
     body_override: str | None = None,
     document_title: str = "",
     favicon: str = "",
+    canonical_url: str = "",
+    og_image: str = "",
+    og_type: str = "website",
 ) -> str:
     """Render a WebPage into a complete standalone HTML document."""
     body = sanitize_legacy_html(_strip_styles(page.html or ""))
@@ -681,6 +684,13 @@ def render_site_page(
     safe_favicon = _safe_legacy_url(favicon, image=True)
     favicon_link = f'<link rel="icon" href="{escape(safe_favicon, quote=True)}">\n' if safe_favicon else ""
     rendered_title = document_title or f"{page.title} – {site_title}"
+    safe_canonical = _safe_legacy_url(canonical_url) or f"/{page.slug}"
+    safe_og_image = _safe_legacy_url(og_image, image=True)
+    social_image = (
+        f'<meta property="og:image" content="{escape(safe_og_image, quote=True)}">\n'
+        f'<meta name="twitter:image" content="{escape(safe_og_image, quote=True)}">\n'
+        if safe_og_image else ""
+    )
     return (
         "<!DOCTYPE html>\n"
         '<html lang="cs">\n'
@@ -689,10 +699,15 @@ def render_site_page(
         '<meta name="viewport" content="width=device-width, initial-scale=1">\n'
         f"<title>{escape(rendered_title)}</title>\n"
         f'<meta name="description" content="{escape(meta_description)}">\n'
-        f'<meta property="og:type" content="website">\n'
+        f'<meta property="og:type" content="{escape(og_type, quote=True)}">\n'
         f'<meta property="og:title" content="{escape(rendered_title)}">\n'
         f'<meta property="og:description" content="{escape(meta_description)}">\n'
-        f'<link rel="canonical" href="/{escape(page.slug)}">\n'
+        f'<meta property="og:url" content="{escape(safe_canonical, quote=True)}">\n'
+        f'<meta name="twitter:card" content="{"summary_large_image" if safe_og_image else "summary"}">\n'
+        f'<meta name="twitter:title" content="{escape(rendered_title, quote=True)}">\n'
+        f'<meta name="twitter:description" content="{escape(meta_description, quote=True)}">\n'
+        f'{social_image}'
+        f'<link rel="canonical" href="{escape(safe_canonical, quote=True)}">\n'
         f"{favicon_link}"
         f"{extra_head}\n"
         '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">\n'

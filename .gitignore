@@ -28,6 +28,9 @@ coverage.xml
 instance/
 db.sqlite3
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # Node
 node_modules/

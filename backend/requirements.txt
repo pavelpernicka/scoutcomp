@@ -12,3 +12,4 @@ httpx
 unidecode
 python-multipart
 playwright
+pywebpush==2.3.0

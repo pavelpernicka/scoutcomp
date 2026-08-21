@@ -1,0 +1,185 @@
+# Example edge nginx configuration for ScoutComp.
+#
+# This file belongs inside nginx's `http {}` context (for example Debian's
+# /etc/nginx/sites-enabled/). Replace both hostnames and certificate paths.
+# Keep the authenticated PWA and the public website on separate origins:
+#   app.example.cz  -> React PWA + /api/
+#   www.example.cz  -> crawlable server-rendered public website
+
+proxy_cache_path /var/cache/nginx/scoutcomp-public
+    levels=1:2
+    keys_zone=scoutcomp_public:32m
+    max_size=2g
+    inactive=24h
+    use_temp_path=off;
+
+limit_req_zone $binary_remote_addr zone=scoutcomp_public_rate:10m rate=30r/s;
+limit_conn_zone $binary_remote_addr zone=scoutcomp_per_ip:10m;
+
+upstream scoutcomp_frontend {
+    server 127.0.0.1:3200 max_fails=3 fail_timeout=10s;
+    keepalive 32;
+}
+
+upstream scoutcomp_api {
+    server 127.0.0.1:8001 max_fails=3 fail_timeout=10s;
+    keepalive 32;
+}
+
+upstream scoutcomp_site {
+    server 127.0.0.1:8090 max_fails=3 fail_timeout=10s;
+    keepalive 64;
+}
+
+# Reject unknown clear-text hosts instead of reflecting an attacker-controlled
+# Host header into redirects or SEO output.
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    return 444;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.example.cz;
+    return 308 https://app.example.cz$request_uri;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name www.example.cz;
+    return 308 https://www.example.cz$request_uri;
+}
+
+# Authenticated application / installable PWA. Do not index this origin.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name app.example.cz;
+
+    ssl_certificate /etc/letsencrypt/live/app.example.cz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/app.example.cz/privkey.pem;
+
+    client_max_body_size 64m;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location = /robots.txt {
+        default_type text/plain;
+        add_header Cache-Control "public, max-age=3600" always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        return 200 "User-agent: *\nDisallow: /\n";
+    }
+
+    # The trailing slash intentionally strips /api before forwarding.
+    location /api/ {
+        proxy_pass http://scoutcomp_api/;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 60s;
+    }
+
+    # sw.js, the manifest, hashed assets and SPA deep links are handled by the
+    # frontend container. Its own nginx applies their precise cache policy.
+    location / {
+        proxy_pass http://scoutcomp_frontend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 60s;
+    }
+}
+
+# Public SSR website. It has no service worker and exposes no authenticated API.
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name www.example.cz;
+
+    ssl_certificate /etc/letsencrypt/live/www.example.cz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/www.example.cz/privkey.pem;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location = /healthz {
+        access_log off;
+        proxy_pass http://scoutcomp_site;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache off;
+    }
+
+    location / {
+        limit_req zone=scoutcomp_public_rate burst=60 nodelay;
+        limit_conn scoutcomp_per_ip 40;
+
+        proxy_pass http://scoutcomp_site;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 30s;
+
+        proxy_cache scoutcomp_public;
+        proxy_cache_key "$scheme$host$request_uri";
+        proxy_cache_methods GET HEAD;
+        proxy_cache_bypass $http_authorization;
+        proxy_no_cache $http_authorization $upstream_http_set_cookie;
+        proxy_cache_lock on;
+        proxy_cache_lock_timeout 5s;
+        proxy_cache_background_update on;
+        proxy_cache_revalidate on;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_cache_valid 200 1m;
+        proxy_cache_valid 301 302 10m;
+        proxy_cache_valid 404 30s;
+        add_header X-Cache-Status $upstream_cache_status always;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    }
+}
+
+# These directives are valid here because files from `conf.d`/`sites-enabled`
+# are normally included inside nginx's `http {}` block.
+gzip on;
+gzip_vary on;
+gzip_min_length 1024;
+gzip_types text/plain text/css application/json application/javascript
+           application/xml image/svg+xml;
+
+# During a domain move keep the old public hostname alive for at least several
+# months and preserve every path/query:
+# server {
+#     listen 443 ssl;
+#     http2 on;
+#     server_name old.example.cz;
+#     ssl_certificate /etc/letsencrypt/live/old.example.cz/fullchain.pem;
+#     ssl_certificate_key /etc/letsencrypt/live/old.example.cz/privkey.pem;
+#     return 308 https://www.example.cz$request_uri;
+# }

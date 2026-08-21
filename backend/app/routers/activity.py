@@ -1,11 +1,12 @@
 import json
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_current_active_user, get_db
+from ..database import SessionLocal
 from ..models import (
     Config,
     DirectMessage,
@@ -20,6 +21,7 @@ from ..models import (
     UserPermissionGroup,
 )
 from ..permissions import allows, managed_team_ids, permission_keys, permission_scopes
+from ..services.web_push import deliver_push_to_user_ids
 
 router = APIRouter(prefix="/activity", tags=["scout activity"])
 admin_router = APIRouter(prefix="/admin/core/attendance", tags=["admin attendance"])
@@ -251,11 +253,13 @@ def list_activity_members(team_id: int | None = Query(None), audience: str = Que
              "is_leader": user.id in leader_ids} for user in users]
 
 @router.post("/events", status_code=status.HTTP_201_CREATED)
-def create_event(payload: EventPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def create_event(payload: EventPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     if not allows(db, current_user, "core.events.create", team_id=payload.team_id): raise HTTPException(403, "Missing permission")
     if payload.audience == "leaders" and not _is_leader(db, current_user):
         raise HTTPException(403, "Only leaders can create council events")
-    event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit(); db.refresh(event); return serialize(event)
+    event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit()
+    background_tasks.add_task(_deliver_event_created_push, event.id, current_user.id)
+    db.refresh(event); return serialize(event)
 
 @router.put("/events/{event_id}")
 def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -344,7 +348,7 @@ def unregister_from_planned(event_id: int, db: Session = Depends(get_db), curren
     return {"event_id": event_id, "user_id": current_user.id, "unregistered": True}
 
 @router.post("/events/{event_id}/message")
-def message_attendees(event_id: int, payload: EventMessagePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def message_attendees(event_id: int, payload: EventMessagePayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     event = db.get(ScoutEvent, event_id)
     if not event: raise HTTPException(404, "Event not found")
     if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id): raise HTTPException(403, "Missing permission")
@@ -359,16 +363,21 @@ def message_attendees(event_id: int, payload: EventMessagePayload, db: Session =
     body = payload.message.strip()
     if not body:
         raise HTTPException(422, "Message cannot be empty")
-    sent = 0
+    sent_users = []
     for user in present_users:
         if not user.is_active:
             continue
         if not user.receive_messages and not override:
             continue
         db.add(DirectMessage(sender_id=current_user.id, recipient_id=user.id, body=body))
-        sent += 1
+        sent_users.append(user)
     db.commit()
-    return {"sent": sent, "total": len(rows)}
+    background_tasks.add_task(deliver_push_to_user_ids, {user.id for user in sent_users}, {
+        "title": "Nová zpráva",
+        "body": "Máš novou soukromou zprávu.",
+        "url": "/messages",
+    })
+    return {"sent": len(sent_users), "total": len(rows)}
 
 
 def require_attendance_manage(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> User:
@@ -638,3 +647,32 @@ def admin_attendance_matrix(
         "total_events": total_events,
         "has_more": offset + len(events) < total_events,
     }
+
+
+def _event_push_recipient_ids(db: Session, event: ScoutEvent, creator_id: int) -> set[int]:
+    """Mirror the calendar visibility rules so a push cannot reveal a hidden event."""
+    recipient_ids: set[int] = set()
+    users = db.query(User).filter(User.is_active.is_(True), User.id != creator_id).all()
+    for user in users:
+        if not allows(db, user, "core.events.read"):
+            continue
+        if user.team_id is not None and event.team_id not in {None, user.team_id}:
+            continue
+        if event.audience == "leaders" and not _is_leader(db, user):
+            continue
+        recipient_ids.add(user.id)
+    return recipient_ids
+
+
+def _deliver_event_created_push(event_id: int, creator_id: int) -> None:
+    """Resolve visibility after commit in a fresh task-owned session."""
+    with SessionLocal() as db:
+        event = db.get(ScoutEvent, event_id)
+        if event is None:
+            return
+        recipient_ids = _event_push_recipient_ids(db, event, creator_id)
+    deliver_push_to_user_ids(recipient_ids, {
+        "title": "Nová událost",
+        "body": "V kalendáři je nová událost.",
+        "url": f"/activity?event={event_id}",
+    })

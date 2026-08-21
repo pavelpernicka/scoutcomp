@@ -616,6 +616,9 @@
     "settingsDetailTemplateHint": "Zvolte publikované rozvržení s obsahem slotu.",
     "settingsMeetingUrl": "Adresa schůzky",
     "settingsMeetingUrlHint": "Musí obsahovat {id}, například /schuzky/{id}.",
+    "settingsEventUrl": "Adresa události",
+    "settingsEventUrlHint": "Musí obsahovat {id}, například /event/{id}.",
+    "settingsEventDetailTemplate": "Šablona detailu události",
     "settingsOpenGraph": "Open Graph",
     "settingsOgTitle": "OG titulek",
     "settingsOgDescription": "OG popis",
@@ -1876,5 +1879,20 @@
     "confirmPassword": "Potvrzení hesla",
     "changingPassword": "Měním heslo...",
     "changePassword": "Změnit heslo"
+  },
+  "pushSettings": {
+    "title": "Notifikace prohlížeče",
+    "description": "Dostávej upozornění i když nemáš otevřenou aplikaci.",
+    "subscribe": "Zapnout notifikace",
+    "unsubscribe": "Vypnout notifikace",
+    "subscribed": "Notifikace jsou zapnuté.",
+    "unsubscribed": "Notifikace vypnuty.",
+    "notSupported": "Tvůj prohlížeč nepodporuje notifikace.",
+    "denied": "Notifikace jsou zablokované. Povol je v nastavení prohlížeče.",
+    "checking": "Zjišťuji stav…",
+    "loadFailed": "Nepodařilo se načíst nastavení notifikací.",
+    "configMissing": "Server není pro notifikace nastaven.",
+    "subscribeFailed": "Nepodařilo se zapnout notifikace.",
+    "unsubscribeFailed": "Nepodařilo se vypnout notifikace."
   }
 }

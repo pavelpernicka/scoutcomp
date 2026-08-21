@@ -2409,6 +2409,71 @@ def _add_web_post_event_reference(conn: Connection) -> None:
         conn.execute(text("CREATE INDEX IF NOT EXISTS ix_web_posts_event_id ON web_posts (event_id)"))
 
 
+
+def _create_push_subscriptions_table(conn: Connection) -> None:
+    """Create push_subscriptions table for Web Push notifications."""
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "push_subscriptions" in tables:
+        logger.info("Table 'push_subscriptions' already exists")
+        return
+    logger.info("Creating 'push_subscriptions' table")
+    conn.execute(
+        text(
+            """
+            CREATE TABLE push_subscriptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                endpoint TEXT NOT NULL UNIQUE,
+                p256dh TEXT NOT NULL,
+                auth TEXT NOT NULL,
+                failure_count INTEGER NOT NULL DEFAULT 0,
+                disabled_at TIMESTAMP,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+    )
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_push_subscriptions_user_id ON push_subscriptions(user_id)"))
+    conn.execute(text("CREATE INDEX IF NOT EXISTS ix_push_subscriptions_endpoint ON push_subscriptions(endpoint)"))
+
+
+def _generalize_public_event_settings(conn: Connection) -> None:
+    """Copy legacy meeting settings to event settings without losing custom URLs."""
+    if "config" not in set(inspect(conn).get_table_names()):
+        return
+
+    legacy_url = conn.execute(text(
+        "SELECT value FROM config WHERE key = 'web.meeting_url_pattern'"
+    )).scalar_one_or_none()
+    event_url = conn.execute(text(
+        "SELECT value FROM config WHERE key = 'web.event_url_pattern'"
+    )).scalar_one_or_none()
+    if event_url is None:
+        value = "/event/{id}" if legacy_url in {None, "", "/meeting/{id}"} else legacy_url
+        conn.execute(text(
+            "INSERT INTO config (key, value, created_at, updated_at) "
+            "VALUES ('web.event_url_pattern', :value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        ), {"value": value})
+    elif event_url == "/meeting/{id}":
+        conn.execute(text(
+            "UPDATE config SET value = '/event/{id}', updated_at = CURRENT_TIMESTAMP "
+            "WHERE key = 'web.event_url_pattern'"
+        ))
+
+    legacy_template = conn.execute(text(
+        "SELECT value FROM config WHERE key = 'web.meeting_detail_template_id'"
+    )).scalar_one_or_none()
+    event_template = conn.execute(text(
+        "SELECT value FROM config WHERE key = 'web.event_detail_template_id'"
+    )).scalar_one_or_none()
+    if event_template is None and legacy_template not in {None, ""}:
+        conn.execute(text(
+            "INSERT INTO config (key, value, created_at, updated_at) "
+            "VALUES ('web.event_detail_template_id', :value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        ), {"value": legacy_template})
+
 MIGRATIONS: List[Migration] = [
     Migration(
         "20240921_add_completion_count",
@@ -2739,6 +2804,16 @@ MIGRATIONS: List[Migration] = [
         "20260817_release_trashed_web_page_addresses",
         _release_trashed_web_page_addresses,
         "Release URLs held by trashed web pages while preserving restore metadata",
+    ),
+    Migration(
+        "20260819_create_push_subscriptions",
+        _create_push_subscriptions_table,
+        "Create push_subscriptions table for Web Push",
+    ),
+    Migration(
+        "20260819_generalize_public_event_settings",
+        _generalize_public_event_settings,
+        "Copy legacy meeting URL and detail settings to event settings",
     ),
 ]
 

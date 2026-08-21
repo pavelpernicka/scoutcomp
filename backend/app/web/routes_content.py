@@ -1,5 +1,7 @@
 """Authenticated CMS content routes."""
 from .routes_common import *  # noqa: F403
+from ..database import SessionLocal
+from ..services.web_push import deliver_push_to_user_ids
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -298,7 +300,13 @@ def _snapshot_post(db: Session, post: WebPost, user_id: int, reason: str, public
     return revision
 
 
-def _publish_post(db: Session, post: WebPost, expected_version: int, user_id: int) -> WebPostRevision:
+def _publish_post(
+    db: Session,
+    post: WebPost,
+    expected_version: int,
+    user_id: int,
+    background_tasks: BackgroundTasks | None = None,
+) -> WebPostRevision:
     if expected_version != (post.draft_version or 1):
         raise HTTPException(409, "Draft was changed by another editor")
     conflicting_publication = (
@@ -315,6 +323,7 @@ def _publish_post(db: Session, post: WebPost, expected_version: int, user_id: in
     )
     if conflicting_publication:
         raise HTTPException(409, "A published post already uses this slug")
+    first_publication = post.published_revision_id is None
     revision = _snapshot_post(db, post, user_id, "publish", True)
     db.flush()
     updated = db.query(WebPost).filter(
@@ -330,6 +339,10 @@ def _publish_post(db: Session, post: WebPost, expected_version: int, user_id: in
     rebuild_published_page_artifacts(db)
     db.commit()
     db.refresh(post)
+
+    if first_publication and background_tasks is not None:
+        background_tasks.add_task(_deliver_new_post_push, post.id, user_id)
+
     return revision
 
 
@@ -494,7 +507,7 @@ def get_post_feed_item(
 
 
 @router.post("/posts", status_code=201)
-def create_post(payload: PostPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def create_post(payload: PostPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_post_manage(db, current_user)
     slug = _slugify(payload.slug or payload.title)
     base, counter = slug, 1
@@ -523,7 +536,7 @@ def create_post(payload: PostPayload, db: Session = Depends(get_db), current_use
     db.refresh(post)
     if payload.published:
         _require_post_publish(db, current_user)
-        _publish_post(db, post, post.draft_version, current_user.id)
+        _publish_post(db, post, post.draft_version, current_user.id, background_tasks)
     return _serialize_post(post)
 
 
@@ -537,7 +550,7 @@ def get_post(post_id: int, db: Session = Depends(get_db), current_user: User = D
 
 
 @router.put("/posts/{post_id}")
-def update_post(post_id: int, payload: PostPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def update_post(post_id: int, payload: PostPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_post_manage(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
@@ -579,18 +592,18 @@ def update_post(post_id: int, payload: PostPayload, db: Session = Depends(get_db
     db.refresh(post)
     if payload.published:
         _require_post_publish(db, current_user)
-        _publish_post(db, post, post.draft_version, current_user.id)
+        _publish_post(db, post, post.draft_version, current_user.id, background_tasks)
     return _serialize_post(post)
 
 
 @router.post("/posts/{post_id}/publish")
-def publish_post(post_id: int, payload: PublishPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def publish_post(post_id: int, payload: PublishPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_post_manage(db, current_user)
     _require_post_publish(db, current_user)
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
-    revision = _publish_post(db, post, payload.expected_version, current_user.id)
+    revision = _publish_post(db, post, payload.expected_version, current_user.id, background_tasks)
     return {"post": _serialize_post(post), "published_revision_id": revision.id}
 
 
@@ -629,3 +642,28 @@ def _parse_dt(value: str | None) -> datetime | None:
         return datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def _active_reader_ids(db: Session, *, exclude_id: int | None = None) -> set[int]:
+    """Return IDs of active users who can read posts (for push dispatch)."""
+    from ..permissions import permission_keys as pk_fn
+    users = db.query(User).filter(User.is_active.is_(True)).all()
+    read_permissions = {"core.posts.read", "core.posts.manage", "web.posts.manage"}
+    return {
+        user.id for user in users
+        if user.id != exclude_id and read_permissions.intersection(pk_fn(db, user))
+    }
+
+
+def _deliver_new_post_push(post_id: int, author_id: int) -> None:
+    """Resolve current readers in a task-owned session after publication commits."""
+    with SessionLocal() as db:
+        post = db.get(WebPost, post_id)
+        if post is None or not post.published:
+            return
+        recipient_ids = _active_reader_ids(db, exclude_id=author_id)
+    deliver_push_to_user_ids(recipient_ids, {
+        "title": "Nový příspěvek",
+        "body": "Byl publikován nový příspěvek.",
+        "url": f"/posts/{post_id}",
+    })

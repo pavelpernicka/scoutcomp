@@ -615,6 +615,9 @@
     "settingsDetailTemplateHint": "Choose a published layout with a content slot.",
     "settingsMeetingUrl": "Meeting URL",
     "settingsMeetingUrlHint": "Must contain {id}, for example /meetings/{id}.",
+    "settingsEventUrl": "Event URL",
+    "settingsEventUrlHint": "Must contain {id}, for example /event/{id}.",
+    "settingsEventDetailTemplate": "Event detail template",
     "settingsOpenGraph": "Open Graph",
     "settingsOgTitle": "OG title",
     "settingsOgDescription": "OG description",
@@ -1865,5 +1868,20 @@
     "confirmPassword": "Confirm password",
     "changingPassword": "Changing password...",
     "changePassword": "Change password"
+  },
+  "pushSettings": {
+    "title": "Browser notifications",
+    "description": "Receive alerts even when the app is closed.",
+    "subscribe": "Enable notifications",
+    "unsubscribe": "Disable notifications",
+    "subscribed": "Notifications are enabled.",
+    "unsubscribed": "Notifications disabled.",
+    "notSupported": "Your browser does not support notifications.",
+    "denied": "Notifications are blocked. Enable them in browser settings.",
+    "checking": "Checking…",
+    "loadFailed": "Failed to load notification settings.",
+    "configMissing": "Server is not configured for notifications.",
+    "subscribeFailed": "Failed to enable notifications.",
+    "unsubscribeFailed": "Failed to disable notifications."
   }
 }

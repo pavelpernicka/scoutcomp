@@ -610,6 +610,11 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
     }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Template was changed by another editor")
+    # The optimistic bulk update bypasses SQLAlchemy's identity map. Reload
+    # these fields before rebuilding linked page artifacts; otherwise the
+    # rebuild can see the previous (or empty) layout and publish an unstyled
+    # document until a later full regeneration.
+    db.expire(template, ["published_project_data", "published_css", "published_version"])
     build_preview(
         db, "templates", template.id,
         template.project_data or _empty_project(), template.css or "", title=template.name,

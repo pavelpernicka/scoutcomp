@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from unidecode import unidecode
 
 from ..models import WebPage, WebPageRevision, WebTemplate
+from ..timezones import application_timezone
 from .linked_resources import validate_linked_resource_instances
 from .renderer import (
     CompiledProject, CompileError, compile_project, component_slot_name,
@@ -552,7 +553,7 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
     # including when it comes from a linked layout/resource.  This preserves
     # the cheap publication path for every page without a calendar.
     if '<section class="sc-calendar"' in default:
-        current_month = date.today().replace(day=1)
+        current_month = datetime.now(application_timezone()).date().replace(day=1)
         for offset in range(-12, 19):
             absolute = current_month.year * 12 + current_month.month - 1 + offset
             month = date(absolute // 12, absolute % 12 + 1, 1).strftime("%Y-%m")

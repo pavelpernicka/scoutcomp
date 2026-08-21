@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from ..dependencies import get_current_active_user, get_db, require_action
 from ..models import DirectMessage, User
 from ..permissions import permission_keys
+from ..services.web_push import deliver_push_to_user_ids
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -163,6 +164,7 @@ def thread(
 @router.post("", status_code=status.HTTP_201_CREATED)
 def send(
     payload: MessageCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_messaging),
 ):
@@ -184,6 +186,13 @@ def send(
     db.add(message)
     db.commit()
     db.refresh(message)
+
+    background_tasks.add_task(deliver_push_to_user_ids, {recipient.id}, {
+        "title": "Nová zpráva",
+        "body": "Máš novou soukromou zprávu.",
+        "url": "/messages",
+    })
+
     return _to_message(message, current_user)
 
 
