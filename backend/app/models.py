@@ -185,31 +185,6 @@ class Team(Base):
         back_populates="team",
         cascade="all, delete-orphan",
     )
-    inventory_items = relationship(
-        "InventoryItem",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
-    inventory_label_templates = relationship(
-        "InventoryLabelTemplate",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
-    inventory_locations = relationship(
-        "InventoryLocation",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
-    inventory_categories = relationship(
-        "InventoryCategory",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
-    inventory_flags = relationship(
-        "InventoryFlag",
-        back_populates="team",
-        cascade="all, delete-orphan",
-    )
 
 
 class Task(Base):
@@ -426,7 +401,6 @@ class InventoryItem(Base):
     __tablename__ = "inventory_items"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(200), nullable=False, index=True)
     description = Column(Text, nullable=True)
     category = Column(String(120), nullable=True, index=True)
@@ -442,7 +416,6 @@ class InventoryItem(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
-    team = relationship("Team", back_populates="inventory_items")
     flag = relationship("InventoryFlag", back_populates="items")
     inventory_set = relationship("InventorySet", back_populates="items")
     photos = relationship(
@@ -469,6 +442,8 @@ class InventoryItem(Base):
         cascade="all, delete-orphan",
         order_by="InventoryItemLocation.location.asc()",
     )
+
+
 class InventoryPhoto(Base):
     __tablename__ = "inventory_photos"
 
@@ -524,11 +499,12 @@ class InventoryHistory(Base):
 
     item = relationship("InventoryItem", back_populates="history_entries")
     actor = relationship("User", back_populates="inventory_history_entries")
+
+
 class InventoryLabelTemplate(Base):
     __tablename__ = "inventory_label_templates"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(200), nullable=False)
     width_mm = Column(Float, nullable=False, default=62)
     height_mm = Column(Float, nullable=False, default=29)
@@ -537,14 +513,11 @@ class InventoryLabelTemplate(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
-    team = relationship("Team", back_populates="inventory_label_templates")
-
 
 class InventoryLocation(Base):
     __tablename__ = "inventory_locations"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey("inventory_locations.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
@@ -553,7 +526,6 @@ class InventoryLocation(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
-    team = relationship("Team", back_populates="inventory_locations")
     parent = relationship("InventoryLocation", remote_side=[id], back_populates="children")
     children = relationship(
         "InventoryLocation",
@@ -567,7 +539,6 @@ class InventoryCategory(Base):
     __tablename__ = "inventory_categories"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(Integer, ForeignKey("inventory_categories.id", ondelete="CASCADE"), nullable=True, index=True)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
@@ -577,7 +548,6 @@ class InventoryCategory(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
-    team = relationship("Team", back_populates="inventory_categories")
     parent = relationship("InventoryCategory", remote_side=[id], back_populates="children")
     children = relationship(
         "InventoryCategory",
@@ -591,7 +561,6 @@ class InventoryFlag(Base):
     __tablename__ = "inventory_flags"
 
     id = Column(Integer, primary_key=True, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(120), nullable=False)
     description = Column(Text, nullable=True)
     color = Column(String(32), nullable=False, default="neutral")
@@ -600,7 +569,6 @@ class InventoryFlag(Base):
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
-    team = relationship("Team", back_populates="inventory_flags")
     items = relationship("InventoryItem", back_populates="flag")
 
 
@@ -989,7 +957,7 @@ class WebMenu(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(200), nullable=False)
-    location = Column(String(50), nullable=False)
+    location = Column(String(50), nullable=False, unique=True)
     draft_version = Column(Integer, nullable=False, default=1)
     published_revision_id = Column(Integer, ForeignKey("web_menu_revisions.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)

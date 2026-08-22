@@ -115,6 +115,7 @@ MediaCard.propTypes = {
     filename: PropTypes.string,
     mime: PropTypes.string,
     url: PropTypes.string,
+    public_url: PropTypes.string,
     alt: PropTypes.string,
     is_image: PropTypes.bool,
   }).isRequired,

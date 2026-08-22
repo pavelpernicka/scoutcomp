@@ -41,7 +41,7 @@ def list_teams(
 def create_team(
     payload: TeamCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_action("core.teams.manage")),
+    current_user: User = Depends(require_action("core.teams.manage")),
 ) -> Team:
     if "any" not in permission_scopes(db, current_user, "core.teams.manage"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Creating a team requires global scope")

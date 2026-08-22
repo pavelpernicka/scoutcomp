@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import PropTypes from "prop-types";
 
 import Modal from "../../../components/Modal";
+import ModalFooterStatus from "../../../components/ModalFooterStatus";
 import { getItemCurrentLocation, getItemFlagBadge } from "../helpers";
 import { parseServerDate } from "../../../utils/dateUtils";
 
@@ -90,14 +91,12 @@ export default function InventoryItemDialog({
   const physicalQuantity = locationEntries.reduce((sum, location) => sum + (Number(location.quantity) || 0), 0);
   const availableLocationOptions = locationEntries.filter((entry) => Number(entry.quantity) > 0);
   const scopedLocationOptions = useMemo(() => {
-    const teamId = Number(form.team_id);
-    const scoped = locationTreeOptions.filter((option) => !teamId || Number(option.teamId) === teamId);
-    const knownLocations = new Set(scoped.map((option) => option.value));
+    const knownLocations = new Set(locationTreeOptions.map((option) => option.value));
     const missingCurrentLocations = locationEntries
       .filter((entry) => entry.location && !knownLocations.has(entry.location))
       .map((entry) => ({ id: `legacy-${entry.location}`, value: entry.location, label: `${entry.location} (mimo strom)` }));
-    return [...scoped, ...missingCurrentLocations];
-  }, [form.team_id, locationEntries, locationTreeOptions]);
+    return [...locationTreeOptions, ...missingCurrentLocations];
+  }, [locationEntries, locationTreeOptions]);
 
   const updateLocationEntry = (index, field, value) => {
     onChange("locations", locationEntries.map((entry, entryIndex) => entryIndex === index ? { ...entry, [field]: value } : entry));
@@ -132,16 +131,22 @@ export default function InventoryItemDialog({
       size="xl"
       footer={(
         <>
-          <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Zavřít</button>
-          <button type="button" className="btn btn-primary" onClick={onSubmit}>
-            {mode === "create" ? "Vytvořit věc" : "Uložit změny"}
-          </button>
+          {saveError || photoError ? (
+            <ModalFooterStatus>
+              {saveError ? <p>{saveError}</p> : null}
+              {photoError ? <p>{photoError}</p> : null}
+            </ModalFooterStatus>
+          ) : null}
+          <div className="app-modal-footer-actions">
+            <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Zavřít</button>
+            <button type="button" className="btn btn-primary" onClick={onSubmit}>
+              {mode === "create" ? "Vytvořit věc" : "Uložit změny"}
+            </button>
+          </div>
         </>
       )}
     >
       <div className="inventory-item-dialog">
-        {saveError ? <div className="alert alert-danger mb-3" role="alert">{saveError}</div> : null}
-        {photoError ? <div className="alert alert-danger mb-3" role="alert">{photoError}</div> : null}
         <header className="inventory-item-hero">
           <div className="inventory-photo-controls">
             <button type="button" className="inventory-photo-placeholder" onClick={() => currentPhoto ? setPhotoPreviewVisible(true) : fileInputRef.current?.click()}>

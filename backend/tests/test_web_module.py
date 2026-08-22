@@ -319,7 +319,9 @@ def test_web_settings_and_menus(client, db_session):
 
     menu = client.post("/web/menus", headers=headers, json={"name": "Hlavní", "location": "main"})
     assert menu.status_code == 201
+    assert menu.json()["published_revision_id"] is not None
     menu_id = menu.json()["id"]
+    initial_revision_id = menu.json()["published_revision_id"]
     home_page = client.post(
         "/web/pages", headers=headers, json={"title": "Domů", "slug": "main"},
     ).json()
@@ -329,6 +331,8 @@ def test_web_settings_and_menus(client, db_session):
         headers=headers,
         json={
             "expected_version": menu.json()["draft_version"],
+            "name": "Hlavní navigace",
+            "location": "primary",
             "items": [
                 {"id": -1, "label": "Domů", "item_type": "page", "page_id": home_page["id"], "position": 0},
                 {"label": "Kontakt", "url": "/contact", "position": 1},
@@ -338,6 +342,9 @@ def test_web_settings_and_menus(client, db_session):
     assert items.status_code == 200
     menus = items.json()
     main_menu = next(m for m in menus if m["id"] == menu_id)
+    assert main_menu["name"] == "Hlavní navigace"
+    assert main_menu["location"] == "primary"
+    assert main_menu["published_revision_id"] != initial_revision_id
     assert [i["label"] for i in main_menu["items"]] == ["Domů", "Kontakt"]
     assert main_menu["items"][0]["page_id"] == home_page["id"]
 

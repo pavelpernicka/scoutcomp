@@ -1,12 +1,8 @@
 import api from "../../services/api";
 
 export const inventoryApi = {
-  getOverview: async (teamId) => {
-    const { data } = await api.get("/inventory/overview", { params: teamId ? { team_id: teamId } : {} });
-    return data;
-  },
-  getTeams: async () => {
-    const { data } = await api.get("/teams");
+  getOverview: async () => {
+    const { data } = await api.get("/inventory/overview");
     return data;
   },
   getLabelTemplates: async () => {

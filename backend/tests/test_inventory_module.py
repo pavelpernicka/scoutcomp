@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from app.core.security import create_access_token
-from app.models import RoleEnum, Team, User
+from app.models import RoleEnum, User
 
 
 def _auth_headers_for_user(user: User) -> dict[str, str]:
@@ -22,47 +22,42 @@ def _active_user(*, username: str, email: str, role: RoleEnum, real_name: str) -
     )
 
 
-def _seed_inventory_scope(db_session):
-    team_alpha = Team(name="Vlci", description="", join_code="VLCI1234")
-    team_beta = Team(name="Rysi", description="", join_code="RYSI1234")
+def _seed_inventory_user(db_session):
     admin = _active_user(username="admin", email="admin@example.com", role=RoleEnum.ADMIN, real_name="Admin")
-    group_admin = _active_user(username="ga", email="ga@example.com", role=RoleEnum.GROUP_ADMIN, real_name="Group Admin")
-    group_admin.managed_teams.append(team_alpha)
-    db_session.add_all([team_alpha, team_beta, admin, group_admin])
+    db_session.add(admin)
     db_session.commit()
-    return team_alpha, team_beta, admin, group_admin
+    return admin
 
 
-def test_group_admin_only_sees_managed_inventory(client, db_session):
-    team_alpha, team_beta, admin, group_admin = _seed_inventory_scope(db_session)
-    alpha_item = client.post(
+def test_inventory_is_global_and_has_no_team_fields(client, db_session):
+    admin = _seed_inventory_user(db_session)
+    first_item = client.post(
         "/inventory/items",
-        json={"team_id": team_alpha.id, "name": "Stan", "quantity": 4, "status": "available"},
+        json={"name": "Stan", "quantity": 4, "status": "available"},
         headers=_auth_headers_for_user(admin),
     )
-    assert alpha_item.status_code == 201
+    assert first_item.status_code == 201
 
-    beta_item = client.post(
+    second_item = client.post(
         "/inventory/items",
-        json={"team_id": team_beta.id, "name": "Kotel", "quantity": 2, "status": "available"},
+        json={"name": "Kotel", "quantity": 2, "status": "available"},
         headers=_auth_headers_for_user(admin),
     )
-    assert beta_item.status_code == 201
+    assert second_item.status_code == 201
 
-    response = client.get("/inventory/items", headers=_auth_headers_for_user(group_admin))
+    response = client.get("/inventory/items", headers=_auth_headers_for_user(admin))
 
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 1
-    assert body[0]["team_id"] == team_alpha.id
-    assert body[0]["name"] == "Stan"
+    assert [item["name"] for item in body] == ["Kotel", "Stan"]
+    assert all("team_id" not in item and "team_name" not in item for item in body)
 
 
 def test_qr_identifier_stays_stable_after_rename(client, db_session):
-    team_alpha, _team_beta, admin, _group_admin = _seed_inventory_scope(db_session)
+    admin = _seed_inventory_user(db_session)
     created = client.post(
         "/inventory/items",
-        json={"team_id": team_alpha.id, "name": "Sekera", "quantity": 1, "status": "available"},
+        json={"name": "Sekera", "quantity": 1, "status": "available"},
         headers=_auth_headers_for_user(admin),
     )
     assert created.status_code == 201
@@ -84,11 +79,10 @@ def test_qr_identifier_stays_stable_after_rename(client, db_session):
 
 
 def test_inventory_loan_return_and_qr_lookup_flow(client, db_session):
-    team_alpha, _team_beta, admin, _group_admin = _seed_inventory_scope(db_session)
+    admin = _seed_inventory_user(db_session)
     created = client.post(
         "/inventory/items",
         json={
-            "team_id": team_alpha.id,
             "name": "Lopata",
             "quantity": 6,
             "status": "available",
@@ -135,12 +129,11 @@ def test_inventory_loan_return_and_qr_lookup_flow(client, db_session):
 
 
 def test_inventory_item_keeps_location_quantities_in_sync_after_return(client, db_session):
-    team_alpha, _team_beta, admin, _group_admin = _seed_inventory_scope(db_session)
+    admin = _seed_inventory_user(db_session)
     headers = _auth_headers_for_user(admin)
     created = client.post(
         "/inventory/items",
         json={
-            "team_id": team_alpha.id,
             "name": "Podsada",
             "quantity": 6,
             "locations": [

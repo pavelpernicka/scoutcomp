@@ -17,8 +17,8 @@ const timestamp = (value) => parseServerDate(value)?.getTime() || 0;
 export default function MessagesWidget() {
   const { t, i18n } = useTranslation();
   const { profile } = useAuth();
-  const { data: conversations = [] } = useQuery({ queryKey: ["messages", "conversations"], queryFn: async () => (await api.get("/messages")).data, enabled: Boolean(profile), staleTime: 30_000 });
-  const { data: notifications = [] } = useQuery({ queryKey: ["notifications"], queryFn: async () => (await api.get("/notifications")).data, enabled: Boolean(profile), staleTime: 30_000 });
+  const { data: conversations = [] } = useQuery({ queryKey: ["messages", "conversations"], queryFn: async () => (await api.get("/messages")).data, enabled: Boolean(profile), staleTime: 15_000, refetchInterval: 5_000, refetchIntervalInBackground: false });
+  const { data: notifications = [] } = useQuery({ queryKey: ["notifications"], queryFn: async () => (await api.get("/notifications")).data, enabled: Boolean(profile), staleTime: 20_000, refetchInterval: 10_000, refetchIntervalInBackground: false });
 
   const rows = useMemo(() => {
     const messageRows = conversations.filter((conversation) => conversation.last_message).map((conversation) => ({

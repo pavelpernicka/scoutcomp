@@ -130,12 +130,24 @@ export function PushNotificationSettings() {
     }
   };
 
-  if (state === "disabled") return null;
+  if (state === "disabled") {
+    return (
+      <section aria-labelledby="push-settings-title">
+        <h3 id="push-settings-title" className="h6 mb-2">
+          <i className="fas fa-bell text-muted me-2" aria-hidden="true" />
+          {t("pushSettings.title")}
+        </h3>
+        <Alert type="info" icon={<i className="fas fa-circle-info" />}>
+          {t("pushSettings.disabledByAdministrator")}
+        </Alert>
+      </section>
+    );
+  }
   if (state === "loading") {
     return <p className="text-muted small mb-0" aria-live="polite">{t("pushSettings.checking")}</p>;
   }
   if (state === "not_supported") {
-    return <Alert type="secondary" icon={<i className="fas fa-info-circle" />}>{t("pushSettings.notSupported")}</Alert>;
+    return <Alert type="info" icon={<i className="fas fa-info-circle" />}>{t("pushSettings.notSupported")}</Alert>;
   }
 
   return (

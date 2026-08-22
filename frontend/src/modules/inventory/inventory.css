@@ -1354,19 +1354,19 @@
   .inventory-photo-controls .btn:not(.inventory-photo-placeholder) { width: auto; justify-self: start; }
   .inventory-main-panel > .table-responsive,
   .inventory-camera-scanner + .table-responsive { overflow-x: hidden; }
-  .inventory-modern-table.table { width: 100%; table-layout: fixed; font-size: .88rem; }
+  .inventory-modern-table.table { width: 100%; min-width: 0 !important; table-layout: fixed; font-size: .88rem; }
   .inventory-modern-table th, .inventory-modern-table td { padding: .55rem .38rem; }
   .inventory-item-mobile-meta { display: flex; flex-wrap: wrap; gap: .28rem; margin-top: .3rem; font-size: .74rem; line-height: 1.25; }
   .inventory-item-mobile-meta span { display: inline-flex; align-items: center; min-height: 1.35rem; padding: .1rem .38rem; border: 1px solid transparent; border-radius: 999px; font-weight: 650; white-space: nowrap; }
   .inventory-item-mobile-meta__quantity { border-color: #b9d8fb !important; background: #edf6ff; color: #1769aa; }
   .inventory-item-mobile-meta__location { border-color: #bfe2ce !important; background: #edf8f0; color: #237143; }
   .inventory-item-mobile-meta__flag { border-color: #f0d69b !important; background: #fff7e6; color: #8a5a00; }
+  .inventory-items-table th:nth-child(3), .inventory-items-table td:nth-child(3),
   .inventory-items-table th:nth-child(4), .inventory-items-table td:nth-child(4),
   .inventory-items-table th:nth-child(5), .inventory-items-table td:nth-child(5),
   .inventory-items-table th:nth-child(6), .inventory-items-table td:nth-child(6) { display: none; }
   .inventory-items-table th:nth-child(1), .inventory-items-table td:nth-child(1) { width: 2.2rem; }
-  .inventory-items-table th:nth-child(2), .inventory-items-table td:nth-child(2) { width: 48%; min-width: 0; }
-  .inventory-items-table th:nth-child(3), .inventory-items-table td:nth-child(3) { min-width: 0; overflow-wrap: anywhere; }
+  .inventory-items-table th:nth-child(2), .inventory-items-table td:nth-child(2) { width: auto; min-width: 0; overflow-wrap: anywhere; }
   .inventory-items-table .inventory-inline-badge { max-width: 100%; padding: .28rem .4rem; font-size: .7rem; overflow-wrap: anywhere; }
   /* On small screens the indentation is enough; a connector competes with
      the selection control in the narrow first column. */

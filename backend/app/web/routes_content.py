@@ -81,6 +81,31 @@ def _serialize_menus(db: Session) -> list[dict]:
     return result
 
 
+def _publish_menu_snapshot(db: Session, menu: WebMenu, current_user: User) -> WebMenuRevision:
+    """Publish the current menu tree inside the caller's transaction."""
+    tree = _build_menu_tree(db.query(WebMenuItem).filter_by(menu_id=menu.id).all())
+    revision_number = int(
+        db.query(func.max(WebMenuRevision.revision_number))
+        .filter_by(menu_id=menu.id)
+        .scalar()
+        or 0
+    ) + 1
+    revision = WebMenuRevision(
+        menu_id=menu.id,
+        revision_number=revision_number,
+        source_version=menu.draft_version,
+        tree=tree,
+        reason="publish",
+        created_by_id=current_user.id,
+    )
+    db.add(revision)
+    db.flush()
+    menu.published_revision_id = revision.id
+    db.flush()
+    rebuild_published_page_artifacts(db)
+    return revision
+
+
 @router.get("/menus")
 def list_menus(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     # Page/template editors need the draft tree to render the atomic menu in
@@ -93,14 +118,22 @@ def list_menus(db: Session = Depends(get_db), current_user: User = Depends(get_c
 
 class MenuPayload(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    location: str | None = None
+    location: str = Field(default="main", min_length=1, max_length=50)
 
 
 @router.post("/menus", status_code=201)
 def create_menu(payload: MenuPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.menus.manage")
-    menu = WebMenu(name=payload.name.strip(), location=payload.location)
+    name = payload.name.strip()
+    location = payload.location.strip().lower()
+    if not name or not location:
+        raise HTTPException(422, "Menu name and designation are required")
+    if db.query(WebMenu).filter(WebMenu.location == location).first():
+        raise HTTPException(409, "Menu designation already exists")
+    menu = WebMenu(name=name, location=location)
     db.add(menu)
+    db.flush()
+    _publish_menu_snapshot(db, menu, current_user)
     db.commit()
     db.refresh(menu)
     return {
@@ -119,16 +152,18 @@ def delete_menu(menu_id: int, db: Session = Depends(get_db), current_user: User 
     menu = db.query(WebMenu).filter_by(id=menu_id).one_or_none()
     if not menu:
         raise HTTPException(404, "Menu not found")
-    if menu.published_revision_id:
-        _require_action(db, current_user, "web.publish")
     db.query(WebMenuItem).filter_by(menu_id=menu_id).delete()
     db.delete(menu)
+    db.flush()
+    rebuild_published_page_artifacts(db)
     db.commit()
 
 
 class MenuItemsPayload(BaseModel):
     items: list[MenuItemPayload]
     expected_version: int | None = Field(default=None, ge=1)
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    location: str | None = Field(default=None, min_length=1, max_length=50)
 
 
 @router.put("/menus/{menu_id}/items")
@@ -144,6 +179,16 @@ def replace_menu_items(menu_id: int, payload: MenuItemsPayload, db: Session = De
     expected = payload.expected_version
     if expected != menu.draft_version:
         raise HTTPException(409, "Menu was changed by another editor")
+    name = payload.name.strip() if payload.name is not None else menu.name
+    location = payload.location.strip().lower() if payload.location is not None else menu.location
+    if not name or not location:
+        raise HTTPException(422, "Menu name and designation are required")
+    duplicate_location = db.query(WebMenu.id).filter(
+        WebMenu.location == location,
+        WebMenu.id != menu.id,
+    ).first()
+    if duplicate_location:
+        raise HTTPException(409, "Menu designation already exists")
     previous_tree = _build_menu_tree(db.query(WebMenuItem).filter_by(menu_id=menu.id).all())
     revision_number = int(db.query(func.max(WebMenuRevision.revision_number)).filter_by(menu_id=menu.id).scalar() or 0) + 1
     db.add(WebMenuRevision(
@@ -153,7 +198,11 @@ def replace_menu_items(menu_id: int, payload: MenuItemsPayload, db: Session = De
     db.flush()
     updated = db.query(WebMenu).filter(
         WebMenu.id == menu.id, WebMenu.draft_version == expected,
-    ).update({WebMenu.draft_version: expected + 1}, synchronize_session=False)
+    ).update({
+        WebMenu.name: name,
+        WebMenu.location: location,
+        WebMenu.draft_version: expected + 1,
+    }, synchronize_session=False)
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Menu was changed by another editor")
     db.refresh(menu)
@@ -215,6 +264,7 @@ def replace_menu_items(menu_id: int, payload: MenuItemsPayload, db: Session = De
         if item.id is not None:
             id_map[item.id] = new_item.id
             depth_map[item.id] = depth
+    _publish_menu_snapshot(db, menu, current_user)
     db.commit()
     return _serialize_menus(db)
 
@@ -222,24 +272,11 @@ def replace_menu_items(menu_id: int, payload: MenuItemsPayload, db: Session = De
 @router.post("/menus/{menu_id}/publish")
 def publish_menu(menu_id: int, payload: PublishPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.menus.manage")
-    _require_action(db, current_user, "web.publish")
     menu = db.query(WebMenu).filter_by(id=menu_id).one_or_none()
     if not menu or menu.draft_version != payload.expected_version:
         raise HTTPException(409, "Menu was changed by another editor")
-    tree = _build_menu_tree(db.query(WebMenuItem).filter_by(menu_id=menu.id).all())
-    number = int(db.query(func.max(WebMenuRevision.revision_number)).filter_by(menu_id=menu.id).scalar() or 0) + 1
-    revision = WebMenuRevision(
-        menu_id=menu.id, revision_number=number, source_version=menu.draft_version,
-        tree=tree, reason="publish", created_by_id=current_user.id,
-    )
-    db.add(revision); db.flush()
-    updated = db.query(WebMenu).filter(
-        WebMenu.id == menu.id, WebMenu.draft_version == payload.expected_version,
-    ).update({WebMenu.published_revision_id: revision.id}, synchronize_session=False)
-    if updated != 1:
-        db.rollback(); raise HTTPException(409, "Menu was changed by another editor")
-    rebuild_published_page_artifacts(db)
-    db.commit(); db.refresh(menu)
+    revision = _publish_menu_snapshot(db, menu, current_user)
+    db.commit()
     return {"menu_id": menu.id, "published_revision_id": revision.id}
 
 

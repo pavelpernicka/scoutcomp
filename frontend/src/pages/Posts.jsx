@@ -16,6 +16,16 @@ const formatDate = (value, options = {}) => {
   return date ? date.toLocaleDateString("cs-CZ", { day: "numeric", month: "long", year: "numeric", ...options }) : "";
 };
 
+const plainTextExcerpt = (value, maxLength = 220) => {
+  if (!value) return "";
+  const parser = new DOMParser();
+  const document = parser.parseFromString(String(value), "text/html");
+  document.querySelectorAll("script, style, noscript, svg, template").forEach((element) => element.remove());
+  const text = (document.body.textContent || "").replace(/\s+/g, " ").trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}…`;
+};
+
 function EventInfoBox({ event }) {
   const queryClient = useQueryClient();
   const attendanceMutation = useMutation({
@@ -29,6 +39,7 @@ function EventInfoBox({ event }) {
   const selection = registration.status;
   const registrationLabel = selection === "attending" ? "Přihlášen" : selection === "not_attending" ? "Omluven" : null;
   const deadlinePassed = event.planned_deadline && parseServerDate(event.planned_deadline) < new Date();
+  const descriptionExcerpt = plainTextExcerpt(event.description);
   const choices = [
     ["attending", "btn-success", "fa-check", "Zúčastním se"],
     ["not_attending", "btn-warning", "fa-xmark", "Nezúčastním se"],
@@ -36,7 +47,7 @@ function EventInfoBox({ event }) {
   ];
 
   return <aside className="post-event-info rounded border p-3 my-4" aria-label="Související akce">
-    <div className="d-flex align-items-start gap-3"><span className="post-event-icon"><i className="fas fa-calendar-check" /></span><div className="flex-grow-1"><div className="small text-uppercase fw-semibold text-primary">Související akce</div><h2 className="h5 mb-1">{event.title}</h2><div className="small text-muted">{formatDate(event.starts_at, { weekday: "long" })}{event.location ? ` · ${event.location}` : ""}</div>{event.description && <p className="mb-0 mt-2 small">{event.description}</p>}</div></div>
+    <div className="d-flex align-items-start gap-3"><span className="post-event-icon"><i className="fas fa-calendar-check" /></span><div className="flex-grow-1"><div className="small text-uppercase fw-semibold text-primary">Související akce</div><h2 className="h5 mb-1">{event.title}</h2><div className="small text-muted">{formatDate(event.starts_at, { weekday: "long" })}{event.location ? ` · ${event.location}` : ""}</div>{descriptionExcerpt && <p className="mb-0 mt-2 small">{descriptionExcerpt}</p>}</div></div>
     {event.requires_planned && <><div className="alert alert-info py-2 small my-3 mb-0"><i className="fas fa-circle-info me-2" />{deadlinePassed ? "Termín pro přihlášení již uplynul." : "Vyberte, zda se akce zúčastníte."}{event.planned_deadline && !deadlinePassed && <> Uzávěrka: {formatDate(event.planned_deadline)}.</>}</div>
       {!deadlinePassed && <div className="post-event-choice-group btn-group mt-3" role="group" aria-label="Účast na akci">{choices.map(([status, className, icon, label]) => <button key={status} className={`btn btn-sm ${selection === status ? className : "btn-outline-secondary"}`} type="button" disabled={attendanceMutation.isPending} onClick={() => attendanceMutation.mutate(status)}><i className={`fas ${icon} me-1`} />{label}</button>)}</div>}
       {registrationLabel && <p className="small text-muted mb-0 mt-2"><i className={`fas ${selection === "attending" ? "fa-check text-success" : "fa-xmark text-warning"} me-1`} />{registrationLabel}{registration.created_at && <> · {formatDate(registration.created_at)}</>}</p>}</>}

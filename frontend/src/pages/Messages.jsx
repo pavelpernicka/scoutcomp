@@ -58,6 +58,8 @@ export default function Messages() {
     },
     enabled: Boolean(userId),
     staleTime: 20_000,
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: notifications = [] } = useQuery({
@@ -68,6 +70,8 @@ export default function Messages() {
     },
     enabled: Boolean(userId),
     staleTime: 30_000,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 
   const searchEnabled = searchQuery.trim().length > 0;
@@ -99,6 +103,8 @@ export default function Messages() {
     },
     enabled: selectedId != null && selectedId !== "system",
     staleTime: 10_000,
+    refetchInterval: 4_000,
+    refetchIntervalInBackground: false,
   });
 
   const thread = useMemo(
@@ -118,8 +124,14 @@ export default function Messages() {
 
   useEffect(() => {
     setOlderMessages([]);
-    setHasMoreOlder(threadPage?.has_more ?? false);
-  }, [selectedId, threadPage?.messages.length]);
+    setHasMoreOlder(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (olderMessages.length === 0) {
+      setHasMoreOlder(threadPage?.has_more ?? false);
+    }
+  }, [olderMessages.length, threadPage?.has_more]);
 
   useEffect(() => {
     if (skipScrollRef.current) {

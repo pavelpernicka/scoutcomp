@@ -44,14 +44,13 @@ const emptyItemForm = {
   locations: [],
   status: "available",
   notes: "",
-  team_id: "",
 };
 
 const emptyPhotoForm = { image_url: "", caption: "" };
 const emptyLoanForm = { borrower_name: "", quantity: 1, due_at: "", note: "", location: "" };
-const emptyLocationForm = { name: "", description: "", parent_id: null, sort_order: 0, team_id: "" };
-const emptyCategoryForm = { name: "", description: "", parent_id: null, color: "#5b8def", sort_order: 0, team_id: "" };
-const emptyFlagForm = { name: "", description: "", color: "#526174", sort_order: 0, team_id: "" };
+const emptyLocationForm = { name: "", description: "", parent_id: null, sort_order: 0 };
+const emptyCategoryForm = { name: "", description: "", parent_id: null, color: "#5b8def", sort_order: 0 };
+const emptyFlagForm = { name: "", description: "", color: "#526174", sort_order: 0 };
 const emptyBulkForm = {
   set_default_location: "",
   set_current_location: "",
@@ -128,13 +127,6 @@ export default function InventoryPage() {
     }
   }, [navigate, screen]);
 
-  const { data: teamsData } = useQuery({
-    queryKey: ["inventory", "teams"],
-    queryFn: inventoryApi.getTeams,
-    staleTime: 60_000,
-  });
-  const teams = teamsData ?? EMPTY_LIST;
-
   const { data: overview, isLoading, error } = useQuery({
     queryKey: ["inventory", "overview"],
     queryFn: () => inventoryApi.getOverview(),
@@ -173,22 +165,6 @@ export default function InventoryPage() {
   }, [categoriesTree, items]);
   const openLoanEntries = useMemo(() => buildOpenLoanEntries(items), [items]);
   const selectedItem = items.find((item) => item.id === selectedItemId) ?? null;
-
-  useEffect(() => {
-    const fallbackTeamId = teams[0]?.id ?? "";
-    if (!fallbackTeamId) return;
-
-    const applyFallbackTeam = (setForm) => {
-      setForm((current) => (
-        current.team_id ? current : { ...current, team_id: fallbackTeamId }
-      ));
-    };
-
-    applyFallbackTeam(setItemForm);
-    applyFallbackTeam(setLocationForm);
-    applyFallbackTeam(setCategoryForm);
-    applyFallbackTeam(setFlagForm);
-  }, [teams]);
 
   const filteredItems = useMemo(
     () => sortItems(filterItems(items, { search, presence: presenceFilter, flagId: flagFilter, locationPath: locationFilter, categoryPath: categoryFilter }, sets), sortBy, sortDir),
@@ -416,7 +392,6 @@ export default function InventoryPage() {
       locations: (item.locations || []).map((location) => ({ location: location.location, quantity: location.quantity })),
       status: item.status || "available",
       notes: item.notes || "",
-      team_id: item.team_id || teams[0]?.id || "",
     });
     setPhotoForm(emptyPhotoForm);
     const openLoan = (item.loans || []).find((loan) => !loan.returned_at);
@@ -434,7 +409,6 @@ export default function InventoryPage() {
     setItemDialogMode("create");
     setItemForm({
       ...emptyItemForm,
-      team_id: teams[0]?.id || "",
       category: categoryFilter || "",
       flag_id: null,
       set_id: null,
@@ -481,19 +455,19 @@ export default function InventoryPage() {
 
   const openCreateRootLocation = () => {
     setEditingLocation(null);
-    setLocationForm({ ...emptyLocationForm, team_id: teams[0]?.id || "", parent_id: null });
+    setLocationForm({ ...emptyLocationForm, parent_id: null });
     setLocationDialogVisible(true);
   };
 
   const openCreateRootCategory = () => {
     setEditingCategory(null);
-    setCategoryForm({ ...emptyCategoryForm, team_id: teams[0]?.id || "", parent_id: null });
+    setCategoryForm({ ...emptyCategoryForm, parent_id: null });
     setCategoryDialogVisible(true);
   };
 
   const openCreateFlag = () => {
     setEditingFlag(null);
-    setFlagForm({ ...emptyFlagForm, team_id: teams[0]?.id || "" });
+    setFlagForm(emptyFlagForm);
     setFlagDialogVisible(true);
   };
 
@@ -501,7 +475,6 @@ export default function InventoryPage() {
     setEditingLocation(null);
     setLocationForm({
       ...emptyLocationForm,
-      team_id: parent.team_id,
       parent_id: parent.id,
       sort_order: parent.children?.length || 0,
     });
@@ -515,7 +488,6 @@ export default function InventoryPage() {
       description: location.description || "",
       parent_id: location.parent_id,
       sort_order: location.sort_order,
-      team_id: location.team_id,
     });
     setLocationDialogVisible(true);
   };
@@ -524,7 +496,6 @@ export default function InventoryPage() {
     setEditingCategory(null);
     setCategoryForm({
       ...emptyCategoryForm,
-      team_id: category.team_id,
       parent_id: category.id,
       sort_order: category.children?.length || 0,
     });
@@ -539,7 +510,6 @@ export default function InventoryPage() {
       parent_id: category.parent_id,
       color: category.color,
       sort_order: category.sort_order,
-      team_id: category.team_id,
     });
     setCategoryDialogVisible(true);
   };
@@ -551,7 +521,6 @@ export default function InventoryPage() {
       description: flag.description || "",
       color: /^#[0-9a-f]{6}$/i.test(flag.color || "") ? flag.color : "#526174",
       sort_order: flag.sort_order,
-      team_id: flag.team_id,
     });
     setFlagDialogVisible(true);
   };
@@ -579,10 +548,6 @@ export default function InventoryPage() {
       setItemSaveError("Vyplň název věci.");
       return;
     }
-    if (!itemForm.team_id) {
-      setItemSaveError("Vyber družinu.");
-      return;
-    }
     if (!Number.isInteger(Number(itemForm.quantity)) || Number(itemForm.quantity) < 1) {
       setItemSaveError("Množství musí být celé číslo alespoň 1.");
       return;
@@ -605,7 +570,6 @@ export default function InventoryPage() {
     setItemSaveError("");
     const payload = {
       ...itemForm,
-      team_id: Number(itemForm.team_id),
       flag_id: itemForm.flag_id || null,
       current_location: itemForm.current_location || itemForm.default_location,
       locations,
@@ -647,7 +611,6 @@ export default function InventoryPage() {
       description: locationForm.description,
       parent_id: locationForm.parent_id,
       sort_order: Number(locationForm.sort_order || 0),
-      team_id: Number(locationForm.team_id),
     };
     if (editingLocation) {
       updateLocationMutation.mutate({ id: editingLocation.id, payload });
@@ -663,7 +626,6 @@ export default function InventoryPage() {
       parent_id: categoryForm.parent_id,
       color: categoryForm.color,
       sort_order: Number(categoryForm.sort_order || 0),
-      team_id: Number(categoryForm.team_id),
     };
     if (editingCategory) {
       updateCategoryMutation.mutate({ id: editingCategory.id, payload });
@@ -678,7 +640,6 @@ export default function InventoryPage() {
       description: flagForm.description,
       color: flagForm.color,
       sort_order: Number(flagForm.sort_order || 0),
-      team_id: Number(flagForm.team_id),
     };
     if (editingFlag) {
       updateFlagMutation.mutate({ id: editingFlag.id, payload });
@@ -817,7 +778,6 @@ export default function InventoryPage() {
                   templates={templates}
                   items={items}
                   selectedItemIds={selectedItemIds}
-                  teams={teams}
                   onCreateTemplate={(templateData) => templateMutation.mutateAsync(templateData)}
                   onUpdateTemplate={(id, templateData) => templateMutation.mutateAsync({ ...templateData, id })}
                   onDeleteTemplate={(id) => deleteTemplateMutation.mutate(id)}

@@ -239,7 +239,6 @@ export function sortItems(items, sortBy, sortDir) {
 export function buildLocationOptions(locations) {
   return flattenLocationTree(locations).map((location) => ({
     id: location.id,
-    teamId: location.team_id,
     value: location.path,
     label: `${"· ".repeat(location.depth)}${location.name}`,
   }));

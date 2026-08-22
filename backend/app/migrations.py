@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import json
+import re
 from datetime import datetime, timezone
 from typing import Callable, List
 
@@ -842,6 +843,18 @@ def _add_inventory_location_descriptions(conn: Connection) -> None:
     if "teams" not in tables or "inventory_flags" not in inspector.get_table_names():
         return
 
+    flag_columns = {column["name"] for column in inspector.get_columns("inventory_flags")}
+    item_columns = (
+        {column["name"] for column in inspector.get_columns("inventory_items")}
+        if "inventory_items" in tables
+        else set()
+    )
+    # New installations create a global inventory schema before historical
+    # migrations run. The legacy per-team flag seed only applies while both
+    # legacy team columns still exist.
+    if "team_id" not in flag_columns or "team_id" not in item_columns:
+        return
+
     team_ids = [row[0] for row in conn.execute(text("SELECT id FROM teams")).fetchall()]
     for team_id in team_ids:
         existing = {
@@ -912,6 +925,36 @@ def _add_inventory_system_flags(conn: Connection) -> None:
         conn.execute(text("ALTER TABLE inventory_flags ADD COLUMN is_system BOOLEAN NOT NULL DEFAULT 0"))
 
     conn.execute(text("UPDATE inventory_flags SET is_system = 1 WHERE lower(trim(name)) = 'došlo'"))
+
+    if "team_id" not in flag_columns:
+        sold_out_flag_id = conn.execute(
+            text("SELECT id FROM inventory_flags WHERE lower(trim(name)) = 'došlo' ORDER BY id LIMIT 1")
+        ).scalar()
+        if sold_out_flag_id is None:
+            conn.execute(text(
+                """
+                INSERT INTO inventory_flags
+                    (name, description, color, is_system, sort_order, created_at, updated_at)
+                VALUES
+                    ('Došlo', 'Systémový příznak pro nulové množství.', 'mismatch', 1, 999,
+                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """
+            ))
+            sold_out_flag_id = conn.execute(
+                text("SELECT id FROM inventory_flags WHERE lower(trim(name)) = 'došlo' ORDER BY id LIMIT 1")
+            ).scalar()
+        if sold_out_flag_id is not None and "inventory_items" in inspector.get_table_names():
+            conn.execute(
+                text(
+                    """
+                    UPDATE inventory_items
+                    SET flag_id = :flag_id, status = 'MISSING'
+                    WHERE quantity <= 0
+                    """
+                ),
+                {"flag_id": sold_out_flag_id},
+            )
+        return
 
     if "teams" not in inspector.get_table_names():
         return
@@ -1077,6 +1120,77 @@ def _remove_inventory_set_team_assignment(conn: Connection) -> None:
         conn.execute(text("PRAGMA foreign_keys=ON"))
         return
     conn.execute(text("ALTER TABLE inventory_sets ALTER COLUMN team_id DROP NOT NULL"))
+
+
+def _remove_inventory_team_assignments(conn: Connection) -> None:
+    """Make all current inventory records global without deleting any rows."""
+    inventory_tables = (
+        ("inventory_items", "ix_inventory_items_team_id"),
+        ("inventory_label_templates", "ix_inventory_label_templates_team_id"),
+        ("inventory_locations", "ix_inventory_locations_team_id"),
+        ("inventory_categories", "ix_inventory_categories_team_id"),
+        ("inventory_flags", "ix_inventory_flags_team_id"),
+    )
+    for table_name, index_name in inventory_tables:
+        inspector = inspect(conn)
+        if table_name not in inspector.get_table_names():
+            continue
+        columns = {column["name"] for column in inspector.get_columns(table_name)}
+        if "team_id" not in columns:
+            continue
+        if conn.dialect.name == "sqlite":
+            # SQLite refuses DROP COLUMN while its CREATE statement still
+            # contains the column-owned FK. Remove only that known constraint
+            # from sqlite_schema first; DROP COLUMN then performs the actual
+            # table rewrite and keeps all dependent inventory rows intact.
+            definition = conn.execute(
+                text("SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = :table"),
+                {"table": table_name},
+            ).scalar_one()
+            without_team_fk = re.sub(
+                r",\s*FOREIGN\s+KEY\s*\(\s*[\"`\[]?team_id[\"`\]]?\s*\)"
+                r"\s*REFERENCES\s+[\"`\[]?teams[\"`\]]?\s*\(\s*[\"`\[]?id[\"`\]]?\s*\)"
+                r"(?:\s+ON\s+DELETE\s+CASCADE)?",
+                "",
+                definition,
+                flags=re.IGNORECASE,
+            )
+            without_team_fk = re.sub(
+                r"(\bteam_id\b\s+INTEGER\s+NOT\s+NULL)\s+REFERENCES\s+"
+                r"[\"`\[]?teams[\"`\]]?\s*\(\s*[\"`\[]?id[\"`\]]?\s*\)"
+                r"(?:\s+ON\s+DELETE\s+CASCADE)?",
+                r"\1",
+                without_team_fk,
+                flags=re.IGNORECASE,
+            )
+            if without_team_fk == definition:
+                raise RuntimeError(f"Could not remove obsolete team foreign key from {table_name}")
+            try:
+                conn.execute(text("PRAGMA writable_schema=ON"))
+                conn.execute(
+                    text("UPDATE sqlite_schema SET sql = :sql WHERE type = 'table' AND name = :table"),
+                    {"sql": without_team_fk, "table": table_name},
+                )
+                schema_version = conn.execute(text("PRAGMA schema_version")).scalar_one()
+                conn.execute(text(f"PRAGMA schema_version={schema_version + 1}"))
+            finally:
+                conn.execute(text("PRAGMA writable_schema=OFF"))
+        conn.execute(text(f"DROP INDEX IF EXISTS {index_name}"))
+        conn.execute(text(f"ALTER TABLE {table_name} DROP COLUMN team_id"))
+
+    tables = set(inspect(conn).get_table_names())
+    if {"permission_definitions", "permission_group_permissions"}.issubset(tables):
+        # Inventory permissions now apply to the single shared warehouse.
+        # Preserve existing access grants while removing their obsolete team scope.
+        conn.execute(text(
+            """
+            UPDATE permission_group_permissions
+            SET scope = 'any'
+            WHERE permission_id IN (
+                SELECT id FROM permission_definitions WHERE module_code = 'inventory'
+            )
+            """
+        ))
 
 
 def _add_inventory_set_item_fields(conn: Connection) -> None:
@@ -2859,6 +2973,11 @@ MIGRATIONS: List[Migration] = [
         "20260821_remove_legacy_page_template_provenance",
         _remove_legacy_page_template_provenance,
         "Remove obsolete page-template columns and their stale foreign key",
+    ),
+    Migration(
+        "20260822_remove_inventory_team_assignments",
+        _remove_inventory_team_assignments,
+        "Remove obsolete team assignments from inventory records",
     ),
 ]
 

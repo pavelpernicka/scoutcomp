@@ -82,9 +82,11 @@ describe("CMS content API contracts", () => {
 
   it("includes the menu version in every draft replacement", () => {
     expect(buildMenuDraftPayload(
-      { draft_version: 9 },
+      { name: "  Main menu ", location: " Main ", draft_version: 9 },
       [{ id: -1, label: "Link", item_type: "external", url: "/contact", parent_id: null }],
     )).toMatchObject({
+      name: "Main menu",
+      location: "main",
       expected_version: 9,
       items: [{ id: -1, item_type: "external", url: "/contact" }],
     });

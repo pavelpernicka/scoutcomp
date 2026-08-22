@@ -356,7 +356,7 @@ export default function WebEditorPage() {
       insertEditorComponents(instance, {
         type: "link",
         content: mediaItem.filename,
-        attributes: { href: mediaItem.url, target: "_blank", "data-sc-media-id": String(mediaItem.id) },
+        attributes: { href: mediaItem.public_url || `/media/${mediaItem.id}/file`, target: "_blank", "data-sc-media-id": String(mediaItem.id) },
       });
     }
   }, [editor.editorRef, mediaPickerTarget]);

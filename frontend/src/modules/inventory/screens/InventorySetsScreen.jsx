@@ -27,7 +27,7 @@ export default function InventorySetsScreen({ sets, onCreate, onUpdate, onDelete
   return <>
     <Card className="border-0 shadow-lg" title="Sety vybavení" icon={<i className="fas fa-layer-group" />}>
       <div className="d-flex justify-content-between align-items-center gap-3 mb-3">
-        <p className="text-muted mb-0">Set je globální věc, která seskupuje více položek. Nemá vlastní družinu ani množství.</p>
+        <p className="text-muted mb-0">Set seskupuje více skladových položek do jednoho celku.</p>
         <button type="button" className="btn btn-primary flex-shrink-0" onClick={openCreate}><i className="fas fa-plus me-2" />Přidat set</button>
       </div>
       <div className="inventory-location-tree">

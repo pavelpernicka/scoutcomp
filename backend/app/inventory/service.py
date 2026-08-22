@@ -8,7 +8,6 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
-from ..dependencies import get_managed_team_ids
 from ..models import (
     InventoryCategory,
     InventoryLocation,
@@ -22,8 +21,6 @@ from ..models import (
     InventoryLoan,
     InventoryPhoto,
     InventorySet,
-    RoleEnum,
-    Team,
     User,
 )
 from ..schemas import (
@@ -39,29 +36,6 @@ from ..schemas import (
 )
 
 MAX_INVENTORY_HISTORY_ENTRIES_PER_ITEM = 200
-
-
-def require_team_scope(user: User, team_id: int) -> None:
-    if user.role == RoleEnum.ADMIN:
-        return
-    managed_ids = get_managed_team_ids(user)
-    if team_id not in managed_ids:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-
-
-def get_allowed_team_ids(user: User) -> Optional[set[int]]:
-    if user.role == RoleEnum.ADMIN:
-        return None
-    managed_ids = get_managed_team_ids(user)
-    return managed_ids
-
-
-def ensure_team_exists_and_allowed(db: Session, user: User, team_id: int) -> Team:
-    require_team_scope(user, team_id)
-    team = db.get(Team, team_id)
-    if not team:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
-    return team
 
 
 def generate_qr_identifier(db: Session) -> str:
@@ -81,7 +55,6 @@ def get_item_query(db: Session):
     # loading it into every list and mutation response made payloads grow with
     # the lifetime of each item.
     return db.query(InventoryItem).options(
-        joinedload(InventoryItem.team),
         joinedload(InventoryItem.flag),
         selectinload(InventoryItem.photos),
         selectinload(InventoryItem.loans),
@@ -90,7 +63,7 @@ def get_item_query(db: Session):
 
 
 def get_template_query(db: Session):
-    return db.query(InventoryLabelTemplate).options(joinedload(InventoryLabelTemplate.team))
+    return db.query(InventoryLabelTemplate)
 
 
 def get_location_query(db: Session):
@@ -102,131 +75,73 @@ def get_category_query(db: Session):
 
 
 def get_flag_query(db: Session):
-    return db.query(InventoryFlag).options(joinedload(InventoryFlag.team))
+    return db.query(InventoryFlag)
 
 
 def get_set_query(db: Session):
     return db.query(InventorySet).options(selectinload(InventorySet.items))
 
 
-def get_scoped_items(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryItem]:
-    query = get_item_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryItem.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryItem.team_id == team_id)
-    return query.order_by(InventoryItem.name.asc()).all()
+def get_inventory_items(db: Session) -> list[InventoryItem]:
+    return get_item_query(db).order_by(InventoryItem.name.asc()).all()
 
 
-def get_scoped_templates(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryLabelTemplate]:
-    query = get_template_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryLabelTemplate.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryLabelTemplate.team_id == team_id)
-    return query.order_by(InventoryLabelTemplate.name.asc()).all()
+def get_inventory_templates(db: Session) -> list[InventoryLabelTemplate]:
+    return get_template_query(db).order_by(InventoryLabelTemplate.name.asc()).all()
 
 
-def get_scoped_locations(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryLocation]:
-    query = get_location_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryLocation.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryLocation.team_id == team_id)
-    return query.order_by(InventoryLocation.team_id.asc(), InventoryLocation.path.asc(), InventoryLocation.sort_order.asc()).all()
+def get_inventory_locations(db: Session) -> list[InventoryLocation]:
+    return get_location_query(db).order_by(InventoryLocation.path.asc(), InventoryLocation.sort_order.asc()).all()
 
 
-def get_scoped_categories(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryCategory]:
-    query = get_category_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryCategory.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryCategory.team_id == team_id)
-    return query.order_by(InventoryCategory.team_id.asc(), InventoryCategory.path.asc(), InventoryCategory.sort_order.asc()).all()
+def get_inventory_categories(db: Session) -> list[InventoryCategory]:
+    return get_category_query(db).order_by(InventoryCategory.path.asc(), InventoryCategory.sort_order.asc()).all()
 
 
-def get_scoped_flags(db: Session, user: User, team_id: Optional[int] = None) -> list[InventoryFlag]:
-    query = get_flag_query(db)
-    allowed_team_ids = get_allowed_team_ids(user)
-    if allowed_team_ids is not None:
-        if not allowed_team_ids:
-            return []
-        query = query.filter(InventoryFlag.team_id.in_(allowed_team_ids))
-    if team_id is not None:
-        if allowed_team_ids is not None and team_id not in allowed_team_ids:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
-        query = query.filter(InventoryFlag.team_id == team_id)
-    return query.order_by(InventoryFlag.team_id.asc(), InventoryFlag.sort_order.asc(), InventoryFlag.name.asc()).all()
+def get_inventory_flags(db: Session) -> list[InventoryFlag]:
+    return get_flag_query(db).order_by(InventoryFlag.sort_order.asc(), InventoryFlag.name.asc()).all()
 
 
-def get_scoped_sets(db: Session, user: User, team_id: Optional[int] = None) -> list[InventorySet]:
-    query = get_set_query(db)
-    # A set has no team scope. For a team-filtered overview, members are
-    # filtered with the items while the global set definition remains visible.
-    return query.order_by(InventorySet.name.asc()).all()
+def get_inventory_sets(db: Session) -> list[InventorySet]:
+    return get_set_query(db).order_by(InventorySet.name.asc()).all()
 
 
-def get_item_or_404(db: Session, user: User, item_id: int) -> InventoryItem:
+def get_item_or_404(db: Session, item_id: int) -> InventoryItem:
     item = get_item_query(db).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory item not found")
-    require_team_scope(user, item.team_id)
     return item
 
 
-def get_template_or_404(db: Session, user: User, template_id: int) -> InventoryLabelTemplate:
+def get_template_or_404(db: Session, template_id: int) -> InventoryLabelTemplate:
     template = get_template_query(db).filter(InventoryLabelTemplate.id == template_id).first()
     if not template:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Label template not found")
-    require_team_scope(user, template.team_id)
     return template
 
 
-def get_location_or_404(db: Session, user: User, location_id: int) -> InventoryLocation:
+def get_location_or_404(db: Session, location_id: int) -> InventoryLocation:
     location = db.get(InventoryLocation, location_id)
     if not location:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
-    require_team_scope(user, location.team_id)
     return location
 
 
-def get_category_or_404(db: Session, user: User, category_id: int) -> InventoryCategory:
+def get_category_or_404(db: Session, category_id: int) -> InventoryCategory:
     category = db.get(InventoryCategory, category_id)
     if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
-    require_team_scope(user, category.team_id)
     return category
 
 
-def get_flag_or_404(db: Session, user: User, flag_id: int) -> InventoryFlag:
+def get_flag_or_404(db: Session, flag_id: int) -> InventoryFlag:
     flag = db.get(InventoryFlag, flag_id)
     if not flag:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
-    require_team_scope(user, flag.team_id)
     return flag
 
 
-def get_set_or_404(db: Session, user: User, set_id: int) -> InventorySet:
+def get_set_or_404(db: Session, set_id: int) -> InventorySet:
     inventory_set = db.get(InventorySet, set_id)
     if not inventory_set:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory set not found")
@@ -278,7 +193,6 @@ def get_available_quantity(item: InventoryItem) -> int:
 def serialize_item(item: InventoryItem) -> InventoryItemPublic:
     return InventoryItemPublic(
         id=item.id,
-        team_id=item.team_id,
         name=item.name,
         description=item.description,
         category=item.category,
@@ -294,7 +208,6 @@ def serialize_item(item: InventoryItem) -> InventoryItemPublic:
         qr_identifier=item.qr_identifier,
         created_at=item.created_at,
         updated_at=item.updated_at,
-        team_name=item.team.name if item.team else None,
         available_quantity=get_available_quantity(item),
         open_loan_quantity=get_open_loan_quantity(item),
         photos=[InventoryPhotoPublic.model_validate(photo) for photo in item.photos],
@@ -317,7 +230,6 @@ def serialize_template(template: InventoryLabelTemplate) -> InventoryLabelTempla
     # Create dict with converted fields
     template_data = {
         "id": template.id,
-        "team_id": template.team_id,
         "name": template.name,
         "width_mm": template.width_mm,
         "height_mm": template.height_mm,
@@ -347,7 +259,6 @@ def serialize_location_tree(locations: Iterable[InventoryLocation]) -> list[Inve
     node_map = {
         location.id: InventoryLocationPublic(
             id=location.id,
-            team_id=location.team_id,
             parent_id=location.parent_id,
             name=location.name,
             description=location.description,
@@ -374,7 +285,6 @@ def serialize_category_tree(categories: Iterable[InventoryCategory]) -> list[Inv
     node_map = {
         category.id: InventoryCategoryPublic(
             id=category.id,
-            team_id=category.team_id,
             parent_id=category.parent_id,
             name=category.name,
             description=category.description,

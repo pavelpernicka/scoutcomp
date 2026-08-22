@@ -2309,13 +2309,14 @@ def test_scout_theme_seeds_a_composed_homepage_and_rich_sections(db_session):
     assert activate_theme(db_session, home.theme_version_id).active_theme_version_id == home.theme_version_id
 
 
-def test_ontario_theme_is_seeded_with_assets_and_default_hierarchical_menus(db_session):
+def test_legacy_ontario_theme_can_be_installed_with_assets_and_default_hierarchical_menus(db_session):
     from app.models import WebReusableComponent, WebSiteStyle, WebTheme, WebThemeAsset
-    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION
+    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION, seed_ontario_theme
     from app.web.routes_templates import seed_default_theme
     from app.web.theme_package import activate_theme, resolve_theme_asset_path
 
     seed_default_theme(db_session)
+    seed_ontario_theme(db_session)
     theme = db_session.query(WebTheme).filter_by(stable_key=ONTARIO_THEME_ID).one()
     version = db_session.query(WebThemeVersion).filter_by(
         theme_id=theme.id, version=ONTARIO_THEME_VERSION,
@@ -2357,11 +2358,12 @@ def test_ontario_theme_is_seeded_with_assets_and_default_hierarchical_menus(db_s
 
 def test_ontario_theme_resources_are_directly_editable(db_session, monkeypatch):
     from app.web import routes_design, routes_templates
-    from app.web.ontario_theme import ONTARIO_THEME_VERSION
+    from app.web.ontario_theme import ONTARIO_THEME_VERSION, seed_ontario_theme
     from app.web.routes_design import DesignResourcePayload
     from app.web.routes_templates import TemplatePayload, seed_default_theme
 
     seed_default_theme(db_session)
+    seed_ontario_theme(db_session)
     user = User(
         username="ontario-editor", real_name="Ontario editor", password_hash="x",
         role=RoleEnum.ADMIN,
@@ -2427,6 +2429,7 @@ def test_ontario_seed_refreshes_only_untouched_bundled_resources(db_session):
     from app.web.routes_templates import seed_default_theme
 
     seed_default_theme(db_session)
+    seed_ontario_theme(db_session)
     home = db_session.query(WebTemplate).filter_by(
         qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:templates:home",
     ).one()
@@ -2463,11 +2466,12 @@ def test_ontario_seed_refreshes_only_untouched_bundled_resources(db_session):
 
 def test_ontario_theme_export_contains_all_editable_resources_and_fonts(db_session, tmp_path):
     from app.models import WebThemeAsset
-    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION
+    from app.web.ontario_theme import ONTARIO_THEME_ID, ONTARIO_THEME_VERSION, seed_ontario_theme
     from app.web.routes_templates import seed_default_theme
     from app.web.theme_package import export_theme_archive, install_theme, uninstall_theme
 
     seed_default_theme(db_session)
+    seed_ontario_theme(db_session)
     theme = db_session.query(WebTheme).filter_by(stable_key=ONTARIO_THEME_ID).one()
     version = db_session.query(WebThemeVersion).filter_by(
         theme_id=theme.id, version=ONTARIO_THEME_VERSION,

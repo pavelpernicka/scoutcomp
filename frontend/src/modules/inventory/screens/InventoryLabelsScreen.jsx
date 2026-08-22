@@ -6,16 +6,15 @@ import InventoryLabelPreview, { defaultLabelConfiguration, getLabelConfiguration
 import { downloadLabelsPdf, printLabelsPdf } from "../components/labelPrinting";
 import { LABEL_FIELD_OPTIONS } from "../helpers";
 
-const newTemplate = (teamId) => ({
+const newTemplate = () => ({
   name: "Nový štítek",
-  team_id: teamId,
   width_mm: 62,
   height_mm: 29,
   qr_size_mm: 22,
   fields: serializeLabelConfiguration(defaultLabelConfiguration),
 });
 
-export default function InventoryLabelsScreen({ templates, items, selectedItemIds, teams, onCreateTemplate, onUpdateTemplate, onDeleteTemplate }) {
+export default function InventoryLabelsScreen({ templates, items, selectedItemIds, onCreateTemplate, onUpdateTemplate, onDeleteTemplate }) {
   const [selectedTemplateId, setSelectedTemplateId] = useState(templates[0]?.id ?? null);
   const [draft, setDraft] = useState(null);
   const [selectedIds, setSelectedIds] = useState(selectedItemIds);
@@ -40,9 +39,9 @@ export default function InventoryLabelsScreen({ templates, items, selectedItemId
   };
   const create = () => {
     setSelectedTemplateId(null);
-    setDraft(newTemplate(teams[0]?.id || ""));
+    setDraft(newTemplate());
   };
-  const configuration = getLabelConfiguration(draft || selectedTemplate || newTemplate(teams[0]?.id || ""));
+  const configuration = getLabelConfiguration(draft || selectedTemplate || newTemplate());
   const updateConfiguration = (next) => setDraft((current) => ({ ...current, fields: serializeLabelConfiguration({ ...configuration, ...next }) }));
 
   return (
@@ -77,7 +76,6 @@ InventoryLabelsScreen.propTypes = {
   templates: PropTypes.array.isRequired,
   items: PropTypes.array.isRequired,
   selectedItemIds: PropTypes.array.isRequired,
-  teams: PropTypes.array.isRequired,
   onCreateTemplate: PropTypes.func.isRequired,
   onUpdateTemplate: PropTypes.func.isRequired,
   onDeleteTemplate: PropTypes.func.isRequired,

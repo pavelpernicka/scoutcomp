@@ -121,6 +121,17 @@ export default function TemplateSettingsPage() {
 
   if (stylesQuery.isLoading) return <section><DesignNav /><LoadingSpinner /></section>;
 
+  const previewStyle = {
+    "--preview-primary": tokens.primary || "#0a224e",
+    "--preview-accent": tokens.accent || "#1e3a6e",
+    "--preview-bg": tokens.bg || "#ffffff",
+    "--preview-text": tokens.text || "#2f3a4b",
+    "--preview-muted": tokens.muted || "#6b7280",
+    "--preview-border": tokens.border || "#e9e0d2",
+    "--preview-radius": tokens.radius || "1rem",
+    fontFamily: tokens.font_body || undefined,
+  };
+
   return <section>
     <DesignNav />
     <AdminPageHeader title={t("web.design.styles")} description={t("web.designDescriptions.styles")} action={actions} />
@@ -138,6 +149,13 @@ export default function TemplateSettingsPage() {
           <small className="text-muted">{t("web.templateSettings.addHint")}</small>
         </div>
       </div>
+      <aside className="web-token-preview" style={previewStyle} aria-label={t("web.templateSettings.preview")}>
+        <small>{t("web.templateSettings.preview")}</small>
+        <h3>{t("web.templateSettings.previewTitle")}</h3>
+        <p>{t("web.templateSettings.previewText")}</p>
+        <button type="button">{t("web.templateSettings.previewButton")}</button>
+        <span className="web-token-preview-accent" aria-hidden="true" />
+      </aside>
     </div>
   </section>;
 }

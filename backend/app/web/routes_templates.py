@@ -6,11 +6,27 @@ from .routes_common import *  # noqa: F403
 router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload, _empty_project
-from .pages import rebuild_published_page_artifacts
+from .pages import _extract_page_content, rebuild_published_page_artifacts
 from .routes_design import _validate_custom_css
 from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
 from .previews import build_preview, ensure_preview, get_current_preview, project_preview_svg
 # ---------------------------------------------------------------- components & templates
+
+_DEFAULT_THEME_CONFIG = {
+    "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
+    "primary-2": {"type": "color", "label": "Tmavá primární", "default": "#2f3a4b"},
+    "accent": {"type": "color", "label": "Barva akcentu", "default": "#1e3a6e"},
+    "secondary": {"type": "color", "label": "Doplňková barva", "default": "#97c93e"},
+    "bg": {"type": "color", "label": "Pozadí", "default": "#ffffff"},
+    "text": {"type": "color", "label": "Barva textu", "default": "#2f3a4b"},
+    "muted": {"type": "color", "label": "Tlumený text", "default": "#6b7280"},
+    "cream": {"type": "color", "label": "Teplá plocha", "default": "#e1d3c1"},
+    "cream-2": {"type": "color", "label": "Světlá teplá plocha", "default": "#f6ebd8"},
+    "border": {"type": "color", "label": "Barva oddělovačů", "default": "#e9e0d2"},
+    "font_body": {"type": "text", "label": "Písmo textu", "default": "'Open Sans', Arial, sans-serif"},
+    "font_heading": {"type": "text", "label": "Písmo nadpisů", "default": "Georgia, 'Times New Roman', serif"},
+    "radius": {"type": "text", "label": "Zaoblení", "default": "1rem"},
+}
 
 
 _DEFAULT_TEMPLATE_SVG = (
@@ -152,15 +168,7 @@ def seed_default_theme(db: Session) -> None:
                 "author": "ScoutComp",
                 "description": DEFAULT_THEME_DESCRIPTION,
                 "license": "GPL-3.0-or-later",
-                "config": {
-                    "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
-                    "accent": {"type": "color", "label": "Barva akcentu", "default": "#1e3a6e"},
-                    "bg": {"type": "color", "label": "Pozadí", "default": "#ffffff"},
-                    "text": {"type": "color", "label": "Barva textu", "default": "#2f3a4b"},
-                    "font_body": {"type": "text", "label": "Písmo textu", "default": "'Open Sans', sans-serif"},
-                    "font_heading": {"type": "text", "label": "Písmo nadpisů", "default": "'Poppins', sans-serif"},
-                    "radius": {"type": "text", "label": "Zaoblení", "default": "1rem"},
-                },
+                "config": _DEFAULT_THEME_CONFIG,
             },
             default_tokens=_THEME_TOKENS,
             base_css=THEME_CSS,
@@ -174,16 +182,12 @@ def seed_default_theme(db: Session) -> None:
         if version.base_css != THEME_CSS:
             version.base_css = THEME_CSS
             theme_css_changed = True
-        if not version.manifest.get("config"):
-            version.manifest = {**version.manifest, "config": {
-                "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
-                "accent": {"type": "color", "label": "Barva akcentu", "default": "#1e3a6e"},
-                "bg": {"type": "color", "label": "Pozadí", "default": "#ffffff"},
-                "text": {"type": "color", "label": "Barva textu", "default": "#2f3a4b"},
-                "font_body": {"type": "text", "label": "Písmo textu", "default": "'Open Sans', sans-serif"},
-                "font_heading": {"type": "text", "label": "Písmo nadpisů", "default": "'Poppins', sans-serif"},
-                "radius": {"type": "text", "label": "Zaoblení", "default": "1rem"},
-            }}
+        existing_config = version.manifest.get("config") or {}
+        version.manifest = {
+            **version.manifest,
+            "config": {**_DEFAULT_THEME_CONFIG, **existing_config},
+        }
+        version.default_tokens = {**_THEME_TOKENS, **(version.default_tokens or {})}
 
     for key, project_data in DEFAULT_THEME_TEMPLATES.items():
         qualified = _qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", key)
@@ -308,11 +312,9 @@ def seed_default_theme(db: Session) -> None:
     version.default_tokens["__preview_svg__"] = _DEFAULT_TEMPLATE_SVG
     db.commit()
 
-    # Ontario is distributed as a second bundled option.  Seeding it here
-    # keeps fresh and upgraded databases reproducible, while the active-theme
-    # pointer above deliberately remains on the ScoutComp default.
-    from .ontario_theme import seed_ontario_theme
-    seed_ontario_theme(db)
+    # Legacy bundled themes are no longer installed on fresh databases.  Their
+    # rows are intentionally not deleted here because an existing site may
+    # still reference an immutable published version.
 
 
 def seed_default_pages(db: Session) -> None:
@@ -331,7 +333,14 @@ def seed_default_pages(db: Session) -> None:
         existing = db.query(WebPage).filter_by(slug=item["slug"]).one_or_none()
         if existing:
             continue
-        template = theme_templates.get(item["slug"] == "main" and "main" or item["slug"]) or theme_templates.get("main")
+        theme_key = {"main": "scout-home", "news": "scout-listing"}.get(item["slug"], item["slug"])
+        template = theme_templates.get(theme_key) or theme_templates.get("main")
+        template_project = deepcopy(template.published_project_data or template.project_data) if template else None
+        page_project = (
+            _extract_page_content(template_project, template_project)
+            if isinstance(template_project, dict) and template_project.get("pages")
+            else _empty_project()
+        )
         page = WebPage(
             slug=item["slug"],
             title=item["title"],
@@ -340,7 +349,7 @@ def seed_default_pages(db: Session) -> None:
             path_segment=item["slug"],
             path="/" if item["slug"] == "main" else f"/{item['slug']}",
             html=None,
-            data=_empty_project(),
+            data=page_project,
             published=False,
             draft_version=1,
         )
@@ -359,7 +368,19 @@ def seed_default_pages(db: Session) -> None:
         template = theme_templates.get(theme_key)
         if not template:
             continue
-        if page.template_id is None or page.template_id != template.id:
+        current_template = db.get(WebTemplate, page.template_id) if page.template_id else None
+        legacy_default_keys = {
+            _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "main"),
+            _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "news"),
+        }
+        # Fill a missing shell and migrate only the two legacy built-in shells.
+        # A site editor's explicit template choice must survive startup/theme
+        # package updates; overwriting it here could leave the page unstyled.
+        if page.template_id is None or (
+            current_template is not None
+            and current_template.qualified_key in legacy_default_keys
+            and current_template.id != template.id
+        ):
             page.template_id = template.id
             page.template = template.key
     db.commit()

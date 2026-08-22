@@ -261,24 +261,6 @@ DEFAULT_SCOUT_TEMPLATE = {
                                                             },
                                                         ],
                                                     },
-                                                    {
-                                                        "type": "sc-condition",
-                                                        "condition": {
-                                                            "left": {"scope": "site", "field": "contact_email"},
-                                                            "operator": "exists",
-                                                        },
-                                                        "components": [
-                                                            {
-                                                                "type": "link",
-                                                                "tagName": "a",
-                                                                "attributes": {"class": "web-social"},
-                                                                "scBindings": {
-                                                                    "href": {"scope": "site", "field": "contact_email"},
-                                                                },
-                                                                "content": "E-mail",
-                                                            },
-                                                        ],
-                                                    },
                                                 ],
                                             },
                                             {"type": "sc-menu", "location": "footer"},
@@ -507,9 +489,6 @@ DEFAULT_THEME_SECTIONS = {
                         {"type": "heading", "tagName": "h2", "content": "Kontakt"},
                         {"type": "text", "tagName": "p", "components": [
                             {"type": "sc-bind", "binding": {"scope": "site", "field": "contact_address"}, "mode": "text"},
-                        ]},
-                        {"type": "text", "tagName": "p", "components": [
-                            {"type": "sc-bind", "binding": {"scope": "site", "field": "contact_email"}, "mode": "text"},
                         ]},
                     ],
                 }],
@@ -770,8 +749,6 @@ DEFAULT_THEME_SECTIONS.update({
     "contact-panel": _scout_section({"type": "default", "tagName": "section", "attributes": {"class": "web-section sc-section-night", "id": "contact"}, "components": [{"type": "default", "tagName": "div", "attributes": {"class": "web-container"}, "components": [
         {"type": "heading", "tagName": "h2", "content": "Ozvěte se nám"},
         {"type": "default", "tagName": "div", "attributes": {"class": "sc-contact-grid"}, "components": [
-            {"type": "text", "tagName": "p", "components": [{"type": "sc-bind", "binding": {"scope": "site", "field": "contact_email"}}]},
-            {"type": "text", "tagName": "p", "components": [{"type": "sc-bind", "binding": {"scope": "site", "field": "contact_phone"}}]},
             {"type": "text", "tagName": "p", "components": [{"type": "sc-bind", "binding": {"scope": "site", "field": "contact_meeting_time"}}]},
         ]},
     ]}]}),
@@ -858,7 +835,10 @@ def _sc2_shell(slot_components):
     return _sc2_project(
         _sc2("header", cls="sc2-site-header", components=[
             _sc2("nav", cls="sc2-navbar", attrs={"aria-label": "Hlavní navigace"}, components=[
-                _sc2("a", kind="link", cls="sc2-brand", attrs={"href": "/"}, bindings={"text": {"scope": "site", "field": "site_title"}}),
+                _sc2("a", kind="link", cls="sc2-brand", attrs={"href": "/"}, components=[
+                    _sc2("img", kind="image", cls="sc2-brand-logo", attrs={"alt": ""}, bindings={"src": {"scope": "site", "field": "site_logo"}}),
+                    _sc2("span", bindings={"text": {"scope": "site", "field": "site_title"}}),
+                ]),
                 _sc2("div", cls="sc2-menu", components=[{"type": "sc-menu", "location": "main"}]),
             ]),
         ]),
@@ -867,7 +847,7 @@ def _sc2_shell(slot_components):
             _sc2("div", cls="sc2-footer-grid", components=[
                 _sc2("div", components=[_sc2("strong", content="Skautský oddíl"), _sc2("p", content="Dobrodružství, přátelství a odpovědnost."),]),
                 _sc2("div", components=[_sc2("h2", kind="heading", content="Navigace"), {"type": "sc-menu", "location": "footer"}]),
-                _sc2("div", components=[_sc2("h2", kind="heading", content="Kontakt"), _sc2("p", bindings={"text": {"scope": "site", "field": "contact_email"}})]),
+                _sc2("div", components=[_sc2("h2", kind="heading", content="Informace"), _sc2("p", content="Aktuální kontakty najdete na kontaktní stránce.")]),
             ]),
             _sc2("p", cls="sc2-copyright", components=[_sc2("span", content="© "), _sc2("span", bindings={"text": {"scope": "site", "field": "site_title"}})]),
         ]),
@@ -925,7 +905,7 @@ DEFAULT_THEME_SECTIONS.update({
     "scout-values": _sc2_project(_sc2("section", cls="sc2-section", components=[_sc2("div", cls="sc2-container", components=[_sc2_heading("HODNOTY", "Na čem stavíme"), _sc2("div", cls="sc2-feature-grid", components=[_sc2("article", cls="sc2-feature", components=[_sc2("i", cls="fa-solid fa-people-group"), _sc2("h3", kind="heading", content="Přátelství"), _sc2("p", content="Držíme spolu a umíme se o sebe opřít.")]), _sc2("article", cls="sc2-feature", components=[_sc2("i", cls="fa-solid fa-tree"), _sc2("h3", kind="heading", content="Příroda"), _sc2("p", content="Objevujeme svět venku a pečujeme o něj.")]), _sc2("article", cls="sc2-feature", components=[_sc2("i", cls="fa-solid fa-fire"), _sc2("h3", kind="heading", content="Odvaha"), _sc2("p", content="Zkoušíme nové věci a rosteme vlastní zkušeností.")])])])])),
     "scout-cta": _sc2_project(_sc2("section", cls="sc2-cta", components=[_sc2("div", cls="sc2-container sc2-cta-inner", components=[_sc2("div", components=[_sc2("p", cls="sc2-kicker", content="PRVNÍ KROK"), _sc2("h2", kind="heading", content="Chceš to zkusit s námi?"), _sc2("p", content="Přijď na schůzku, poznej vedoucí a zjisti, jestli je skaut právě pro tebe.")]), _sc2_button("Napiš nám", "/kontakt", "dark")])])),
     "scout-gallery": _sc2_project(_sc2("section", cls="sc2-section", components=[_sc2("div", cls="sc2-container", components=[_sc2_heading("GALERIE", "Z našich akcí"), _sc2("div", cls="sc2-gallery", components=[{"type": "sc-repeat", "source": "core.media", "params": {"limit": 9}, "components": [_sc2("figure", cls="sc2-gallery-item", components=[_sc2("img", kind="image", attrs={"alt": ""}, bindings={"src": {"scope": "context", "field": "url"}, "alt": {"scope": "context", "field": "alt"}})])], "empty": [_sc2("p", content="Fotogalerii brzy doplníme.")]}])])])),
-    "scout-contact": _sc2_project(_sc2("section", cls="sc2-section sc2-contact", components=[_sc2("div", cls="sc2-container sc2-contact-grid", components=[_sc2("div", components=[_sc2_heading("KONTAKT", "Ozvěte se nám", "Rádi odpovíme na otázky rodičů i zájemců o členství."), _sc2_button("Napsat e-mail", "mailto:", "dark")]), _sc2("aside", cls="sc2-contact-card", components=[_sc2("h3", kind="heading", content="Spojení"), _sc2("p", bindings={"text": {"scope": "site", "field": "contact_email"}}), _sc2("p", bindings={"text": {"scope": "site", "field": "contact_phone"}}), _sc2("p", bindings={"text": {"scope": "site", "field": "contact_meeting_time"}})])])])),
+    "scout-contact": _sc2_project(_sc2("section", cls="sc2-section sc2-contact", components=[_sc2("div", cls="sc2-container sc2-contact-grid", components=[_sc2("div", components=[_sc2_heading("KONTAKT", "Ozvěte se nám", "Kontaktní údaje a způsob spojení doplňte podle potřeb svého oddílu.")]), _sc2("aside", cls="sc2-contact-card", components=[_sc2("h3", kind="heading", content="Kdy se potkáváme"), _sc2("p", bindings={"text": {"scope": "site", "field": "contact_meeting_time"}})])])])),
 })
 
 DEFAULT_THEME_COMPONENTS.update({

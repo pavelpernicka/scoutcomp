@@ -332,13 +332,11 @@ ONTARIO_GALLERY_HUB = _element("section", "ontario-gallery-hub ontario-section",
     ]),
 ])
 
-def _person_card(name: str, role: str, phone: str = "605 404 983", email: str = "ontario@zlin6.cz") -> dict:
+def _person_card(name: str, role: str) -> dict:
     return _element("article", "ontario-person text-center", components=[
         _image("assets/mockups/scout-planning-v1.webp", name, "ontario-person-photo sc-shape-oval"),
         _text(role, "ontario-person-role skaut mb-1"),
         _heading("h3", name, "h5 skaut"),
-        _element("p", "ontario-person-contact", components=[_text("Telefon: ", "", "span"), _element("a", content=phone, href=f"tel:{phone.replace(' ', '')}")]),
-        _element("p", "ontario-person-contact", components=[_text("E-mail: ", "", "span"), _element("a", content=email, href=f"mailto:{email}")]),
     ])
 
 
@@ -361,7 +359,7 @@ ONTARIO_LEADERS = _element("section", "ontario-leaders ontario-section sc-edge-p
         ]),
         _element("div", "row row-cols-1 row-cols-sm-2 g-5 ontario-leader-grid", components=[
             _element("div", "col", components=[_person_card("David Holík – Kráč", "Vůdce")]),
-            _element("div", "col", components=[_person_card("Matěj Škarka", "Zástupce vůdce", "605 579 131", "matej@zlin6.cz")]),
+            _element("div", "col", components=[_person_card("Matěj Škarka", "Zástupce vůdce")]),
         ]),
     ]),
 ])
@@ -375,10 +373,10 @@ ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section", name="O
             _element("span", "badge bg-primary", content="Výpravy"),
         ]),
         _element("div", "row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-5 mt-4", components=[
-            _element("div", "col", components=[_person_card("Vojta Palíšek – Rychlonožka", "Rádce", "739 800 454", "rychlonozka@zlin6.cz")]),
-            _element("div", "col", components=[_person_card("Jan Holík – Tuty", "Rádce", "605 966 538", "tuty@zlin6.cz")]),
-            _element("div", "col", components=[_person_card("Vojta Mikulášek – Napoleon", "Vedoucí družiny", "605 909 585", "napoleon@zlin6.cz")]),
-            _element("div", "col", components=[_person_card("Jakub Tkadleček – Kuba", "Vedoucí družiny", "737 300 596", "jakub@zlin6.cz")]),
+            _element("div", "col", components=[_person_card("Vojta Palíšek – Rychlonožka", "Rádce")]),
+            _element("div", "col", components=[_person_card("Jan Holík – Tuty", "Rádce")]),
+            _element("div", "col", components=[_person_card("Vojta Mikulášek – Napoleon", "Vedoucí družiny")]),
+            _element("div", "col", components=[_person_card("Jakub Tkadleček – Kuba", "Vedoucí družiny")]),
         ]),
     ]),
 ])
@@ -790,7 +788,10 @@ def ontario_css() -> str:
     # before their pseudo-element; escaping the colon disables only those
     # unused aliases while keeping the stylesheet package-safe.
     fontawesome = fontawesome.replace("file:before", r"file\:before")
-    return bootstrap + "\n" + fontawesome + "\n" + _ONTARIO_CSS
+    legacy_fixes = """
+@media(max-width:700px){.ontario-calendar .sc-calendar-day-number[aria-current=date]{display:inline-grid;width:1.5rem;height:1.5rem;place-items:center;padding:0;border-radius:50%}}
+"""
+    return bootstrap + "\n" + fontawesome + "\n" + _ONTARIO_CSS + legacy_fixes
 
 
 def _copy_assets(version: WebThemeVersion, db: Session) -> None:

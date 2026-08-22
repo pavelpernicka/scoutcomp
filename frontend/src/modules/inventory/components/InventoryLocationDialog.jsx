@@ -23,7 +23,7 @@ export default function InventoryLocationDialog({
       footer={(
         <>
           <button type="button" className="btn btn-outline-secondary" onClick={onClose}>Zavřít</button>
-          <button type="button" className="btn btn-primary" onClick={onSubmit}>{editing ? "Uložit lokaci" : "Vytvořit lokaci"}</button>
+          <button type="button" className="btn btn-primary" disabled={!form.name.trim()} onClick={onSubmit}>{editing ? "Uložit lokaci" : "Vytvořit lokaci"}</button>
         </>
       )}
     >

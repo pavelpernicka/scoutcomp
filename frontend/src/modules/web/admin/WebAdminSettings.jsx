@@ -97,7 +97,7 @@ export default function WebAdminSettings() {
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const pickMedia = (mediaItem) => {
     if (!mediaPickerField) return;
-    setField(mediaPickerField, mediaItem.url);
+    setField(mediaPickerField, mediaItem.public_url || mediaItem.url);
     setMediaPickerField(null);
   };
 

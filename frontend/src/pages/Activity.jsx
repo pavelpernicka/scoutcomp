@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
 
@@ -817,6 +817,22 @@ export default function Activity() {
                 </p>
               )}
             </div>
+
+            {selectedEvent.linked_posts?.length > 0 && (
+              <div className="col-12">
+                <h3 className="h6 mb-2">
+                  <i className="fas fa-newspaper me-2 text-primary" aria-hidden="true" />
+                  Související příspěvky
+                </h3>
+                <div className="list-group">
+                  {selectedEvent.linked_posts.map((post) => (
+                    <Link key={post.id} className="list-group-item list-group-item-action" to={`/posts/${post.id}`}>
+                      {post.title}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="col-12">
               <hr />

@@ -100,6 +100,8 @@ export const serializeMenuItems = (items) => {
 };
 
 export const buildMenuDraftPayload = (menu, items) => ({
+  name: menu.name.trim(),
+  location: menu.location.trim().toLowerCase(),
   items: serializeMenuItems(items),
   expected_version: menu.draft_version,
 });

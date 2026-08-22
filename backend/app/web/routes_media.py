@@ -21,6 +21,7 @@ class MediaOut(BaseModel):
     mime: str | None = None
     size: int = 0
     url: str = ""
+    public_url: str = ""
     album: str | None = None
     folder_id: int | None = None
     alt: str | None = None
@@ -44,6 +45,7 @@ def _media_out(record: WebMedia, db: Session | None = None) -> MediaOut:
         mime=record.mime,
         size=record.size,
         url=f"/api/web/media/{record.id}/file",
+        public_url=f"/media/{record.id}/file",
         album=record.album,
         folder_id=record.folder_id,
         alt=record.alt,

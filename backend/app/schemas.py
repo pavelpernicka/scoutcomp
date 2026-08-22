@@ -570,7 +570,6 @@ class InventoryItemBase(BaseModel):
     current_location: Optional[str] = Field(default=None, max_length=200)
     status: InventoryItemStatus = InventoryItemStatus.AVAILABLE
     notes: Optional[str] = None
-    team_id: int
 
 
 class InventoryItemLocationInput(BaseModel):
@@ -601,7 +600,6 @@ class InventoryItemUpdate(BaseModel):
     current_location: Optional[str] = Field(default=None, max_length=200)
     status: Optional[InventoryItemStatus] = None
     notes: Optional[str] = None
-    team_id: Optional[int] = None
     locations: Optional[List[InventoryItemLocationInput]] = None
 
 
@@ -645,7 +643,6 @@ class InventoryLoanPublic(BaseModel):
 
 class InventoryLabelTemplateBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
-    team_id: int
     width_mm: float = Field(default=62, gt=0)
     height_mm: float = Field(default=29, gt=0)
     qr_size_mm: float = Field(default=18, gt=0)
@@ -658,7 +655,6 @@ class InventoryLabelTemplateCreate(InventoryLabelTemplateBase):
 
 class InventoryLabelTemplateUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    team_id: Optional[int] = None
     width_mm: Optional[float] = Field(default=None, gt=0)
     height_mm: Optional[float] = Field(default=None, gt=0)
     qr_size_mm: Optional[float] = Field(default=None, gt=0)
@@ -676,7 +672,6 @@ class InventoryLabelTemplatePublic(InventoryLabelTemplateBase):
 class InventoryLocationBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
-    team_id: int
     parent_id: Optional[int] = None
     sort_order: int = Field(default=0, ge=0)
 
@@ -688,14 +683,12 @@ class InventoryLocationCreate(InventoryLocationBase):
 class InventoryLocationUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
-    team_id: Optional[int] = None
     parent_id: Optional[int] = None
     sort_order: Optional[int] = Field(default=None, ge=0)
 
 
 class InventoryLocationPublic(BaseModel):
     id: int
-    team_id: int
     parent_id: Optional[int]
     name: str
     description: Optional[str]
@@ -711,7 +704,6 @@ class InventoryLocationPublic(BaseModel):
 class InventoryCategoryBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: Optional[str] = None
-    team_id: int
     parent_id: Optional[int] = None
     color: str = Field(default="#5b8def", min_length=4, max_length=16)
     sort_order: int = Field(default=0, ge=0)
@@ -724,7 +716,6 @@ class InventoryCategoryCreate(InventoryCategoryBase):
 class InventoryCategoryUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     description: Optional[str] = None
-    team_id: Optional[int] = None
     parent_id: Optional[int] = None
     color: Optional[str] = Field(default=None, min_length=4, max_length=16)
     sort_order: Optional[int] = Field(default=None, ge=0)
@@ -732,7 +723,6 @@ class InventoryCategoryUpdate(BaseModel):
 
 class InventoryCategoryPublic(BaseModel):
     id: int
-    team_id: int
     parent_id: Optional[int]
     name: str
     description: Optional[str]
@@ -749,7 +739,6 @@ class InventoryCategoryPublic(BaseModel):
 class InventoryFlagBase(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     description: Optional[str] = None
-    team_id: int
     color: str = Field(default="neutral", min_length=3, max_length=32)
     sort_order: int = Field(default=0, ge=0)
 
@@ -761,14 +750,12 @@ class InventoryFlagCreate(InventoryFlagBase):
 class InventoryFlagUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     description: Optional[str] = None
-    team_id: Optional[int] = None
     color: Optional[str] = Field(default=None, min_length=3, max_length=32)
     sort_order: Optional[int] = Field(default=None, ge=0)
 
 
 class InventoryFlagPublic(BaseModel):
     id: int
-    team_id: int
     name: str
     description: Optional[str]
     color: str
@@ -782,7 +769,6 @@ class InventoryFlagPublic(BaseModel):
 
 class InventoryItemPublic(BaseModel):
     id: int
-    team_id: int
     name: str
     description: Optional[str]
     category: Optional[str]
@@ -798,7 +784,6 @@ class InventoryItemPublic(BaseModel):
     qr_identifier: str
     created_at: datetime
     updated_at: datetime
-    team_name: Optional[str] = None
     available_quantity: int = 0
     open_loan_quantity: int = 0
     photos: List[InventoryPhotoPublic] = Field(default_factory=list)

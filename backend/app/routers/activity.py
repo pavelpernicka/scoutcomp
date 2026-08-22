@@ -19,6 +19,8 @@ from ..models import (
     Team,
     User,
     UserPermissionGroup,
+    WebPost,
+    WebPostRevision,
 )
 from ..permissions import allows, managed_team_ids, permission_keys, permission_scopes
 from ..services.web_push import deliver_push_to_user_ids
@@ -138,12 +140,38 @@ def _leader_user_ids(db: Session, user_ids: list[int]) -> set[int]:
     }
     return (group_ids | direct_ids) - denied_ids
 
-def serialize(event):
+def _linked_posts(db: Session, event_ids: list[int]) -> dict[int, list[dict]]:
+    if not event_ids:
+        return {}
+    rows = (
+        db.query(WebPost.id, WebPost.event_id, WebPostRevision.title)
+        .join(WebPostRevision, WebPostRevision.id == WebPost.published_revision_id)
+        .filter(
+            WebPost.event_id.in_(event_ids),
+            WebPost.published.is_(True),
+            WebPost.deleted_at.is_(None),
+            WebPostRevision.is_publication.is_(True),
+        )
+        .order_by(WebPost.published_at.desc(), WebPost.id.desc())
+        .all()
+    )
+    result: dict[int, list[dict]] = {}
+    for post_id, event_id, title in rows:
+        result.setdefault(event_id, []).append({"id": post_id, "title": title})
+    return result
+
+
+def _can_read_posts(db: Session, user: User) -> bool:
+    return bool({"core.posts.read", "core.posts.manage", "web.posts.manage"} & permission_keys(db, user))
+
+
+def serialize(event, *, linked_posts: list[dict] | None = None):
     return {"id": event.id, "team_id": event.team_id, "title": event.title, "description": event.description,
             "kind": event.kind, "starts_at": event.starts_at, "ends_at": event.ends_at, "location": event.location,
             "color": event.color, "audience": event.audience, "requires_planned": event.requires_planned,
             "planned_deadline": event.planned_deadline, "is_public": event.is_public,
             "created_by_id": event.created_by_id,
+            "linked_posts": linked_posts or [],
             "team_name": event.team.name if getattr(event, "team", None) else None,
             "attendance": [{"user_id": a.user_id,
                             "user_name": a.user.real_name if a.user else None,
@@ -161,7 +189,9 @@ def list_events(team_id: int | None = Query(None), db: Session = Depends(get_db)
     elif current_user.team_id: query = query.filter((ScoutEvent.team_id == current_user.team_id) | (ScoutEvent.team_id.is_(None)))
     if not _is_leader(db, current_user):
         query = query.filter(ScoutEvent.audience == "members")
-    return [serialize(e) for e in query.order_by(ScoutEvent.starts_at.desc()).all()]
+    events = query.order_by(ScoutEvent.starts_at.desc()).all()
+    posts_by_event = _linked_posts(db, [event.id for event in events]) if _can_read_posts(db, current_user) else {}
+    return [serialize(event, linked_posts=posts_by_event.get(event.id)) for event in events]
 
 
 @router.get("/events/options")
@@ -259,7 +289,9 @@ def create_event(payload: EventPayload, background_tasks: BackgroundTasks, db: S
         raise HTTPException(403, "Only leaders can create council events")
     event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit()
     background_tasks.add_task(_deliver_event_created_push, event.id, current_user.id)
-    db.refresh(event); return serialize(event)
+    db.refresh(event)
+    posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
+    return serialize(event, linked_posts=posts)
 
 @router.put("/events/{event_id}")
 def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
@@ -273,7 +305,9 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
     if was_public or event.is_public:
         from ..web.pages import rebuild_published_page_artifacts
         rebuild_published_page_artifacts(db)
-    db.commit(); return serialize(event)
+    db.commit()
+    posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
+    return serialize(event, linked_posts=posts)
 
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
