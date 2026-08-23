@@ -483,7 +483,7 @@ def test_calendar_component_rejects_untrusted_configuration(payload):
         compile_project(project(payload))
 
 
-def test_public_image_binding_accepts_verified_avatar_but_rejects_svg(db_session):
+def test_public_image_binding_accepts_verified_avatar_and_replaces_missing_or_unsafe_images(db_session):
     compiled = compile_project(project({
         "type": "sc-repeat", "source": "core.events", "components": [{
             "type": "image", "tagName": "img", "attributes": {"alt": "Autor"},
@@ -499,10 +499,17 @@ def test_public_image_binding_accepts_verified_avatar_but_rejects_svg(db_session
         db_session, compiled.tree,
         resolver=lambda *_: [{"author_avatar": "data:image/svg+xml;base64,PHN2Zz4="}],
     )
+    missing = render_project(
+        db_session, compiled.tree,
+        resolver=lambda *_: [{"author_avatar": None}],
+    )
 
     assert 'src="data:image/gif;base64,R0lGODlh"' in valid
     assert "data:image/svg+xml" not in unsafe
-    assert " src=" not in unsafe
+    assert "<img" not in unsafe
+    assert "<img" not in missing
+    assert '<div aria-hidden="true" class="sc-image-placeholder"></div>' in unsafe
+    assert '<div aria-hidden="true" class="sc-image-placeholder"></div>' in missing
 
 
 def test_hierarchical_menu_component_preserves_children_and_safe_links(db_session):

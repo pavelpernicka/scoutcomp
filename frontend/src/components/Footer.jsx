@@ -13,7 +13,7 @@ export default function Footer() {
           <div className="col-md-6">
             <small>
               <a
-                href="https://github.com/pavelpernicka/scoutcomp"
+                href="https://scoutcomp.pernicka.cz"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="link-primary"

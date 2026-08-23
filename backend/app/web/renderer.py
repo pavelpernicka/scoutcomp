@@ -1589,7 +1589,8 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
             attrs["src"] = site_logo
     bound_styles: dict[str, str] = {}
     content = escape(str(node.get("content") or ""))
-    for target, binding in (node.get("scBindings") or {}).items():
+    bindings = node.get("scBindings") or {}
+    for target, binding in bindings.items():
         value = _binding_value(binding, state, context)
         text = _format_value(value, binding.get("format"))
         if target == "text":
@@ -1609,6 +1610,23 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
                 bound_styles[property_name] = clean
         else:
             attrs[target] = text
+    # A dynamically bound image without a usable source must not reach the
+    # browser. An <img> without src renders its alt text/broken-image indicator.
+    # Keep its layout classes on a decorative element instead, so themes can
+    # provide a deliberate empty-state surface without duplicating conditions
+    # around every bound image.
+    if tag.lower() == "img" and "src" in bindings and not str(attrs.get("src") or "").strip():
+        placeholder_attrs = {
+            "aria-hidden": "true",
+            "class": " ".join(filter(None, (str(attrs.get("class") or "").strip(), "sc-image-placeholder"))),
+        }
+        if attrs.get("style"):
+            placeholder_attrs["style"] = attrs["style"]
+        placeholder_html = "".join(
+            f' {key}="{escape(str(value), quote=True)}"'
+            for key, value in sorted(placeholder_attrs.items())
+        )
+        return f"<div{placeholder_html}></div>"
     if bound_styles:
         attrs["style"] = ";".join(f"{key}:{value}" for key, value in sorted(bound_styles.items()))
     attr_html = "".join(f' {key}="{escape(str(value), quote=True)}"' for key, value in sorted(attrs.items()))
