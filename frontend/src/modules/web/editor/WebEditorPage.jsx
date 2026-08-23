@@ -19,6 +19,7 @@ import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
 import MediaPickerModal from "../media/MediaPickerModal";
+import { hydrateEditorMediaPreviews } from "../media/editorMedia";
 import api from "../../../services/api";
 import "../styles/editor.css";
 
@@ -87,6 +88,14 @@ export default function WebEditorPage() {
   );
   const canvasStyles = canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [];
   const editorBlocks = useMemo(() => [
+    ...((canvasStylesQuery.data?.editor?.blocks || []).map((item) => ({
+      id: `sc-theme-${item.id}`,
+      label: item.label,
+      category: item.category,
+      content: item.content,
+      media: `<i class="fas fa-${item.icon || "cube"}" aria-hidden="true"></i>`,
+      attributes: { title: item.label },
+    }))),
     ...components.map((item) => ({
       id: `sc-resource-component-${item.id}`,
       label: item.name,
@@ -101,7 +110,7 @@ export default function WebEditorPage() {
       content: cloneResourceComponents(item),
       attributes: { title: item.description || item.name },
     })),
-  ], [components, sections, t]);
+  ], [canvasStylesQuery.data?.editor?.blocks, components, sections, t]);
   const templateCSSQuery = useQuery({
     queryKey: ["web", "template", page?.template_id],
     queryFn: () => cmsApi.getTemplate(page.template_id).then((tpl) => tpl?.published_css || tpl?.css || ""),
@@ -145,6 +154,18 @@ export default function WebEditorPage() {
     if (!editor.isReady) return undefined;
     return hydrateMenuComponents(editor.editorRef.current, menusQuery.data || []);
   }, [editor.editorRef, editor.isReady, menusQuery.data]);
+
+  useEffect(() => {
+    const instance = editor.editorRef.current;
+    if (!editor.isReady || !instance) return undefined;
+    let disposed = false;
+    let release = null;
+    hydrateEditorMediaPreviews(instance).then((cleanup) => {
+      if (disposed) cleanup();
+      else release = cleanup;
+    });
+    return () => { disposed = true; release?.(); };
+  }, [editor.editorRef, editor.isReady, page?.id, page?.draft_version]);
 
   const getPayload = useCallback(() => {
     const snapshot = editor.getSnapshot();
@@ -338,7 +359,9 @@ export default function WebEditorPage() {
       };
       const targetComponent = target?.component || target;
       if (target?.mode === "background" && targetComponent?.addStyle) {
+        targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
         targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
+        targetComponent.getEl?.()?.style?.setProperty("background-image", `url("${src}")`);
         autosaveRef.current?.schedule();
         return;
       }
@@ -515,7 +538,7 @@ export default function WebEditorPage() {
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => openMediaPicker()} />
     <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onTemplateChange={requestTemplateChange} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}{device === "Mobile" && <div className="web-editor-device-fit" aria-hidden="true">{t("web.editor.devices.mobile")} · 375 px · {editor.canvasZoom} %</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
-    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || EMPTY} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
+    <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || EMPTY} themeControls={canvasStylesQuery.data?.editor?.component_controls || EMPTY} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>
     <div className="visually-hidden" aria-live="polite">{publishedNotice || t(`web.editor.saveStates.${autosave.status}`)}</div>
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}

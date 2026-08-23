@@ -40,7 +40,7 @@ def _site_settings(db: Session) -> dict:
         key="web.event_detail_template_id",
     ).one_or_none()
     return {
-        "site_title": get_config_value(db, "web.site_title") or "Naše skautská střediska",
+        "site_title": get_config_value(db, "web.site_title") or "Skautský oddíl",
         "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
         "site_tagline": get_config_value(db, "web.site_tagline"),
         "site_meta": get_config_value(db, "web.site_meta"),
@@ -411,6 +411,7 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
     base_css = ""
     font_sets = []
     font_awesome_icons = []
+    editor_metadata = {}
     if style and style.active_theme_version_id:
         version = db.query(WebThemeVersion).filter_by(id=style.active_theme_version_id).one_or_none()
         if version:
@@ -457,6 +458,7 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
         "active_theme_version_id": style.active_theme_version_id if style else None,
         "font_sets": font_sets,
         "font_awesome_icons": font_awesome_icons,
+        "editor": editor_metadata,
     }
 
 

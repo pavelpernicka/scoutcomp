@@ -1,7 +1,7 @@
-"""Bundled Ontario scout theme.
+"""Bundled Scout troop theme.
 
-The source design is the Apache-2.0 Scout Bootstrap theme customised for the
-Ontario troop.  Only the runtime assets used by these declarative resources
+The source design is based on the Apache-2.0 Scout Bootstrap theme. Only the
+runtime assets used by these declarative resources
 are vendored; the original builder, scripts and development dependencies are
 intentionally excluded.
 """
@@ -31,11 +31,11 @@ from ..models import (
 )
 
 ONTARIO_THEME_ID = "ontario"
-ONTARIO_THEME_VERSION = "1.2.0"
-ONTARIO_THEME_NAME = "Ontario"
+ONTARIO_THEME_VERSION = "1.3.0"
+ONTARIO_THEME_NAME = "Skautský oddíl"
 ONTARIO_THEME_DESCRIPTION = (
-    "Skautské Bootstrap 5 téma Ontario 1.0 s responzivní hierarchickou navigací, "
-    "organickými okraji, datovými archivy, kalendářem a šablonami detailů."
+    "Téma pro skautský oddíl nebo středisko založené na Bootstrap 5 "
+    "s bohatou sadou prvků a sekcí."
 )
 
 _BUNDLE_ROOT = Path(__file__).with_name("builtin_themes") / "ontario"
@@ -76,7 +76,7 @@ def _logo_fallback(role: str, classes: str, *, tag: str = "span") -> dict:
             "class": classes,
             "data-sc-template-logo-fallback": role,
         },
-        "content": "Ontario",
+        "content": "Skautský oddíl",
         "scBindings": {"text": {"scope": "site", "field": "site_title"}},
     }
 
@@ -129,12 +129,12 @@ def _icon(name: str, label: str = "") -> dict:
     return _element("i", f"fa-solid fa-{name} ontario-icon", **({"aria-label": label} if label else {"aria-hidden": "true"}))
 
 
-ONTARIO_HEADER = _element("nav", "navbar ontario-navbar", name="Ontario – horní navigace",
+ONTARIO_HEADER = _element("nav", "navbar ontario-navbar", name="Horní navigace",
     components=[_element("div", "container ontario-navbar-inner", components=[
-        {"type": "link", "tagName": "a", "attributes": {"class": "navbar-brand", "href": "/", "aria-label": "Ontario – domů"},
-         "components": [_image("assets/white_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-light", lazy=False, template_logo="navigation-light"),
+        {"type": "link", "tagName": "a", "attributes": {"class": "navbar-brand", "href": "/", "aria-label": "Skautský oddíl – domů"},
+         "components": [_image("assets/white_text_next.png", "Skautský oddíl", "ontario-wordmark ontario-wordmark-light", lazy=False, template_logo="navigation-light"),
                         _logo_fallback("navigation-light", "ontario-wordmark-fallback ontario-wordmark-fallback-light"),
-                        _image("assets/blue_text_next.png", "Ontario", "ontario-wordmark ontario-wordmark-dark", lazy=False, template_logo="navigation-dark"),
+                        _image("assets/blue_text_next.png", "Skautský oddíl", "ontario-wordmark ontario-wordmark-dark", lazy=False, template_logo="navigation-dark"),
                         _logo_fallback("navigation-dark", "ontario-wordmark-fallback ontario-wordmark-fallback-dark")]},
         _element("div", "ontario-desktop-menu", components=[
             {"type": "sc-menu", "location": "main", "presentation": "bootstrap-navbar"},
@@ -152,12 +152,12 @@ ONTARIO_HEADER = _element("nav", "navbar ontario-navbar", name="Ontario – horn
         ]),
     ])], **{"aria-label": "Hlavní navigace"})
 
-ONTARIO_HERO = _element("header", "ontario-hero sc-edge-rolling sc-edge-bottom sc-edge-white sc-edge-lg", name="Ontario – hero", components=[
+ONTARIO_HERO = _element("header", "ontario-hero sc-edge-rolling sc-edge-bottom sc-edge-white sc-edge-lg", name="Hero", components=[
     _element("div", "ontario-photo-mask ontario-hero-overlay", **{"aria-hidden": "true"}),
     _element("div", "container ontario-hero-content", components=[
-        _image("assets/round_notext.png", "Znak oddílu Ontario", "ontario-round-logo", lazy=False, template_logo="hero-mark"),
+        _image("assets/round_notext.png", "Znak skautského oddílu", "ontario-round-logo", lazy=False, template_logo="hero-mark"),
         _logo_fallback("hero-mark", "display-3 skaut ontario-hero-logo-fallback", tag="h1"),
-        _heading("h2", "51. oddíl skautů ve Zlíně při 6. středisku", "h4 fw-normal"),
+        _heading("h2", "Skautský oddíl pro děti a mladé lidi", "h4 fw-normal"),
     ]),
 ], **{"data-sc-overlay": "true"})
 
@@ -174,7 +174,7 @@ ONTARIO_ABOUT = _element("section", "ontario-about ontario-section", name="O odd
         _element("div", "col-md-6", components=[_image("assets/mockups/scout-planning-v1.webp", "Ilustrovaná skautská výprava", "img-fluid ontario-mockup ontario-photo-tint")]),
         _element("div", "col-md-6", components=[
             _heading("h2", "Kdo jsme", "display-5 skaut"),
-            _text("Jsme skautský oddíl pro kluky ve věku 11–15 let a spadáme pod 6. skautské středisko ve Zlíně.", "lead"),
+            _text("Jsme skautský oddíl, který nabízí dobrodružství, přátelství a smysluplný program.", "lead"),
             {"type": "link", "tagName": "a", "attributes": {"class": "btn btn-secondary btn-lg btn-skaut ontario-btn-organic", "href": "/o-nas"}, "content": "Více o nás →"},
         ]),
     ])]),
@@ -358,8 +358,8 @@ ONTARIO_LEADERS = _element("section", "ontario-leaders ontario-section sc-edge-p
             _element("span", "badge ontario-badge-magenta", content="Oddílové věci"),
         ]),
         _element("div", "row row-cols-1 row-cols-sm-2 g-5 ontario-leader-grid", components=[
-            _element("div", "col", components=[_person_card("David Holík – Kráč", "Vůdce")]),
-            _element("div", "col", components=[_person_card("Matěj Škarka", "Zástupce vůdce")]),
+            _element("div", "col", components=[_person_card("Jan Novák", "Vůdce")]),
+            _element("div", "col", components=[_person_card("Petr Svoboda", "Zástupce vůdce")]),
         ]),
     ]),
 ])
@@ -373,10 +373,10 @@ ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section", name="O
             _element("span", "badge bg-primary", content="Výpravy"),
         ]),
         _element("div", "row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-5 mt-4", components=[
-            _element("div", "col", components=[_person_card("Vojta Palíšek – Rychlonožka", "Rádce")]),
-            _element("div", "col", components=[_person_card("Jan Holík – Tuty", "Rádce")]),
-            _element("div", "col", components=[_person_card("Vojta Mikulášek – Napoleon", "Vedoucí družiny")]),
-            _element("div", "col", components=[_person_card("Jakub Tkadleček – Kuba", "Vedoucí družiny")]),
+            _element("div", "col", components=[_person_card("Eva Novotná", "Rádkyně")]),
+            _element("div", "col", components=[_person_card("Tomáš Dvořák", "Rádce")]),
+            _element("div", "col", components=[_person_card("Anna Černá", "Vedoucí družiny")]),
+            _element("div", "col", components=[_person_card("Martin Procházka", "Vedoucí družiny")]),
         ]),
     ]),
 ])
@@ -406,7 +406,7 @@ ONTARIO_SOCIAL_LINKS = _element("section", "ontario-socials ontario-section", na
         ]),
         _heading("h2", "Další oddíly ve středisku", "h3 skaut text-center ontario-related-title"),
         _element("div", "row row-cols-1 row-cols-sm-3 g-5 ontario-related-links", components=[
-            _element("div", "col", components=[_element("a", "ontario-related-link", href="#", components=[_image("assets/round_notext.png", "6. středisko Zlín", "ontario-related-logo"), _text("6. středisko Zlín", "skaut")])]),
+            _element("div", "col", components=[_element("a", "ontario-related-link", href="#", components=[_image("assets/round_notext.png", "Skautské středisko", "ontario-related-logo"), _text("Skautské středisko", "skaut")])]),
             _element("div", "col", components=[_element("a", "ontario-related-link", href="https://www.skaut.cz", components=[_image("assets/SKAUT_logo_podklad_bily.png", "Junák – český skaut", "ontario-related-logo"), _text("Stránky Junáka", "skaut")])]),
             _element("div", "col", components=[_element("a", "ontario-related-link", href="#", components=[_icon("compass"), _text("Albion", "skaut")])]),
         ]),
@@ -418,7 +418,7 @@ ONTARIO_DOWNLOAD_CARDS = _element("section", "ontario-downloads ontario-section"
         _heading("h2", "Naše oddílové materiály", "display-5 skaut"),
         _element("div", "row row-cols-1 row-cols-lg-2 g-4 mt-3", components=[
             _element("div", "col", components=[_element("article", "card ontario-resource-card h-100", components=[
-                _element("div", "card-body", components=[_heading("h3", "Ontario zpěvník", "h4 skaut"), _text("Stáhněte si zpěvník do mobilu nebo k tisku."), _element("a", "btn btn-info btn-skaut sc-mask-button-soft", content="Stáhnout PDF", href="#")]),
+                _element("div", "card-body", components=[_heading("h3", "Oddílový zpěvník", "h4 skaut"), _text("Stáhněte si zpěvník do mobilu nebo k tisku."), _element("a", "btn btn-info btn-skaut sc-mask-button-soft", content="Stáhnout PDF", href="#")]),
             ])]),
             _element("div", "col", components=[_element("article", "card ontario-resource-card h-100", components=[
                 _element("div", "card-body", components=[_heading("h3", "Kronika", "h4 skaut"), _text("Prolistujte si oddílovou kroniku online."), _element("a", "btn btn-info btn-skaut sc-mask-button-rugged", content="Otevřít kroniku", href="#")]),
@@ -430,7 +430,7 @@ ONTARIO_DOWNLOAD_CARDS = _element("section", "ontario-downloads ontario-section"
 ONTARIO_FOOTER = {
     "type": "default",
     "tagName": "footer",
-    "name": "Ontario – patička",
+    "name": "Patička",
     "attributes": {"class": "ontario-footer bg-dark text-white"},
     "components": [{
         "type": "default",
@@ -447,7 +447,7 @@ ONTARIO_FOOTER = {
                         "tagName": "a",
                         "attributes": {"class": "ontario-footer-brand", "href": "/"},
                         "components": [
-                            _image("assets/white_text_next.png", "Ontario", "ontario-footer-logo", template_logo="footer"),
+                            _image("assets/white_text_next.png", "Skautský oddíl", "ontario-footer-logo", template_logo="footer"),
                             _logo_fallback("footer", "ontario-footer-logo-fallback skaut"),
                         ],
                     },
@@ -459,7 +459,7 @@ ONTARIO_FOOTER = {
                 ],
             },
             _element("small", "ontario-copyright", components=[
-                _text("© 2026 Ontario. Powered by ", "", "span"),
+                _text("© 2026 Skautský oddíl. Powered by ", "", "span"),
                 _element("a", content="ScoutComp", href="https://scoutcomp.pernicka.cz"),
                 _text(".", "", "span"),
             ]),
@@ -555,6 +555,197 @@ ONTARIO_THEME_COMPONENTS = {
     "person-card": _project(_person_card("Jméno vedoucího", "Vedoucí družiny")),
     "download-card": _project(_element("article", "card ontario-resource-card", components=[_element("div", "card-body", components=[_heading("h3", "Dokument", "h4 skaut"), _text("Krátký popis dokumentu."), _element("a", "btn btn-info btn-skaut sc-mask-button-soft", content="Stáhnout", href="#")])])),
     "social-icon": _project(_social_link("Instagram", "instagram")),
+    "photo-mask": _project(_element(
+        "figure",
+        "ontario-photo-frame sc-shape-soft",
+        name="Fotografie s barevnou maskou",
+        components=[_image("assets/mockups/scout-planning-v1.webp", "Fotografie z oddílové akce", "img-fluid w-100")],
+        **{"data-sc-overlay": "true"},
+    )),
+}
+
+
+_ONTARIO_EDITOR = {
+    "font_sets": [
+        {"id": "themix", "label": "TheMix", "value": '"TheMix", Arial, sans-serif'},
+        {"id": "skaut", "label": "SKAUT Bold", "value": '"SKAUT Bold", "TheMix", sans-serif'},
+    ],
+    # Theme-specific component settings are declarative data.  The editor
+    # supplies generic field renderers, while this theme decides where those
+    # fields appear and which CSS/attributes/classes they modify.
+    "component_controls": [
+        {
+            "id": "photo-mask",
+            "label": "Fotografie s barevnou maskou",
+            "icon": "fill-drip",
+            "scope": "closest",
+            "match": {"all_classes": ["ontario-photo-frame"]},
+            "fields": [
+                {
+                    "id": "photo",
+                    "label": "Fotografie",
+                    "type": "media",
+                    "bind": {"kind": "media", "target": {"scope": "descendant", "match": {"tags": ["img"]}}},
+                },
+                {
+                    "id": "position",
+                    "label": "Pozice fotografie",
+                    "type": "select",
+                    "default": "center center",
+                    "options": [
+                        {"value": "center center", "label": "Uprostřed"},
+                        {"value": "center top", "label": "Nahoře"},
+                        {"value": "center bottom", "label": "Dole"},
+                        {"value": "left center", "label": "Vlevo"},
+                        {"value": "right center", "label": "Vpravo"},
+                    ],
+                    "bind": {"kind": "style", "name": "object-position", "target": {"scope": "descendant", "match": {"tags": ["img"]}}},
+                },
+                {"id": "enabled", "label": "Zobrazit masku", "type": "checkbox", "default": True, "bind": {"kind": "attribute", "name": "data-sc-overlay-enabled"}},
+                {"id": "color", "label": "Barva masky", "type": "color", "default": "#0a224e", "bind": {"kind": "style", "name": "--sc-overlay-color"}},
+                {"id": "opacity", "label": "Intenzita masky", "type": "range", "default": 64, "min": 0, "max": 100, "step": 1, "scale": 0.01, "bind": {"kind": "style", "name": "--sc-overlay-opacity"}},
+                {
+                    "id": "shape",
+                    "label": "Tvar fotografie",
+                    "type": "select",
+                    "default": "soft",
+                    "options": [
+                        {"value": "none", "label": "Bez masky"},
+                        {"value": "soft", "label": "Měkký organický", "class_name": "sc-shape-soft"},
+                        {"value": "blob", "label": "Organický blob", "class_name": "sc-shape-blob"},
+                        {"value": "oval", "label": "Ovál", "class_name": "sc-shape-oval"},
+                        {"value": "rounded", "label": "Zaoblený obdélník", "class_name": "sc-shape-rounded"},
+                    ],
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-shape-"},
+                },
+            ],
+        },
+        {
+            "id": "hero-overlay",
+            "label": "Fotografické pozadí a maska",
+            "icon": "images",
+            "scope": "closest",
+            "match": {"any_classes": ["ontario-hero", "ontario-compact-hero", "ontario-contact-hero"]},
+            "fields": [
+                {"id": "background", "label": "Fotografie na pozadí", "type": "media", "bind": {"kind": "media"}},
+                {"id": "position", "label": "Pozice obrázku", "type": "select", "default": "center center", "options": [{"value": "center center", "label": "Uprostřed"}, {"value": "center top", "label": "Nahoře"}, {"value": "center bottom", "label": "Dole"}, {"value": "left center", "label": "Vlevo"}, {"value": "right center", "label": "Vpravo"}], "bind": {"kind": "style", "name": "background-position"}},
+                {"id": "enabled", "label": "Zobrazit masku", "type": "checkbox", "default": True, "bind": {"kind": "attribute", "name": "data-sc-overlay-enabled"}},
+                {"id": "color", "label": "Barva masky", "type": "color", "default": "#0a224e", "bind": {"kind": "style", "name": "--sc-overlay-color"}},
+                {"id": "opacity", "label": "Intenzita masky", "type": "range", "default": 64, "min": 0, "max": 100, "step": 1, "scale": 0.01, "bind": {"kind": "style", "name": "--sc-overlay-opacity"}},
+            ],
+        },
+        {
+            "id": "media-link-overlay",
+            "label": "Fotografická karta",
+            "icon": "image",
+            "scope": "closest",
+            "match": {"all_classes": ["ontario-media-link"]},
+            "fields": [
+                {"id": "photo", "label": "Fotografie", "type": "media", "bind": {"kind": "media", "target": {"scope": "descendant", "match": {"all_classes": ["ontario-media-link-image"]}}}},
+                {"id": "position", "label": "Pozice obrázku", "type": "select", "default": "center center", "options": [{"value": "center center", "label": "Uprostřed"}, {"value": "center top", "label": "Nahoře"}, {"value": "center bottom", "label": "Dole"}, {"value": "left center", "label": "Vlevo"}, {"value": "right center", "label": "Vpravo"}], "bind": {"kind": "style", "name": "object-position", "target": {"scope": "descendant", "match": {"all_classes": ["ontario-media-link-image"]}}}},
+                {"id": "enabled", "label": "Zobrazit masku", "type": "checkbox", "default": True, "bind": {"kind": "attribute", "name": "data-sc-overlay-enabled"}},
+                {"id": "color", "label": "Barva masky", "type": "color", "default": "#081a3b", "bind": {"kind": "style", "name": "--sc-overlay-color"}},
+                {"id": "opacity", "label": "Intenzita masky", "type": "range", "default": 62, "min": 0, "max": 100, "step": 1, "scale": 0.01, "bind": {"kind": "style", "name": "--sc-overlay-opacity"}},
+            ],
+        },
+        {
+            "id": "button-style",
+            "label": "Vzhled tlačítka",
+            "icon": "hand-pointer",
+            "match": {"all_classes": ["btn"]},
+            "fields": [
+                {
+                    "id": "variant", "label": "Varianta", "type": "select", "default": "primary",
+                    "options": [
+                        {"value": value, "label": value.replace("-", " ").title(), "class_name": f"btn-{value}"}
+                        for value in tuple(
+                            variant
+                            for color in ("primary", "secondary", "success", "danger", "warning", "info", "light", "dark")
+                            for variant in (color, f"outline-{color}")
+                        )
+                    ],
+                    "bind": {"kind": "class_choice"},
+                },
+                {
+                    "id": "size", "label": "Velikost", "type": "select", "default": "normal",
+                    "options": [
+                        {"value": "normal", "label": "Běžná"},
+                        {"value": "small", "label": "Malá", "class_name": "btn-sm"},
+                        {"value": "large", "label": "Velká", "class_name": "btn-lg"},
+                    ],
+                    "bind": {"kind": "class_choice"},
+                },
+                {
+                    "id": "mask", "label": "Tvar", "type": "select", "default": "none",
+                    "options": [
+                        {"value": "none", "label": "Výchozí"},
+                        {"value": "soft", "label": "Měkký", "class_name": "sc-mask-button-soft"},
+                        {"value": "flow", "label": "Plynulý", "class_name": "sc-mask-button-flow"},
+                        {"value": "pebble", "label": "Oblázek", "class_name": "sc-mask-button-pebble"},
+                        {"value": "natural", "label": "Přírodní", "class_name": "sc-mask-button-natural"},
+                        {"value": "rounded-asymmetric", "label": "Asymetrický", "class_name": "sc-mask-button-rounded-asymmetric"},
+                        {"value": "soft-capsule", "label": "Měkká kapsle", "class_name": "sc-mask-button-soft-capsule"},
+                        {"value": "oval-wave", "label": "Oválná vlna", "class_name": "sc-mask-button-oval-wave"},
+                    ],
+                    "bind": {"kind": "class_choice"},
+                },
+                {"id": "full-width", "label": "Přes celou šířku", "type": "checkbox", "default": False, "bind": {"kind": "class_toggle", "class_name": "w-100"}},
+            ],
+        },
+        {
+            "id": "alert-variant",
+            "label": "Vzhled upozornění",
+            "icon": "triangle-exclamation",
+            "match": {"all_classes": ["alert"]},
+            "fields": [{
+                "id": "variant", "label": "Varianta", "type": "select", "default": "info",
+                "options": [{"value": value, "label": value.title(), "class_name": f"alert-{value}"} for value in ("primary", "secondary", "success", "danger", "warning", "info", "light", "dark")],
+                "bind": {"kind": "class_choice", "remove_prefix": "alert-"},
+            }],
+        },
+        {
+            "id": "badge-variant",
+            "label": "Vzhled štítku",
+            "icon": "tag",
+            "match": {"all_classes": ["badge"]},
+            "fields": [{
+                "id": "variant", "label": "Varianta", "type": "select", "default": "secondary",
+                "options": [{"value": value, "label": value.title(), "class_name": f"bg-{value}"} for value in ("primary", "secondary", "success", "danger", "warning", "info", "light", "dark")],
+                "bind": {"kind": "class_choice", "remove_prefix": "bg-"},
+            }],
+        },
+        {
+            "id": "table-style",
+            "label": "Vzhled tabulky",
+            "icon": "table",
+            "match": {"tags": ["table"]},
+            "fields": [
+                {
+                    "id": "variant", "label": "Varianta", "type": "select", "default": "default",
+                    "options": [
+                        {"value": "default", "label": "Výchozí"},
+                        *[
+                            {"value": value, "label": value.title(), "class_name": f"table-{value}"}
+                            for value in ("primary", "secondary", "success", "danger", "warning", "info", "light", "dark")
+                        ],
+                    ],
+                    "bind": {"kind": "class_choice"},
+                },
+                {"id": "striped", "label": "Pruhované řádky", "type": "checkbox", "default": False, "bind": {"kind": "class_toggle", "class_name": "table-striped"}},
+                {"id": "hover", "label": "Zvýraznit řádek pod kurzorem", "type": "checkbox", "default": False, "bind": {"kind": "class_toggle", "class_name": "table-hover"}},
+                {"id": "compact", "label": "Kompaktní", "type": "checkbox", "default": False, "bind": {"kind": "class_toggle", "class_name": "table-sm"}},
+                {
+                    "id": "border", "label": "Ohraničení", "type": "select", "default": "default",
+                    "options": [
+                        {"value": "default", "label": "Výchozí"},
+                        {"value": "bordered", "label": "Ohraničená", "class_name": "table-bordered"},
+                        {"value": "borderless", "label": "Bez čar", "class_name": "table-borderless"},
+                    ],
+                    "bind": {"kind": "class_choice"},
+                },
+            ],
+        },
+    ],
 }
 
 _ONTARIO_MENU_DEFAULTS = {
@@ -665,6 +856,14 @@ _ONTARIO_CSS = r"""
 @font-face{font-family:"TheMix";src:url(assets/fonts/TheMix_LT_400.woff) format("woff");font-weight:400;font-display:swap}
 @font-face{font-family:"TheMix";src:url(assets/fonts/TheMix_LT_700.woff) format("woff");font-weight:700;font-display:swap}
 :root{--ontario-blue:var(--sc-primary-color,#255c9e);--ontario-blue-dark:var(--sc-primary-dark-color,#0a224e);--ontario-blue-pale:var(--sc-primary-pale-color,#bdd4df);--ontario-yellow:var(--sc-accent-color,#f9b200);--ontario-cream:var(--sc-warm-surface-color,#f6ebd8);--ontario-link:var(--sc-footer-link-color,#a9bed2);--ontario-dark:var(--sc-footer-color,#212529);--ontario-text:var(--sc-text-color,#252b31);--ontario-radius:1rem}
+:root{--sc-bs-primary:var(--sc-bootstrap-primary,#0d6efd);--sc-bs-secondary:var(--sc-bootstrap-secondary,#6c757d);--sc-bs-success:var(--sc-bootstrap-success,#198754);--sc-bs-danger:var(--sc-bootstrap-danger,#dc3545);--sc-bs-warning:var(--sc-bootstrap-warning,#ffc107);--sc-bs-info:var(--sc-bootstrap-info,#0dcaf0);--sc-bs-light:var(--sc-bootstrap-light,#f8f9fa);--sc-bs-dark:var(--sc-bootstrap-dark,#212529)}
+.bg-primary,.text-bg-primary{background-color:var(--sc-bs-primary)!important}.bg-secondary,.text-bg-secondary{background-color:var(--sc-bs-secondary)!important}.bg-success,.text-bg-success{background-color:var(--sc-bs-success)!important}.bg-danger,.text-bg-danger{background-color:var(--sc-bs-danger)!important}.bg-warning,.text-bg-warning{background-color:var(--sc-bs-warning)!important}.bg-info,.text-bg-info{background-color:var(--sc-bs-info)!important}.bg-light,.text-bg-light{background-color:var(--sc-bs-light)!important}.bg-dark,.text-bg-dark{background-color:var(--sc-bs-dark)!important}
+.text-primary{color:var(--sc-bs-primary)!important}.text-secondary{color:var(--sc-bs-secondary)!important}.text-success{color:var(--sc-bs-success)!important}.text-danger{color:var(--sc-bs-danger)!important}.text-warning{color:var(--sc-bs-warning)!important}.text-info{color:var(--sc-bs-info)!important}.text-light{color:var(--sc-bs-light)!important}.text-dark{color:var(--sc-bs-dark)!important}
+.border-primary{border-color:var(--sc-bs-primary)!important}.border-secondary{border-color:var(--sc-bs-secondary)!important}.border-success{border-color:var(--sc-bs-success)!important}.border-danger{border-color:var(--sc-bs-danger)!important}.border-warning{border-color:var(--sc-bs-warning)!important}.border-info{border-color:var(--sc-bs-info)!important}.border-light{border-color:var(--sc-bs-light)!important}.border-dark{border-color:var(--sc-bs-dark)!important}
+.btn-primary{--bs-btn-bg:var(--sc-bs-primary);--bs-btn-border-color:var(--sc-bs-primary);--bs-btn-hover-bg:color-mix(in srgb,var(--sc-bs-primary) 84%,#000);--bs-btn-hover-border-color:color-mix(in srgb,var(--sc-bs-primary) 78%,#000)}.btn-secondary{--bs-btn-bg:var(--sc-bs-secondary);--bs-btn-border-color:var(--sc-bs-secondary)}.btn-success{--bs-btn-bg:var(--sc-bs-success);--bs-btn-border-color:var(--sc-bs-success)}.btn-danger{--bs-btn-bg:var(--sc-bs-danger);--bs-btn-border-color:var(--sc-bs-danger)}.btn-warning{--bs-btn-bg:var(--sc-bs-warning);--bs-btn-border-color:var(--sc-bs-warning)}.btn-info{--bs-btn-bg:var(--sc-bs-info);--bs-btn-border-color:var(--sc-bs-info)}.btn-light{--bs-btn-bg:var(--sc-bs-light);--bs-btn-border-color:var(--sc-bs-light)}.btn-dark{--bs-btn-bg:var(--sc-bs-dark);--bs-btn-border-color:var(--sc-bs-dark)}
+.btn-outline-primary{--bs-btn-color:var(--sc-bs-primary);--bs-btn-border-color:var(--sc-bs-primary);--bs-btn-hover-bg:var(--sc-bs-primary);--bs-btn-hover-border-color:var(--sc-bs-primary)}.btn-outline-secondary{--bs-btn-color:var(--sc-bs-secondary);--bs-btn-border-color:var(--sc-bs-secondary);--bs-btn-hover-bg:var(--sc-bs-secondary)}.btn-outline-success{--bs-btn-color:var(--sc-bs-success);--bs-btn-border-color:var(--sc-bs-success);--bs-btn-hover-bg:var(--sc-bs-success)}.btn-outline-danger{--bs-btn-color:var(--sc-bs-danger);--bs-btn-border-color:var(--sc-bs-danger);--bs-btn-hover-bg:var(--sc-bs-danger)}.btn-outline-warning{--bs-btn-color:var(--sc-bs-warning);--bs-btn-border-color:var(--sc-bs-warning);--bs-btn-hover-bg:var(--sc-bs-warning)}.btn-outline-info{--bs-btn-color:var(--sc-bs-info);--bs-btn-border-color:var(--sc-bs-info);--bs-btn-hover-bg:var(--sc-bs-info)}.btn-outline-light{--bs-btn-color:var(--sc-bs-light);--bs-btn-border-color:var(--sc-bs-light);--bs-btn-hover-bg:var(--sc-bs-light)}.btn-outline-dark{--bs-btn-color:var(--sc-bs-dark);--bs-btn-border-color:var(--sc-bs-dark);--bs-btn-hover-bg:var(--sc-bs-dark)}
+.alert-primary{--bs-alert-border-color:var(--sc-bs-primary);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-primary) 14%,#fff)}.alert-secondary{--bs-alert-border-color:var(--sc-bs-secondary);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-secondary) 14%,#fff)}.alert-success{--bs-alert-border-color:var(--sc-bs-success);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-success) 14%,#fff)}.alert-danger{--bs-alert-border-color:var(--sc-bs-danger);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-danger) 14%,#fff)}.alert-warning{--bs-alert-border-color:var(--sc-bs-warning);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-warning) 18%,#fff)}.alert-info{--bs-alert-border-color:var(--sc-bs-info);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-info) 14%,#fff)}.alert-light{--bs-alert-border-color:var(--sc-bs-light);--bs-alert-bg:var(--sc-bs-light)}.alert-dark{--bs-alert-border-color:var(--sc-bs-dark);--bs-alert-bg:color-mix(in srgb,var(--sc-bs-dark) 18%,#fff)}
+.table-primary{--bs-table-bg:color-mix(in srgb,var(--sc-bs-primary) 20%,#fff)}.table-secondary{--bs-table-bg:color-mix(in srgb,var(--sc-bs-secondary) 20%,#fff)}.table-success{--bs-table-bg:color-mix(in srgb,var(--sc-bs-success) 20%,#fff)}.table-danger{--bs-table-bg:color-mix(in srgb,var(--sc-bs-danger) 20%,#fff)}.table-warning{--bs-table-bg:color-mix(in srgb,var(--sc-bs-warning) 24%,#fff)}.table-info{--bs-table-bg:color-mix(in srgb,var(--sc-bs-info) 20%,#fff)}.table-light{--bs-table-bg:var(--sc-bs-light)}.table-dark{--bs-table-bg:var(--sc-bs-dark)}
 html,body{overflow-x:clip}body{min-height:100vh;min-height:100svh;display:flex;flex-direction:column;font-family:"TheMix",Arial,sans-serif;color:var(--ontario-text)}body>main{flex:1 0 auto;display:flex;flex-direction:column}.skaut,.ontario-footer .sc-menu-heading{font-family:"SKAUT Bold","TheMix",sans-serif;text-transform:uppercase}.ontario-icon{width:1.4em;text-align:center}.ontario-page-top{padding-top:5rem}.ontario-section{position:relative;padding:5.5rem 0}.ontario-section-lead{margin:0 auto 2.25rem;max-width:42rem}.ontario-reading{max-width:820px}.ontario-empty{grid-column:1/-1;padding:3rem;text-align:center;background:var(--ontario-cream);border-radius:var(--ontario-radius)}
 @keyframes ontario-nav-scroll{from{background:rgba(10,34,78,0);box-shadow:0 1px 0 rgba(10,34,78,0)}to{background:var(--sc-nav-scrolled,#0a224e);box-shadow:0 1px 0 rgba(255,255,255,.14)}}@keyframes ontario-dropdown-in{from{opacity:0;transform:translateY(-.5rem)}to{opacity:1;transform:translateY(0)}}@keyframes ontario-menu-in{from{opacity:0;transform:translateX(2rem)}to{opacity:1;transform:translateX(0)}}
 .ontario-navbar{position:sticky;top:0;z-index:100;margin-bottom:-4.75rem;padding:.7rem 0;background:rgba(10,34,78,.88);box-shadow:0 1px 0 rgba(255,255,255,.1)}.ontario-navbar-inner{display:flex;align-items:center;justify-content:space-between;max-width:1300px}.ontario-wordmark{display:block;width:118px;height:auto}.ontario-wordmark-dark{display:none}.ontario-desktop-menu{display:flex;align-items:center}.ontario-menu-shell{display:none}.ontario-menu-panel{display:flex;align-items:center}.ontario-menu-tools{display:none}.ontario-navbar .sc-menu-list{display:flex;flex-direction:row;align-items:center;justify-content:flex-end;gap:.1rem;margin:0}.ontario-navbar .sc-menu-item{position:relative;list-style:none}.ontario-navbar .sc-menu-details>summary{list-style:none}.ontario-navbar .sc-menu-details>summary::-webkit-details-marker{display:none}.ontario-navbar .sc-menu-link{display:flex;align-items:center;gap:.45rem;padding:.45rem .65rem;color:rgba(255,255,255,.82);font-size:.96rem;text-decoration:none;cursor:pointer;transition:color .16s ease,background-color .16s ease}.ontario-navbar .sc-menu-item:hover>.sc-menu-link,.ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link{color:#fff}.ontario-navbar .sc-menu-link:focus-visible,.ontario-navbar summary:focus-visible{color:#fff;outline:2px solid currentColor;outline-offset:2px}.ontario-navbar .sc-menu-details>summary:after{content:"";width:.55rem;height:.55rem;margin-top:-.2rem;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(45deg);transition:transform .18s ease}.ontario-navbar .sc-menu-details[open]>summary:after{transform:rotate(225deg);margin-top:.2rem}.ontario-navbar .sc-menu-dropdown{display:none;position:absolute;top:100%;left:0;z-index:110;min-width:13.5rem;margin:0;padding:.4rem 0;background:#fff;border:1px solid rgba(10,34,78,.08);box-shadow:0 .75rem 1.6rem rgba(10,34,78,.15)}.ontario-navbar .sc-menu-item:hover .sc-menu-dropdown,.ontario-navbar .sc-menu-item:focus-within .sc-menu-dropdown,.ontario-navbar .sc-menu-details[open]>.sc-menu-dropdown{display:block;animation:ontario-dropdown-in .18s ease-out both}.ontario-navbar .sc-menu-dropdown .sc-menu-link{padding:.6rem 1.1rem;color:#272c31;white-space:nowrap}.ontario-navbar .sc-menu-dropdown .sc-menu-link:hover,.ontario-navbar .sc-menu-dropdown .sc-menu-link:focus-visible{background:#eef4fb;color:var(--ontario-blue)}body:has(.ontario-page-top) .ontario-navbar{animation:none;background:#fff;box-shadow:0 1px 0 rgba(10,34,78,.08)}body:has(.ontario-page-top) .ontario-wordmark-light{display:none}body:has(.ontario-page-top) .ontario-wordmark-dark{display:block}body:has(.ontario-page-top) .ontario-navbar .sc-menu-link{color:#4b4f54}body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-item:hover>.sc-menu-details>.sc-menu-link,body:has(.ontario-page-top) .ontario-navbar .sc-menu-link:focus-visible{color:var(--ontario-blue-dark)}@supports(animation-timeline:scroll()){body:not(:has(.ontario-page-top)) .ontario-navbar{background:transparent;box-shadow:none;animation:ontario-nav-scroll linear both;animation-timeline:scroll(root block);animation-range:0 8rem}}
@@ -759,7 +958,7 @@ img[data-sc-template-logo-hidden="true"]{display:none!important}
 img[data-sc-template-logo-hidden="true"]+[data-sc-template-logo-fallback]{display:inline-flex}
 .ontario-wordmark-fallback{align-items:center;min-height:44px;color:inherit;font-size:1.25rem;line-height:1;text-transform:uppercase}.ontario-wordmark-fallback-dark{display:none!important}.ontario-hero-logo-fallback{margin:0 auto 1.25rem}.ontario-footer-logo-fallback{color:#fff;font-size:1.7rem}
 
-@media(max-width:991.98px){.ontario-page-top{padding-top:0}.ontario-navbar{margin-bottom:0}.ontario-menu-shell>summary,body:has(.ontario-page-top) .ontario-menu-shell>summary{color:#fff}body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;margin-bottom:0}.ontario-menu-shell[open]>summary{color:var(--ontario-blue-dark)}.ontario-contact-hero{min-height:360px}.ontario-social-row{margin-bottom:5rem}}
+@media(max-width:991.98px){.ontario-page-top{padding-top:0}.ontario-navbar{margin-bottom:0}.ontario-menu-shell>summary,body:has(.ontario-page-top) .ontario-menu-shell>summary{color:#fff}body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;margin-bottom:0}.ontario-menu-shell[open]>summary,body:has(.ontario-page-top) .ontario-menu-shell[open]>summary{color:var(--ontario-blue-dark)!important}body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link{color:#111!important}body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link:hover,body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link:focus-visible,body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-details[open]>summary{color:var(--ontario-blue-dark)!important}.ontario-contact-hero{min-height:360px}.ontario-social-row{margin-bottom:5rem}}
 @media(max-width:575.98px){.sc-edge-lg{--sc-edge-height:3.5rem}.ontario-contact-hero{min-height:320px}.ontario-contact-hero-content{padding:4rem 1rem}.ontario-leaders{padding-bottom:6rem}.ontario-social-page-title{margin-bottom:4rem}.ontario-social-link{width:3.25rem;height:3.25rem;font-size:1.55rem}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 """
@@ -847,7 +1046,7 @@ def _copy_assets(version: WebThemeVersion, db: Session) -> None:
 
 
 def seed_ontario_theme(db: Session) -> WebThemeVersion:
-    """Idempotently install the bundled Ontario theme without activating it."""
+    """Install the bundled scout theme and activate it on a fresh site."""
     from .theme_package import (
         _legacy_template_key,
         _namespace_asset_references,
@@ -859,7 +1058,7 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         theme = WebTheme(
             stable_key=ONTARIO_THEME_ID,
             name=ONTARIO_THEME_NAME,
-            author="Ontario / ScoutComp",
+            author="ScoutComp",
             description=ONTARIO_THEME_DESCRIPTION,
             license="Apache-2.0",
         )
@@ -867,6 +1066,7 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         db.flush()
     else:
         theme.name = ONTARIO_THEME_NAME
+        theme.author = "ScoutComp"
         theme.description = ONTARIO_THEME_DESCRIPTION
 
     base_css = ontario_css()
@@ -875,6 +1075,7 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
             "templates": ONTARIO_THEME_TEMPLATES,
             "sections": ONTARIO_THEME_SECTIONS,
             "components": ONTARIO_THEME_COMPONENTS,
+            "editor": _ONTARIO_EDITOR,
         },
         ensure_ascii=False,
         sort_keys=True,
@@ -895,10 +1096,17 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "id": ONTARIO_THEME_ID,
         "name": ONTARIO_THEME_NAME,
         "version": ONTARIO_THEME_VERSION,
-        "author": "Ontario / ScoutComp",
+        "author": "ScoutComp",
         "description": ONTARIO_THEME_DESCRIPTION,
         "license": "Apache-2.0",
         "config": {
+            "site_logo": {
+                "type": "media",
+                "label": "Logo oddílu",
+                "help": "Nahradí logo na místech, která šablona označuje jako logo oddílu.",
+                "default": "",
+                "storage": "site_setting",
+            },
             "primary_color": {
                 "type": "color", "label": "Hlavní barva", "default": "#255c9e",
             },
@@ -926,13 +1134,32 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
             "nav_scrolled": {
                 "type": "color", "label": "Barva navigace po posunutí", "default": "#0a224e",
             },
+            "bootstrap_primary": {
+                "type": "color", "label": "Bootstrap: primary", "default": "#0d6efd",
+            },
+            "bootstrap_secondary": {
+                "type": "color", "label": "Bootstrap: secondary", "default": "#6c757d",
+            },
+            "bootstrap_success": {
+                "type": "color", "label": "Bootstrap: success", "default": "#198754",
+            },
+            "bootstrap_danger": {
+                "type": "color", "label": "Bootstrap: danger", "default": "#dc3545",
+            },
+            "bootstrap_warning": {
+                "type": "color", "label": "Bootstrap: warning", "default": "#ffc107",
+            },
+            "bootstrap_info": {
+                "type": "color", "label": "Bootstrap: info", "default": "#0dcaf0",
+            },
+            "bootstrap_light": {
+                "type": "color", "label": "Bootstrap: light", "default": "#f8f9fa",
+            },
+            "bootstrap_dark": {
+                "type": "color", "label": "Bootstrap: dark", "default": "#212529",
+            },
         },
-        "editor": {
-            "font_sets": [
-                {"id": "themix", "label": "TheMix", "value": '"TheMix", Arial, sans-serif'},
-                {"id": "skaut", "label": "SKAUT Bold", "value": '"SKAUT Bold", "TheMix", sans-serif'},
-            ],
-        },
+        "editor": deepcopy(_ONTARIO_EDITOR),
     }
     tokens = {
         "colors": {
@@ -949,6 +1176,14 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "footer_color": "#212529",
         "footer_link_color": "#a9bed2",
         "nav_scrolled": "#0a224e",
+        "bootstrap_primary": "#0d6efd",
+        "bootstrap_secondary": "#6c757d",
+        "bootstrap_success": "#198754",
+        "bootstrap_danger": "#dc3545",
+        "bootstrap_warning": "#ffc107",
+        "bootstrap_info": "#0dcaf0",
+        "bootstrap_light": "#f8f9fa",
+        "bootstrap_dark": "#212529",
     }
     if version is None:
         version = WebThemeVersion(
@@ -970,25 +1205,29 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         # package_hash is unique and represents the code-owned bundled source.
         version.package_hash = package_hash
 
+    stored_manifest = deepcopy(manifest)
+    stored_manifest["editor"] = _namespace_asset_references(_ONTARIO_EDITOR, version.id)
+    version.manifest = stored_manifest
+
     _copy_assets(version, db)
     names = {
-        "main": "Ontario – hlavní rozvržení",
-        "home": "Ontario – úvodní stránka",
-        "page": "Ontario – běžná stránka",
-        "news": "Ontario – aktuality",
-        "archive": "Ontario – archiv příspěvků",
-        "team": "Ontario – stránka družiny",
-        "article": "Ontario – detail článku",
-        "meeting": "Ontario – detail události",
-        "meetings": "Ontario – seznam událostí",
-        "calendar": "Ontario – kalendář",
-        "contact": "Ontario – kontakt",
+        "main": "Hlavní rozvržení",
+        "home": "Úvodní stránka",
+        "page": "Běžná stránka",
+        "news": "Aktuality",
+        "archive": "Archiv příspěvků",
+        "team": "Družina",
+        "article": "Detail článku",
+        "meeting": "Detail události",
+        "meetings": "Seznam událostí",
+        "calendar": "Kalendář",
+        "contact": "Kontakt",
         "contact-hero": "Kontaktní hero",
-        "gallery": "Ontario – galerie",
-        "support": "Ontario – jak nás podpořit",
-        "downloads": "Ontario – ke stažení",
-        "links": "Ontario – odkazy",
-        "hero": "Ontario hero",
+        "gallery": "Galerie",
+        "support": "Jak nás podpořit",
+        "downloads": "Ke stažení",
+        "links": "Odkazy",
+        "hero": "Hero",
         "about": "O oddílu",
         "posts": "Aktuality",
         "header": "Horní navigace",
@@ -1015,6 +1254,7 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
         "person-card": "Karta vedoucího",
         "download-card": "Karta dokumentu",
         "social-icon": "Ikona sociální sítě",
+        "photo-mask": "Fotografie s barevnou maskou",
     }
 
     for key, project in ONTARIO_THEME_TEMPLATES.items():
@@ -1107,7 +1347,22 @@ def seed_ontario_theme(db: Session) -> WebThemeVersion:
                 row.is_locked = False
     db.flush()
     style = db.get(WebSiteStyle, 1)
-    if source_changed and style is not None and style.active_theme_version_id == version.id:
+    theme_upgraded = False
+    if style is None:
+        style = WebSiteStyle(id=1)
+        db.add(style)
+    if style.active_theme_version_id is None:
+        style.active_theme_version_id = version.id
+        seed_ontario_menus(db)
+    elif style.active_theme_version_id != version.id:
+        active_version = db.get(WebThemeVersion, style.active_theme_version_id)
+        if active_version is not None and active_version.theme_id == theme.id:
+            # Move only sites already using this bundled theme. Page revisions
+            # keep their immutable old template snapshots, while the active
+            # design tokens/CSS and future templates move to the new version.
+            style.active_theme_version_id = version.id
+            theme_upgraded = True
+    if (source_changed or theme_upgraded) and style.active_theme_version_id == version.id:
         # Published pages are immutable artifacts.  Refresh them when the
         # bundled theme source changes so style/template upgrades and newly
         # required calendar variants become visible atomically after restart.

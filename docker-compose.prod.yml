@@ -63,6 +63,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      site:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/robots.txt"]

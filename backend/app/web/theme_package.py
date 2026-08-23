@@ -121,7 +121,12 @@ _MANIFEST_KEYS = {
     "author", "description", "license", "compatible_scoutcomp",
     "scoutcomp_version", "resources", "preview", "config", "site_resources", "editor",
 }
-_CONFIG_TYPES = {"text", "color", "number", "select"}
+_CONFIG_TYPES = {"text", "color", "number", "select", "checkbox", "media"}
+_CONFIG_STORAGE = {"tokens", "site_setting"}
+_THEME_SITE_SETTINGS = {"site_logo"}
+_EDITOR_CONTROL_FIELD_TYPES = {"text", "number", "color", "range", "select", "checkbox", "media"}
+_EDITOR_CONTROL_BINDINGS = {"attribute", "style", "class_choice", "class_toggle", "media"}
+_EDITOR_TARGET_SCOPES = {"self", "descendant"}
 _THEME_KEYS = {"schema_version", "package_schema_version", "tokens", "default_tokens", "styles"}
 _RESOURCE_ENTRY_KEYS = {"id", "file", "name", "description", "kind", "css", "usage_mode"}
 
@@ -144,6 +149,192 @@ class ThemeNotFoundError(ThemePackageError):
 
 class ThemeInUseError(ThemePackageError):
     code = "theme_in_use"
+
+
+def _validate_editor_match(value: Any, label: str) -> None:
+    """Validate the small, non-executable component matcher language.
+
+    Theme packages deliberately cannot ship CSS selectors or JavaScript.  The
+    editor evaluates these bounded tag/class/attribute predicates against the
+    GrapesJS model, which gives themes control over their inspector UI without
+    introducing an executable plugin boundary.
+    """
+    if not isinstance(value, dict) or set(value) - {"tags", "all_classes", "any_classes", "attributes"}:
+        _fail(f"{label} is invalid")
+    for key in ("tags", "all_classes", "any_classes"):
+        items = value.get(key, [])
+        if not isinstance(items, list) or len(items) > 30:
+            _fail(f"{label}.{key} must be a bounded list")
+        for item in items:
+            if not isinstance(item, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,79}", item):
+                _fail(f"{label}.{key} contains an invalid identifier")
+    attributes = value.get("attributes", {})
+    if not isinstance(attributes, dict) or len(attributes) > 30:
+        _fail(f"{label}.attributes must be an object")
+    for name, expected in attributes.items():
+        if not isinstance(name, str) or not re.fullmatch(r"[A-Za-z_:][A-Za-z0-9_.:-]{0,99}", name):
+            _fail(f"{label}.attributes contains an invalid name")
+        if expected is not None and (not isinstance(expected, str) or len(expected) > 200):
+            _fail(f"{label}.attributes contains an invalid value")
+
+
+def _validate_editor_metadata(editor_metadata: Any, archive_paths: set[str] | None = None) -> None:
+    if not isinstance(editor_metadata, dict) or set(editor_metadata) - {"font_sets", "component_controls", "blocks"}:
+        _fail("manifest.json editor metadata is invalid")
+    font_sets = editor_metadata.get("font_sets", [])
+    if not isinstance(font_sets, list) or len(font_sets) > 50:
+        _fail("manifest.json editor.font_sets must be a bounded list")
+    for item in font_sets:
+        if not isinstance(item, dict) or set(item) != {"id", "label", "value"}:
+            _fail("editor font set is invalid")
+        if not _ID_RE.fullmatch(str(item.get("id", ""))):
+            _fail("editor font set id is invalid")
+        for field in ("label", "value"):
+            value = item.get(field)
+            if not isinstance(value, str) or not value.strip() or len(value) > 200:
+                _fail(f"editor font set {field} is invalid")
+        if any(token in item["value"].lower() for token in ("url(", "@import", ";", "{")):
+            _fail("editor font set value is unsafe")
+
+    blocks = editor_metadata.get("blocks", [])
+    if not isinstance(blocks, list) or len(blocks) > 200:
+        _fail("manifest.json editor.blocks must be a bounded list")
+    for block in blocks:
+        if not isinstance(block, dict) or set(block) - {"id", "label", "category", "icon", "content"}:
+            _fail("editor block is invalid")
+        if not _ID_RE.fullmatch(str(block.get("id", ""))):
+            _fail("editor block id is invalid")
+        for field in ("label", "category"):
+            value = block.get(field)
+            if not isinstance(value, str) or not value.strip() or len(value) > 200:
+                _fail(f"editor block {field} is invalid")
+        icon = block.get("icon")
+        if icon is not None and (not isinstance(icon, str) or not re.fullmatch(r"[a-z0-9-]{1,80}", icon)):
+            _fail("editor block icon is invalid")
+        content = block.get("content")
+        if not isinstance(content, (dict, list)):
+            _fail("editor block content must be project data")
+        if archive_paths is not None:
+            project = content if isinstance(content, dict) else {"components": content}
+            _validate_project_data(project, "editor block", archive_paths)
+        _validate_json_shape(content, "editor block content")
+        if _DANGEROUS_PROJECT_TEXT.search(json.dumps(content, ensure_ascii=False)):
+            _fail("editor block contains executable markup or a dangerous URL")
+        stack = [content]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, dict):
+                for key, child in item.items():
+                    lowered = key.casefold()
+                    if lowered.startswith("on") and len(lowered) > 2:
+                        _fail("editor block contains an event-handler property")
+                    if lowered in {"script", "script-export", "componentscript"}:
+                        _fail("editor block contains executable component code")
+                    if lowered in {"tagname", "type"} and isinstance(child, str) and child.casefold() in {"script", "iframe", "object", "embed"}:
+                        _fail("editor block contains an executable component type")
+                    stack.append(child)
+            elif isinstance(item, list):
+                stack.extend(item)
+
+    controls = editor_metadata.get("component_controls", [])
+    if not isinstance(controls, list) or len(controls) > 200:
+        _fail("manifest.json editor.component_controls must be a bounded list")
+    for control in controls:
+        allowed = {"id", "label", "icon", "match", "scope", "fields"}
+        if not isinstance(control, dict) or set(control) - allowed:
+            _fail("editor component control is invalid")
+        if not _ID_RE.fullmatch(str(control.get("id", ""))):
+            _fail("editor component control id is invalid")
+        if not isinstance(control.get("label"), str) or not control["label"].strip() or len(control["label"]) > 200:
+            _fail("editor component control label is invalid")
+        icon = control.get("icon")
+        if icon is not None and (not isinstance(icon, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,80}", icon)):
+            _fail("editor component control icon is invalid")
+        if control.get("scope", "self") not in {"self", "closest"}:
+            _fail("editor component control scope is invalid")
+        _validate_editor_match(control.get("match"), "editor component control match")
+        fields = control.get("fields")
+        if not isinstance(fields, list) or not fields or len(fields) > 50:
+            _fail("editor component control fields must be a non-empty bounded list")
+        for field in fields:
+            allowed_field = {"id", "label", "type", "bind", "default", "min", "max", "step", "scale", "options", "help"}
+            if not isinstance(field, dict) or set(field) - allowed_field:
+                _fail("editor component control field is invalid")
+            if not _ID_RE.fullmatch(str(field.get("id", ""))):
+                _fail("editor component control field id is invalid")
+            if not isinstance(field.get("label"), str) or not field["label"].strip() or len(field["label"]) > 200:
+                _fail("editor component control field label is invalid")
+            field_type = field.get("type")
+            if field_type not in _EDITOR_CONTROL_FIELD_TYPES:
+                _fail("editor component control field type is invalid")
+            default = field.get("default")
+            if default is not None and (
+                not isinstance(default, (str, int, float, bool))
+                or isinstance(default, str) and len(default) > 500
+                or isinstance(default, float) and not math.isfinite(default)
+            ):
+                _fail("editor component control field default is invalid")
+            help_text = field.get("help")
+            if help_text is not None and (not isinstance(help_text, str) or len(help_text) > 500):
+                _fail("editor component control field help is invalid")
+            bind = field.get("bind")
+            allowed_bind = {"kind", "name", "class_name", "remove_prefix", "target"}
+            if not isinstance(bind, dict) or set(bind) - allowed_bind or bind.get("kind") not in _EDITOR_CONTROL_BINDINGS:
+                _fail("editor component control field binding is invalid")
+            for key in ("name", "class_name", "remove_prefix"):
+                value = bind.get(key)
+                if value is not None and (not isinstance(value, str) or not re.fullmatch(r"--?[A-Za-z0-9_-]{1,98}|[A-Za-z][A-Za-z0-9_.:-]{0,99}", value)):
+                    _fail("editor component control field binding name is invalid")
+            binding_name = str(bind.get("name") or "").casefold()
+            if bind.get("kind") == "attribute" and (
+                binding_name.startswith("on")
+                or binding_name in {"src", "srcset", "poster", "href", "ping", "action", "srcdoc", "style", "formaction", "xlink:href"}
+            ):
+                _fail("editor component control cannot bind an executable attribute")
+            if bind.get("kind") in {"attribute", "style"} and not binding_name:
+                _fail("editor component control binding requires a name")
+            if bind.get("kind") == "style" and (
+                binding_name in {"behavior", "-moz-binding"}
+                or field_type in {"text", "media", "checkbox"}
+            ):
+                _fail("editor component control cannot bind an unsafe style")
+            if bind.get("kind") == "class_choice" and field_type != "select":
+                _fail("editor class choice must use a select field")
+            if bind.get("kind") == "class_toggle" and (field_type != "checkbox" or not bind.get("class_name")):
+                _fail("editor class toggle must use a checkbox and class_name")
+            if bind.get("kind") == "media" and field_type != "media":
+                _fail("editor media binding must use a media field")
+            target = bind.get("target")
+            if target is not None:
+                if not isinstance(target, dict) or set(target) - {"scope", "match"} or target.get("scope") not in _EDITOR_TARGET_SCOPES:
+                    _fail("editor component control target is invalid")
+                if target.get("scope") == "descendant":
+                    _validate_editor_match(target.get("match"), "editor component control target match")
+            for key in ("min", "max", "step", "scale"):
+                value = field.get(key)
+                if value is not None and (not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value)):
+                    _fail("editor component control numeric constraint is invalid")
+            options = field.get("options", [])
+            if not isinstance(options, list) or len(options) > 100:
+                _fail("editor component control options are invalid")
+            if field_type == "select" and not options:
+                _fail("editor select field must declare options")
+            if field_type != "select" and options:
+                _fail("only editor select fields can declare options")
+            for option in options:
+                if not isinstance(option, dict) or set(option) - {"value", "label", "class_name"}:
+                    _fail("editor component control option is invalid")
+                if not isinstance(option.get("value"), str) or len(option["value"]) > 100:
+                    _fail("editor component control option value is invalid")
+                if not isinstance(option.get("label"), str) or not option["label"].strip() or len(option["label"]) > 200:
+                    _fail("editor component control option label is invalid")
+                class_name = option.get("class_name")
+                if class_name is not None and (not isinstance(class_name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,99}", class_name)):
+                    _fail("editor component control option class is invalid")
+                if bind.get("kind") == "style" and (
+                    any(token in option["value"].casefold() for token in ("url(", "expression(", ";", "{", "}"))
+                ):
+                    _fail("editor component control style option is unsafe")
 
 
 def _fail(message: str) -> None:
@@ -592,6 +783,23 @@ def _namespace_asset_references(value: Any, theme_version_id: int) -> Any:
     return result
 
 
+def _portable_asset_references(value: Any, theme_version_id: int) -> Any:
+    """Restore one installed theme's asset URLs to package-relative paths."""
+    prefixes = (
+        f"/theme-assets/{theme_version_id}/",
+        f"/api/web/theme-assets/{theme_version_id}/",
+    )
+    if isinstance(value, list):
+        return [_portable_asset_references(item, theme_version_id) for item in value]
+    if isinstance(value, dict):
+        return {key: _portable_asset_references(child, theme_version_id) for key, child in value.items()}
+    if isinstance(value, str):
+        for prefix in prefixes:
+            if value.startswith(prefix):
+                return value.removeprefix(prefix)
+    return value
+
+
 def rewrite_theme_asset_urls(css: str, theme_version_id: int, *, api: bool = False) -> str:
     """Rewrite already-validated package CSS assets to a namespaced endpoint."""
     def replace(match: re.Match[str]) -> str:
@@ -707,6 +915,8 @@ def install_theme(
                 _fail(f"config key is invalid: {key}")
             if not isinstance(spec, dict):
                 _fail(f"config entry for '{key}' must be an object")
+            if set(spec) - {"type", "label", "default", "help", "options", "min", "max", "step", "storage"}:
+                _fail(f"config entry for '{key}' contains unknown fields")
             field_type = str(spec.get("type", "text"))
             if field_type not in _CONFIG_TYPES:
                 _fail(f"config entry for '{key}' has an unsupported type")
@@ -715,28 +925,34 @@ def install_theme(
                 _fail(f"config entry for '{key}' has an invalid label")
             if "default" in spec and not isinstance(spec["default"], (str, int, float, bool)):
                 _fail(f"config entry for '{key}' has an invalid default")
+            help_text = spec.get("help")
+            if help_text is not None and (not isinstance(help_text, str) or len(help_text) > 500):
+                _fail(f"config entry for '{key}' has invalid help text")
+            storage = spec.get("storage", "tokens")
+            if storage not in _CONFIG_STORAGE:
+                _fail(f"config entry for '{key}' has invalid storage")
+            if storage == "site_setting" and key not in _THEME_SITE_SETTINGS:
+                _fail(f"config entry for '{key}' cannot write that site setting")
+            if field_type == "media" and storage != "site_setting":
+                _fail(f"config media entry for '{key}' must use site_setting storage")
+            options = spec.get("options")
+            if field_type == "select":
+                if not isinstance(options, list) or not options or len(options) > 100:
+                    _fail(f"config select entry for '{key}' must declare options")
+                for option in options:
+                    if not isinstance(option, dict) or set(option) != {"value", "label"}:
+                        _fail(f"config select entry for '{key}' has invalid options")
+                    if not isinstance(option["value"], (str, int, float, bool)) or not isinstance(option["label"], str):
+                        _fail(f"config select entry for '{key}' has invalid options")
+            elif options is not None:
+                _fail(f"config entry for '{key}' cannot declare options")
+            for bound in ("min", "max", "step"):
+                if bound in spec and (not isinstance(spec[bound], (int, float)) or isinstance(spec[bound], bool)):
+                    _fail(f"config entry for '{key}' has invalid {bound}")
 
-    # Editor metadata is declarative only. Font sets provide labels and safe
-    # CSS font-family values; actual font files remain validated theme assets
-    # referenced from the package stylesheet.
+    # Editor metadata is declarative only. It describes the theme-owned block
+    # catalogue and bounded inspector fields; it never executes package code.
     editor_metadata = manifest.get("editor")
-    if editor_metadata is not None:
-        if not isinstance(editor_metadata, dict) or set(editor_metadata) - {"font_sets"}:
-            _fail("manifest.json editor metadata is invalid")
-        font_sets = editor_metadata.get("font_sets", [])
-        if not isinstance(font_sets, list) or len(font_sets) > 50:
-            _fail("manifest.json editor.font_sets must be a bounded list")
-        for item in font_sets:
-            if not isinstance(item, dict) or set(item) != {"id", "label", "value"}:
-                _fail("editor font set is invalid")
-            if not _ID_RE.fullmatch(str(item.get("id", ""))):
-                _fail("editor font set id is invalid")
-            for field in ("label", "value"):
-                value = item.get(field)
-                if not isinstance(value, str) or not value.strip() or len(value) > 200:
-                    _fail(f"editor font set {field} is invalid")
-            if any(token in item["value"].lower() for token in ("url(", "@import", ";", "{")):
-                _fail("editor font set value is unsafe")
 
     entries = _resource_entries(manifest)
     declared_paths = {entry["file"] for values in entries.values() for entry in values}
@@ -754,6 +970,8 @@ def install_theme(
         _fail(f"Archive is missing a declared file: {sorted(missing)[0]}")
 
     archive_paths = set(files)
+    if editor_metadata is not None:
+        _validate_editor_metadata(editor_metadata, archive_paths)
     for kind in ("assets", "previews"):
         for entry in entries[kind]:
             _validate_asset(contents[entry["file"]], entry["file"])
@@ -857,6 +1075,10 @@ def install_theme(
         )
         db.add(theme_version)
         db.flush()
+        if editor_metadata is not None:
+            stored_manifest = dict(manifest)
+            stored_manifest["editor"] = _namespace_asset_references(editor_metadata, theme_version.id)
+            theme_version.manifest = stored_manifest
 
         for path, content in contents.items():
             mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
@@ -1347,21 +1569,11 @@ def export_theme_archive(db: Session, theme_version_id: int, *, include_site_res
                 "styles": ["styles/theme.css"],
             }, indent=2, ensure_ascii=False))
 
-            old_public_prefixes = (
-                f"/theme-assets/{version.id}/",
-                f"/api/web/theme-assets/{version.id}/",
-            )
-
             def portable_project(value: Any) -> Any:
-                if isinstance(value, list):
-                    return [portable_project(child) for child in value]
-                if isinstance(value, dict):
-                    return {key: portable_project(child) for key, child in value.items()}
-                if isinstance(value, str):
-                    for prefix in old_public_prefixes:
-                        if value.startswith(prefix):
-                            return value.removeprefix(prefix)
-                return value
+                return _portable_asset_references(value, version.id)
+
+            if isinstance(manifest_payload.get("editor"), dict):
+                manifest_payload["editor"] = portable_project(manifest_payload["editor"])
 
             resources: dict[str, list[Any]] = {
                 "templates": [], "components": [], "sections": [], "patterns": [],
@@ -1489,6 +1701,11 @@ def duplicate_theme(db: Session, theme_version_id: int, *, new_name: str, instal
     )
     db.add(new_version)
     db.flush()
+    source_manifest = dict(version.manifest or {})
+    if isinstance(source_manifest.get("editor"), dict):
+        portable_editor = _portable_asset_references(source_manifest["editor"], version.id)
+        source_manifest["editor"] = _namespace_asset_references(portable_editor, new_version.id)
+        new_version.manifest = source_manifest
 
     # A clone owns its package directory. Reusing only DB rows would leave all
     # image/font endpoints pointing at files that do not exist under the new

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import EditorInspector, { findNearestRepeat, IconPicker, replaceComponentCss } from "./EditorInspector";
+import CharacteristicContentPanel from "./CharacteristicContentPanel";
 
 class FakeSelected {
   constructor(values) {
@@ -50,6 +51,35 @@ class FakeSelected {
   replaceWith(value) { return this.values.replaceWith?.(value) || []; }
 }
 
+const OVERLAY_CONTROLS = [
+  {
+    id: "hero-overlay", label: "Fotografické pozadí a maska", icon: "images", scope: "closest",
+    match: { all_classes: ["ontario-hero"] },
+    fields: [
+      { id: "background", label: "Fotografie na pozadí", type: "media", bind: { kind: "media" } },
+      { id: "position", label: "Pozice obrázku", type: "select", default: "center center", options: [{ value: "center center", label: "Uprostřed" }, { value: "center top", label: "Nahoře" }], bind: { kind: "style", name: "background-position" } },
+      { id: "enabled", label: "Použít barevnou masku", type: "checkbox", default: true, bind: { kind: "attribute", name: "data-sc-overlay-enabled" } },
+      { id: "color", label: "Barva masky", type: "color", default: "#0a224e", bind: { kind: "style", name: "--sc-overlay-color" } },
+      { id: "opacity", label: "Intenzita masky", type: "range", default: 64, min: 0, max: 100, step: 1, scale: 0.01, bind: { kind: "style", name: "--sc-overlay-opacity" } },
+    ],
+  },
+  {
+    id: "media-card", label: "Fotografická karta", icon: "image", match: { all_classes: ["ontario-media-link"] },
+    fields: [
+      { id: "photo", label: "Fotografie", type: "media", bind: { kind: "media", target: { scope: "descendant", match: { all_classes: ["ontario-media-link-image"] } } } },
+      { id: "position", label: "Pozice obrázku", type: "select", default: "center center", options: [{ value: "center center", label: "Uprostřed" }, { value: "right center", label: "Vpravo" }], bind: { kind: "style", name: "object-position", target: { scope: "descendant", match: { all_classes: ["ontario-media-link-image"] } } } },
+    ],
+  },
+];
+
+const BUTTON_MASK_CONTROL = [{
+  id: "button", label: "Vzhled tlačítka", icon: "hand-pointer", match: { all_classes: ["btn"] }, fields: [{
+    id: "mask", label: "Organický tvar", type: "select", default: "none",
+    options: [{ value: "none", label: "Výchozí" }, { value: "natural", label: "Natural", class_name: "sc-mask-button-natural" }, { value: "flow", label: "Flow", class_name: "sc-mask-button-flow" }, { value: "pebble", label: "Pebble", class_name: "sc-mask-button-pebble" }],
+    bind: { kind: "class_choice", remove_prefix: "sc-mask-button-" },
+  }],
+}];
+
 describe("EditorInspector linked props", () => {
   it("offers a keyboard accessible icon autocomplete with a visual preview", () => {
     const onChange = vi.fn();
@@ -69,6 +99,7 @@ describe("EditorInspector linked props", () => {
       selected={null}
       dataSources={[]}
       resources={{ components: [], sections: [] }}
+      themeControls={OVERLAY_CONTROLS}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
     />);
@@ -270,32 +301,6 @@ describe("EditorInspector linked props", () => {
     expect(screen.queryByText(/Loga šablony|Template logos/)).not.toBeInTheDocument();
   });
 
-  it("offers targeted media changes for template logos inside the selected source", () => {
-    const onSelectMedia = vi.fn();
-    const onContentChange = vi.fn();
-    const lightLogo = new FakeSelected({ type: "image", attributes: { "data-sc-template-logo": "navigation-light" } });
-    const darkLogo = new FakeSelected({ type: "image", attributes: { "data-sc-template-logo": "navigation-dark" } });
-    const selected = new FakeSelected({ type: "default", tagName: "nav", children: [lightLogo, darkLogo] });
-    render(<EditorInspector
-      selected={selected}
-      dataSources={[]}
-      resources={{ components: [], sections: [] }}
-      onDuplicate={vi.fn()}
-      onDelete={vi.fn()}
-      onSelectMedia={onSelectMedia}
-      onContentChange={onContentChange}
-    />);
-
-    expect(screen.getByText(/Změna platí pouze|This change applies only/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: /Změnit logo:.*světlé|Change logo:.*light/i }));
-    expect(onSelectMedia).toHaveBeenCalledTimes(1);
-    expect(onSelectMedia).toHaveBeenCalledWith(lightLogo);
-    fireEvent.click(screen.getByRole("button", { name: /Odebrat logo:.*světlé|Remove logo:.*light/i }));
-    expect(lightLogo.values.attributes["data-sc-template-logo-hidden"]).toBe("true");
-    expect(screen.getByRole("button", { name: /Použít logo:.*světlé|Use logo:.*light/i })).toBeInTheDocument();
-    expect(onContentChange).toHaveBeenCalledTimes(1);
-  });
-
   it("edits a hero background and overlay from a selected mask child", () => {
     const onSelectMedia = vi.fn();
     const onContentChange = vi.fn();
@@ -304,24 +309,25 @@ describe("EditorInspector linked props", () => {
       type: "default",
       tagName: "header",
       attributes: { class: "ontario-hero" },
-      style: { "background-image": "url(hero.jpg)", "--sc-hero-tint": "#123456", "--sc-hero-tint-opacity": ".7" },
+      style: { "background-image": "url(hero.jpg)", "--sc-overlay-color": "#123456", "--sc-overlay-opacity": ".7" },
       children: [mask],
     });
     render(<EditorInspector
       selected={mask}
       dataSources={[]}
       resources={{ components: [], sections: [] }}
+      themeControls={OVERLAY_CONTROLS}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
       onSelectMedia={onSelectMedia}
       onContentChange={onContentChange}
     />);
 
-    expect(screen.getByText(/Pozadí a barevná maska|Background and color overlay/)).toBeInTheDocument();
+    expect(screen.getByText("Fotografické pozadí a maska")).toBeInTheDocument();
     expect(screen.getByLabelText(/Barva masky|Overlay color/)).toHaveValue("#123456");
     fireEvent.click(screen.getByRole("button", { name: /Vybrat médium|Choose media/ }));
     expect(onSelectMedia).toHaveBeenCalledWith({ component: hero, mode: "background" });
-    fireEvent.change(screen.getByLabelText(/Pozice obrázku|Image position/), { target: { value: "top" } });
+    fireEvent.change(screen.getByLabelText(/Pozice obrázku|Image position/), { target: { value: "center top" } });
     fireEvent.change(screen.getByLabelText(/Barva masky|Overlay color/), { target: { value: "#abcdef" } });
     fireEvent.change(screen.getByLabelText(/Intenzita masky|Overlay intensity/), { target: { value: "35" } });
     fireEvent.click(screen.getByLabelText(/Použít barevnou masku|Use color overlay/));
@@ -344,6 +350,7 @@ describe("EditorInspector linked props", () => {
       selected={card}
       dataSources={[]}
       resources={{ components: [], sections: [] }}
+      themeControls={OVERLAY_CONTROLS}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
       onSelectMedia={onSelectMedia}
@@ -352,47 +359,34 @@ describe("EditorInspector linked props", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Vybrat médium|Choose media/ }));
     expect(onSelectMedia).toHaveBeenCalledWith(image);
-    fireEvent.change(screen.getByLabelText(/Pozice obrázku|Image position/), { target: { value: "right" } });
+    fireEvent.change(screen.getByLabelText(/Pozice obrázku|Image position/), { target: { value: "right center" } });
     expect(image.values.style["object-position"]).toBe("right center");
     fireEvent.click(screen.getByRole("button", { name: /^Odebrat$|^Remove$/ }));
     expect(image.values.attributes.src).toBeUndefined();
     expect(image.values.attributes["data-sc-media-id"]).toBeUndefined();
   });
 
-  it("normalizes button content when adding an icon and supports icon-only labels", () => {
+  it("keeps generic link content editable independently of a theme", () => {
     const onContentChange = vi.fn();
-    const selected = new FakeSelected({ type: "default", tagName: "button", content: "Pokračovat", attributes: { class: "btn btn-primary" } });
+    const selected = new FakeSelected({ type: "link", tagName: "a", content: "Pokračovat", attributes: { class: "btn btn-primary", href: "#" } });
     render(<EditorInspector
       selected={selected}
       dataSources={[]}
       resources={{ components: [], sections: [] }}
-      fontAwesomeIcons={["arrow-right"]}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
       onContentChange={onContentChange}
     />);
 
-    const iconSearch = screen.getByLabelText(/Ikona tlačítka|Button icon/);
-    fireEvent.focus(iconSearch);
-    fireEvent.change(iconSearch, { target: { value: "arrow-right" } });
-    fireEvent.click(screen.getByRole("option", { name: "arrow-right" }));
-    const icon = selected.children.find((child) => child.values.attributes?.["data-sc-button-icon"] !== undefined);
-    const label = selected.children.find((child) => child.getClasses().includes("sc-button-label"));
-    expect(icon.getClasses()).toEqual(expect.arrayContaining(["fa-solid", "fa-arrow-right", "sc-button-icon"]));
-    expect(icon.values.attributes["aria-hidden"]).toBe("true");
-    expect(label.values.content).toBe("Pokračovat");
-    fireEvent.change(screen.getByLabelText(/Pozice ikony|Icon position/), { target: { value: "right" } });
-    expect(selected.getClasses()).toContain("sc-button-icon-right");
-    fireEvent.change(screen.getByLabelText(/^Text$|^Label$/), { target: { value: "" } });
-    expect(selected.getClasses()).toContain("sc-button-icon-only");
-    expect(screen.getByRole("alert")).toHaveTextContent(/přístupný název|accessible label/i);
-    fireEvent.change(screen.getByLabelText(/Přístupný název|Accessible label/), { target: { value: "Pokračovat dál" } });
-    expect(selected.values.attributes["aria-label"]).toBe("Pokračovat dál");
+    fireEvent.blur(screen.getByLabelText(/^Text$|^Label$/), { target: { value: "Pokračovat dál" } });
+    fireEvent.change(screen.getByLabelText(/^URL$/), { target: { value: "/kontakt" } });
+    expect(selected.values.content).toBe("Pokračovat dál");
+    expect(selected.values.attributes.href).toBe("/kontakt");
+    expect(onContentChange).toHaveBeenCalled();
   });
 
-  it("changes a social link network, icon and accessible link data", () => {
-    const icon = new FakeSelected({ type: "default", tagName: "i", attributes: { class: "fa-brands fa-instagram", "aria-hidden": "true" } });
-    const selected = new FakeSelected({ type: "link", tagName: "a", attributes: { class: "ontario-social-link ontario-social-instagram", href: "#", "aria-label": "Instagram" }, children: [icon] });
+  it("does not infer theme-specific controls from CSS class names", () => {
+    const selected = new FakeSelected({ type: "link", tagName: "a", attributes: { class: "ontario-social-link ontario-social-instagram", href: "#", "aria-label": "Instagram" } });
     render(<EditorInspector
       selected={selected}
       dataSources={[]}
@@ -402,21 +396,19 @@ describe("EditorInspector linked props", () => {
       onContentChange={vi.fn()}
     />);
 
-    fireEvent.change(screen.getByLabelText(/Síť nebo služba|Network or service/), { target: { value: "linkedin" } });
-    expect(selected.getClasses()).toEqual(expect.arrayContaining(["ontario-social-link", "ontario-social-linkedin"]));
-    expect(icon.getClasses()).toEqual(expect.arrayContaining(["fa-brands", "fa-linkedin-in"]));
-    expect(selected.values.attributes["aria-label"]).toBe("LinkedIn");
-    fireEvent.change(screen.getByLabelText(/Adresa odkazu|Link address/), { target: { value: "https://linkedin.com/company/scout" } });
+    expect(screen.queryByLabelText(/Síť nebo služba|Network or service/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^URL$/), { target: { value: "https://linkedin.com/company/scout" } });
     expect(selected.values.attributes.href).toBe("https://linkedin.com/company/scout");
   });
 
   it("applies each new organic button mask through the general class mapping", () => {
     const onContentChange = vi.fn();
-    const selected = new FakeSelected({ type: "default", tagName: "a", content: "Více", attributes: { class: "btn btn-primary sc-mask-button-rugged" } });
+    const selected = new FakeSelected({ type: "link", tagName: "a", content: "Více", attributes: { class: "btn btn-primary sc-mask-button-natural" } });
     render(<EditorInspector
       selected={selected}
       dataSources={[]}
       resources={{ components: [], sections: [] }}
+      themeControls={BUTTON_MASK_CONTROL}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
       onContentChange={onContentChange}
@@ -477,7 +469,8 @@ describe("EditorInspector linked props", () => {
     />);
 
     fireEvent.click(screen.getAllByRole("tab")[3]);
-    const [htmlInput, cssInput] = screen.getAllByRole("textbox");
+    const htmlInput = screen.getByLabelText(/HTML/);
+    const cssInput = screen.getByLabelText(/CSS/);
     fireEvent.change(htmlInput, { target: { value: "<section>Changed</section>" } });
     fireEvent.change(cssInput, { target: { value: ".changed{color:blue}" } });
     fireEvent.click(screen.getByRole("button", { name: /Použít kód|Apply code/ }));
@@ -505,4 +498,63 @@ describe("EditorInspector linked props", () => {
     expect(remove).toHaveBeenCalledWith([oldRule]);
     expect(addRules).not.toHaveBeenCalled();
   });
+describe("CharacteristicContentPanel", () => {
+  it("shows structural layout controls for a div", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "div", attributes: { class: "" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    expect(screen.getByText(/Základní rozložení|Basic layout/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Uspořádání obsahu|Content arrangement/), { target: { value: "grid" } });
+    expect(selected.getClasses()).toContain("sc-layout-responsive-grid");
+    expect(onContentChange).toHaveBeenCalled();
+  });
+
+  it("shows text panel with heading level for h2", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "text", tagName: "h2", content: "Nadpis", attributes: { class: "" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    expect(screen.getByLabelText(/Obsah|Content/)).toHaveValue("Nadpis");
+    expect(screen.getByLabelText(/Úroveň nadpisu|Heading level/)).toHaveValue("h2");
+  });
+
+  it("shows list type control for ul", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "ul", attributes: { class: "" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    fireEvent.change(screen.getByLabelText(/Druh seznamu|List type/), { target: { value: "ol" } });
+    expect(selected.get("tagName")).toBe("ol");
+  });
+
+  it("shows divider appearance controls for hr", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "hr", attributes: { class: "" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    expect(screen.getByText(/Vzhled oddělovače|Divider appearance/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Styl čáry|Line style/), { target: { value: "dashed" } });
+    expect(selected.getStyle()["border-top-style"]).toBe("dashed");
+  });
+
+  it("shows spacer height control for aria-hidden div", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "div", attributes: { class: "", "aria-hidden": "true" }, style: { height: "2rem" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    expect(screen.getByText(/Velikost mezery|Spacer size/)).toBeInTheDocument();
+  });
+
+  it("keeps accessibility panel collapsed by default", () => {
+    const onContentChange = vi.fn();
+    const selected = new FakeSelected({ type: "default", tagName: "div", attributes: { class: "" } });
+    render(<CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />);
+
+    const details = screen.getByText(/Popis a přístupnost|Description and accessibility/).closest("details");
+    expect(details).toBeInTheDocument();
+    expect(details).not.toHaveAttribute("open");
+  });
+});
+
 });

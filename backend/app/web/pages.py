@@ -520,7 +520,11 @@ def publish_page(db: Session, page: WebPage, *, expected_version: int, user_id: 
     # Compile all public documents before committing the publication pointer.
     # The public server therefore has a single immutable output to read and
     # cannot accidentally render mutable data during a visitor request.
-    _build_publication_artifacts(db, page, revision)
+    try:
+        _build_publication_artifacts(db, page, revision)
+    except (CompileError, ResourcePropsError) as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from exc
     db.commit()
     db.refresh(revision)
     return revision

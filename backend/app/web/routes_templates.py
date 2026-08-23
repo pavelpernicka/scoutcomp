@@ -8,26 +8,9 @@ router = APIRouter(prefix="/web", tags=["web"])
 from .routes_pages import PublishPayload, _empty_project
 from .pages import _extract_page_content, rebuild_published_page_artifacts
 from .routes_design import _validate_custom_css
-from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
+from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_CONFIG, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
 from .previews import build_preview, ensure_preview, get_current_preview, project_preview_svg
 # ---------------------------------------------------------------- components & templates
-
-_DEFAULT_THEME_CONFIG = {
-    "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
-    "primary-2": {"type": "color", "label": "Tmavá primární", "default": "#2f3a4b"},
-    "accent": {"type": "color", "label": "Barva akcentu", "default": "#1e3a6e"},
-    "secondary": {"type": "color", "label": "Doplňková barva", "default": "#97c93e"},
-    "bg": {"type": "color", "label": "Pozadí", "default": "#ffffff"},
-    "text": {"type": "color", "label": "Barva textu", "default": "#2f3a4b"},
-    "muted": {"type": "color", "label": "Tlumený text", "default": "#6b7280"},
-    "cream": {"type": "color", "label": "Teplá plocha", "default": "#e1d3c1"},
-    "cream-2": {"type": "color", "label": "Světlá teplá plocha", "default": "#f6ebd8"},
-    "border": {"type": "color", "label": "Barva oddělovačů", "default": "#e9e0d2"},
-    "font_body": {"type": "text", "label": "Písmo textu", "default": "'Open Sans', Arial, sans-serif"},
-    "font_heading": {"type": "text", "label": "Písmo nadpisů", "default": "Georgia, 'Times New Roman', serif"},
-    "radius": {"type": "text", "label": "Zaoblení", "default": "1rem"},
-}
-
 
 _DEFAULT_TEMPLATE_SVG = (
     'data:image/svg+xml,' +
@@ -150,6 +133,10 @@ def seed_default_theme(db: Session) -> None:
         )
         db.add(theme)
         db.flush()
+    else:
+        theme.name = DEFAULT_THEME_NAME
+        theme.author = "ScoutComp"
+        theme.description = DEFAULT_THEME_DESCRIPTION
 
     version = db.query(WebThemeVersion).filter_by(theme_id=theme.id, version=DEFAULT_THEME_VERSION).one_or_none()
     theme_css_changed = False
@@ -168,7 +155,7 @@ def seed_default_theme(db: Session) -> None:
                 "author": "ScoutComp",
                 "description": DEFAULT_THEME_DESCRIPTION,
                 "license": "GPL-3.0-or-later",
-                "config": _DEFAULT_THEME_CONFIG,
+                "config": DEFAULT_THEME_CONFIG,
             },
             default_tokens=_THEME_TOKENS,
             base_css=THEME_CSS,
@@ -185,7 +172,13 @@ def seed_default_theme(db: Session) -> None:
         existing_config = version.manifest.get("config") or {}
         version.manifest = {
             **version.manifest,
-            "config": {**_DEFAULT_THEME_CONFIG, **existing_config},
+            "id": DEFAULT_THEME_ID,
+            "name": DEFAULT_THEME_NAME,
+            "version": DEFAULT_THEME_VERSION,
+            "author": "ScoutComp",
+            "description": DEFAULT_THEME_DESCRIPTION,
+            "license": "GPL-3.0-or-later",
+            "config": {**DEFAULT_THEME_CONFIG, **existing_config},
         }
         version.default_tokens = {**_THEME_TOKENS, **(version.default_tokens or {})}
 
@@ -321,19 +314,25 @@ def seed_default_pages(db: Session) -> None:
     """Create any missing default pages (main, news) idempotently and keep
     the built-in slugs in their default published state."""
     seed_default_templates(db)
-    seed_default_theme(db)
+    from .ontario_theme import (
+        ONTARIO_THEME_ID,
+        ONTARIO_THEME_TEMPLATES,
+        ONTARIO_THEME_VERSION,
+        seed_ontario_theme,
+    )
+    seed_ontario_theme(db)
     from .theme_package import _qualified_key as _theme_qualified_key
     theme_templates = {
         key: db.query(WebTemplate).filter_by(
-            qualified_key=_theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", key),
+            qualified_key=_theme_qualified_key(ONTARIO_THEME_ID, ONTARIO_THEME_VERSION, "templates", key),
         ).one_or_none()
-        for key in DEFAULT_THEME_TEMPLATES
+        for key in ONTARIO_THEME_TEMPLATES
     }
     for item in DEFAULT_PAGES:
         existing = db.query(WebPage).filter_by(slug=item["slug"]).one_or_none()
         if existing:
             continue
-        theme_key = {"main": "scout-home", "news": "scout-listing"}.get(item["slug"], item["slug"])
+        theme_key = {"main": "home", "news": "news"}.get(item["slug"], item["slug"])
         template = theme_templates.get(theme_key) or theme_templates.get("main")
         template_project = deepcopy(template.published_project_data or template.project_data) if template else None
         page_project = (
@@ -361,10 +360,7 @@ def seed_default_pages(db: Session) -> None:
         page = db.query(WebPage).filter_by(slug=item["slug"], deleted_at=None).one_or_none()
         if not page:
             continue
-        # The 2.0 system theme has dedicated composed starters; keep the
-        # built-in homepage and news page on those instead of the legacy
-        # compatibility layouts shipped under the generic main/news keys.
-        theme_key = {"main": "scout-home", "news": "scout-listing"}.get(item["slug"], item["slug"])
+        theme_key = {"main": "home", "news": "news"}.get(item["slug"], item["slug"])
         template = theme_templates.get(theme_key)
         if not template:
             continue
@@ -372,6 +368,8 @@ def seed_default_pages(db: Session) -> None:
         legacy_default_keys = {
             _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "main"),
             _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "news"),
+            _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "scout-home"),
+            _theme_qualified_key(DEFAULT_THEME_ID, DEFAULT_THEME_VERSION, "templates", "scout-listing"),
         }
         # Fill a missing shell and migrate only the two legacy built-in shells.
         # A site editor's explicit template choice must survive startup/theme
@@ -431,7 +429,8 @@ def _active_theme_version_id(db: Session) -> int:
 @router.get("/templates")
 def list_templates(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.templates.manage")
-    seed_default_theme(db)
+    from .ontario_theme import seed_ontario_theme
+    seed_ontario_theme(db)
     active_theme_id = _active_theme_version_id(db)
     templates = db.query(WebTemplate).filter_by(theme_version_id=active_theme_id).order_by(WebTemplate.name.asc()).all()
     version = db.get(WebThemeVersion, active_theme_id)

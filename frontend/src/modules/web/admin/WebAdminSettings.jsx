@@ -120,7 +120,7 @@ export default function WebAdminSettings() {
                 <div className="mb-3">
                   <label className="form-label small fw-semibold">{t("web.settingsTitlePattern")}</label>
                   <input className="form-control font-monospace" value={form.title_pattern} onChange={(e) => setField("title_pattern", e.target.value)} placeholder="{page} | {site}" />
-                  <div className="form-text">{t("web.settingsTitlePatternHint", { example: form.title_pattern.replaceAll("{page}", t("web.settingsTitlePatternExamplePage")).replaceAll("{site}", form.site_title || "Ontario") })}</div>
+                  <div className="form-text">{t("web.settingsTitlePatternHint", { example: form.title_pattern.replaceAll("{page}", t("web.settingsTitlePatternExamplePage")).replaceAll("{site}", form.site_title || "Skautský oddíl") })}</div>
                 </div>
                 <div className="mb-3">
                   <label className="form-label small fw-semibold">{t("web.settingsTagline")}</label>

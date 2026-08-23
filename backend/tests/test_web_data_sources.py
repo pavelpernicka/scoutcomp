@@ -318,12 +318,13 @@ def test_menu_source_reads_published_tree_and_projects_nested_items(db_session):
 def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_session):
     _seed(db_session)
     public = WebMedia(filename="public.png", path="public.png", mime="image/png", size=1, album="Live")
+    background = WebMedia(filename="background.png", path="background.png", mime="image/png", size=1, album="Live")
     gallery = WebMedia(
         filename="gallery.png", path="gallery.png", mime="image/png", size=1,
         album="Live", is_public=True,
     )
     draft = WebMedia(filename="draft.png", path="draft.png", mime="image/png", size=1, album="Draft secret")
-    db_session.add_all([public, gallery, draft]); db_session.flush()
+    db_session.add_all([public, background, gallery, draft]); db_session.flush()
     page = WebPage(
         slug="gallery", path_segment="gallery", path="/gallery", title="Gallery",
         data={}, published=True, draft_version=1,
@@ -336,6 +337,7 @@ def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_se
             "type": "default", "tagName": "img",
             "attributes": {"src": f"/media/{public.id}/file"}, "components": [],
         },
+        compiled_css=f'.hero{{background-image:url("/media/{background.id}/file")}}',
     )
     db_session.add(revision); db_session.flush()
     page.published_revision_id = revision.id
@@ -343,7 +345,7 @@ def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_se
 
     result = resolve_data_source(db_session, "core.media")
 
-    assert {item["id"] for item in result} == {public.id, gallery.id}
+    assert {item["id"] for item in result} == {public.id, background.id, gallery.id}
     assert all(item["album"] != "Draft secret" for item in result)
 
 

@@ -619,7 +619,7 @@ def restore_page_revision(page_id: int, revision_id: int, db: Session = Depends(
 
 def _site_settings(db: Session) -> dict:
     return {
-        "site_title": get_config_value(db, "web.site_title") or "Naše skautská střediska",
+        "site_title": get_config_value(db, "web.site_title") or "Skautský oddíl",
         "title_pattern": get_config_value(db, "web.title_pattern") or DEFAULT_TITLE_PATTERN,
         "favicon": get_config_value(db, "web.favicon"),
         "site_tagline": get_config_value(db, "web.site_tagline"),

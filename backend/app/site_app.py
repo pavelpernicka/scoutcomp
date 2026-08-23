@@ -8,8 +8,9 @@ Run with::
 
     uvicorn app.site_app:app --host 0.0.0.0 --port 8090
 
-Everything is server-rendered static HTML (web components are expanded
-server-side), so it needs no JavaScript and no login.
+Everything is server-rendered HTML (web components are expanded server-side).
+A tiny first-party runtime progressively enhances calendar navigation; the
+links remain fully functional without JavaScript and no login is required.
 """
 from __future__ import annotations
 
@@ -63,6 +64,78 @@ register_all_modules()
 
 app = FastAPI(title="ScoutComp Public Site", docs_url=None, redoc_url=None, openapi_url=None)
 
+_SITE_RUNTIME_JS = r'''(() => {
+  "use strict";
+  const navigationSelector = ".sc-calendar-nav[href],.sc-calendar-today[href]";
+  const requests = new WeakMap();
+  const documentLocation = (value = window.location.href) => {
+    const url = new URL(value, window.location.href);
+    return `${url.origin}${url.pathname}${url.search}`;
+  };
+  let renderedLocation = documentLocation();
+
+  async function replaceCalendar(source, targetUrl, updateHistory) {
+    const calendars = Array.from(document.querySelectorAll(".sc-calendar"));
+    const index = Math.max(0, calendars.indexOf(source));
+    const currentView = source.querySelector(".sc-calendar-view-list")?.checked ? "list" : "month";
+    const focusClass = source.ownerDocument.activeElement?.classList.contains("sc-calendar-nav--prev")
+      ? "sc-calendar-nav--prev"
+      : source.ownerDocument.activeElement?.classList.contains("sc-calendar-nav--next")
+        ? "sc-calendar-nav--next"
+        : "sc-calendar-today";
+    const request = (requests.get(source) || 0) + 1;
+    requests.set(source, request);
+    const response = await fetch(targetUrl, {
+      credentials: "same-origin",
+      headers: { "X-ScoutComp-Fragment": "calendar" },
+    });
+    if (!response.ok) throw new Error("Calendar navigation failed");
+    const parsed = new DOMParser().parseFromString(await response.text(), "text/html");
+    const replacement = parsed.querySelectorAll(".sc-calendar")[index];
+    if (!replacement || request !== requests.get(source)) return;
+    const imported = document.importNode(replacement, true);
+    if (currentView === "list") {
+      const listControl = imported.querySelector(".sc-calendar-view-list");
+      if (listControl) listControl.checked = true;
+    }
+    source.replaceWith(imported);
+    renderedLocation = documentLocation(targetUrl);
+    if (updateHistory) history.pushState({ scoutcompCalendar: true }, "", targetUrl);
+    imported.querySelector(`.${focusClass}`)?.focus({ preventScroll: true });
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest?.(navigationSelector);
+    if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const calendar = link.closest(".sc-calendar");
+    if (!calendar) return;
+    const targetUrl = new URL(link.href, window.location.href);
+    if (targetUrl.origin !== window.location.origin) return;
+    event.preventDefault();
+    replaceCalendar(calendar, targetUrl, true).catch(() => { window.location.assign(targetUrl); });
+  });
+
+  window.addEventListener("popstate", () => {
+    // Opening and closing the CSS-only day dialog changes only the fragment.
+    // Browsers also expose that history movement through popstate; replacing
+    // the calendar in that case removes the :target element and makes the
+    // dialog flash and immediately disappear.
+    if (documentLocation() === renderedLocation) return;
+    document.querySelectorAll(".sc-calendar").forEach((calendar) => {
+      replaceCalendar(calendar, window.location.href, false).catch(() => window.location.reload());
+    });
+  });
+})();'''
+
+
+@app.get("/site-runtime.js", include_in_schema=False)
+def site_runtime() -> Response:
+    return Response(
+        _SITE_RUNTIME_JS,
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=0, must-revalidate", "X-Content-Type-Options": "nosniff"},
+    )
+
 
 @app.middleware("http")
 async def public_security_headers(request: Request, call_next):
@@ -72,7 +145,7 @@ async def public_security_headers(request: Request, call_next):
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https:; "
+        "default-src 'none'; script-src 'self'; connect-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; media-src 'self' https:; "
         "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; "
         "font-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     )
@@ -92,7 +165,7 @@ async def public_security_headers(request: Request, call_next):
             )
     return response
 
-DEFAULT_SITE_TITLE = "ScoutComp"
+DEFAULT_SITE_TITLE = "Skautský oddíl"
 
 
 def _enabled_components(db: Session) -> set[str]:
@@ -380,6 +453,7 @@ def _detail_document(
                 og_type=og_type or site_settings["og_type"],
                 site_name=site_settings["site_title"],
                 css=f"{global_css}\n{linked_part_css}\n{template_css}", base_css=base_css, tokens=tokens,
+                site_runtime=True,
             )
         except CompileError:
             # A deleted/inconsistent setting must not take a public detail down.
@@ -393,7 +467,7 @@ def _detail_document(
         og_image=effective_image,
         og_type=og_type or site_settings["og_type"],
         site_name=site_settings["site_title"],
-        css=global_css, base_css=base_css, tokens=tokens,
+        css=global_css, base_css=base_css, tokens=tokens, site_runtime=True,
     )
 
 
@@ -624,6 +698,7 @@ def _render_revision(
         css=f"{global_css}\n{linked_css}\n{css}",
         base_css=base_css,
         tokens=tokens,
+        site_runtime=True,
     )
 
 

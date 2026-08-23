@@ -70,7 +70,7 @@ SAFE_CSS_PROPERTIES = {
     # Theme-owned authoring shortcuts. Keep the allow-list explicit so a
     # custom property cannot smuggle arbitrary declarations into public CSS.
     "--sc-edge-fill", "--sc-hero-tint", "--sc-hero-tint-opacity",
-    "--sc-overlay-color", "--sc-overlay-opacity",
+    "--sc-overlay-color", "--sc-overlay-opacity", "--sc-layout-columns",
 }
 CONDITION_OPERATORS = {"eq", "neq", "in", "not_in", "exists", "empty", "gt", "gte", "lt", "lte"}
 BIND_TARGETS = {
@@ -98,7 +98,10 @@ SLOT_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,49}$")
 # Authors can still override these classes in their own theme/resource CSS.
 BUILDER_LAYOUT_CSS = (
     ".sc-layout-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}"
-    "@media (max-width:575px){.sc-layout-columns{grid-template-columns:1fr}}"
+    ".sc-layout-responsive-grid{display:grid;grid-template-columns:repeat(var(--sc-layout-columns,2),minmax(0,1fr));gap:1rem}"
+    ".sc-layout-flex{display:flex}.sc-layout-flex-column{display:flex;flex-direction:column}"
+    ".sc-list-inline{display:flex;flex-wrap:wrap;gap:1rem;padding-left:0;list-style:none}"
+    "@media (max-width:575px){.sc-layout-columns,.sc-layout-responsive-grid{grid-template-columns:1fr}}"
     ".sc-shape-soft{border-radius:1.75rem 2.2rem 1.6rem 2rem/2rem 1.6rem 2.2rem 1.7rem!important}"
     ".sc-shape-blob{border-radius:2.8rem 1.8rem 2.5rem 2rem/2rem 2.6rem 1.8rem 2.4rem!important}"
     ".sc-shape-oval{border-radius:50%!important}.sc-shape-rounded{border-radius:1rem!important}"
@@ -109,6 +112,7 @@ BUILDER_LAYOUT_CSS = (
     ".sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:absolute;z-index:20;left:0;top:100%}"
     ".sc-menu-dropdown .sc-menu-dropdown{left:100%;top:0}"
     "@media (min-width:576px){.sc-menu:not(.sc-menu--footer) .sc-menu-dropdown .sc-menu-link{color:var(--sc-menu-dropdown-text,#252b31)!important}}"
+    ".sc-menu--ontario-mobile-navbar .sc-menu-link{color:var(--sc-menu-mobile-text,#111)!important}"
     ".sc-menu--footer .sc-menu-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(10rem,1fr));gap:.25rem 1rem}"
     ".sc-menu--footer .sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}"
     "@media (max-width:575px){.sc-menu-list{display:block}.sc-menu-dropdown,.sc-menu-item:hover>.sc-menu-dropdown,.sc-menu-item:focus-within>.sc-menu-dropdown{display:block;position:static;box-shadow:none;background:transparent;padding-left:.7rem}}"
@@ -560,6 +564,8 @@ def _normalise_styles(project: dict[str, Any]) -> str:
                 raise CompileError(f"CSS value for '{prop}' must be a safe color")
             if prop in {"--sc-hero-tint-opacity", "--sc-overlay-opacity"} and not re.fullmatch(r"(?:0(?:\.\d+)?|1(?:\.0+)?)", text):
                 raise CompileError(f"CSS value for '{prop}' must be between 0 and 1")
+            if prop == "--sc-layout-columns" and not re.fullmatch(r"[1-9][0-9]{0,2}", text):
+                raise CompileError("CSS value for '--sc-layout-columns' must be a positive integer")
             declarations.append(f"{prop}:{text}")
         if declarations:
             state = str(rule.get("state") or "").strip().lower()
@@ -1353,7 +1359,7 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         '</fieldset>'
         '<div class="sc-calendar-toolbar">'
         f'{previous_control}'
-        f'<div><h2 class="sc-calendar-title">{title}</h2>'
+        f'<div><h2 class="sc-calendar-title" aria-live="polite">{title}</h2>'
         f'<a class="sc-calendar-today" href="?month={current_month}">Dnes</a></div>'
         f'{next_control}'
         f'</div><div class="sc-calendar-table" role="grid" aria-label="Kalendář – {title}" '
@@ -1573,6 +1579,14 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
 
     tag = node.get("tagName", "div")
     attrs = dict(node.get("attributes") or {})
+    # Theme logos keep their bundled image as a reliable fallback, while a
+    # site-wide logo selected in Template settings replaces every declared
+    # logo role at render time. The stored theme project stays portable and
+    # never embeds an environment-specific media URL.
+    if attrs.get("data-sc-template-logo") and state.site.get("site_logo"):
+        site_logo = _safe_url(state.site["site_logo"], image=True)
+        if site_logo:
+            attrs["src"] = site_logo
     bound_styles: dict[str, str] = {}
     content = escape(str(node.get("content") or ""))
     for target, binding in (node.get("scBindings") or {}).items():
@@ -1607,6 +1621,11 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
 _ALLOWED_THEME_URL = re.compile(
     r"url\(\s*([\'\"]?)/(?:api/web/)?theme-assets/\d+/assets/[A-Za-z0-9%._~!$&'()*+,;=:@/-]+\1\s*\)", re.I,
 )
+# Editor media and its public projection use fixed same-origin endpoints. The
+# public file route still verifies that the id belongs to a live snapshot.
+_ALLOWED_MEDIA_URL = re.compile(
+    r"url\(\s*([\'\"]?)/(?:api/web/)?media/[1-9][0-9]{0,9}/file\1\s*\)", re.I,
+)
 # Ontario 1.1.0 used an empty URL only as a `mask-image` feature-test
 # value. It cannot address an external resource, so keep old immutable theme
 # versions previewable while newer bundled CSS uses `mask-image:none`.
@@ -1618,6 +1637,7 @@ def validate_render_css(css: str) -> None:
     """Reject CSS that violates the public rendering boundary."""
     cleaned = _EMPTY_CSS_URL.sub("", css or "")
     cleaned = _ALLOWED_THEME_URL.sub("", cleaned)
+    cleaned = _ALLOWED_MEDIA_URL.sub("", cleaned)
     if _UNSAFE_URL.search(cleaned):
         raise CompileError("CSS violates the public rendering policy")
     if UNSAFE_CSS.search(cleaned) or CSS_TAG_BREAKOUT.search(cleaned):
@@ -1716,6 +1736,7 @@ def render_document(
     css: str = "",
     base_css: str = "",
     tokens: dict[str, Any] | None = None,
+    site_runtime: bool = False,
 ) -> str:
     for layer in (css, base_css):
         validate_render_css(layer)
@@ -1779,11 +1800,13 @@ def render_document(
         f'<meta name="twitter:description" content="{escape(social_description, quote=True)}">'
         f'{twitter_image_meta}'
     )
+    runtime_script = '<script src="/site-runtime.js" defer></script>' if site_runtime else ""
     return (
         "<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         f'<meta name="description" content="{escape(description, quote=True)}">'
-        f"{robots}{canonical}{social_meta}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style></head>"
+        f"{robots}{canonical}{social_meta}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style>"
+        f'{runtime_script}</head>'
         f"<body>{body}</body></html>"
     )

@@ -14,6 +14,20 @@ const stripEditorOnlyPreview = (value) => {
     if (key === "livePreviewHtml" || key === "livePreviewCss" || key === "menuItems") return;
     next[key] = stripEditorOnlyPreview(child);
   });
+  const attributes = isObject(next.attributes) ? next.attributes : null;
+  const mediaId = String(attributes?.["data-sc-media-id"] || "");
+  const isImage = next.type === "image" || String(next.tagName || "").toLowerCase() === "img" || attributes?.src;
+  if (isImage && /^\d+$/.test(mediaId)) {
+    next.attributes = { ...attributes, src: `/media/${mediaId}/file` };
+    if ("src" in next) next.src = `/media/${mediaId}/file`;
+  }
+  const backgroundMediaId = String(attributes?.["data-sc-background-media-id"] || "");
+  if (/^\d+$/.test(backgroundMediaId) && isObject(next.style)) {
+    next.style = {
+      ...next.style,
+      "background-image": `url("/media/${backgroundMediaId}/file")`,
+    };
+  }
   return next;
 };
 

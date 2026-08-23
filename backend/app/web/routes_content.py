@@ -152,6 +152,8 @@ def delete_menu(menu_id: int, db: Session = Depends(get_db), current_user: User 
     menu = db.query(WebMenu).filter_by(id=menu_id).one_or_none()
     if not menu:
         raise HTTPException(404, "Menu not found")
+    if menu.published_revision_id:
+        _require_action(db, current_user, "web.publish")
     db.query(WebMenuItem).filter_by(menu_id=menu_id).delete()
     db.delete(menu)
     db.flush()

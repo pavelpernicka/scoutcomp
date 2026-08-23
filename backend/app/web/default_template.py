@@ -289,11 +289,23 @@ DEFAULT_SCOUT_TEMPLATE = {
 
 DEFAULT_THEME_ID = "scoutcomp-default"
 DEFAULT_THEME_VERSION = "2.0.0"
-DEFAULT_THEME_NAME = "Výchozí web oddílu"
-DEFAULT_THEME_DESCRIPTION = (
-    "Bohaté skautské téma inspirované kompozicí webu ontario.zlin6.cz: "
-    "hero, družiny, schůzky, aktuality, výzvy a patička."
-)
+DEFAULT_THEME_NAME = "Testovací šablona"
+DEFAULT_THEME_DESCRIPTION = "Jednoduché základní téma."
+DEFAULT_THEME_CONFIG = {
+    "primary": {"type": "color", "label": "Primární barva", "default": "#0a224e"},
+    "primary-2": {"type": "color", "label": "Tmavá primární", "default": "#2f3a4b"},
+    "accent": {"type": "color", "label": "Barva akcentu", "default": "#1e3a6e"},
+    "secondary": {"type": "color", "label": "Doplňková barva", "default": "#97c93e"},
+    "bg": {"type": "color", "label": "Pozadí", "default": "#ffffff"},
+    "text": {"type": "color", "label": "Barva textu", "default": "#2f3a4b"},
+    "muted": {"type": "color", "label": "Tlumený text", "default": "#6b7280"},
+    "cream": {"type": "color", "label": "Teplá plocha", "default": "#e1d3c1"},
+    "cream-2": {"type": "color", "label": "Světlá teplá plocha", "default": "#f6ebd8"},
+    "border": {"type": "color", "label": "Barva oddělovačů", "default": "#e9e0d2"},
+    "font_body": {"type": "text", "label": "Písmo textu", "default": "'Open Sans', Arial, sans-serif"},
+    "font_heading": {"type": "text", "label": "Písmo nadpisů", "default": "Georgia, 'Times New Roman', serif"},
+    "radius": {"type": "text", "label": "Zaoblení", "default": "1rem"},
+}
 
 # GrapesJS Project Data for the page-type templates that belong to the theme.
 # The `main` template embeds the full site layout (header/content/footer) and

@@ -374,7 +374,9 @@ def published_media_ids(db: Session) -> set[int]:
     for revision in page_revisions:
         if revision.og_image_id is not None:
             result.add(revision.og_image_id)
-        result.update(_media_references(revision.compiled_tree or revision.data))
+        result.update(_media_references(revision.compiled_tree))
+        result.update(_media_references(revision.compiled_css))
+        result.update(_media_references(revision.data))
         if revision.reason == "migration":
             result.update(_media_references(revision.html))
 

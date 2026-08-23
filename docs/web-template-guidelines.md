@@ -31,6 +31,43 @@ theme.zip
 
 `manifest.json` musí obsahovat: `schema_version`, `id`, `name`, `version`, `author`, `description` (volitelně `license`, `resources`). Každý zdroj patří do svého jmenného prostoru (`templates/`, `parts/`, atd.) a má stabilní `id`.
 
+### Nastavení a editor vlastněné tématem
+
+Téma samo určuje, která nastavení a které specializované ovládací prvky editor zobrazí. Aplikace poskytuje jen obecné, bezpečné vykreslení deklarovaného schématu:
+
+- `config` definuje nastavení tématu (`text`, `number`, `color`, `select`, `checkbox` a `media`). Běžné hodnoty se ukládají jako design tokeny. Povolené sdílené nastavení, například `site_logo`, může použít `storage: "site_setting"`.
+- `editor.component_controls` mapuje jednoduchý matcher tagů/tříd/atributů na pole v panelu Obsah. Pole se vážou na styl, atribut, volbu/toggle třídy nebo médium.
+- `editor.blocks` doplňuje katalog prvků tématu. Složitější znovupoužitelné prvky a sekce patří přednostně do `resources.components` a `resources.sections`.
+- `editor.font_sets` definuje nabídku písem aktivního tématu.
+
+```json
+{
+  "config": {
+    "primary_color": {"type": "color", "label": "Hlavní barva", "default": "#255c9e"},
+    "site_logo": {"type": "media", "label": "Logo", "storage": "site_setting", "default": ""}
+  },
+  "editor": {
+    "component_controls": [{
+      "id": "alert-variant",
+      "label": "Vzhled upozornění",
+      "match": {"all_classes": ["alert"]},
+      "fields": [{
+        "id": "variant",
+        "label": "Varianta",
+        "type": "select",
+        "options": [
+          {"value": "info", "label": "Info", "class_name": "alert-info"},
+          {"value": "warning", "label": "Varování", "class_name": "alert-warning"}
+        ],
+        "bind": {"kind": "class_choice"}
+      }]
+    }]
+  }
+}
+```
+
+Balíček nemůže dodat JavaScript ani serverový kód. To není omezení vzhledu: interakce editoru vznikají z uvedeného schématu a veřejné chování z podporovaných sémantických prvků. Zůstává tak přenositelné, validovatelné a bezpečné i téma nahrané méně důvěryhodným správcem.
+
 ## 3. Deklarativní primitiva
 
 Používejte obecné typy prvků:

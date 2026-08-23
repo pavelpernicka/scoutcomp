@@ -671,6 +671,10 @@ def test_renderer_accepts_legacy_empty_feature_test_url_but_not_external_css_url
         css='@supports (mask-image:url("")){.shape{mask-image:none}}',
     )
     assert '@supports (mask-image:url(""))' in document
+    document = render_document(
+        "", title="x", css='.hero{background-image:url("/media/12/file")}',
+    )
+    assert 'url("/media/12/file")' in document
     with pytest.raises(CompileError):
         render_document(
             "", title="x",

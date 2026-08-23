@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { createDataSourceBlocks, createPrimitiveBlocks } from "./blocks";
 
 const STRUCTURAL_IDS = [
-  "sc-container",
-  "sc-box",
-  "sc-section",
+  "sc-columns",
+  "sc-flex",
+  "sc-grid",
   "sc-semantic-article",
   "sc-semantic-header",
   "sc-semantic-footer",
@@ -19,7 +19,7 @@ describe("builder primitive blocks", () => {
     const blocks = createPrimitiveBlocks((key) => key);
     const blockIds = blocks.map((block) => block.id);
 
-    expect(blockIds).toContain("sc-section");
+    expect(blockIds).toContain("sc-columns");
     expect(blockIds).not.toContain("sc-template-part");
     expect(blockIds).not.toContain("sc-global-part");
     expect(blockIds).toContain("sc-menu");
@@ -50,68 +50,31 @@ describe("builder primitive blocks", () => {
     }
   });
 
-  it("offers reusable Ontario, Font Awesome and safe Bootstrap starters", () => {
+  it("registers only platform blocks globally", () => {
     const ids = createPrimitiveBlocks((key) => key).map((block) => block.id);
 
-    expect(ids).toEqual(expect.arrayContaining([
-      "sc-fa-icon",
-      "sc-photo-mask",
-      "layout-media-split",
-      "block-section-heading",
-      "block-hero",
-      "bs-alert",
-      "bs-badge",
-      "bs-breadcrumb",
-      "bs-card",
-      "bs-button-group",
-      "bs-list-group",
-      "bs-accordion",
-      "bs-pagination",
-      "bs-table-responsive",
-      "bs-ratio",
-      "bs-progress",
-      "bs-callout",
-      "bs-nav-pills",
-      "bs-card-grid",
-      "bs-dropdown",
-      "bs-description-list",
-      "bs-accordion-group",
-    ]));
+    expect(ids).toEqual(expect.arrayContaining(["sc-text", "sc-image", "sc-columns", "sc-menu", "sc-calendar"]));
+    expect(ids.some((id) => id.startsWith("bs-") || id.startsWith("layout-") || id.startsWith("block-"))).toBe(false);
+    expect(ids).not.toEqual(expect.arrayContaining(["sc-fa-icon", "sc-photo-mask", "sc-button", "sc-container"]));
   });
 
-  it("offers the extended graphic blocks and editorial layouts", () => {
+  it("does not leak visual blocks from a bundled theme", () => {
     const ids = createPrimitiveBlocks((key) => key).map((block) => block.id);
 
-    expect(ids).toEqual(expect.arrayContaining([
-      "block-organic-photo",
-      "block-portrait-quote",
-      "block-colored-cta",
-      "block-contact-row",
-      "layout-photo-cta",
-      "layout-collage-2-1",
-      "layout-media-alternating",
-      "layout-contact-split",
-    ]));
+    expect(ids).not.toEqual(expect.arrayContaining(["block-portrait-quote", "block-colored-cta", "layout-collage-2-1"]));
   });
 
-  it("keeps the new Bootstrap starters declarative and usable without theme JavaScript", () => {
-    const blocks = createPrimitiveBlocks((key) => key);
-    const dropdown = blocks.find((block) => block.id === "bs-dropdown");
-    const cardGrid = blocks.find((block) => block.id === "bs-card-grid");
-    const accordionGroup = blocks.find((block) => block.id === "bs-accordion-group");
-
-    expect(dropdown.content.tagName).toBe("details");
-    expect(cardGrid.content.components).toHaveLength(3);
-    expect(accordionGroup.content.components).toHaveLength(3);
-    expect(accordionGroup.content.components.every((component) => component.tagName === "details")).toBe(true);
+  it("does not register Bootstrap starters without a theme declaration", () => {
+    const ids = createPrimitiveBlocks((key) => key).map((block) => block.id);
+    expect(ids.some((id) => id.startsWith("bs-"))).toBe(false);
   });
 
-  it("marks image-overlay starters with the shared overlay contract", () => {
+  it("does not register bundled-theme overlay starters globally", () => {
     const blocks = createPrimitiveBlocks((key) => key);
 
     for (const id of ["sc-photo-mask", "block-hero", "block-contact-hero", "block-organic-photo", "layout-photo-cta"]) {
       const block = blocks.find((item) => item.id === id);
-      expect(block?.content?.attributes?.["data-sc-overlay"], id).toBe("true");
+      expect(block, id).toBeUndefined();
     }
   });
 

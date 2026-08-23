@@ -79,6 +79,8 @@ export const cmsApi = {
   getCanvasStyles: () => api.get("/web/design/canvas-styles").then(unwrap),
   saveGlobalStyles: (payload) => api.put("/web/design/styles", payload).then(unwrap),
   publishGlobalStyles: (expectedVersion) => api.post("/web/design/styles/publish", { expected_version: expectedVersion }).then(unwrap),
+  getSiteSettings: () => api.get("/web/settings").then(unwrap),
+  updateSiteSettings: (payload) => api.put("/web/settings", payload).then(unwrap),
 
   listThemes: () => api.get("/web/themes").then(unwrap),
   installTheme: (file) => {

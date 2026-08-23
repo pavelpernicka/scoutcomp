@@ -9,12 +9,13 @@ import { useAuth } from "../../../providers/AuthProvider";
 import api from "../../../services/api";
 import { cmsApi } from "../api/cms";
 import { cloneResourceComponents, filterCatalogResources, hydrateMenuComponents } from "../editor/resourceBlocks";
-import { DataBindings, ImageContentPanel, LinkedResourceProps, QuickContentPanel, RepeatConfigurator, TemplateLogosPanel } from "../editor/EditorInspector";
+import { DataBindings, ImageContentPanel, LinkedResourceProps, QuickContentPanel, RepeatConfigurator } from "../editor/EditorInspector";
 import EditorNavigator from "../editor/EditorNavigator";
 import EditorBreadcrumbs from "../editor/EditorBreadcrumbs";
 import useGrapesEditor from "../editor/useGrapesEditor";
 import MediaPreview from "../media/MediaPreview";
 import MediaPickerModal from "../media/MediaPickerModal";
+import { hydrateEditorMediaPreviews } from "../media/editorMedia";
 import { getTemplateUsageMode, TEMPLATE_USAGE_MODES, templatePersistenceFields } from "../templateContracts";
 import ResourcePropSchemaEditor from "./ResourcePropSchemaEditor";
 import "../styles/editor.css";
@@ -118,7 +119,14 @@ export default function DesignResourceEditorPage({ kind }) {
   }, [resource]);
 
   const editorBlocks = useMemo(() => {
-    const blocks = [];
+    const blocks = (canvasStylesQuery.data?.editor?.blocks || []).map((item) => ({
+      id: `sc-theme-${item.id}`,
+      label: item.label,
+      category: item.category,
+      content: item.content,
+      media: `<i class="fas fa-${item.icon || "cube"}" aria-hidden="true"></i>`,
+      attributes: { title: item.label },
+    }));
     if (kind === "templates" && getTemplateUsageMode(resource) === TEMPLATE_USAGE_MODES.linkedLayout) {
       blocks.push({
         id: "sc-template-content-slot",
@@ -152,7 +160,7 @@ export default function DesignResourceEditorPage({ kind }) {
       });
     }
     return blocks;
-  }, [catalogComponents, catalogSections, kind, resource, t]);
+  }, [canvasStylesQuery.data?.editor?.blocks, catalogComponents, catalogSections, kind, resource, t]);
 
   const editor = useGrapesEditor({
     containerRef,
@@ -177,6 +185,17 @@ export default function DesignResourceEditorPage({ kind }) {
     if (!editor.isReady) return undefined;
     return hydrateMenuComponents(editor.editorRef.current, menusQuery.data || []);
   }, [editor.editorRef, editor.isReady, menusQuery.data]);
+  useEffect(() => {
+    const instance = editor.editorRef.current;
+    if (!editor.isReady || !instance) return undefined;
+    let disposed = false;
+    let release = null;
+    hydrateEditorMediaPreviews(instance).then((cleanup) => {
+      if (disposed) cleanup();
+      else release = cleanup;
+    });
+    return () => { disposed = true; release?.(); };
+  }, [editor.editorRef, editor.isReady, resource?.id, resource?.draft_version]);
   const selectedComponent = selectionRevision >= 0 ? editor.editorRef.current?.getSelected?.() : null;
   const selectedLinkedResource = selectedComponent?.get?.("type") === "sc-resource-instance";
   const selectComponent = (component) => editor.editorRef.current?.select?.(component);
@@ -190,17 +209,19 @@ export default function DesignResourceEditorPage({ kind }) {
     setMediaPickerTarget(null);
     const targetComponent = target?.component || target;
     if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
-    if (target?.mode === "background" && targetComponent?.addStyle) {
-      targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
-      markComponentChanged();
-      return;
-    }
-    if (!targetComponent || targetComponent.get?.("type") !== "image") return;
+    if (!targetComponent || (target?.mode !== "background" && targetComponent.get?.("type") !== "image")) return;
     let src = mediaItem.url;
     try {
       const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
       src = URL.createObjectURL(data);
     } catch { /* the durable media id still renders on the public site */ }
+    if (target?.mode === "background" && targetComponent?.addStyle) {
+      targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
+      targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
+      targetComponent.getEl?.()?.style?.setProperty("background-image", `url("${src}")`);
+      markComponentChanged();
+      return;
+    }
     targetComponent.addAttributes?.({
       src,
       alt: mediaItem.alt || "",
@@ -386,8 +407,7 @@ export default function DesignResourceEditorPage({ kind }) {
         <div className={selectedLinkedResource ? "d-none" : ""}>
           {selectedComponent?.get?.("type") === "image" && <div className="web-editor-inspector-body"><ImageContentPanel selected={selectedComponent} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} /></div>}
           {selectedComponent && selectedComponent.get?.("type") !== "image" && <div className="web-editor-inspector-body">
-            <TemplateLogosPanel selected={selectedComponent} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} />
-            <QuickContentPanel selected={selectedComponent} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || []} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} />
+            <QuickContentPanel selected={selectedComponent} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || []} themeControls={canvasStylesQuery.data?.editor?.component_controls || []} onSelectMedia={setMediaPickerTarget} onContentChange={markComponentChanged} />
           </div>}
           <div className="web-editor-trait-manager" />
         </div>
