@@ -2001,7 +2001,7 @@
     "subscribed": "Notifikace jsou zapnuté.",
     "unsubscribed": "Notifikace vypnuty.",
     "notSupported": "Tvůj prohlížeč nepodporuje notifikace.",
-    "disabledByAdministrator": "Notifikace zatím nejsou na serveru zapnuté. Správce musí nastavit stabilní VAPID klíče a HTTPS.",
+    "disabledByAdministrator": "Notifikace zatím nejsou na serveru zapnuté.",
     "denied": "Notifikace jsou zablokované. Povol je v nastavení prohlížeče.",
     "checking": "Zjišťuji stav…",
     "loadFailed": "Nepodařilo se načíst nastavení notifikací.",

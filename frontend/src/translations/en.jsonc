@@ -1990,7 +1990,7 @@
     "subscribed": "Notifications are enabled.",
     "unsubscribed": "Notifications disabled.",
     "notSupported": "Your browser does not support notifications.",
-    "disabledByAdministrator": "Notifications are not enabled on the server yet. An administrator must configure stable VAPID keys and HTTPS.",
+    "disabledByAdministrator": "Notifications are not enabled on the server yet.",
     "denied": "Notifications are blocked. Enable them in browser settings.",
     "checking": "Checking…",
     "loadFailed": "Failed to load notification settings.",

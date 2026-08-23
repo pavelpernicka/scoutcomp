@@ -178,6 +178,41 @@ SCOUTCOMP_PUSH_ALLOWED_HOSTS="fcm.googleapis.com,updates.push.services.mozilla.c
   deployed at any HTTPS hostname, provided the app is mounted at `/`. PWA
   installation and Web Push require HTTPS (localhost is the development
   exception). Generate the VAPID key pair once and keep it stable.
+
+### Enabling browser notifications
+
+Web Push requires a stable VAPID key pair and HTTPS on the authenticated app
+hostname. Generate the pair once in the persistent `data` volume:
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm --workdir /app/data backend vapid --gen
+docker compose -f docker-compose.prod.yml run --rm --workdir /app/data backend \
+  vapid --private-key private_key.pem --applicationServerKey
+chmod 600 data/private_key.pem
+```
+
+The second command prints `Application Server Key = ...`. Copy that value and
+configure the root `.env` file as follows (the private-key path is the path
+inside the backend container):
+
+```bash
+SCOUTCOMP_PUSH_ENABLED=true
+SCOUTCOMP_PUSH_VAPID_PUBLIC_KEY="<Application Server Key>"
+SCOUTCOMP_PUSH_VAPID_PRIVATE_KEY="/app/data/private_key.pem"
+SCOUTCOMP_PUSH_VAPID_SUBJECT="mailto:admin@example.cz"
+```
+
+Apply the configuration and verify that the app is served through HTTPS:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build backend
+```
+
+Users can then enable notifications themselves in their account settings;
+the browser permission prompt is only shown after they click the enable
+button. Keep `private_key.pem` backed up and never commit it. Changing or losing
+the key requires users to create new push subscriptions.
+
 - Test current setup using `docker compose -f docker-compose.prod.yml up -d --build`
 - If a loopback port is already occupied, change the matching
   `SCOUTCOMP_*_PORT` value in `.env` **and** its nginx upstream.
