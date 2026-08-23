@@ -236,7 +236,12 @@ def test_preview_html_resolves_linked_resources_with_database_session(
 
 def test_theme_preview_inlines_package_images_and_fonts(db_session, preview_context):
     from app.models import WebTemplate, WebTheme, WebThemeVersion
-    from app.web.ontario_theme import ONTARIO_THEME_VERSION
+    from app.web.ontario_theme import ONTARIO_THEME_VERSION, seed_ontario_theme
+
+    # Ontario is a legacy bundled package and is intentionally not installed by
+    # the default-theme fixture on a fresh database.  This test exercises its
+    # package assets specifically, so install that package explicitly.
+    seed_ontario_theme(db_session)
 
     theme = db_session.query(WebTheme).filter_by(stable_key="ontario").one()
     version = db_session.query(WebThemeVersion).filter_by(
