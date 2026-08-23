@@ -8,7 +8,11 @@ from sqlalchemy.orm import Session, joinedload
 from ..dependencies import get_current_active_user, get_db, require_action
 from ..models import DirectMessage, User
 from ..permissions import permission_keys
-from ..services.web_push import deliver_push_to_user_ids
+from ..services.web_push import (
+    deliver_push_to_user_ids,
+    notification_text,
+    notification_timestamp,
+)
 
 router = APIRouter(prefix="/messages", tags=["messages"])
 
@@ -278,7 +282,25 @@ def send(
     background_tasks.add_task(deliver_push_to_user_ids, {recipient.id}, {
         "title": "Nová zpráva",
         "body": "Máš novou soukromou zprávu.",
-        "url": "/messages",
+        "url": f"/messages?user={current_user.id}&message={message.id}",
+        "kind": "message",
+        "tag": f"message-thread-{current_user.id}",
+        "timestamp": notification_timestamp(message.created_at),
+        "actions": [
+            {
+                "action": "reply",
+                "title": "Odpovědět",
+                "url": f"/messages?user={current_user.id}&message={message.id}",
+            },
+            {"action": "overview", "title": "Zprávy", "url": "/messages"},
+        ],
+        "preview": {
+            "title": notification_text(
+                f"Zpráva od {current_user.real_name or current_user.username}",
+                limit=100,
+            ),
+            "body": notification_text(body, limit=200),
+        },
     })
 
     return _to_message(message, current_user)

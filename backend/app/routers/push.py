@@ -22,6 +22,7 @@ MAX_SUBSCRIPTIONS_PER_USER = 5
 class PushConfigResponse(BaseModel):
     enabled: bool
     vapid_public_key: str | None = None
+    show_previews: bool = False
 
 
 class PushSubscriptionKeys(BaseModel):
@@ -42,6 +43,12 @@ class PushUnsubscribePayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     endpoint: str = Field(min_length=12, max_length=2048)
+
+
+class PushPreferencesPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    show_previews: bool
 
 
 def _validate_endpoint(endpoint: str) -> None:
@@ -76,12 +83,23 @@ def _validate_endpoint(endpoint: str) -> None:
 def get_push_config(
     current_user: User = Depends(get_current_active_user),
 ) -> PushConfigResponse:
-    del current_user
     enabled = push_enabled()
     return PushConfigResponse(
         enabled=enabled,
         vapid_public_key=settings.app.push.vapid_public_key if enabled else None,
+        show_previews=bool(current_user.push_show_previews),
     )
+
+
+@router.put("/preferences")
+def update_push_preferences(
+    payload: PushPreferencesPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+) -> dict:
+    current_user.push_show_previews = payload.show_previews
+    db.commit()
+    return {"show_previews": bool(current_user.push_show_previews)}
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -11,9 +11,11 @@ from app.models import PushSubscription, RoleEnum, Team, User
 from app.routers.push import (
     MAX_SUBSCRIPTIONS_PER_USER,
     PushSubscriptionPayload,
+    PushPreferencesPayload,
     PushUnsubscribePayload,
     get_push_config,
     unsubscribe,
+    update_push_preferences,
     upsert_subscription,
 )
 from app.services import web_push
@@ -38,6 +40,7 @@ def _enable_push(monkeypatch) -> None:
     monkeypatch.setattr(settings.app.push, "vapid_private_key", "private-key")
     monkeypatch.setattr(settings.app.push, "vapid_subject", "mailto:admin@example.test")
     monkeypatch.setattr(settings.app.push, "allowed_hosts", ["updates.example"])
+    monkeypatch.setattr(settings.site, "public_url", "https://site.example")
 
 
 def test_push_config_is_disabled_without_complete_vapid_configuration(db_session):
@@ -47,7 +50,15 @@ def test_push_config_is_disabled_without_complete_vapid_configuration(db_session
     db_session.commit()
 
     response = get_push_config(current_user=alice)
-    assert response.model_dump() == {"enabled": False, "vapid_public_key": None}
+    assert response.model_dump() == {
+        "enabled": False,
+        "vapid_public_key": None,
+        "show_previews": False,
+    }
+    assert update_push_preferences(
+        PushPreferencesPayload(show_previews=True), db_session, alice,
+    ) == {"show_previews": True}
+    assert get_push_config(current_user=alice).show_previews is True
 
 
 def test_subscription_upsert_delete_and_owner_boundary(db_session, monkeypatch):
@@ -152,6 +163,22 @@ def test_delivery_prunes_gone_endpoint_and_tracks_transient_failure(db_session, 
     web_push.send_to_subscriptions(db_session, [flaky], {"title": "Test"})
     assert flaky.failure_count == 1
     assert flaky.disabled_at is None
+    rich_payload = {
+        "title": "Generic",
+        "body": "Generic body",
+        "preview": {
+            "title": "Private title",
+            "body": "Private body",
+            "image": "https://site.example/media/1/file",
+        },
+        "actions": [{"action": "open", "title": "Open", "url": "/messages"}],
+    }
+    generic = web_push._payload_for_delivery(rich_payload, show_previews=False)
+    preview = web_push._payload_for_delivery(rich_payload, show_previews=True)
+    assert generic["title"] == "Generic"
+    assert "image" not in generic
+    assert preview["title"] == "Private title"
+    assert preview["image"] == "https://site.example/media/1/file"
 
 
 def test_subscription_limit_is_bounded_per_user(db_session, monkeypatch):

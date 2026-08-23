@@ -23,7 +23,12 @@ from ..models import (
     WebPostRevision,
 )
 from ..permissions import allows, managed_team_ids, permission_keys, permission_scopes
-from ..services.web_push import deliver_push_to_user_ids
+from ..services.web_push import (
+    deliver_push_to_user_ids,
+    notification_text,
+    notification_timestamp,
+)
+from ..timezones import utc_storage_to_local
 
 router = APIRouter(prefix="/activity", tags=["scout activity"])
 admin_router = APIRouter(prefix="/admin/core/attendance", tags=["admin attendance"])
@@ -409,7 +414,21 @@ def message_attendees(event_id: int, payload: EventMessagePayload, background_ta
     background_tasks.add_task(deliver_push_to_user_ids, {user.id for user in sent_users}, {
         "title": "Nová zpráva",
         "body": "Máš novou soukromou zprávu.",
-        "url": "/messages",
+        "url": f"/messages?user={current_user.id}",
+        "kind": "message",
+        "tag": f"message-thread-{current_user.id}",
+        "timestamp": notification_timestamp(datetime.now(timezone.utc)),
+        "actions": [
+            {"action": "reply", "title": "Odpovědět", "url": f"/messages?user={current_user.id}"},
+            {"action": "overview", "title": "Zprávy", "url": "/messages"},
+        ],
+        "preview": {
+            "title": notification_text(
+                f"Zpráva od {current_user.real_name or current_user.username}",
+                limit=100,
+            ),
+            "body": notification_text(body, limit=200),
+        },
     })
     return {"sent": len(sent_users), "total": len(rows)}
 
@@ -705,8 +724,28 @@ def _deliver_event_created_push(event_id: int, creator_id: int) -> None:
         if event is None:
             return
         recipient_ids = _event_push_recipient_ids(db, event, creator_id)
-    deliver_push_to_user_ids(recipient_ids, {
-        "title": "Nová událost",
-        "body": "V kalendáři je nová událost.",
-        "url": f"/activity?event={event_id}",
-    })
+        local_start = utc_storage_to_local(event.starts_at)
+        detail_parts = []
+        if local_start is not None:
+            detail_parts.append(local_start.strftime("%-d. %-m. %Y %H:%M"))
+        if event.location:
+            detail_parts.append(notification_text(event.location, limit=80))
+        preview_body = " · ".join(detail_parts) or "Nová událost v kalendáři."
+        payload = {
+            "title": "Nová událost",
+            "body": "V kalendáři je nová událost.",
+            "url": f"/activity?event={event_id}",
+            "kind": "event",
+            "tag": f"event-{event_id}",
+            "timestamp": notification_timestamp(event.created_at),
+            "actions": [
+                {"action": "open", "title": "Detail", "url": f"/activity?event={event_id}"},
+                {"action": "calendar", "title": "Kalendář", "url": "/activity"},
+            ],
+            "preview": {
+                "title": notification_text(event.title, limit=100),
+                "body": preview_body,
+                "timestamp": notification_timestamp(event.starts_at),
+            },
+        }
+    deliver_push_to_user_ids(recipient_ids, payload)

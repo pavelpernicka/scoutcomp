@@ -4,12 +4,14 @@ from __future__ import annotations
 import json
 import ipaddress
 import logging
+import re
 import socket
 from datetime import datetime, timezone
+from html import unescape
 from typing import Any, Iterable
 from urllib.parse import urlsplit
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..config import settings
 from ..database import SessionLocal
@@ -24,6 +26,7 @@ except ImportError:  # pragma: no cover - production dependencies include pywebp
     RequestsSession = None
 
 logger = logging.getLogger(__name__)
+_ACTION_ID = re.compile(r"^[a-z0-9_-]{1,32}$")
 
 
 if RequestsSession is not None:
@@ -43,6 +46,81 @@ def push_enabled() -> bool:
         and push.vapid_private_key
         and push.vapid_subject
     )
+
+
+def notification_text(value: Any, *, limit: int = 180) -> str:
+    """Project rich user content to a short, single-line OS notification."""
+    text = re.sub(r"<[^>]*>", " ", str(value or ""))
+    text = re.sub(r"[`*_>#~]", "", unescape(text))
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    shortened = text[: max(1, limit - 1)].rsplit(" ", 1)[0].rstrip()
+    return f"{shortened or text[:limit - 1].rstrip()}…"
+
+
+def notification_timestamp(value: datetime | None) -> int | None:
+    """Return the millisecond epoch expected by NotificationOptions."""
+    if value is None:
+        return None
+    aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return int(aware.timestamp() * 1000)
+
+
+def _safe_rich_image(value: Any) -> str | None:
+    """Allow only a published media route on this deployment's public site."""
+    public_origin = settings.site.public_url
+    if not value or not public_origin:
+        return None
+    candidate = urlsplit(str(value).strip())
+    configured = urlsplit(public_origin)
+    if (
+        candidate.scheme != configured.scheme
+        or candidate.netloc != configured.netloc
+        or candidate.query
+        or candidate.fragment
+        or not re.fullmatch(r"/media/[1-9][0-9]{0,9}/file", candidate.path)
+    ):
+        return None
+    return candidate.geturl()
+
+
+def _payload_for_delivery(payload: dict[str, Any], *, show_previews: bool) -> dict[str, Any]:
+    """Build a bounded browser payload without leaking an opted-out preview."""
+    source = dict(payload)
+    preview = source.pop("preview", None)
+    if show_previews and isinstance(preview, dict):
+        source.update(preview)
+
+    result: dict[str, Any] = {
+        "title": notification_text(source.get("title") or "ScoutComp", limit=100),
+        "body": notification_text(source.get("body"), limit=240),
+    }
+    for key, limit in (("url", 700), ("tag", 80), ("kind", 32), ("lang", 12)):
+        value = str(source.get(key) or "").strip()
+        if value:
+            result[key] = value[:limit]
+    image = _safe_rich_image(source.get("image"))
+    if image:
+        result["image"] = image
+    timestamp = source.get("timestamp")
+    if isinstance(timestamp, (int, float)) and timestamp >= 0:
+        result["timestamp"] = int(timestamp)
+
+    actions: list[dict[str, str]] = []
+    for raw_action in source.get("actions") or []:
+        if not isinstance(raw_action, dict):
+            continue
+        action = str(raw_action.get("action") or "").strip()
+        title = notification_text(raw_action.get("title"), limit=32)
+        url = str(raw_action.get("url") or "").strip()[:700]
+        if _ACTION_ID.fullmatch(action) and title and url:
+            actions.append({"action": action, "title": title, "url": url})
+        if len(actions) == 2:
+            break
+    if actions:
+        result["actions"] = actions
+    return result
 
 
 def endpoint_host_allowed(endpoint: str) -> bool:
@@ -75,7 +153,7 @@ def send_to_subscriptions(
         return
 
     push = settings.app.push
-    data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    serialized_payloads: dict[bool, str] = {}
     for subscription in subscriptions:
         if subscription.disabled_at is not None:
             continue
@@ -84,6 +162,18 @@ def send_to_subscriptions(
             logger.warning("Push endpoint did not resolve to a public HTTPS address")
             continue
         try:
+            show_previews = bool(
+                subscription.user is not None
+                and subscription.user.push_show_previews
+            )
+            data = serialized_payloads.get(show_previews)
+            if data is None:
+                data = json.dumps(
+                    _payload_for_delivery(payload, show_previews=show_previews),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                serialized_payloads[show_previews] = data
             session = _NoRedirectSession() if _NoRedirectSession is not None else None
             try:
                 webpush(
@@ -146,6 +236,6 @@ def deliver_push_to_user_ids(user_ids: Iterable[int], payload: dict[str, Any]) -
         subscriptions = db.query(PushSubscription).filter(
             PushSubscription.user_id.in_(ids),
             PushSubscription.disabled_at.is_(None),
-        ).all()
+        ).options(joinedload(PushSubscription.user)).all()
         send_to_subscriptions(db, subscriptions, payload)
         db.commit()

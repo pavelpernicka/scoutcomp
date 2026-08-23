@@ -1290,6 +1290,20 @@ def _add_receive_messages_column(conn: Connection) -> None:
     conn.execute(text("ALTER TABLE users ADD COLUMN receive_messages BOOLEAN NOT NULL DEFAULT 1"))
 
 
+def _add_push_preview_preference(conn: Connection) -> None:
+    """Keep sensitive lock-screen content opt-in per user."""
+    inspector = inspect(conn)
+    if "users" not in inspector.get_table_names():
+        return
+    columns = {col["name"] for col in inspector.get_columns("users")}
+    if "push_show_previews" in columns:
+        return
+    logger.info("Adding 'push_show_previews' column to users table")
+    conn.execute(text(
+        "ALTER TABLE users ADD COLUMN push_show_previews BOOLEAN NOT NULL DEFAULT 0"
+    ))
+
+
 def _add_user_avatar_column(conn: Connection) -> None:
     inspector = inspect(conn)
     if "users" not in inspector.get_table_names():
@@ -2978,6 +2992,11 @@ MIGRATIONS: List[Migration] = [
         "20260822_remove_inventory_team_assignments",
         _remove_inventory_team_assignments,
         "Remove obsolete team assignments from inventory records",
+    ),
+    Migration(
+        "20260823_add_push_preview_preference",
+        _add_push_preview_preference,
+        "Add opt-in rich notification previews per user",
     ),
 ]
 

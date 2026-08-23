@@ -34,8 +34,10 @@ export function PushNotificationSettings() {
   const { t } = useTranslation();
   const [state, setState] = useState("loading");
   const [vapidPublicKey, setVapidPublicKey] = useState("");
+  const [showPreviews, setShowPreviews] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -52,6 +54,7 @@ export function PushNotificationSettings() {
           return;
         }
         setVapidPublicKey(data.vapid_public_key || "");
+        setShowPreviews(Boolean(data.show_previews));
         if (Notification.permission === "denied") {
           setState("denied");
           return;
@@ -130,6 +133,23 @@ export function PushNotificationSettings() {
     }
   };
 
+  const updatePreviews = async (event) => {
+    const nextValue = event.target.checked;
+    const previousValue = showPreviews;
+    setShowPreviews(nextValue);
+    setPreviewBusy(true);
+    setFeedback(null);
+    try {
+      await api.put("/push/preferences", { show_previews: nextValue });
+      setFeedback({ type: "success", message: t("pushSettings.previewSaved") });
+    } catch {
+      setShowPreviews(previousValue);
+      setFeedback({ type: "danger", message: t("pushSettings.previewSaveFailed") });
+    } finally {
+      setPreviewBusy(false);
+    }
+  };
+
   if (state === "disabled") {
     return (
       <section aria-labelledby="push-settings-title">
@@ -158,6 +178,23 @@ export function PushNotificationSettings() {
       </h3>
       <p className="form-text mt-0 mb-2">{t("pushSettings.description")}</p>
       {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
+      <div className="form-check mb-3">
+        <input
+          id="push-show-previews"
+          className="form-check-input"
+          type="checkbox"
+          checked={showPreviews}
+          disabled={previewBusy}
+          onChange={updatePreviews}
+          aria-describedby="push-show-previews-hint"
+        />
+        <label className="form-check-label" htmlFor="push-show-previews">
+          {t("pushSettings.previewLabel")}
+        </label>
+        <div id="push-show-previews-hint" className="form-text mt-1">
+          {t("pushSettings.previewHint")}
+        </div>
+      </div>
       {state === "denied" ? (
         <Alert type="warning" icon={<i className="fas fa-ban" />}>{t("pushSettings.denied")}</Alert>
       ) : state === "error" ? null : (

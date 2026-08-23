@@ -32,6 +32,38 @@ self.addEventListener("message", (event) => {
 
 /* ---------- Web Push ---------- */
 
+const notificationText = (value, limit) => String(value || "")
+  .replace(/[\u0000-\u001f\u007f]/g, " ")
+  .replace(/\s+/g, " ")
+  .trim()
+  .slice(0, limit);
+
+const sameOriginTarget = (value) => {
+  try {
+    const parsed = new URL(value || "/", self.location.origin);
+    if (parsed.origin === self.location.origin) {
+      return parsed.pathname + parsed.search + parsed.hash;
+    }
+  } catch (_) {
+    // ignored: callers fall back to the application root
+  }
+  return null;
+};
+
+const notificationImage = (value) => {
+  if (!value) return null;
+  try {
+    const parsed = new URL(value, self.location.origin);
+    const isLocalDevelopment = ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+    if (parsed.protocol === "https:" || (parsed.protocol === "http:" && isLocalDevelopment)) {
+      return parsed.href;
+    }
+  } catch (_) {
+    // malformed rich media is omitted
+  }
+  return null;
+};
+
 self.addEventListener("push", (event) => {
   let payload = {};
   try {
@@ -42,34 +74,61 @@ self.addEventListener("push", (event) => {
     // ignore malformed payload
   }
 
-  const title = (payload && payload.title) || "ScoutComp";
+  const title = notificationText(payload && payload.title, 100) || "ScoutComp";
+  const body = notificationText(payload && payload.body, 240);
+  const target = sameOriginTarget(payload && payload.url) || "/";
+  const actionUrls = {};
+  const rawActions = Array.isArray(payload && payload.actions) ? payload.actions : [];
+  const supportedActionCount = Number.isFinite(self.Notification?.maxActions)
+    ? Math.max(0, Math.min(2, self.Notification.maxActions))
+    : 2;
+  const actions = rawActions.slice(0, supportedActionCount).flatMap((item) => {
+    const action = notificationText(item && item.action, 32);
+    const actionTitle = notificationText(item && item.title, 32);
+    const actionTarget = sameOriginTarget(item && item.url);
+    if (!/^[a-z0-9_-]+$/.test(action) || !actionTitle || !actionTarget) return [];
+    actionUrls[action] = actionTarget;
+    return [{ action, title: actionTitle }];
+  });
+
   const options = {
-    body: (payload && payload.body) || "",
+    body,
     icon: "/pwa-192.png",
     badge: "/pwa-192.png",
-    data: payload || {},
+    data: { url: target, actionUrls },
   };
+  const image = notificationImage(payload && payload.image);
+  if (image) options.image = image;
+  if (actions.length) options.actions = actions;
+  const tag = notificationText(payload && payload.tag, 80);
+  if (tag) {
+    options.tag = tag;
+    options.renotify = true;
+  }
+  if (Number.isFinite(payload && payload.timestamp) && payload.timestamp >= 0) {
+    options.timestamp = payload.timestamp;
+  }
+  const lang = notificationText(payload && payload.lang, 12);
+  if (lang) options.lang = lang;
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    self.registration.showNotification(title, options).catch(() => (
+      self.registration.showNotification(title, {
+        body,
+        icon: "/pwa-192.png",
+        badge: "/pwa-192.png",
+        data: { url: target, actionUrls: {} },
+      })
+    ))
+  );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const data = event.notification.data || {};
-  let target = "/";
-
-  if (data.url) {
-    try {
-      const parsed = new URL(data.url, self.location.origin);
-      // only same-origin URLs
-      if (parsed.origin === self.location.origin) {
-        target = parsed.pathname + parsed.search + parsed.hash;
-      }
-    } catch (_) {
-      // fall through to /
-    }
-  }
+  const actionTarget = event.action && data.actionUrls && data.actionUrls[event.action];
+  const target = sameOriginTarget(actionTarget || data.url) || "/";
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true })

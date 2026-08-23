@@ -87,6 +87,7 @@ class User(Base):
     team_id = Column(Integer, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     first_login_at = Column(DateTime, nullable=True)  # Track first login for password change prompt
     receive_messages = Column(Boolean, default=True, nullable=False)
+    push_show_previews = Column(Boolean, default=False, nullable=False)
     avatar = Column(Text, nullable=True)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)

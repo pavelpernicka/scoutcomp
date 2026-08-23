@@ -1,7 +1,11 @@
 """Authenticated CMS content routes."""
 from .routes_common import *  # noqa: F403
 from ..database import SessionLocal
-from ..services.web_push import deliver_push_to_user_ids
+from ..services.web_push import (
+    deliver_push_to_user_ids,
+    notification_text,
+    notification_timestamp,
+)
 
 router = APIRouter(prefix="/web", tags=["web"])
 
@@ -707,9 +711,35 @@ def _deliver_new_post_push(post_id: int, author_id: int) -> None:
         post = db.get(WebPost, post_id)
         if post is None or not post.published:
             return
+        revision = (
+            db.get(WebPostRevision, post.published_revision_id)
+            if post.published_revision_id else None
+        )
+        source = revision or post
         recipient_ids = _active_reader_ids(db, exclude_id=author_id)
-    deliver_push_to_user_ids(recipient_ids, {
-        "title": "Nový příspěvek",
-        "body": "Byl publikován nový příspěvek.",
-        "url": f"/posts/{post_id}",
-    })
+        media_id = source.og_image_id or source.cover_media_id
+        image = (
+            f"{settings.site.public_url}/media/{media_id}/file"
+            if media_id and settings.site.public_url
+            else None
+        )
+        preview = {
+            "title": notification_text(source.title, limit=100),
+            "body": "Nový příspěvek v ScoutComp.",
+        }
+        if image:
+            preview["image"] = image
+        payload = {
+            "title": "Nový příspěvek",
+            "body": "Byl publikován nový příspěvek.",
+            "url": f"/posts/{post_id}",
+            "kind": "post",
+            "tag": f"post-{post_id}",
+            "timestamp": notification_timestamp(post.published_at),
+            "actions": [
+                {"action": "open", "title": "Číst", "url": f"/posts/{post_id}"},
+                {"action": "overview", "title": "Příspěvky", "url": "/posts"},
+            ],
+            "preview": preview,
+        }
+    deliver_push_to_user_ids(recipient_ids, payload)
