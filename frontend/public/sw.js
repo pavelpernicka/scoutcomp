@@ -1,6 +1,6 @@
 /* ScoutComp service worker — app shell, asset caching, and Web Push. */
-const STATIC_CACHE = "scoutcomp-static-v3";
-const SHELL_CACHE = "scoutcomp-shell-v3";
+const STATIC_CACHE = "scoutcomp-static-v4";
+const SHELL_CACHE = "scoutcomp-shell-v4";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-192.png", "/pwa-512.png"];
 
 self.addEventListener("install", (event) => {
