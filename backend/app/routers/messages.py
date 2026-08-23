@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..dependencies import get_current_active_user, get_db, require_action
@@ -53,6 +53,14 @@ def _to_message(message: DirectMessage, current_user: User) -> dict:
     }
 
 
+def _to_message_preview(message: DirectMessage, current_user: User) -> dict:
+    payload = _to_message(message, current_user)
+    body = payload["body"]
+    payload["body"] = body[:300]
+    payload["body_truncated"] = len(body) > 300
+    return payload
+
+
 @router.get("/users/search")
 def search_users(
     q: str = "",
@@ -87,36 +95,59 @@ def conversations(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_messaging),
 ):
-    messages = (
-        db.query(DirectMessage)
-        .options(joinedload(DirectMessage.sender), joinedload(DirectMessage.recipient))
-        .filter(
-            or_(
-                DirectMessage.sender_id == current_user.id,
-                DirectMessage.recipient_id == current_user.id,
-            )
+    participant_filter = or_(
+        DirectMessage.sender_id == current_user.id,
+        DirectMessage.recipient_id == current_user.id,
+    )
+    other_user_id = case(
+        (DirectMessage.sender_id == current_user.id, DirectMessage.recipient_id),
+        else_=DirectMessage.sender_id,
+    )
+    latest_messages = (
+        db.query(
+            other_user_id.label("other_user_id"),
+            func.max(DirectMessage.id).label("last_message_id"),
         )
-        .order_by(DirectMessage.created_at.desc())
+        .filter(participant_filter)
+        .group_by(other_user_id)
+        .subquery()
+    )
+    unread_messages = (
+        db.query(
+            DirectMessage.sender_id.label("other_user_id"),
+            func.count(DirectMessage.id).label("unread_count"),
+        )
+        .filter(
+            DirectMessage.recipient_id == current_user.id,
+            DirectMessage.read_at.is_(None),
+        )
+        .group_by(DirectMessage.sender_id)
+        .subquery()
+    )
+    rows = (
+        db.query(DirectMessage, unread_messages.c.unread_count)
+        .join(latest_messages, DirectMessage.id == latest_messages.c.last_message_id)
+        .outerjoin(
+            unread_messages,
+            unread_messages.c.other_user_id == latest_messages.c.other_user_id,
+        )
+        .options(
+            joinedload(DirectMessage.sender).joinedload(User.team),
+            joinedload(DirectMessage.recipient).joinedload(User.team),
+        )
+        .order_by(DirectMessage.created_at.desc(), DirectMessage.id.desc())
         .all()
     )
-    latest: dict[int, DirectMessage] = {}
-    unread: dict[int, int] = {}
-    for message in messages:
-        other_id = message.recipient_id if message.sender_id == current_user.id else message.sender_id
-        if other_id not in latest:
-            latest[other_id] = message
-        if message.recipient_id == current_user.id and message.read_at is None:
-            unread[other_id] = unread.get(other_id, 0) + 1
+
     result = []
-    for other_id, last in latest.items():
+    for last, unread_count_value in rows:
         other = last.sender if last.sender_id != current_user.id else last.recipient
         result.append({
             "other_user": _other_user_public(other) if other else None,
-            "last_message": _to_message(last, current_user),
+            "last_message": _to_message_preview(last, current_user),
             "last_message_at": last.created_at,
-            "unread_count": unread.get(other_id, 0),
+            "unread_count": int(unread_count_value or 0),
         })
-    result.sort(key=lambda item: item["last_message_at"], reverse=True)
     return result
 
 
@@ -124,12 +155,19 @@ def conversations(
 def thread(
     user_id: int,
     before_id: int | None = None,
+    after_id: int | None = None,
+    known_read_id: int | None = None,
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_messaging),
 ):
     if user_id == current_user.id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot open a conversation with yourself")
+    if before_id is not None and after_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="before_id and after_id cannot be combined",
+        )
     other = db.get(User, user_id)
     if not other or not other.is_active:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -146,18 +184,68 @@ def thread(
     )
     if before_id is not None:
         query = query.filter(DirectMessage.id < before_id)
-    rows = query.order_by(DirectMessage.id.desc()).limit(limit + 1).all()
+    if after_id is not None:
+        query = query.filter(DirectMessage.id > after_id)
+        rows = query.order_by(DirectMessage.id.asc()).limit(limit + 1).all()
+    else:
+        rows = query.order_by(DirectMessage.id.desc()).limit(limit + 1).all()
     has_more = len(rows) > limit
     messages = rows[:limit]
 
     read_at = _now()
-    for message in messages:
-        if message.recipient_id == current_user.id and message.read_at is None:
-            message.read_at = read_at
-    db.commit()
+    read_changed = False
+    if before_id is None and after_id is None:
+        read_changed = bool(
+            db.query(DirectMessage)
+            .filter(
+                DirectMessage.sender_id == user_id,
+                DirectMessage.recipient_id == current_user.id,
+                DirectMessage.read_at.is_(None),
+            )
+            .update({DirectMessage.read_at: read_at}, synchronize_session=False)
+        )
+        if read_changed:
+            for message in messages:
+                if message.recipient_id == current_user.id and message.read_at is None:
+                    message.read_at = read_at
+    else:
+        for message in messages:
+            if message.recipient_id == current_user.id and message.read_at is None:
+                message.read_at = read_at
+                read_changed = True
+    if read_changed:
+        db.commit()
+
+    unread_count_value = (
+        db.query(DirectMessage)
+        .filter(
+            DirectMessage.sender_id == user_id,
+            DirectMessage.recipient_id == current_user.id,
+            DirectMessage.read_at.is_(None),
+        )
+        .count()
+    )
+    read_through = (
+        db.query(DirectMessage)
+        .filter(
+            DirectMessage.sender_id == current_user.id,
+            DirectMessage.recipient_id == user_id,
+            DirectMessage.read_at.is_not(None),
+        )
+        .order_by(DirectMessage.id.desc())
+        .first()
+    )
+    ordered_messages = messages if after_id is not None else list(reversed(messages))
+    read_receipt_changed = read_through is not None and (
+        known_read_id is None or read_through.id > known_read_id
+    )
     return {
-        "messages": [_to_message(message, current_user) for message in reversed(messages)],
+        "messages": [_to_message(message, current_user) for message in ordered_messages],
         "has_more": has_more,
+        "other_user": _other_user_public(other) if after_id is None else None,
+        "unread_count": unread_count_value,
+        "read_through_id": read_through.id if read_receipt_changed else None,
+        "read_through_at": read_through.read_at if read_receipt_changed else None,
     }
 
 

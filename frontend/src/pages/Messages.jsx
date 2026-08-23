@@ -24,6 +24,78 @@ const extractErrorMessage = (error, fallback) => {
   return fallback;
 };
 
+const messageId = (message) => Number(message?.id) || 0;
+
+const mergeThreadPage = (current, incoming) => {
+  if (!current) {
+    const messages = incoming.messages || [];
+    return { ...incoming, cursor: messageId(messages.at(-1)) };
+  }
+
+  const knownIds = new Set(current.messages.map(messageId));
+  const additions = (incoming.messages || []).filter((message) => !knownIds.has(messageId(message)));
+  let messages = additions.length > 0 ? [...current.messages, ...additions] : current.messages;
+  const readThroughId = Number(incoming.read_through_id) || 0;
+  const receiptChanged = readThroughId > (Number(current.read_through_id) || 0);
+  if (receiptChanged) {
+    let messagesChanged = false;
+    messages = messages.map((message) => {
+      if (!message.from_me || message.read_at || messageId(message) > readThroughId) return message;
+      messagesChanged = true;
+      return { ...message, read_at: incoming.read_through_at || true };
+    });
+    if (!messagesChanged && additions.length === 0) messages = current.messages;
+  }
+
+  const unreadChanged = incoming.unread_count !== undefined
+    && incoming.unread_count !== current.unread_count;
+  if (additions.length === 0 && !receiptChanged && !unreadChanged) return current;
+  return {
+    ...current,
+    messages,
+    cursor: messageId(messages.at(-1)) || current.cursor || 0,
+    other_user: current.other_user || incoming.other_user,
+    unread_count: incoming.unread_count ?? current.unread_count,
+    read_through_id: incoming.read_through_id ?? current.read_through_id,
+    read_through_at: incoming.read_through_at ?? current.read_through_at,
+  };
+};
+
+const syncConversation = (conversations, otherUser, lastMessage, unreadCountOverride) => {
+  if (!otherUser?.id) return conversations;
+  const index = conversations.findIndex(
+    (conversation) => Number(conversation.other_user?.id) === Number(otherUser.id)
+  );
+  if (index < 0) {
+    if (!lastMessage) return conversations;
+    return [{
+      other_user: otherUser,
+      last_message: lastMessage,
+      last_message_at: lastMessage.created_at,
+      unread_count: 0,
+    }, ...conversations];
+  }
+
+  const existing = conversations[index];
+  const hasNewLastMessage = messageId(lastMessage) > messageId(existing.last_message);
+  const unreadCount = unreadCountOverride ?? (existing.unread_count || 0);
+  if (!hasNewLastMessage && unreadCount === (existing.unread_count || 0)) return conversations;
+  const updated = {
+    ...existing,
+    ...(hasNewLastMessage ? {
+      last_message: lastMessage,
+      last_message_at: lastMessage.created_at,
+    } : {}),
+    unread_count: unreadCount,
+  };
+  if (!hasNewLastMessage) {
+    const next = [...conversations];
+    next[index] = updated;
+    return next;
+  }
+  return [updated, ...conversations.slice(0, index), ...conversations.slice(index + 1)];
+};
+
 export default function Messages() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
@@ -40,11 +112,11 @@ export default function Messages() {
   )); // null | "system" | user id
   const [pickedUser, setPickedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [body, setBody] = useState("");
   const [sendError, setSendError] = useState(null);
   const threadEndRef = useRef(null);
   const threadScrollRef = useRef(null);
-  const skipScrollRef = useRef(false);
 
   const [olderMessages, setOlderMessages] = useState([]);
   const [hasMoreOlder, setHasMoreOlder] = useState(false);
@@ -52,34 +124,43 @@ export default function Messages() {
 
   const { data: conversations = [], isLoading: loadingConversations } = useQuery({
     queryKey: ["messages", "conversations"],
-    queryFn: async () => {
-      const { data } = await api.get("/messages");
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get("/messages", { signal });
       return data;
     },
     enabled: Boolean(userId),
-    staleTime: 20_000,
-    refetchInterval: 5_000,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   });
 
   const { data: notifications = [] } = useQuery({
-    queryKey: ["notifications"],
-    queryFn: async () => {
-      const { data } = await api.get("/notifications");
+    queryKey: ["notifications", "list", 50],
+    queryFn: async ({ signal }) => {
+      const { data } = await api.get("/notifications", { params: { limit: 50 }, signal });
       return data;
     },
     enabled: Boolean(userId),
     staleTime: 30_000,
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   });
 
-  const searchEnabled = searchQuery.trim().length > 0;
+  useEffect(() => {
+    const timeout = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery.trim()),
+      250
+    );
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const searchEnabled = debouncedSearchQuery.length > 0;
   const { data: searchResults = [], isLoading: searching } = useQuery({
-    queryKey: ["messages", "search", searchQuery.trim()],
-    queryFn: async () => {
+    queryKey: ["messages", "search", debouncedSearchQuery],
+    queryFn: async ({ signal }) => {
       const { data } = await api.get("/messages/users/search", {
-        params: { q: searchQuery.trim() },
+        params: { q: debouncedSearchQuery },
+        signal,
       });
       return data;
     },
@@ -95,14 +176,24 @@ export default function Messages() {
     );
   }, [selectedId, conversations]);
 
+  const threadQueryKey = useMemo(
+    () => ["messages", "thread", selectedId],
+    [selectedId]
+  );
   const { data: threadPage, isLoading: loadingThread } = useQuery({
-    queryKey: ["messages", "thread", selectedId],
-    queryFn: async () => {
-      const { data } = await api.get(`/messages/${selectedId}`);
-      return data;
+    queryKey: threadQueryKey,
+    queryFn: async ({ signal }) => {
+      const current = queryClient.getQueryData(threadQueryKey);
+      const params = { limit: 50 };
+      if (current) {
+        params.after_id = current.cursor || messageId(current.messages?.at(-1));
+        if (current.read_through_id) params.known_read_id = current.read_through_id;
+      }
+      const { data } = await api.get(`/messages/${selectedId}`, { params, signal });
+      return mergeThreadPage(current, data);
     },
     enabled: selectedId != null && selectedId !== "system",
-    staleTime: 10_000,
+    staleTime: 0,
     refetchInterval: 4_000,
     refetchIntervalInBackground: false,
   });
@@ -133,13 +224,10 @@ export default function Messages() {
     }
   }, [olderMessages.length, threadPage?.has_more]);
 
+  const latestThreadId = messageId(thread.at(-1));
   useEffect(() => {
-    if (skipScrollRef.current) {
-      skipScrollRef.current = false;
-      return;
-    }
     threadEndRef.current?.scrollIntoView({ block: "end" });
-  }, [thread, selectedId]);
+  }, [latestThreadId, selectedId]);
 
   useEffect(() => {
     if (!requestedMessageId || !thread.some((message) => Number(message.id) === requestedMessageId)) {
@@ -161,7 +249,6 @@ export default function Messages() {
       return;
     }
     setLoadingOlder(true);
-    skipScrollRef.current = true;
     const container = threadScrollRef.current;
     const prevScrollHeight = container ? container.scrollHeight : null;
     try {
@@ -186,11 +273,19 @@ export default function Messages() {
     }
   };
 
+  const threadUser = pickedUser || selectedUser || threadPage?.other_user || null;
+  const latestPageMessage = threadPage?.messages?.at(-1) || null;
   useEffect(() => {
-    if (thread.length > 0) {
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
-    }
-  }, [thread, queryClient]);
+    if (!threadPage || selectedId === "system") return;
+    queryClient.setQueryData(["messages", "conversations"], (current = []) => (
+      syncConversation(
+        current,
+        threadPage.other_user || threadUser,
+        latestPageMessage,
+        threadPage.unread_count
+      )
+    ));
+  }, [latestPageMessage, queryClient, selectedId, threadPage, threadUser]);
 
   const unreadTotal = useMemo(
     () =>
@@ -207,11 +302,17 @@ export default function Messages() {
       const { data } = await api.post("/messages", payload);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (message) => {
       setBody("");
       setSendError(null);
-      queryClient.invalidateQueries({ queryKey: ["messages", "conversations"] });
-      queryClient.invalidateQueries({ queryKey: ["messages", "thread", selectedId] });
+      queryClient.setQueryData(threadQueryKey, (current) => mergeThreadPage(current, {
+        messages: [message],
+        has_more: false,
+        other_user: threadUser,
+      }));
+      queryClient.setQueryData(["messages", "conversations"], (current = []) => (
+        syncConversation(current, threadUser, message)
+      ));
     },
     onError: (error) => {
       setSendError(extractErrorMessage(error, t("messages.sendFailed")));
@@ -256,8 +357,6 @@ export default function Messages() {
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedId]);
-
-  const threadUser = pickedUser || selectedUser;
 
   const showBlockedNotice = threadUser && threadUser.receive_messages === false;
 

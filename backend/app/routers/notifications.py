@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
 from ..dependencies import (
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 @router.get("/", response_model=List[NotificationPublic])
 @router.get("", response_model=List[NotificationPublic], include_in_schema=False)
 def list_notifications(
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ) -> List[Notification]:
@@ -28,6 +29,7 @@ def list_notifications(
         .options(joinedload(Notification.sender))
         .filter(Notification.user_id == current_user.id)
         .order_by(Notification.created_at.desc())
+        .limit(limit)
         .all()
     )
     return [

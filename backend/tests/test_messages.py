@@ -223,3 +223,16 @@ def test_thread_pagination_loads_older_pages(client, db_session):
     ).json()
     assert [message["body"] for message in third_page["messages"]] == ["Zpráva 1"]
     assert third_page["has_more"] is False
+
+    bob_token = _login(client, "bob", "secret")
+    newest_id = first_page["messages"][-1]["id"]
+    client.post(
+        "/messages",
+        json={"recipient_id": alice.id, "body": "Nová živá zpráva"},
+        headers=_headers(bob_token),
+    )
+    delta = client.get(
+        f"/messages/{bob.id}", params={"after_id": newest_id}, headers=headers
+    ).json()
+    assert [message["body"] for message in delta["messages"]] == ["Nová živá zpráva"]
+    assert delta["unread_count"] == 0
