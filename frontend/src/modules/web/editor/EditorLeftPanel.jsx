@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import MediaPreview from "../media/MediaPreview";
 import EditorNavigator from "./EditorNavigator";
+import { groupCatalogResources } from "./resourceBlocks";
 
 export default function EditorLeftPanel({
   mode,
@@ -14,6 +15,7 @@ export default function EditorLeftPanel({
   components,
   sections,
   dataSources,
+  resourceGroups,
   editor,
   selected,
   onOpenPage,
@@ -34,6 +36,16 @@ export default function EditorLeftPanel({
     sections: filter(sections),
     data: filter(dataSources),
   }), [components, sections, dataSources, search]);
+  const groupedCatalogItems = useMemo(() => (
+    catalog === "data"
+      ? []
+      : groupCatalogResources(
+        catalogItems[catalog],
+        catalog,
+        resourceGroups,
+        t(`web.editor.catalog.${catalog}`),
+      )
+  ), [catalog, catalogItems, resourceGroups, t]);
   const startDrag = (event, item) => {
     const blockId = catalog === "data"
       ? `sc-data-${String(item.id).replace(/[^a-zA-Z0-9_-]/g, "-")}`
@@ -50,6 +62,14 @@ export default function EditorLeftPanel({
         && !block.textContent.toLowerCase().includes(search.toLowerCase());
     });
   }, [catalog, search]);
+
+  const renderCatalogItem = (item) => {
+    const preview = item.preview_url || (item.preview_media_id ? `/api/web/media/${item.preview_media_id}/file` : null);
+    return <button key={item.id} type="button" draggable={Boolean(editor)} onDragStart={(event) => startDrag(event, item)} title={catalog === "data" ? (item.description || item.label || item.name || item.id) : undefined} onClick={() => onInsert(catalog, item)}>
+      <span className="web-editor-catalog-icon">{preview ? <MediaPreview src={preview} alt="" /> : <i className={`fas ${catalog === "data" ? "fa-database" : "fa-layer-group"}`} />}</span>
+      <span><strong>{item.name || item.label || item.id}</strong><small>{item.description || item.id}</small></span>
+    </button>;
+  };
 
   return <aside id="web-editor-left-panel" className="web-editor-left" aria-label={t(`web.editor.rail.${mode}`)}>
     <div className={mode === "pages" ? "" : "d-none"}>
@@ -76,13 +96,14 @@ export default function EditorLeftPanel({
       <div className="web-editor-catalog-tabs" role="tablist">{["components", "sections", "data"].map((key) => <button key={key} type="button" role="tab" aria-selected={catalog === key} className={catalog === key ? "active" : ""} onClick={() => setCatalog(key)}>{t(`web.editor.catalog.${key}`)}</button>)}</div>
       <label className="web-editor-search"><i className="fas fa-magnifying-glass" /><span className="visually-hidden">{t("web.search")}</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("web.editor.searchCatalog")} /></label>
       <div className={catalog === "components" ? "web-editor-block-manager" : "web-editor-block-manager d-none"} />
-      <div className="web-editor-catalog-list">{catalogItems[catalog]?.map((item) => {
-        const preview = item.preview_url || (item.preview_media_id ? `/api/web/media/${item.preview_media_id}/file` : null);
-        return <button key={item.id} type="button" draggable={Boolean(editor)} onDragStart={(event) => startDrag(event, item)} title={catalog === "data" ? (item.description || item.label || item.name || item.id) : undefined} onClick={() => onInsert(catalog, item)}>
-          <span className="web-editor-catalog-icon">{preview ? <MediaPreview src={preview} alt="" /> : <i className={`fas ${catalog === "data" ? "fa-database" : "fa-layer-group"}`} />}</span>
-          <span><strong>{item.name || item.label || item.id}</strong><small>{item.description || item.id}</small></span>
-        </button>;
-      })}{catalog !== "components" && catalogItems[catalog]?.length === 0 && <p className="web-editor-panel-empty">{t("web.empty.noResults")}</p>}</div>
+      <div className="web-editor-catalog-list">
+        {catalog === "data" && catalogItems.data.map(renderCatalogItem)}
+        {catalog === "sections" && groupedCatalogItems.map((group) => <section className="web-editor-catalog-group" key={group.id}>
+          <h3>{group.label}</h3>
+          <div>{group.items.map(renderCatalogItem)}</div>
+        </section>)}
+        {catalog !== "components" && catalogItems[catalog]?.length === 0 && <p className="web-editor-panel-empty">{t("web.empty.noResults")}</p>}
+      </div>
     </div>
     <div className={mode === "layers" ? "" : "d-none"}>
       <div className="web-editor-panel-heading"><h2>{t("web.editor.navigator.title")}</h2></div>
@@ -97,11 +118,11 @@ EditorLeftPanel.propTypes = {
   pages: PropTypes.array.isRequired,
   currentPageId: PropTypes.number.isRequired,
   pageForm: PropTypes.object.isRequired,
-  teams: PropTypes.array.isRequired,
   templates: PropTypes.array.isRequired,
   components: PropTypes.array.isRequired,
   sections: PropTypes.array.isRequired,
   dataSources: PropTypes.array.isRequired,
+  resourceGroups: PropTypes.array.isRequired,
   editor: PropTypes.object,
   selected: PropTypes.object,
   onOpenPage: PropTypes.func.isRequired,

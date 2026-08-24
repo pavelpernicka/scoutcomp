@@ -12,6 +12,31 @@ export const filterCatalogResources = (value, activeThemeVersionId) => {
   return items.filter((resource) => String(resource.theme_version_id) === String(activeThemeVersionId));
 };
 
+const resourceKey = (resource = {}) => String(resource.qualified_key || resource.id || "").split(":").pop();
+
+export const getResourceGroup = (resource, kind, groups = []) => {
+  const normalizedKind = kind === "sections" || kind === "section" ? "sections" : "components";
+  const key = resourceKey(resource);
+  return (Array.isArray(groups) ? groups : [])
+    .filter((group) => group?.kind === normalizedKind && Array.isArray(group.resources))
+    .find((group) => group.resources.some((candidate) => candidate === key || candidate === resource?.qualified_key));
+};
+
+export const groupCatalogResources = (resources, kind, groups = [], fallbackLabel = "Other") => {
+  const buckets = new Map();
+  (resources || []).forEach((resource) => {
+    const group = getResourceGroup(resource, kind, groups) || {
+      id: "other", label: fallbackLabel, order: 1000,
+    };
+    if (!buckets.has(group.id)) buckets.set(group.id, { ...group, items: [] });
+    buckets.get(group.id).items.push(resource);
+  });
+  return [...buckets.values()].sort((left, right) => (
+    Number(left.order || 0) - Number(right.order || 0)
+    || String(left.label).localeCompare(String(right.label))
+  ));
+};
+
 export const cloneResourceComponents = (resource) => {
   const root = getResourceComponent(resource);
   const insertable = root?.type === "wrapper" && Array.isArray(root.components)

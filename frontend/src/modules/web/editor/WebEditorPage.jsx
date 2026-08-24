@@ -14,7 +14,7 @@ import EditorRail from "./EditorRail";
 import EditorTopbar from "./EditorTopbar";
 import PreviewDialog from "./PreviewDialog";
 import RevisionsDialog from "./RevisionsDialog";
-import { cloneResourceComponents, detachLinkedResource, filterCatalogResources, hydrateMenuComponents, insertResource } from "./resourceBlocks";
+import { detachLinkedResource, filterCatalogResources, getResourceGroup, groupCatalogResources, hydrateMenuComponents, insertLinkedResource, linkedResourceInstance } from "./resourceBlocks";
 import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
@@ -87,6 +87,7 @@ export default function WebEditorPage() {
     TEMPLATE_USAGE_MODES.linkedLayout,
   );
   const canvasStyles = canvasStylesQuery.data?.css ? [{ href: "", css: canvasStylesQuery.data.css }] : [];
+  const resourceGroups = canvasStylesQuery.data?.editor?.resource_groups || EMPTY;
   const editorBlocks = useMemo(() => [
     ...((canvasStylesQuery.data?.editor?.blocks || []).map((item) => ({
       id: `sc-theme-${item.id}`,
@@ -96,21 +97,23 @@ export default function WebEditorPage() {
       media: `<i class="fas fa-${item.icon || "cube"}" aria-hidden="true"></i>`,
       attributes: { title: item.label },
     }))),
-    ...components.map((item) => ({
+    ...groupCatalogResources(components, "components", resourceGroups, t("web.editor.catalog.components")).flatMap((group) => group.items.map((item) => ({
       id: `sc-resource-component-${item.id}`,
       label: item.name,
-      category: t("web.editor.catalog.components"),
-      content: cloneResourceComponents(item),
+      category: getResourceGroup(item, "components", resourceGroups)?.label || t("web.editor.catalog.components"),
+      content: linkedResourceInstance(item, "components"),
+      media: '<i class="fas fa-puzzle-piece" aria-hidden="true"></i>',
       attributes: { title: item.description || item.name },
-    })),
-    ...sections.map((item) => ({
+    }))),
+    ...groupCatalogResources(sections, "sections", resourceGroups, t("web.editor.catalog.sections")).flatMap((group) => group.items.map((item) => ({
       id: `sc-resource-section-${item.id}`,
       label: item.name,
-      category: t("web.editor.catalog.sections"),
-      content: cloneResourceComponents(item),
+      category: getResourceGroup(item, "sections", resourceGroups)?.label || t("web.editor.catalog.sections"),
+      content: linkedResourceInstance(item, "sections"),
+      media: '<i class="fas fa-layer-group" aria-hidden="true"></i>',
       attributes: { title: item.description || item.name },
-    })),
-  ], [canvasStylesQuery.data?.editor?.blocks, components, sections, t]);
+    }))),
+  ], [canvasStylesQuery.data?.editor?.blocks, components, resourceGroups, sections, t]);
   const templateCSSQuery = useQuery({
     queryKey: ["web", "template", page?.template_id],
     queryFn: () => cmsApi.getTemplate(page.template_id).then((tpl) => tpl?.published_css || tpl?.css || ""),
@@ -505,7 +508,7 @@ export default function WebEditorPage() {
     if (catalog === "data") return editor.addBlock(`sc-data-${safeId(item.id)}`);
     const instance = editor.editorRef.current;
     if (!instance) return [];
-    return insertResource(instance, item);
+    return insertLinkedResource(instance, item, catalog);
   };
   const navigateAfterSave = async (destination) => {
     if (autosave.hasPendingChanges) {
@@ -536,7 +539,7 @@ export default function WebEditorPage() {
   return <div className={`web-editor-shell ${leftOpen ? "" : "left-closed"} ${inspectorOpen ? "" : "inspector-closed"}`} data-device={device.toLowerCase()}>
     <EditorTopbar title={pageForm.title} path={page.path || `/${pageForm.path_segment}`} device={device} saveStatus={autosave.status} inspectorOpen={inspectorOpen} canUndo={editor.canUndo} canRedo={editor.canRedo} canPublish={can("web.publish") || can("web.manage")} publishing={publishMutation.isPending} onBack={() => { void navigateAfterSave("/admin/web/pages"); }} onTitleChange={changeTitle} onUndo={editor.undo} onRedo={editor.redo} onDevice={(next) => { setDeviceState(next); editor.setDevice(next); if (next === "Mobile") { setLeftOpen(false); setInspectorOpen(false); } }} onToggleInspector={toggleInspector} onPreview={() => previewMutation.mutate()} onPublish={() => publishMutation.mutate()} onSave={() => { void autosave.saveNow().catch(() => {}); }} />
     <EditorRail mode={mode} open={leftOpen} onMode={changeMode} onMedia={() => openMediaPicker()} />
-    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onTemplateChange={requestTemplateChange} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
+    <EditorLeftPanel mode={mode} pages={pagesQuery.data || EMPTY} currentPageId={pageId} pageForm={pageForm} templates={templates} components={components} sections={sections} dataSources={dataSources} resourceGroups={resourceGroups} editor={editor.editorRef.current} selected={selectedComponent} onOpenPage={(nextId) => { void navigateAfterSave(`/admin/web/pages/${nextId}/editor`); }} onPageFormChange={changePageForm} onTemplateChange={requestTemplateChange} onEditTemplate={handleEditTemplate} onRevisions={() => setRevisionsOpen(true)} onInsert={insertCatalogItem} onSelect={selectComponent} />
     <main className="web-editor-workbench"><div className="web-editor-canvas" ref={setCanvasElement} />{!editor.isReady && <div className="web-editor-canvas-loading"><i className="fas fa-spinner fa-spin" />{t("web.editor.loadingCanvas")}</div>}{device === "Mobile" && <div className="web-editor-device-fit" aria-hidden="true">{t("web.editor.devices.mobile")} · 375 px · {editor.canvasZoom} %</div>}<EditorBreadcrumbs selected={selectedComponent} onSelect={selectComponent} /></main>
     <EditorInspector selected={selectedComponent} dataSources={dataSources} resources={{ components, sections }} fontAwesomeIcons={canvasStylesQuery.data?.font_awesome_icons || EMPTY} themeControls={canvasStylesQuery.data?.editor?.component_controls || EMPTY} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClone={handleClone} onDetach={handleDetach} onEditDefinition={handleEditDefinition} onEditTemplate={handleEditTemplate} onContentChange={() => autosave.schedule()} onSelectMedia={openMediaPicker} />
     <div className="web-editor-mobile-note">{t("web.editor.wideScreenHint")}</div>

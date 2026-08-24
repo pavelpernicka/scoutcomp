@@ -68,6 +68,25 @@ _SITE_RUNTIME_JS = r'''(() => {
   "use strict";
   const navigationSelector = ".sc-calendar-nav[href],.sc-calendar-today[href]";
   const requests = new WeakMap();
+  // The class fallback keeps already-published Ontario snapshots working;
+  // newly rendered themes opt in through the generic data attribute.
+  const scrollNavigations = Array.from(document.querySelectorAll("[data-sc-scroll-nav],.ontario-navbar"));
+  let scrollFrame = 0;
+  const updateScrollNavigations = () => {
+    scrollFrame = 0;
+    const scrollTop = window.scrollY || document.scrollingElement?.scrollTop || 0;
+    scrollNavigations.forEach((navigation) => {
+      navigation.classList.toggle("sc-scroll-nav--scrolled", scrollTop > 24);
+    });
+  };
+  const scheduleScrollNavigationUpdate = () => {
+    if (!scrollFrame) scrollFrame = window.requestAnimationFrame(updateScrollNavigations);
+  };
+  if (scrollNavigations.length) {
+    updateScrollNavigations();
+    window.addEventListener("scroll", scheduleScrollNavigationUpdate, { passive: true });
+    window.addEventListener("pageshow", scheduleScrollNavigationUpdate);
+  }
   const documentLocation = (value = window.location.href) => {
     const url = new URL(value, window.location.href);
     return `${url.origin}${url.pathname}${url.search}`;

@@ -179,7 +179,7 @@ def _validate_editor_match(value: Any, label: str) -> None:
 
 
 def _validate_editor_metadata(editor_metadata: Any, archive_paths: set[str] | None = None) -> None:
-    if not isinstance(editor_metadata, dict) or set(editor_metadata) - {"font_sets", "component_controls", "blocks"}:
+    if not isinstance(editor_metadata, dict) or set(editor_metadata) - {"font_sets", "component_controls", "blocks", "resource_groups"}:
         _fail("manifest.json editor metadata is invalid")
     font_sets = editor_metadata.get("font_sets", [])
     if not isinstance(font_sets, list) or len(font_sets) > 50:
@@ -235,6 +235,38 @@ def _validate_editor_metadata(editor_metadata: Any, archive_paths: set[str] | No
                     stack.append(child)
             elif isinstance(item, list):
                 stack.extend(item)
+
+    resource_groups = editor_metadata.get("resource_groups", [])
+    if not isinstance(resource_groups, list) or len(resource_groups) > 50:
+        _fail("manifest.json editor.resource_groups must be a bounded list")
+    seen_group_ids: set[str] = set()
+    grouped_resources: set[tuple[str, str]] = set()
+    for group in resource_groups:
+        allowed = {"id", "kind", "label", "order", "resources"}
+        if not isinstance(group, dict) or set(group) - allowed or not {"id", "kind", "label", "resources"} <= set(group):
+            _fail("editor resource group is invalid")
+        group_id = str(group.get("id", ""))
+        if not _ID_RE.fullmatch(group_id) or group_id in seen_group_ids:
+            _fail("editor resource group id is invalid or duplicated")
+        seen_group_ids.add(group_id)
+        if group.get("kind") not in {"components", "sections"}:
+            _fail("editor resource group kind is invalid")
+        label = group.get("label")
+        if not isinstance(label, str) or not label.strip() or len(label) > 200:
+            _fail("editor resource group label is invalid")
+        order = group.get("order", 0)
+        if not isinstance(order, int) or isinstance(order, bool) or not -1000 <= order <= 1000:
+            _fail("editor resource group order is invalid")
+        resources = group.get("resources")
+        if not isinstance(resources, list) or not resources or len(resources) > 200:
+            _fail("editor resource group resources must be a non-empty bounded list")
+        for resource in resources:
+            if not isinstance(resource, str) or not _ID_RE.fullmatch(resource):
+                _fail("editor resource group contains an invalid resource id")
+            marker = (group["kind"], resource)
+            if marker in grouped_resources:
+                _fail("editor resource is assigned to more than one group")
+            grouped_resources.add(marker)
 
     controls = editor_metadata.get("component_controls", [])
     if not isinstance(controls, list) or len(controls) > 200:
