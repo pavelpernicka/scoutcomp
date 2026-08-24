@@ -1,10 +1,7 @@
-import React from "react";
-import { useTranslation } from "react-i18next";
 import { useConfig } from "../providers/ConfigProvider";
 import packageJson from "../../package.json";
 
 export default function Footer() {
-  const { t } = useTranslation();
   const { config } = useConfig();
   const currentVersion = packageJson.version;
 
@@ -34,7 +31,7 @@ export default function Footer() {
                 className="link-primary"
                 style={{ fontSize: 'inherit' }}
               >
-                {t("footer.madeWith")} <i className="fas fa-heart text-danger"></i> {t("footer.byAuthor", { author: "Hruška" })}
+                <span lang="en">Made with <i className="fas fa-heart text-danger" aria-hidden="true" /> by Hruška.</span>
               </a>
             </small>
           </div>

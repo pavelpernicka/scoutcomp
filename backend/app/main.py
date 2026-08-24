@@ -58,7 +58,7 @@ def _app_shell(db: Session) -> str:
         # production image always copies the built document beside the API.
         template = (
             "<!doctype html><html lang=\"cs\"><head><meta charset=\"UTF-8\">"
-            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover\">"
             '<meta name="robots" content="noindex,nofollow">'
             f"<title>{_APP_SHELL_TITLE}</title><link rel=\"icon\" href=\"{_APP_SHELL_ICON}\"></head>"
             "<body><div id=\"root\"></div><script type=\"module\" src=\"/src/main.jsx\"></script></body></html>"
