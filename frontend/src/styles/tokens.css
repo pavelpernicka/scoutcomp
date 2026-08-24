@@ -26,12 +26,3 @@ body {
   background: #f5f4ef;
   text-rendering: optimizeLegibility;
 }
-
-@media (max-width: 767.98px) {
-  html,
-  body,
-  #root {
-    touch-action: pan-x pan-y;
-    overscroll-behavior: none;
-  }
-}
