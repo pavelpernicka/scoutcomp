@@ -454,6 +454,7 @@
       "bindingTarget": "Cíl",
       "addBinding": "Přidat vazbu",
       "repeatHelp": "Vyberte kolekci a nastavte její filtry, řazení a limit. Obsah uvnitř prvku se vykreslí pro každý záznam.",
+      "unknownOption": "Neznámá položka (#{{id}})",
       "repeatSelectSource": "Vyberte zdroj dat…",
       "repeatEmptySource": "Opakování zatím nemá zdroj. Lze je bezpečně uložit; na webu zobrazí prázdný stav.",
       "repeatFields": "Pole položky",
@@ -483,8 +484,8 @@
           "trip": "Výpravy",
           "other": "Ostatní"
         },
-        "teamId": "ID družiny",
-        "teamIdHelp": "Nechte prázdné pro akce všech družin.",
+        "teamId": "Družina",
+        "teamIdHelp": "Vyberte družinu nebo zobrazte akce všech družin.",
         "allTeams": "Všechny družiny",
         "teamShort": "družina",
         "firstDayOfWeek": "První den týdne",

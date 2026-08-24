@@ -81,12 +81,15 @@ class QueryParameter:
     choices: tuple[Any, ...] = ()
     minimum: int | float | None = None
     maximum: int | float | None = None
+    option_source: str | None = None
     label_key: str | None = None
     description_key: str | None = None
 
     def __post_init__(self) -> None:
         if self.type not in {"string", "integer", "number", "boolean", "datetime"}:
             raise ValueError(f"Unsupported query parameter type: {self.type}")
+        if self.option_source not in {None, "teams"}:
+            raise ValueError(f"Unsupported query parameter option source: {self.option_source}")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -274,6 +277,19 @@ def list_data_sources(db: Session) -> list[dict[str, Any]]:
     from ..modules import registry
 
     enabled = _available_module_codes(db)
+    option_cache: dict[str, list[dict[str, Any]]] = {}
+
+    def parameter_catalog(definition: QueryParameter) -> dict[str, Any]:
+        result = definition.as_dict()
+        if definition.option_source == "teams":
+            if "teams" not in option_cache:
+                option_cache["teams"] = [
+                    {"value": team.id, "label": team.name}
+                    for team in db.query(Team).order_by(func.lower(Team.name), Team.id).all()
+                ]
+            result["options"] = option_cache["teams"]
+        return result
+
     result = []
     for module in registry.manifests():
         if module.code not in enabled:
@@ -288,7 +304,7 @@ def list_data_sources(db: Session) -> list[dict[str, Any]]:
                 "description_key": source.description_key,
                 "collection": source.collection,
                 "fields": {name: item.as_dict() for name, item in source.fields.items()},
-                "parameters": {name: item.as_dict() for name, item in source.parameters.items()},
+                "parameters": {name: parameter_catalog(item) for name, item in source.parameters.items()},
                 "cache_ttl_seconds": source.cache_ttl_seconds,
             })
     return result
@@ -608,7 +624,7 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
     },
     parameters={
         "kind": QueryParameter("string", "Kind", choices=("meeting", "trip", "other")),
-        "team_id": QueryParameter("integer", "Team", minimum=1),
+        "team_id": QueryParameter("integer", "Team", minimum=1, option_source="teams"),
         # Repeats are compiler-capped at 100. The slightly larger resolver
         # bound lets the calendar fetch 500 events plus one overflow sentinel
         # in a single deterministic publication query.

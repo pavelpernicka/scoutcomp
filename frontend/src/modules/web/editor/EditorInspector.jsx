@@ -49,7 +49,7 @@ export default function EditorInspector({ selected, dataSources, resources, font
           : type === "sc-pagination"
             ? <PaginationConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
             : type === "sc-calendar"
-              ? <CalendarConfigurator selected={selected} onContentChange={onContentChange} />
+              ? <CalendarConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
               : <DataBindings selected={selected} dataSources={dataSources} />)}
         <div className={selected && tab === "code" ? "" : "d-none"}>{selected && <CodePanel key={selected.cid} selected={selected} onApplied={onContentChange} />}</div>
         {selected && tab === "advanced" && <AdvancedInspector selected={selected} />}
@@ -492,6 +492,32 @@ const parameterValue = (params, definition) => (
   Object.prototype.hasOwnProperty.call(params, definition.id) ? params[definition.id] : definition.default ?? ""
 );
 
+const parameterOptions = (definition) => (Array.isArray(definition?.options)
+  ? definition.options
+    .filter((option) => option && option.value !== undefined && option.value !== null)
+    .map((option) => ({ value: option.value, label: String(option.label ?? option.value) }))
+  : []
+);
+
+function NamedOptionSelect({ definition, value, emptyLabel, onChange }) {
+  const { t } = useTranslation();
+  const options = parameterOptions(definition);
+  const hasValue = value !== "" && value !== undefined && value !== null;
+  const selectedOptionIsMissing = hasValue && !options.some((option) => String(option.value) === String(value));
+  return <select value={String(value ?? "")} onChange={(event) => onChange(event.target.value)}>
+    {emptyLabel !== null && <option value="">{emptyLabel || "—"}</option>}
+    {selectedOptionIsMissing && <option value={String(value)}>{t("web.editor.unknownOption", { id: value })}</option>}
+    {options.map((option) => <option key={String(option.value)} value={String(option.value)}>{option.label}</option>)}
+  </select>;
+}
+
+NamedOptionSelect.propTypes = {
+  definition: PropTypes.object,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  emptyLabel: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
+
 const coerceParameter = (definition, value) => {
   if (value === "") return undefined;
   if (definition.type === "integer") return Number.parseInt(value, 10);
@@ -500,11 +526,13 @@ const coerceParameter = (definition, value) => {
   return value;
 };
 
-export function CalendarConfigurator({ selected, onContentChange }) {
+export function CalendarConfigurator({ selected, dataSources, onContentChange }) {
   const { t } = useTranslation();
   const [, setRevision] = useState(0);
   const kind = selected.get?.("kind") || "all";
   const teamId = selected.get?.("teamId") ?? "";
+  const eventSource = dataSources.find((source) => source?.id === "core.events");
+  const teamDefinition = sourceParameters(eventSource).find((definition) => definition.id === "team_id");
   const firstDayOfWeek = selected.get?.("firstDayOfWeek") || "monday";
   const showDescription = selected.get?.("showDescription") !== false;
   const update = (key, value) => {
@@ -517,13 +545,11 @@ export function CalendarConfigurator({ selected, onContentChange }) {
     <label><span>{t("web.editor.calendar.kind")}</span><select value={kind} onChange={(event) => update("kind", event.target.value)}>
       {["all", "meeting", "trip", "other"].map((value) => <option key={value} value={value}>{t(`web.editor.calendar.kinds.${value}`)}</option>)}
     </select></label>
-    <label><span>{t("web.editor.calendar.teamId")}</span><input
-      type="number"
-      min="1"
-      inputMode="numeric"
-      value={teamId}
-      placeholder={t("web.editor.calendar.allTeams")}
-      onChange={(event) => update("teamId", event.target.value === "" ? "" : Number(event.target.value))}
+    <label><span>{t("web.editor.calendar.teamId")}</span><NamedOptionSelect
+      definition={teamDefinition}
+      value={String(teamId)}
+      emptyLabel={t("web.editor.calendar.allTeams")}
+      onChange={(value) => update("teamId", value === "" ? "" : Number(value))}
     /><small>{t("web.editor.calendar.teamIdHelp")}</small></label>
     <label><span>{t("web.editor.calendar.firstDayOfWeek")}</span><select value={firstDayOfWeek} onChange={(event) => update("firstDayOfWeek", event.target.value)}>
       <option value="monday">{t("web.editor.calendar.monday")}</option>
@@ -533,7 +559,7 @@ export function CalendarConfigurator({ selected, onContentChange }) {
   </div>;
 }
 
-CalendarConfigurator.propTypes = { selected: PropTypes.object.isRequired, onContentChange: PropTypes.func };
+CalendarConfigurator.propTypes = { selected: PropTypes.object.isRequired, dataSources: PropTypes.array.isRequired, onContentChange: PropTypes.func };
 
 export function RepeatConfigurator({ selected, dataSources, onContentChange }) {
   const { t } = useTranslation();
@@ -568,6 +594,15 @@ export function RepeatConfigurator({ selected, dataSources, onContentChange }) {
       {sourceParameters(source).map((definition) => {
         const value = parameterValue(params, definition);
         const label = definition.label || definition.id;
+        if (Array.isArray(definition.options)) {
+          const emptyLabel = !definition.required && definition.default == null ? "—" : null;
+          return <label key={definition.id}><span>{label}</span><NamedOptionSelect
+            definition={definition}
+            value={value}
+            emptyLabel={emptyLabel}
+            onChange={(nextValue) => updateParameter(definition, nextValue)}
+          />{definition.description && <small>{definition.description}</small>}</label>;
+        }
         if (definition.choices?.length) return <label key={definition.id}><span>{label}</span><select value={String(value ?? "")} onChange={(event) => updateParameter(definition, event.target.value)}>
           {!definition.required && definition.default == null && <option value="">—</option>}
           {definition.choices.map((choice) => <option key={String(choice)} value={String(choice)}>{String(choice)}</option>)}

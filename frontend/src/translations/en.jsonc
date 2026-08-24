@@ -454,6 +454,7 @@
       "bindingTarget": "Target",
       "addBinding": "Add binding",
       "repeatHelp": "Choose a collection and configure its filters, sorting and limit. Content inside the element renders once for every record.",
+      "unknownOption": "Unknown item (#{{id}})",
       "repeatSelectSource": "Choose a data source…",
       "repeatEmptySource": "This repeat has no source yet. It can be saved safely and renders its empty state on the site.",
       "repeatFields": "Record fields",
@@ -483,8 +484,8 @@
           "trip": "Trips",
           "other": "Other"
         },
-        "teamId": "Team ID",
-        "teamIdHelp": "Leave empty to show events from every team.",
+        "teamId": "Team",
+        "teamIdHelp": "Choose a team or show events from every team.",
         "allTeams": "All teams",
         "teamShort": "team",
         "firstDayOfWeek": "First day of week",

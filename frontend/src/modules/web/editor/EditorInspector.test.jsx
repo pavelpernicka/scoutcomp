@@ -147,7 +147,12 @@ describe("EditorInspector linked props", () => {
       dataSources={[{
         id: "core.events", label: "Events", collection: true,
         fields: { title: { label: "Title" } },
-        parameters: { team_id: { type: "integer", label: "Team", minimum: 1 } },
+        parameters: {
+          team_id: {
+            type: "integer", label: "Team", minimum: 1,
+            options: [{ value: 7, label: "Otters" }, { value: 9, label: "Wolves" }],
+          },
+        },
       }]}
       resources={{ components: [], sections: [] }}
       onDuplicate={vi.fn()}
@@ -156,6 +161,7 @@ describe("EditorInspector linked props", () => {
     />);
 
     fireEvent.click(screen.getAllByRole("tab")[2]);
+    expect(screen.getByRole("option", { name: "Otters" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Team"), { target: { value: "7" } });
     expect(selected.values.params).toEqual({ team_id: 7 });
   });
@@ -171,7 +177,15 @@ describe("EditorInspector linked props", () => {
     });
     render(<EditorInspector
       selected={selected}
-      dataSources={[]}
+      dataSources={[{
+        id: "core.events", label: "Events", collection: true, fields: {},
+        parameters: {
+          team_id: {
+            type: "integer", label: "Team", minimum: 1,
+            options: [{ value: 12, label: "Ravens" }],
+          },
+        },
+      }]}
       resources={{ components: [], sections: [] }}
       onDuplicate={vi.fn()}
       onDelete={vi.fn()}
@@ -180,7 +194,8 @@ describe("EditorInspector linked props", () => {
 
     fireEvent.click(screen.getAllByRole("tab")[2]);
     fireEvent.change(screen.getByLabelText(/Typ akcí|Event kind/), { target: { value: "trip" } });
-    fireEvent.change(screen.getByLabelText(/ID družiny|Team ID/), { target: { value: "12" } });
+    expect(screen.getByRole("option", { name: "Ravens" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: /Družina|Team/ }), { target: { value: "12" } });
     fireEvent.change(screen.getByLabelText(/První den týdne|First day of week/), { target: { value: "sunday" } });
     fireEvent.click(screen.getByLabelText(/Zobrazit stručný popis|Show the event summary/));
 

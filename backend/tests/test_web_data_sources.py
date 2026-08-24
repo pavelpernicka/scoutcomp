@@ -10,6 +10,7 @@ from app.models import (
     RegisteredModule,
     RoleEnum,
     ScoutEvent,
+    Team,
     User,
     WebPost,
     WebPostRevision,
@@ -42,9 +43,18 @@ def _now():
 
 def test_catalog_only_contains_sources_from_available_modules(db_session):
     _seed(db_session)
-    assert {item["id"] for item in list_data_sources(db_session)} == {
+    db_session.add_all([
+        Team(name="Vlčata", join_code="vlcata"),
+        Team(name="Bobři", join_code="bobri"),
+    ])
+    db_session.flush()
+    catalog = list_data_sources(db_session)
+    assert {item["id"] for item in catalog} == {
         "core.events", "core.media", "web.menu", "core.posts", "core.teams",
     }
+    events = next(item for item in catalog if item["id"] == "core.events")
+    assert [option["label"] for option in events["parameters"]["team_id"]["options"]] == ["Bobři", "Vlčata"]
+    assert all(set(option) == {"value", "label"} for option in events["parameters"]["team_id"]["options"])
 
     core = db_session.query(RegisteredModule).filter_by(code="core").one()
     core.enabled = False
