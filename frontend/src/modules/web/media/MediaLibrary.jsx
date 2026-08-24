@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { cmsApi } from "../api/cms";
 import MediaCard from "./MediaCard";
-import { MEDIA_UPLOAD_ACCEPT, mediaUploadSizeError } from "./mediaUpload";
+import { MEDIA_UPLOAD_ACCEPT, mediaUploadSizeError, prependUploadedMedia } from "./mediaUpload";
 import "../styles/admin.css";
 
 function flattenFolders(nodes, out = []) {
@@ -131,7 +131,15 @@ export default function MediaLibrary({ selectMode = false, onSelectItem, embedde
 
   const upload = useMutation({
     mutationFn: (file) => cmsApi.uploadMedia(file, { folder_id: selectedFolder }),
-    onSuccess: invalidate,
+    onSuccess: (item) => {
+      const firstPageKey = ["web", "media", { folder_id: selectedFolder, page: 0, pageSize }];
+      if (page === 0) {
+        queryClient.setQueryData(firstPageKey, (current) => prependUploadedMedia(current, item, pageSize));
+      } else {
+        setPage(0);
+        queryClient.invalidateQueries({ queryKey: firstPageKey, exact: true });
+      }
+    },
     onError: (e) => setError(e?.response?.data?.detail || t("web.mediaUploadFailed")),
   });
   const remove = useMutation({ mutationFn: cmsApi.deleteMedia, onSuccess: invalidate });

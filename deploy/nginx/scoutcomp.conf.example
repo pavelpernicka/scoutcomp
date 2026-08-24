@@ -82,6 +82,9 @@ server {
     location /api/ {
         proxy_pass http://scoutcomp_api/;
         proxy_http_version 1.1;
+        # Stream uploads to FastAPI instead of first writing the complete
+        # multipart request into nginx temporary storage.
+        proxy_request_buffering off;
         proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

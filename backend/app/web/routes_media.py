@@ -73,10 +73,17 @@ def list_media(
     query = db.query(WebMedia)
     if folder_id is not None:
         query = query.filter(WebMedia.folder_id == folder_id)
-    items = [
-        _media_out(m, db).model_dump()
-        for m in query.order_by(WebMedia.created_at.desc()).offset(offset).limit(limit).all()
-    ]
+    records = query.order_by(WebMedia.created_at.desc()).offset(offset).limit(limit).all()
+    uploader_ids = {record.uploaded_by_id for record in records if record.uploaded_by_id}
+    uploaders = {
+        user.id: {"id": user.id, "username": user.username, "real_name": user.real_name}
+        for user in db.query(User).filter(User.id.in_(uploader_ids)).all()
+    } if uploader_ids else {}
+    items = []
+    for record in records:
+        item = _media_out(record).model_dump()
+        item["uploaded_by"] = uploaders.get(record.uploaded_by_id)
+        items.append(item)
     return {"items": items, "total": query.count(), "limit": limit, "offset": offset}
 
 
@@ -285,7 +292,7 @@ def delete_media_folder(folder_id: int, db: Session = Depends(get_db), current_u
 
 
 @router.post("/media", status_code=201)
-async def upload_media(
+def upload_media(
     file: UploadFile,
     album: str | None = Form(None),
     folder_id: int | None = Form(None),
@@ -301,41 +308,64 @@ async def upload_media(
     else:
         if not db.query(WebMediaFolder).filter_by(id=payload_folder_id).one_or_none():
             raise HTTPException(404, "Folder not found")
-    chunks: list[bytes] = []
-    size = 0
-    while True:
-        chunk = await file.read(min(1024 * 1024, MAX_MEDIA_SIZE + 1 - size))
-        if not chunk:
-            break
-        chunks.append(chunk)
-        size += len(chunk)
-        if size > MAX_MEDIA_SIZE:
-            raise HTTPException(
-                413,
-                f"File is too large (maximum {MAX_MEDIA_SIZE // (1024 * 1024)} MB)",
-            )
-    content = b"".join(chunks)
-    announced = (file.content_type or "").lower().split(";")[0].strip()
-    detected = _resolve_media_type(content, announced, file.filename)
-    extension = ALLOWED_MEDIA_TYPES.get(detected or "")
-    if not extension:
-        raise HTTPException(415, "Unsupported file type or content mismatch")
     media_dir = _media_dir()
-    stored_name = f"{uuid.uuid4().hex}{extension}"
-    (media_dir / stored_name).write_bytes(content)
-    record = WebMedia(
-        filename=file.filename or stored_name,
-        path=stored_name,
-        mime=detected,
-        size=size,
-        uploaded_by_id=current_user.id,
-        album=payload_album,
-        folder_id=payload_folder_id,
-    )
-    db.add(record)
-    db.commit()
-    db.refresh(record)
-    return _media_out(record, db).model_dump()
+    storage_id = uuid.uuid4().hex
+    temporary_path = media_dir / f".{storage_id}.upload"
+    size = 0
+    announced = (file.content_type or "").lower().split(";")[0].strip()
+    try:
+        with temporary_path.open("xb") as destination:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_MEDIA_SIZE:
+                    raise HTTPException(
+                        413,
+                        f"File is too large (maximum {MAX_MEDIA_SIZE // (1024 * 1024)} MB)",
+                    )
+                destination.write(chunk)
+
+        # Images, PDF and ZIP have strong signatures at the beginning. Avoid
+        # reading a multi-megabyte image back into memory merely to identify it;
+        # SVG and text still receive the existing full-content validation.
+        with temporary_path.open("rb") as uploaded:
+            header = uploaded.read(64 * 1024)
+        strong_type = _sniff_image(header)
+        if not strong_type and header.startswith(b"%PDF-"):
+            strong_type = "application/pdf"
+        if not strong_type and header.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
+            strong_type = "application/zip"
+        validation_content = header if strong_type else temporary_path.read_bytes()
+        detected = _resolve_media_type(validation_content, announced, file.filename)
+        extension = ALLOWED_MEDIA_TYPES.get(detected or "")
+        if not extension:
+            raise HTTPException(415, "Unsupported file type or content mismatch")
+
+        stored_name = f"{storage_id}{extension}"
+        stored_path = media_dir / stored_name
+        temporary_path.replace(stored_path)
+        record = WebMedia(
+            filename=file.filename or stored_name,
+            path=stored_name,
+            mime=detected,
+            size=size,
+            uploaded_by_id=current_user.id,
+            album=payload_album,
+            folder_id=payload_folder_id,
+        )
+        db.add(record)
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            stored_path.unlink(missing_ok=True)
+            raise
+        db.refresh(record)
+        return _media_out(record, db).model_dump()
+    finally:
+        temporary_path.unlink(missing_ok=True)
 
 
 @router.get("/media/{media_id}/file")

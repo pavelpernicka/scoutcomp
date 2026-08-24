@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { cmsApi } from "../api/cms";
-import { mediaUploadSizeError } from "./mediaUpload";
+import { mediaUploadSizeError, prependUploadedMedia } from "./mediaUpload";
 
 /**
  * Shared media query hook used by both MediaLibrary (admin) and
@@ -35,7 +35,15 @@ export default function useMediaBrowser({ initialFolderId = null, limit = 24 } =
 
   const upload = useMutation({
     mutationFn: (file) => cmsApi.uploadMedia(file, { folder_id: selectedFolder }),
-    onSuccess: invalidate,
+    onSuccess: (item) => {
+      const firstPageKey = ["web", "media", { folder: selectedFolder, page: 0, limit }];
+      if (page === 0) {
+        queryClient.setQueryData(firstPageKey, (current) => prependUploadedMedia(current, item, limit));
+      } else {
+        setPage(0);
+        queryClient.invalidateQueries({ queryKey: firstPageKey, exact: true });
+      }
+    },
     onError: (err) => setError(err?.response?.data?.detail?.toString() || "Upload failed"),
   });
 

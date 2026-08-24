@@ -857,7 +857,14 @@ def _sc2_shell(slot_components):
         _sc2("main", cls="sc2-main", components=[{"type": "sc-slot", "name": "content", "components": slot_components}]),
         _sc2("footer", cls="sc2-footer", components=[
             _sc2("div", cls="sc2-footer-grid", components=[
-                _sc2("div", components=[_sc2("strong", content="Skautský oddíl"), _sc2("p", content="Dobrodružství, přátelství a odpovědnost."),]),
+                _sc2("div", components=[
+                    _sc2(
+                        "strong",
+                        content="Skautský oddíl",
+                        bindings={"text": {"scope": "site", "field": "site_title"}},
+                    ),
+                    _sc2("p", content="Dobrodružství, přátelství a odpovědnost."),
+                ]),
                 _sc2("div", components=[_sc2("h2", kind="heading", content="Navigace"), {"type": "sc-menu", "location": "footer"}]),
                 _sc2("div", components=[_sc2("h2", kind="heading", content="Informace"), _sc2("p", content="Aktuální kontakty najdete na kontaktní stránce.")]),
             ]),

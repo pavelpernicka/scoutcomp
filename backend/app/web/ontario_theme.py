@@ -513,7 +513,14 @@ ONTARIO_FOOTER = {
                 ],
             },
             _element("small", "ontario-copyright", components=[
-                _text("© 2026 Skautský oddíl. Powered by ", "", "span"),
+                _text("© 2026 ", "", "span"),
+                {
+                    "type": "text",
+                    "tagName": "span",
+                    "content": "Skautský oddíl",
+                    "scBindings": {"text": {"scope": "site", "field": "site_title"}},
+                },
+                _text(". Powered by ", "", "span"),
                 _element("a", content="ScoutComp", href="https://scoutcomp.pernicka.cz"),
                 _text(".", "", "span"),
             ]),
