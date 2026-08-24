@@ -189,6 +189,7 @@ export default function WebEditorPage() {
     if (!instance || definitions.length === 0) return undefined;
     let cancelled = false;
     const objectUrls = [];
+    const previewComponents = new Set();
     Promise.all(definitions.map(async (item) => {
       try {
         const previewUrl = item.preview_url;
@@ -209,7 +210,10 @@ export default function WebEditorPage() {
       const apply = (component) => {
         if (component?.get?.("type") === "sc-resource-instance") {
           const url = previews.get(String(component.get("resourceId") || ""));
-          if (url && component.get("previewUrl") !== url) component.set("previewUrl", url, { avoidStore: true });
+          if (url && component.get("previewUrl") !== url) {
+            component.set("previewUrl", url, { avoidStore: true });
+            previewComponents.add(component);
+          }
         }
         component?.components?.().forEach?.(apply);
       };
@@ -218,13 +222,19 @@ export default function WebEditorPage() {
     return () => {
       cancelled = true;
       const revoked = new Set(objectUrls);
-      const clear = (component) => {
-        if (component?.get?.("type") === "sc-resource-instance" && revoked.has(component.get("previewUrl"))) {
-          component.set("previewUrl", "", { avoidStore: true });
+      previewComponents.forEach((component) => {
+        try {
+          // useGrapesEditor may already have destroyed the editor before React
+          // cleans up this later effect. The remembered models are sufficient;
+          // traversing instance.getWrapper() here crashes after navigation.
+          if (component.getEl?.()?.isConnected && revoked.has(component.get?.("previewUrl"))) {
+            component.set?.("previewUrl", "", { avoidStore: true });
+          }
+        } catch {
+          // A destroyed GrapesJS model needs no further cleanup.
         }
-        component?.components?.().forEach?.(clear);
-      };
-      clear(instance.getWrapper?.());
+      });
+      previewComponents.clear();
       objectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [activeThemeVersionId, componentsQuery.data, editor.editorRef, sectionsQuery.data]);
