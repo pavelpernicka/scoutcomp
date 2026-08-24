@@ -1565,7 +1565,7 @@ def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
 def test_media_magic_size_and_path_security(tmp_path):
     assert _sniff_image(b'<svg xmlns="http://www.w3.org/2000/svg"></svg>') is None
     assert _sniff_image(b"\x89PNG\r\n\x1a\nrest") == "image/png"
-    assert MAX_MEDIA_SIZE == 10 * 1024 * 1024
+    assert MAX_MEDIA_SIZE == 15 * 1024 * 1024
     original = settings.app.web_media_dir
     settings.app.web_media_dir = str(tmp_path / "media")
     try:

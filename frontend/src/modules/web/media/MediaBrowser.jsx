@@ -2,6 +2,7 @@ import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
 import MediaCard from "./MediaCard";
+import { MEDIA_UPLOAD_ACCEPT } from "./mediaUpload";
 import useMediaBrowser from "./useMediaBrowser";
 
 /**
@@ -53,7 +54,8 @@ export default function MediaBrowser({ initialFolderId, onSelect, onClose }) {
         </aside>
         <main className="web-media-browser-main">
           <div className="web-media-browser-toolbar">
-            <input ref={inputRef} className="visually-hidden" type="file" accept="image/*,.pdf,.svg,.csv,.txt,.zip" onChange={handleUpload} />
+            <small className="text-muted me-auto">{t("web.mediaUploadHint")}</small>
+            <input ref={inputRef} className="visually-hidden" type="file" accept={MEDIA_UPLOAD_ACCEPT} onChange={handleUpload} />
             <button type="button" className="btn btn-sm btn-primary" disabled={upload.isPending} onClick={() => inputRef.current?.click()}>
               <i className="fas fa-upload me-1" />{t("web.uploadMedia")}
             </button>

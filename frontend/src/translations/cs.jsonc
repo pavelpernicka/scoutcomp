@@ -903,6 +903,8 @@
     "revision": "Revize",
     "confirmRestoreRevision": "Obnovit tuto verzi?",
     "mediaUploadFailed": "Nahrání selhalo",
+    "mediaTooLarge": "Soubor je příliš velký. Maximální velikost je {{maxSize}} MB.",
+    "mediaUploadHint": "Obrázky, PDF, SVG, CSV, TXT nebo ZIP · maximálně 15 MB",
     "allMedia": "Všechna média",
     "uploadMedia": "Nahrát médium",
     "collapse": "Sbalit",

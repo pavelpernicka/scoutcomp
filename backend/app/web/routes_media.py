@@ -310,22 +310,15 @@ async def upload_media(
         chunks.append(chunk)
         size += len(chunk)
         if size > MAX_MEDIA_SIZE:
-            raise HTTPException(413, "File is too large (maximum 10 MB)")
+            raise HTTPException(
+                413,
+                f"File is too large (maximum {MAX_MEDIA_SIZE // (1024 * 1024)} MB)",
+            )
     content = b"".join(chunks)
-    detected = _sniff_image(content)
-    extension = ALLOWED_MEDIA_TYPES.get(detected or "")
     announced = (file.content_type or "").lower().split(";")[0].strip()
-    if detected is None and announced in ALLOWED_MEDIA_TYPES:
-        # Content does not have a reliable magic-byte signature (e.g. plain
-        # CSV which is just text). Trust the browser-announced MIME and use
-        # the appropriate extension.
-        detected = announced
-        extension = ALLOWED_MEDIA_TYPES[detected]
-    if detected == "text/plain" and announced in ("text/plain", "text/csv", "application/octet-stream"):
-        pass  # CSV often arrives as text/plain or octet-stream
-    elif detected == "image/svg+xml" and announced in ("image/svg+xml", "text/xml", "application/xml", "text/plain", "application/octet-stream"):
-        pass  # Browsers may announce SVG as text/xml or octet-stream
-    elif not extension or detected != announced:
+    detected = _resolve_media_type(content, announced, file.filename)
+    extension = ALLOWED_MEDIA_TYPES.get(detected or "")
+    if not extension:
         raise HTTPException(415, "Unsupported file type or content mismatch")
     media_dir = _media_dir()
     stored_name = f"{uuid.uuid4().hex}{extension}"
@@ -355,10 +348,14 @@ def serve_media(media_id: int, db: Session = Depends(get_db), current_user: User
     if not path.is_file():
         raise HTTPException(404, "Media file is missing")
     filename = quote(record.filename or "file")
+    disposition = "inline" if record.mime and record.mime.startswith("image/") else "attachment"
     return FileResponse(
         path,
         media_type=record.mime or "application/octet-stream",
-        headers={"Content-Disposition": f'inline; filename*=UTF-8\'\'{filename}', "X-Content-Type-Options": "nosniff"},
+        headers={
+            "Content-Disposition": f"{disposition}; filename*=UTF-8''{filename}",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

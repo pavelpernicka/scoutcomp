@@ -1100,10 +1100,14 @@ def site_media(media_id: int):
         if not path.is_file():
             raise HTTPException(404, "Media file is missing")
         filename = quote(record.filename or "file")
+        disposition = "inline" if record.mime and record.mime.startswith("image/") else "attachment"
         return FileResponse(
             path,
             media_type=record.mime or "application/octet-stream",
-            headers={"Content-Disposition": f'inline; filename*=UTF-8\'\'{filename}', "X-Content-Type-Options": "nosniff"},
+            headers={
+                "Content-Disposition": f"{disposition}; filename*=UTF-8''{filename}",
+                "X-Content-Type-Options": "nosniff",
+            },
         )
     finally:
         session.close()

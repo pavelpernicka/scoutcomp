@@ -1,6 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { cmsApi } from "../api/cms";
+import { mediaUploadSizeError } from "./mediaUpload";
 
 /**
  * Shared media query hook used by both MediaLibrary (admin) and
@@ -8,6 +10,7 @@ import { cmsApi } from "../api/cms";
  * upload, and move logic so the two views share the same state shape.
  */
 export default function useMediaBrowser({ initialFolderId = null, limit = 24 } = {}) {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const inputRef = useRef(null);
   const [error, setError] = useState("");
@@ -41,9 +44,14 @@ export default function useMediaBrowser({ initialFolderId = null, limit = 24 } =
 
   const handleUpload = useCallback((e) => {
     const file = e.target.files?.[0];
-    if (file) upload.mutate(file);
+    const sizeError = mediaUploadSizeError(file, t);
+    if (sizeError) setError(sizeError);
+    else if (file) {
+      setError("");
+      upload.mutate(file);
+    }
     if (inputRef.current) inputRef.current.value = "";
-  }, [upload]);
+  }, [t, upload]);
 
   const media = Array.isArray(mediaQuery.data) ? mediaQuery.data : mediaQuery.data?.items || [];
   const total = mediaQuery.data?.total ?? media.length;

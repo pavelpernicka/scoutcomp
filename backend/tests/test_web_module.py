@@ -227,14 +227,28 @@ def test_web_media_upload_list_serve_delete(client, db_session, tmp_path):
         served = client.get(f"/web/media/{media['id']}/file", headers=headers)
         assert served.status_code == 200
         assert served.content == b"\x89PNG\r\n\x1a\nfake-bytes"
+        assert served.headers["content-disposition"].startswith("inline;")
+
+        document_upload = client.post(
+            "/web/media",
+            headers=headers,
+            files={"file": ("notes.txt", b"hello", "text/plain")},
+        )
+        assert document_upload.status_code == 201
+        document = document_upload.json()
+        document_response = client.get(f"/web/media/{document['id']}/file", headers=headers)
+        assert document_response.status_code == 200
+        assert document_response.content == b"hello"
+        assert document_response.headers["content-disposition"].startswith("attachment;")
 
         rejected = client.post(
             "/web/media",
             headers=headers,
-            files={"file": ("evil.txt", b"hello", "text/plain")},
+            files={"file": ("fake.txt", b"\x00binary", "text/plain")},
         )
         assert rejected.status_code == 415
 
+        assert client.delete(f"/web/media/{document['id']}", headers=headers).status_code == 204
         deleted = client.delete(f"/web/media/{media['id']}", headers=headers)
         assert deleted.status_code == 204
         assert client.get(f"/web/media/{media['id']}/file", headers=headers).status_code == 404

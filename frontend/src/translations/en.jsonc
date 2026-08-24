@@ -893,6 +893,8 @@
     "revision": "Revision",
     "confirmRestoreRevision": "Restore this revision?",
     "mediaUploadFailed": "Upload failed",
+    "mediaTooLarge": "The file is too large. Maximum size is {{maxSize}} MB.",
+    "mediaUploadHint": "Images, PDF, SVG, CSV, TXT, or ZIP · maximum 15 MB",
     "allMedia": "All media",
     "uploadMedia": "Upload media",
     "collapse": "Collapse",

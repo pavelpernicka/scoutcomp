@@ -25,7 +25,8 @@
 .web-admin-empty h3 { margin:0; color:#343a46; font-size:1.05rem; }
 .web-admin-empty p { margin:.35rem 0 0; }
 .web-media-library { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:.8rem; }
-.web-media-library-toolbar { display:flex; justify-content:flex-end; margin:0 0 .85rem; }
+.web-media-library-toolbar { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:.5rem 1rem; margin:0 0 .85rem; }
+.web-media-browser-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; margin:0 0 .85rem; }
 .web-media-card { position:relative; overflow:hidden; border:1px solid #dfe3e8; border-radius:.35rem; background:#fff; }
 .web-media-card img { width:100%; aspect-ratio:4/3; object-fit:cover; background:#eceff2; }
 .web-media-card > div { min-width:0; padding:.65rem; }

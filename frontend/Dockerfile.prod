@@ -18,6 +18,7 @@ COPY --from=build /app/dist /usr/share/nginx/html
 RUN echo 'server { \
     listen 80; \
     server_tokens off; \
+    client_max_body_size 16m; \
     root /usr/share/nginx/html; \
     \
     location = /sw.js { \

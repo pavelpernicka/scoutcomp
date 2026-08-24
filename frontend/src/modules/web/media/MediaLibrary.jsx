@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { cmsApi } from "../api/cms";
 import MediaCard from "./MediaCard";
+import { MEDIA_UPLOAD_ACCEPT, mediaUploadSizeError } from "./mediaUpload";
 import "../styles/admin.css";
 
 function flattenFolders(nodes, out = []) {
@@ -166,7 +167,12 @@ export default function MediaLibrary({ selectMode = false, onSelectItem, embedde
 
   const handleUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) upload.mutate(file);
+    const sizeError = mediaUploadSizeError(file, t);
+    if (sizeError) setError(sizeError);
+    else if (file) {
+      setError("");
+      upload.mutate(file);
+    }
     e.target.value = "";
   };
 
@@ -192,7 +198,8 @@ export default function MediaLibrary({ selectMode = false, onSelectItem, embedde
     <div className={`web-media-library-shell ${embedded ? "embedded" : ""}`}>
       {error && <div className="alert alert-danger">{error}</div>}
       <div className="web-media-library-toolbar">
-        <input ref={inputRef} className="visually-hidden" type="file" accept="image/*,.pdf,.svg,.csv,.txt,.zip" onChange={handleUpload} />
+        <small className="text-muted me-auto">{t("web.mediaUploadHint")}</small>
+        <input ref={inputRef} className="visually-hidden" type="file" accept={MEDIA_UPLOAD_ACCEPT} onChange={handleUpload} />
         <button className="btn btn-primary" type="button" disabled={upload.isPending} onClick={() => inputRef.current?.click()}>
           <i className="fas fa-upload me-2" />
           {upload.isPending ? t("web.states.uploading") : t("web.uploadMedia")}

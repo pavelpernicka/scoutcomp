@@ -11,6 +11,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote, urlparse
+from xml.etree import ElementTree
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -74,13 +75,29 @@ from ..web.renderer import CompileError, compile_project, render_document, rende
 from ..web_render import render_article_body
 
 COMPONENT_TAG = "scoutcomp-web-component"
-MAX_MEDIA_SIZE = 10 * 1024 * 1024
+MAX_MEDIA_SIZE = 15 * 1024 * 1024
 ALLOWED_MEDIA_TYPES = {
     "image/png": ".png",
     "image/jpeg": ".jpg",
     "image/gif": ".gif",
     "image/webp": ".webp",
     "image/avif": ".avif",
+    "image/svg+xml": ".svg",
+    "application/pdf": ".pdf",
+    "application/zip": ".zip",
+    "text/csv": ".csv",
+    "text/plain": ".txt",
+}
+
+_MEDIA_TYPE_ALIASES = {
+    "application/x-zip": "application/zip",
+    "application/x-zip-compressed": "application/zip",
+    "application/vnd.ms-excel": "text/csv",
+    "image/svg": "image/svg+xml",
+    "text/comma-separated-values": "text/csv",
+}
+_SVG_FORBIDDEN_ELEMENTS = {
+    "audio", "embed", "foreignobject", "iframe", "object", "script", "video",
 }
 
 
@@ -96,6 +113,94 @@ def _sniff_image(content: bytes) -> str | None:
     if len(content) >= 12 and content[4:12] in {b"ftypavif", b"ftypavis"}:
         return "image/avif"
     return None
+
+
+def _is_safe_svg(content: bytes) -> bool:
+    """Accept passive SVG images while rejecting executable/external content."""
+    lowered = content[:4096].lower()
+    if b"<!doctype" in lowered or b"<!entity" in lowered:
+        return False
+    try:
+        root = ElementTree.fromstring(content)
+    except (ElementTree.ParseError, ValueError):
+        return False
+    if root.tag.rsplit("}", 1)[-1].lower() != "svg":
+        return False
+    for element in root.iter():
+        local_name = element.tag.rsplit("}", 1)[-1].lower()
+        if local_name in _SVG_FORBIDDEN_ELEMENTS:
+            return False
+        if local_name == "style":
+            style_text = "".join(element.itertext()).lower()
+            if "url(" in style_text or "@import" in style_text:
+                return False
+        for raw_name, raw_value in element.attrib.items():
+            name = raw_name.rsplit("}", 1)[-1].lower()
+            value = str(raw_value).strip().lower()
+            if name.startswith("on"):
+                return False
+            if name in {"href", "src"} and value and not value.startswith("#"):
+                return False
+            if name == "style" and ("url(" in value or "@import" in value):
+                return False
+    return True
+
+
+def _sniff_media(content: bytes) -> str | None:
+    image_type = _sniff_image(content)
+    if image_type:
+        return image_type
+    if content.startswith(b"%PDF-"):
+        return "application/pdf"
+    if content.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")):
+        return "application/zip"
+    stripped = content.lstrip(b"\xef\xbb\xbf\t\r\n ")
+    if stripped.startswith(b"<") and _is_safe_svg(content):
+        return "image/svg+xml"
+    try:
+        text_content = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return None
+    if any(ord(character) < 32 and character not in "\t\r\n" for character in text_content):
+        return None
+    return "text/plain"
+
+
+def _resolve_media_type(content: bytes, announced: str, filename: str | None) -> str | None:
+    """Match browser metadata to a content signature without trusting filenames."""
+    detected = _sniff_media(content)
+    announced = _MEDIA_TYPE_ALIASES.get(announced, announced)
+    suffix = Path(filename or "").suffix.lower()
+    if detected == "text/plain":
+        if announced == "text/csv" or suffix == ".csv":
+            return (
+                "text/csv"
+                if announced in {"text/csv", "text/plain", "application/octet-stream"}
+                else None
+            )
+        return "text/plain" if announced in {"text/plain", "application/octet-stream"} else None
+    if detected == "image/svg+xml":
+        return (
+            detected
+            if announced
+            in {
+                "image/svg+xml",
+                "text/xml",
+                "application/xml",
+                "text/plain",
+                "application/octet-stream",
+            }
+            else None
+        )
+    if detected == "application/pdf":
+        return detected if announced == detected or (
+            announced == "application/octet-stream" and suffix == ".pdf"
+        ) else None
+    if detected == "application/zip":
+        return detected if announced == detected or (
+            announced == "application/octet-stream" and suffix == ".zip"
+        ) else None
+    return detected if detected and detected == announced else None
 
 
 def _stored_media_path(record: WebMedia) -> Path:
