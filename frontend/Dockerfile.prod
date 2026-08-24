@@ -39,6 +39,22 @@ RUN echo 'server { \
         try_files $uri =404; \
         add_header Cache-Control "public, max-age=86400" always; \
     } \
+    location = /pwa-1024.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
+    } \
+    location = /pwa-maskable-512.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
+    } \
+    location = /pwa-maskable-1024.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
+    } \
+    location = /apple-touch-icon-180.png { \
+        try_files $uri =404; \
+        add_header Cache-Control "public, max-age=86400" always; \
+    } \
     location = /favicon.svg { \
         try_files $uri =404; \
     } \

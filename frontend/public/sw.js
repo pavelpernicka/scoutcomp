@@ -1,7 +1,16 @@
 /* ScoutComp service worker — app shell, asset caching, and Web Push. */
-const STATIC_CACHE = "scoutcomp-static-v4";
-const SHELL_CACHE = "scoutcomp-shell-v4";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-192.png", "/pwa-512.png"];
+const STATIC_CACHE = "scoutcomp-static-v5";
+const SHELL_CACHE = "scoutcomp-shell-v5";
+const APP_SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/apple-touch-icon-180.png",
+  "/pwa-192.png",
+  "/pwa-512.png",
+  "/pwa-1024.png",
+  "/pwa-maskable-512.png",
+  "/pwa-maskable-1024.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -93,7 +102,7 @@ self.addEventListener("push", (event) => {
 
   const options = {
     body,
-    icon: "/pwa-192.png",
+    icon: "/pwa-512.png",
     badge: "/pwa-192.png",
     data: { url: target, actionUrls },
   };
@@ -115,7 +124,7 @@ self.addEventListener("push", (event) => {
     self.registration.showNotification(title, options).catch(() => (
       self.registration.showNotification(title, {
         body,
-        icon: "/pwa-192.png",
+        icon: "/pwa-512.png",
         badge: "/pwa-192.png",
         data: { url: target, actionUrls: {} },
       })
