@@ -1142,7 +1142,7 @@ export default function AdminUsers() {
                     {editPasswordGenerated && (
                       <div className="alert alert-success py-2 mb-2" role="alert">
                         <i className="fas fa-check-circle me-1"></i>
-                        Random password generated and revealed. Don&apos;t forget to save changes!
+                        {t("adminUsers.passwordGeneratedSaveReminder")}
                       </div>
                     )}
                     <div className="input-group">
@@ -1160,7 +1160,7 @@ export default function AdminUsers() {
                           type="button"
                           className="btn btn-outline-secondary"
                           onClick={() => setShowEditPassword(!showEditPassword)}
-                          title={showEditPassword ? "Hide password" : "Show password"}
+                          title={showEditPassword ? t("adminUsers.hidePassword") : t("adminUsers.showPassword")}
                         >
                           <i className={`fas ${showEditPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                         </button>
@@ -1170,7 +1170,7 @@ export default function AdminUsers() {
                         className="btn btn-outline-secondary"
                         onClick={handleGeneratePassword}
                         disabled={generatePasswordMutation.isLoading}
-                        title="Generate random password"
+                        title={t("adminUsers.generatePassword")}
                       >
                         <i className="fas fa-dice me-1"></i>{t('adminUsers.generate')}
                       </button>
@@ -1180,7 +1180,7 @@ export default function AdminUsers() {
                   {updateUserMutation.isError && (
                     <div className="col-12">
                       <div className="alert alert-danger" role="alert">
-                        {getErrorMessage(updateUserMutation.error, "Failed to update user.")}
+                        {getErrorMessage(updateUserMutation.error, t("adminUsers.failedToUpdateUser"))}
                       </div>
                     </div>
                   )}
@@ -1416,7 +1416,7 @@ export default function AdminUsers() {
                                 <option value="rejected">{t('adminUsers.rejected')}</option>
                                 {item.status === "pending" && (
                                   <option value="pending" disabled>
-                                    Pending
+                                    {t("adminUsers.pending")}
                                   </option>
                                 )}
                               </select>
@@ -1482,7 +1482,7 @@ export default function AdminUsers() {
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title">{t('adminUsers.createUser')}</h5>
-                  <button type="button" className="btn-close" aria-label="Close" onClick={closeCreateModal}></button>
+                  <button type="button" className="btn-close" aria-label={t("common.close")} onClick={closeCreateModal}></button>
                 </div>
                 <form onSubmit={handleCreateUser}>
                   <div className="modal-body">
@@ -1525,7 +1525,7 @@ export default function AdminUsers() {
                         {createPasswordGenerated && (
                           <div className="alert alert-success py-2 mb-2" role="alert">
                             <i className="fas fa-check-circle me-1"></i>
-                            Random password generated and revealed!
+                            {t("adminUsers.passwordGenerated")}
                           </div>
                         )}
                         <div className="input-group">
@@ -1543,7 +1543,7 @@ export default function AdminUsers() {
                               type="button"
                               className="btn btn-outline-secondary"
                               onClick={() => setShowCreatePassword(!showCreatePassword)}
-                              title={showCreatePassword ? "Hide password" : "Show password"}
+                              title={showCreatePassword ? t("adminUsers.hidePassword") : t("adminUsers.showPassword")}
                             >
                               <i className={`fas ${showCreatePassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
                             </button>
@@ -1552,7 +1552,7 @@ export default function AdminUsers() {
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={handleGenerateCreatePassword}
-                            title="Generate random password"
+                            title={t("adminUsers.generatePassword")}
                           >
                             <i className="fas fa-dice"></i>
                           </button>
@@ -1675,22 +1675,22 @@ export default function AdminUsers() {
             <div className="modal-dialog" role="document" onClick={(event) => event.stopPropagation()}>
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Add completion</h5>
+                  <h5 className="modal-title">{t("adminUsers.addCompletionBtn")}</h5>
                   <button
                     type="button"
                     className="btn-close"
-                    aria-label="Close"
+                    aria-label={t("common.close")}
                     onClick={closeCreateCompletionModal}
                   ></button>
                 </div>
                 {tasksLoading ? (
                   <div className="modal-body">
-                    <div className="text-center text-muted">Loading tasks…</div>
+                    <div className="text-center text-muted">{t("adminUsers.loadingTasks")}</div>
                   </div>
                 ) : assignableTasks.length === 0 ? (
                   <div className="modal-body">
                     <div className="alert alert-warning mb-0" role="alert">
-                      No compatible tasks available for this user.
+                      {t("adminUsers.noCompatibleTasks")}
                     </div>
                   </div>
                 ) : (
@@ -1702,7 +1702,7 @@ export default function AdminUsers() {
                         </div>
                       )}
                       <div className="mb-3">
-                        <label className="form-label">Task</label>
+                        <label className="form-label">{t("adminUsers.task")}</label>
                         <select
                           className="form-select"
                           value={newCompletionForm.taskId}
@@ -1716,7 +1716,7 @@ export default function AdminUsers() {
                           required
                         >
                           <option value="" disabled>
-                            Select task
+                            {t("adminUsers.selectTask")}
                           </option>
                           {assignableTasks.map((task) => (
                             <option key={task.value} value={task.value}>
@@ -1727,7 +1727,7 @@ export default function AdminUsers() {
                       </div>
                       {availableVariants.length > 0 && (
                         <div className="mb-3">
-                          <label className="form-label">Task Type</label>
+                          <label className="form-label">{t("adminUsers.taskType")}</label>
                           <select
                             className="form-select"
                             value={newCompletionForm.variantId}
@@ -1740,7 +1740,7 @@ export default function AdminUsers() {
                             required
                           >
                             <option value="" disabled>
-                              Select task type
+                              {t("adminUsers.selectTaskType")}
                             </option>
                             {availableVariants.map((variant) => (
                               <option key={variant.value} value={variant.value}>
@@ -1752,7 +1752,7 @@ export default function AdminUsers() {
                       )}
                       <div className="row g-3">
                         <div className="col-12 col-md-6">
-                          <label className="form-label">Count</label>
+                          <label className="form-label">{t("adminUsers.count")}</label>
                           <input
                             className="form-control"
                             type="number"
@@ -1769,7 +1769,7 @@ export default function AdminUsers() {
                           />
                         </div>
                         <div className="col-12 col-md-6">
-                          <label className="form-label">Status</label>
+                          <label className="form-label">{t("adminUsers.status")}</label>
                           <select
                             className="form-select"
                             value={newCompletionForm.status}
@@ -1780,13 +1780,13 @@ export default function AdminUsers() {
                               }))
                             }
                           >
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
+                            <option value="approved">{t("adminUsers.approved")}</option>
+                            <option value="rejected">{t("adminUsers.rejected")}</option>
                           </select>
                         </div>
                       </div>
                       <div className="mb-3 mt-3">
-                        <label className="form-label">Member note</label>
+                        <label className="form-label">{t("adminUsers.memberNote")}</label>
                         <textarea
                           className="form-control"
                           rows={2}
@@ -1800,7 +1800,7 @@ export default function AdminUsers() {
                         ></textarea>
                       </div>
                       <div className="mb-0">
-                        <label className="form-label">Admin note</label>
+                        <label className="form-label">{t("adminUsers.adminNote")}</label>
                         <textarea
                           className="form-control"
                           rows={2}
@@ -1821,14 +1821,14 @@ export default function AdminUsers() {
                         onClick={closeCreateCompletionModal}
                         disabled={createCompletionMutation.isLoading}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                       <button
                         type="submit"
                         className="btn btn-primary"
                         disabled={createCompletionMutation.isLoading}
                       >
-                        Add completion
+                        {t("adminUsers.addCompletionBtn")}
                       </button>
                     </div>
                   </form>
@@ -1853,7 +1853,7 @@ export default function AdminUsers() {
               <div className="modal-content">
                 <div className="modal-header">
                   <h5 className="modal-title">{t('adminUsers.bulkRegister.title')}</h5>
-                  <button type="button" className="btn-close" aria-label="Close" onClick={closeBulkRegistrationModal}></button>
+                  <button type="button" className="btn-close" aria-label={t("common.close")} onClick={closeBulkRegistrationModal}></button>
                 </div>
                 <form onSubmit={handleBulkRegistration}>
                   <div className="modal-body">
@@ -1921,14 +1921,14 @@ export default function AdminUsers() {
 
                       {previewUsers.length > 0 && (
                         <div className="col-12">
-                          <h6 className="fw-semibold">Username preview ({previewUsers.length} users)</h6>
+                          <h6 className="fw-semibold">{t("adminUsers.usernamePreview", { count: previewUsers.length })}</h6>
                           <div className="border rounded p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                             <div className="table-responsive">
                               <table className="table table-sm table-borderless mb-0">
                                 <thead>
                                   <tr>
-                                    <th>Real name</th>
-                                    <th>Generated username</th>
+                                    <th>{t("adminUsers.realName")}</th>
+                                    <th>{t("adminUsers.generatedUsername")}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1960,7 +1960,7 @@ export default function AdminUsers() {
                       className="btn btn-primary"
                       disabled={bulkRegisterMutation.isLoading || previewUsers.length === 0}
                     >
-                      {bulkRegisterMutation.isLoading ? 'Creating...' : `Create ${previewUsers.length} users`}
+                      {bulkRegisterMutation.isLoading ? t("adminUsers.creatingUsers") : t("adminUsers.createUsers", { count: previewUsers.length })}
                     </button>
                   </div>
                 </form>
@@ -2019,7 +2019,7 @@ export default function AdminUsers() {
                                   navigator.clipboard.writeText(`${user.username}: ${user.password}`);
                                   // Could add toast notification here
                                 }}
-                                title="Copy username and password"
+                                title={t("adminUsers.copyCredentials")}
                               >
                                 <i className="fas fa-copy"></i>
                               </button>
@@ -2032,7 +2032,7 @@ export default function AdminUsers() {
 
                   {bulkRegistrationResults.failed_count > 0 && (
                     <div className="mt-3">
-                      <h6 className="text-danger">Failed to create ({bulkRegistrationResults.failed_count}):</h6>
+                      <h6 className="text-danger">{t("adminUsers.failedToCreateCount", { count: bulkRegistrationResults.failed_count })}</h6>
                       <ul className="text-danger">
                         {bulkRegistrationResults.errors.map((error, index) => (
                           <li key={index}>{error}</li>

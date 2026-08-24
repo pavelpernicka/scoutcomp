@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import api from "../services/api";
 import Alert from "../components/Alert";
 import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
+import { translateServerValue } from "../utils/serverTranslations";
 
 const getErrorMessage = (error) => {
   const detail = error?.response?.data?.detail;
@@ -16,7 +17,7 @@ const getErrorMessage = (error) => {
 };
 
 export default function AdminModules() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const client = useQueryClient();
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
@@ -57,6 +58,8 @@ export default function AdminModules() {
   );
 
   const moduleByName = useMemo(() => new Map(modules.map((m) => [m.code, m])), [modules]);
+  const moduleName = (module) => translateServerValue(t, i18n, module?.name_key, module?.name);
+  const moduleDescription = (module) => translateServerValue(t, i18n, module?.description_key, module?.description);
 
   const statusInfo = (module) => {
     if (module.code === "core") return { label: t("adminModules.statusCore"), cls: "text-bg-primary" };
@@ -110,10 +113,10 @@ export default function AdminModules() {
                         onClick={() => setSelected(module)}
                       >
                         <i className={`fas ${module.metadata?.icon || "fa-puzzle-piece"} text-primary me-2`}></i>
-                        <strong>{module.name}</strong>
+                        <strong>{moduleName(module)}</strong>
                       </button>
                       <code className="ms-2 text-muted">{module.code}</code>
-                      <div className="small text-muted">{module.description}</div>
+                      <div className="small text-muted">{moduleDescription(module)}</div>
                     </td>
                     <td>
                       <span className={`badge ${status.cls}`}>{status.label}</span>
@@ -125,7 +128,7 @@ export default function AdminModules() {
                         <div className="d-flex flex-wrap gap-1">
                           {deps.map((dep) => (
                             <span key={dep.code} className={`badge ${dep.installed && dep.enabled ? "text-bg-light border text-dark" : "text-bg-danger"}`}>
-                              {dep.name}
+                              {moduleName(dep)}
                             </span>
                           ))}
                         </div>
@@ -136,7 +139,7 @@ export default function AdminModules() {
                         <div className="d-flex flex-wrap gap-1">
                           {module.dependents.map((code) => (
                             <span key={code} className="badge text-bg-light border text-dark">
-                              {moduleByName.get(code)?.name || code}
+                              {moduleName(moduleByName.get(code)) || code}
                             </span>
                           ))}
                         </div>
@@ -200,12 +203,12 @@ export default function AdminModules() {
                 <div className="modal-header">
                   <h5 className="modal-title">
                     <i className={`fas ${detail.metadata?.icon || "fa-puzzle-piece"} text-primary me-2`}></i>
-                    {detail.name} <code className="ms-2 text-muted">{detail.code}</code>
+                    {moduleName(detail)} <code className="ms-2 text-muted">{detail.code}</code>
                   </h5>
                   <button type="button" className="btn-close" aria-label="Close" onClick={() => setSelected(null)}></button>
                 </div>
                 <div className="modal-body">
-                  <p className="text-muted">{detail.description}</p>
+                  <p className="text-muted">{moduleDescription(detail)}</p>
                   <div className="row g-3">
                     <div className="col-12 col-md-6">
                       <h6 className="fw-semibold">{t("adminModules.detailStatus")}</h6>

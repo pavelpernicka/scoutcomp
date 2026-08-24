@@ -1,6 +1,7 @@
 import React from "react";
 import { Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import Layout from "./components/Layout";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -43,12 +44,13 @@ const ThemesPage = React.lazy(() => import("./modules/web/themes/ThemesPage"));
 const WebEditorPage = React.lazy(() => import("./modules/web/editor/WebEditorPage"));
 
 export default function App() {
+  const { t } = useTranslation();
   const location = useLocation();
   const isWebEditor = /^\/admin\/web\/(?:pages\/\d+|design\/(?:templates|components|sections)\/\d+)\/editor\/?$/.test(location.pathname);
   const isAuthRoute = location.pathname === "/login";
 
   const routes = (
-    <Suspense fallback={<div className="loader">Loading…</div>}>
+    <Suspense fallback={<div className="loader">{t("common.loading")}</div>}>
         <Routes>
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<HomeDashboard />} />

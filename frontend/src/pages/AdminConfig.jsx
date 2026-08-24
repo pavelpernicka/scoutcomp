@@ -187,7 +187,7 @@ export default function AdminConfig() {
                             type="button"
                             className="btn btn-outline-secondary"
                             onClick={resetIcon}
-                            title="Reset to default icon"
+                            title={t("adminConfig.resetIcon")}
                           >
                             <i className="fas fa-undo me-1"></i>{t("common.reset")}
                           </button>
@@ -201,7 +201,7 @@ export default function AdminConfig() {
                           <div className="border rounded p-3 bg-light d-inline-block">
                             <img
                               src={iconPreview}
-                              alt="App Icon Preview"
+                              alt={t("adminConfig.iconPreviewAlt")}
                               style={{
                                 width: "64px",
                                 height: "64px",

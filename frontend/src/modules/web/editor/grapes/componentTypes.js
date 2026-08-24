@@ -226,7 +226,7 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         params: {},
         droppable: false,
         editable: false,
-        content: "← Předchozí · 1 · Další →",
+        content: `← ${translate("web.editor.pagination.previousDefault")} · 1 · ${translate("web.editor.pagination.nextDefault")} →`,
         style: {
           display: "flex",
           gap: "8px",

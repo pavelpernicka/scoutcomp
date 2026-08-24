@@ -56,7 +56,7 @@ export default function MessagesWidget() {
       {rows.map((row) => <Link to={row.to} key={row.key} className={`dashboard-message-row d-flex align-items-start gap-3 p-3 text-decoration-none text-reset ${row.unread ? "dashboard-message-unread" : ""}`}>
         {row.user ? <UserAvatar user={{ real_name: row.name, avatar: row.user.avatar }} size={36} fallbackClass="bg-success" /> : <span className="bg-info rounded-circle d-flex align-items-center justify-content-center text-white flex-shrink-0" style={{ width: 36, height: 36 }}><i className="fas fa-bell" /></span>}
         <span className="flex-grow-1 overflow-hidden"><span className="d-flex justify-content-between gap-2"><strong className="text-truncate">{row.name}</strong><small className="text-muted text-nowrap">{formatRelativeTime(row.createdAt, i18n.language, t)}</small></span><span className="d-block text-truncate small text-muted mt-1">{row.body}</span></span>
-        {row.unread && <span className="badge bg-primary rounded-pill">{row.count || "Nové"}</span>}
+        {row.unread && <span className="badge bg-primary rounded-pill">{row.count || t("messages.new")}</span>}
       </Link>)}
     </div>}
   </DecoratedCard>;

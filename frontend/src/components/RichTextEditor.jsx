@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
 import MediaPickerModal from "../modules/web/media/MediaPickerModal";
 import api from "../services/api";
@@ -57,7 +58,7 @@ async function hydrateEditorMedia(editor) {
   }));
 }
 
-function mediaHtml(item) {
+function mediaHtml(item, fallbackFileName) {
   const element = document.createElement(item.is_image ? "img" : "a");
   element.setAttribute("data-media-id", String(item.id));
   if (item.is_image) {
@@ -67,18 +68,29 @@ function mediaHtml(item) {
     return `<figure>${element.outerHTML}</figure>`;
   }
   element.setAttribute("href", item.url);
-  element.textContent = item.filename || "Soubor";
+  element.textContent = item.filename || fallbackFileName;
   return `<p>${element.outerHTML}</p>`;
 }
 
 /** A shared Jodit editor with the application's central media picker. */
 export default function RichTextEditor({ value, onChange, disabled = false, height = 360, placeholder, className = "" }) {
+  const { t, i18n } = useTranslation();
   const hostRef = useRef(null);
   const editorRef = useRef(null);
   const onChangeRef = useRef(onChange);
   const valueRef = useRef(value);
   const [mediaPickerMode, setMediaPickerMode] = useState(null);
   const [dialog, setDialog] = useState(null);
+  const translationsRef = useRef({});
+  translationsRef.current = {
+    image: t("richText.insertImage"),
+    gif: t("richText.searchGif"),
+    link: t("richText.insertLink"),
+    color: t("richText.textColor"),
+    embed: t("richText.embed"),
+    details: t("richText.details"),
+    info: t("richText.infoBox"),
+  };
 
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   valueRef.current = value;
@@ -95,6 +107,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, heig
       ]);
       if (disposed || !hostRef.current) return;
       editor = Jodit.make(hostRef.current, {
+        language: i18n.language === "cs" ? "cs" : "en",
         readonly: disabled,
         height,
         placeholder: placeholder || "",
@@ -106,13 +119,13 @@ export default function RichTextEditor({ value, onChange, disabled = false, heig
         showWordsCounter: true,
         showXPathInStatusbar: true,
         controls: {
-          insertImage: { icon: "image", tooltip: "Vložit obrázek", exec: (instance) => { instance.s.save(); setDialog({ type: "image" }); return false; } },
-          gifSearch: { icon: "smile", tooltip: "Hledat GIF", exec: (instance) => { instance.s.save(); setDialog({ type: "gif" }); return false; } },
-          insertLink: { icon: "link", tooltip: "Vložit odkaz", exec: (instance) => { instance.s.save(); setDialog({ type: "link" }); return false; } },
-          textColor: { icon: "brush", tooltip: "Barva textu", exec: (instance) => { instance.s.save(); setDialog({ type: "color" }); return false; } },
-          embed: { icon: "video", tooltip: "Vložit video nebo iframe", exec: (instance) => { instance.s.save(); setDialog({ type: "embed" }); return false; } },
-          detailsBlock: { icon: "plus", tooltip: "Rozbalovací sekce", exec: (instance) => { instance.s.save(); setDialog({ type: "details" }); return false; } },
-          infoBox: { icon: "info", tooltip: "Informační box", exec: (instance) => { instance.s.save(); setDialog({ type: "info" }); return false; } },
+          insertImage: { icon: "image", tooltip: translationsRef.current.image, exec: (instance) => { instance.s.save(); setDialog({ type: "image" }); return false; } },
+          gifSearch: { icon: "smile", tooltip: translationsRef.current.gif, exec: (instance) => { instance.s.save(); setDialog({ type: "gif" }); return false; } },
+          insertLink: { icon: "link", tooltip: translationsRef.current.link, exec: (instance) => { instance.s.save(); setDialog({ type: "link" }); return false; } },
+          textColor: { icon: "brush", tooltip: translationsRef.current.color, exec: (instance) => { instance.s.save(); setDialog({ type: "color" }); return false; } },
+          embed: { icon: "video", tooltip: translationsRef.current.embed, exec: (instance) => { instance.s.save(); setDialog({ type: "embed" }); return false; } },
+          detailsBlock: { icon: "plus", tooltip: translationsRef.current.details, exec: (instance) => { instance.s.save(); setDialog({ type: "details" }); return false; } },
+          infoBox: { icon: "info", tooltip: translationsRef.current.info, exec: (instance) => { instance.s.save(); setDialog({ type: "info" }); return false; } },
         },
         uploader: { insertImageAsBase64URI: false },
       });
@@ -128,7 +141,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, heig
       editor?.destruct();
     };
     // The editor owns its state after creation; value is synchronized below.
-  }, []);
+  }, [i18n.language]);
 
   useEffect(() => {
     const editor = editorRef.current;
@@ -152,7 +165,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, heig
     setMediaPickerMode(null);
     if (!editor || disabled) return;
     editor.s.restore();
-    editor.s.insertHTML(mediaHtml(item));
+    editor.s.insertHTML(mediaHtml(item, t("common.file")));
     hydrateEditorMedia(editor);
     editor.synchronizeValues();
     onChangeRef.current(editorValue(editor.value));
@@ -172,13 +185,14 @@ export default function RichTextEditor({ value, onChange, disabled = false, heig
 
   return <div className={`rich-text-editor ${className}`.trim()}>
     <div ref={hostRef} />
-    {mediaPickerMode && <MediaPickerModal title={mediaPickerMode === "image" ? "Vybrat obrázek z galerie" : "Vybrat médium"} onSelect={selectMedia} onClose={() => setMediaPickerMode(null)} />}
+    {mediaPickerMode && <MediaPickerModal title={mediaPickerMode === "image" ? t("richText.chooseImage") : t("richText.chooseMedia")} onSelect={selectMedia} onClose={() => setMediaPickerMode(null)} />}
     {dialog?.type === "gif" && <GifPickerDialog onClose={() => setDialog(null)} onInsert={insertDialogContent} />}
     {dialog && dialog.type !== "gif" && <EditorDialog dialog={dialog} editor={editorRef.current} onClose={() => setDialog(null)} onInsert={insertDialogContent} onOpenGallery={() => { setDialog(null); setMediaPickerMode("image"); }} />}
   </div>;
 }
 
 function GifPickerDialog({ onClose, onInsert }) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [items, setItems] = useState([]);
   const [state, setState] = useState("idle");
@@ -217,17 +231,17 @@ function GifPickerDialog({ onClose, onInsert }) {
     source.href = `https://commons.wikimedia.org/wiki/${encodeURIComponent(gif.title.replace(/ /g, "_"))}`;
     source.target = "_blank";
     source.rel = "noopener noreferrer";
-    source.textContent = "Zdroj: Wikimedia Commons";
+    source.textContent = t("richText.wikimediaSource");
     onInsert(`<figure>${image.outerHTML}<figcaption>${source.outerHTML}</figcaption></figure>`);
   };
 
-  return createPortal(<div className="rich-text-dialog-backdrop" role="dialog" aria-modal="true" aria-label="Hledat GIF" onClick={(event) => event.stopPropagation()}>
+  return createPortal(<div className="rich-text-dialog-backdrop" role="dialog" aria-modal="true" aria-label={t("richText.searchGif")} onClick={(event) => event.stopPropagation()}>
     <div className="rich-text-dialog rich-text-gif-dialog" onClick={(event) => event.stopPropagation()}>
-      <div className="rich-text-dialog-heading"><h2>Hledat GIF</h2><button type="button" className="btn-close" onClick={onClose} /></div>
+      <div className="rich-text-dialog-heading"><h2>{t("richText.searchGif")}</h2><button type="button" className="btn-close" aria-label={t("common.close")} onClick={onClose} /></div>
       <>
-        <input className="form-control" autoFocus value={query} placeholder="Např. radost, tábor, potlesk…" onChange={(event) => setQuery(event.target.value)} />
-        {state === "loading" && <p className="rich-text-dialog-help">Vyhledávám GIFy…</p>}
-        {state === "error" && <p className="text-danger small mb-0">GIFy se nepodařilo načíst.</p>}
+        <input className="form-control" autoFocus value={query} placeholder={t("richText.gifPlaceholder")} onChange={(event) => setQuery(event.target.value)} />
+        {state === "loading" && <p className="rich-text-dialog-help">{t("richText.searchingGifs")}</p>}
+        {state === "error" && <p className="text-danger small mb-0">{t("richText.gifLoadError")}</p>}
         {state === "ready" && <div className="rich-text-gif-grid">{items.map((gif) => <button type="button" key={gif.pageid} className="rich-text-gif-tile" title={gif.title || "GIF"} onClick={() => choose(gif)}><img src={gif.imageinfo?.[0]?.thumburl || gif.imageinfo?.[0]?.url} alt="" loading="lazy" /></button>)}</div>}
       </>
       <small className="rich-text-gif-credit">Wikimedia Commons</small>
@@ -238,9 +252,10 @@ function GifPickerDialog({ onClose, onInsert }) {
 GifPickerDialog.propTypes = { onClose: PropTypes.func.isRequired, onInsert: PropTypes.func.isRequired };
 
 function EditorDialog({ dialog, editor, onClose, onInsert, onOpenGallery }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(dialog.type === "color" ? "#1f4f37" : "");
   const [linkText, setLinkText] = useState("");
-  const title = { color: "Barva textu", link: "Vložit odkaz", image: "Vložit obrázek", embed: "Video nebo iframe", details: "Rozbalovací sekce", info: "Informační box" }[dialog.type];
+  const title = t(`richText.dialogTitles.${dialog.type}`);
   const submit = (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -282,23 +297,23 @@ function EditorDialog({ dialog, editor, onClose, onInsert, onOpenGallery }) {
         const youtube = ["www.youtube.com", "www.youtube-nocookie.com"].includes(url.hostname) && url.pathname.startsWith("/embed/");
         const vimeo = url.hostname === "player.vimeo.com" && url.pathname.startsWith("/video/");
         if (!youtube && !vimeo) throw new Error();
-        onInsert(`<iframe src="${url.href}" title="Vložené video" width="560" height="315" loading="lazy" allowfullscreen></iframe>`);
+        onInsert(`<iframe src="${url.href}" title="${t("richText.embeddedVideo")}" width="560" height="315" loading="lazy" allowfullscreen></iframe>`);
       } catch { return; }
       return;
     }
-    if (dialog.type === "details") onInsert(`<details><summary>${value || "Více informací"}</summary><p>Sem napište rozbalený obsah.</p></details>`);
-    if (dialog.type === "info") onInsert(`<aside class="rich-text-infobox" role="note"><strong>${value || "Důležitá informace"}</strong><p>Sem napište obsah informačního boxu.</p></aside>`);
+    if (dialog.type === "details") onInsert(`<details><summary>${value || t("richText.detailsDefaultTitle")}</summary><p>${t("richText.detailsDefaultBody")}</p></details>`);
+    if (dialog.type === "info") onInsert(`<aside class="rich-text-infobox" role="note"><strong>${value || t("richText.infoDefaultTitle")}</strong><p>${t("richText.infoDefaultBody")}</p></aside>`);
   };
   return createPortal(<div className="rich-text-dialog-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
     <form className="rich-text-dialog" onSubmit={submit} onClick={(event) => event.stopPropagation()}>
-      <div className="rich-text-dialog-heading"><h2>{title}</h2><button type="button" className="btn-close" onClick={onClose} /></div>
+      <div className="rich-text-dialog-heading"><h2>{title}</h2><button type="button" className="btn-close" aria-label={t("common.close")} onClick={onClose} /></div>
       {dialog.type === "color" ? <input className="form-control form-control-color" type="color" value={value} onChange={(event) => setValue(event.target.value)} /> : <>
-        <label>{dialog.type === "link" ? "Adresa odkazu" : dialog.type === "image" ? "URL obrázku" : dialog.type === "embed" ? "URL YouTube/Vimeo nebo iframe kód" : dialog.type === "details" ? "Nadpis sekce" : "Nadpis boxu"}<input className="form-control mt-1" autoFocus type={dialog.type === "link" || dialog.type === "image" ? "url" : "text"} value={value} onChange={(event) => setValue(event.target.value)} /></label>
-        {dialog.type === "link" && <label>Text odkazu <input className="form-control mt-1" value={linkText} onChange={(event) => setLinkText(event.target.value)} /></label>}
-        {dialog.type === "image" && <button type="button" className="btn btn-outline-secondary" onClick={onOpenGallery}><i className="fas fa-images me-1" />Vybrat z galerie</button>}
+        <label>{t(`richText.fieldLabels.${dialog.type}`)}<input className="form-control mt-1" autoFocus type={dialog.type === "link" || dialog.type === "image" ? "url" : "text"} value={value} onChange={(event) => setValue(event.target.value)} /></label>
+        {dialog.type === "link" && <label>{t("richText.linkText")} <input className="form-control mt-1" value={linkText} onChange={(event) => setLinkText(event.target.value)} /></label>}
+        {dialog.type === "image" && <button type="button" className="btn btn-outline-secondary" onClick={onOpenGallery}><i className="fas fa-images me-1" />{t("richText.chooseFromGallery")}</button>}
       </>}
-      {dialog.type === "embed" && <p className="rich-text-dialog-help">Povoleny jsou bezpečné HTTPS vložené přehrávače YouTube a Vimeo.</p>}
-      <div className="rich-text-dialog-actions"><button type="button" className="btn btn-light" onClick={onClose}>Zrušit</button><button className="btn btn-primary" type="submit">Vložit</button></div>
+      {dialog.type === "embed" && <p className="rich-text-dialog-help">{t("richText.embedHelp")}</p>}
+      <div className="rich-text-dialog-actions"><button type="button" className="btn btn-light" onClick={onClose}>{t("common.cancel")}</button><button className="btn btn-primary" type="submit">{t("richText.insert")}</button></div>
     </form>
   </div>, document.body);
 }

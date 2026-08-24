@@ -1,5 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
 import { getQrImageUrl, LABEL_FIELD_OPTIONS } from "../helpers";
 
@@ -36,25 +37,28 @@ export function getLabelQrSize(template, width, height) {
   return Math.min(Number(template.qr_size_mm) || 18, availableSize);
 }
 
-export function labelMetadata(item, configuration) {
+export function labelMetadata(item, configuration, translate = (_key, _options, fallback) => fallback) {
   const values = {
-    category: item.category || "Bez kategorie",
-    current_location: item.current_location || item.default_location || "Bez lokace",
-    default_location: item.default_location || "Bez výchozí lokace",
-    status: item.open_loan_quantity > 0 ? `Vypůjčeno (${item.open_loan_quantity} ${item.quantity_unit})` : "Dostupné",
+    category: item.category || translate("inventory.noCategory", undefined, "No category"),
+    current_location: item.current_location || item.default_location || translate("inventory.noLocation", undefined, "No location"),
+    default_location: item.default_location || translate("inventory.noDefaultLocation", undefined, "No default location"),
+    status: item.open_loan_quantity > 0
+      ? translate("inventory.loanedQuantity", { count: item.open_loan_quantity, unit: item.quantity_unit }, `Loaned (${item.open_loan_quantity} ${item.quantity_unit})`)
+      : translate("inventory.available", undefined, "Available"),
   };
   return configuration.visibleFields.map((field) => ({ id: field, value: values[field] })).filter(({ value }) => Boolean(value));
 }
 
 export default function InventoryLabelPreview({ item, template, className = "" }) {
+  const { t } = useTranslation();
   const configuration = getLabelConfiguration(template);
-  const metadata = labelMetadata(item, configuration);
+  const metadata = labelMetadata(item, configuration, (key, options, fallback) => t(key, { ...options, defaultValue: fallback }));
   const width = Number(template.width_mm) || 62;
   const height = Number(template.height_mm) || 29;
   const qrSize = getLabelQrSize(template, width, height);
   return (
     <article className={`inventory-print-label ${className}`} style={{ width: `${width}mm`, height: `${height}mm`, "--inventory-label-padding": `${LABEL_PADDING_MM}mm`, "--inventory-label-qr-size": `${qrSize}mm` }}>
-      <img src={getQrImageUrl(item.qr_identifier)} alt={`QR kód ${item.qr_identifier}`} />
+      <img src={getQrImageUrl(item.qr_identifier)} alt={t("inventory.qrCodeAlt", { code: item.qr_identifier })} />
       <div className="inventory-print-label-content">
         <strong>{item.name}</strong>
         <code>{item.qr_identifier}</code>

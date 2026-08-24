@@ -1,22 +1,24 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
 const sections = [
-  { id: "locations", label: "Lokace", icon: "fas fa-sitemap" },
-  { id: "categories", label: "Kategorie", icon: "fas fa-diagram-project" },
-  { id: "flags", label: "Příznaky", icon: "fas fa-flag" },
-  { id: "sets", label: "Sety", icon: "fas fa-layer-group" },
-  { id: "labels", label: "Štítky", icon: "fas fa-tags" },
+  { id: "locations", labelKey: "inventory.locations", icon: "fas fa-sitemap" },
+  { id: "categories", labelKey: "inventory.categories", icon: "fas fa-diagram-project" },
+  { id: "flags", labelKey: "inventory.flags", icon: "fas fa-flag" },
+  { id: "sets", labelKey: "inventory.sets", icon: "fas fa-layer-group" },
+  { id: "labels", labelKey: "inventory.labels", icon: "fas fa-tags" },
 ];
 
 export default function InventorySettingsScreen({ activeSection, onSectionChange, children }) {
+  const { t } = useTranslation();
   return (
     <section className="inventory-settings">
       <header className="inventory-settings-header">
-        <div><div className="inventory-table-eyebrow">Konfigurace</div><h1>Nastavení skladu</h1><p>Správa kategorií, příznaků a šablon štítků.</p></div>
+        <div><div className="inventory-table-eyebrow">{t("inventory.configuration")}</div><h1>{t("inventory.settings")}</h1><p>{t("inventory.settingsDescription")}</p></div>
       </header>
       <div className="inventory-settings-layout">
-        <nav className="inventory-settings-nav" aria-label="Sekce nastavení skladu" role="tablist">
+        <nav className="inventory-settings-nav" aria-label={t("inventory.settingsSections")} role="tablist">
           {sections.map((section) => (
             <button
               key={section.id}
@@ -29,7 +31,7 @@ export default function InventorySettingsScreen({ activeSection, onSectionChange
               onClick={() => onSectionChange(section.id)}
             >
               <i className={section.icon} aria-hidden="true" />
-              <span>{section.label}</span>
+              <span>{t(section.labelKey)}</span>
             </button>
           ))}
         </nav>

@@ -391,7 +391,7 @@ export default function LeaderboardPage() {
             className="h-100 leaderboard-card"
             rightBadge={teamBoard.length}
             rightContent={isTeamModeLocked ? null : (
-              <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label="Team leaderboard mode">
+              <div className="btn-group btn-group-sm ms-2 bg-light" role="group" aria-label={t("leaderboard.teamMode")}>
                 <Button
                   variant={teamMode === "total" ? "warning" : "secondary"}
                   size="sm"
@@ -545,7 +545,7 @@ export default function LeaderboardPage() {
                             variant="link"
                             className="p-0 text-start"
                             onClick={() => handleShowUserDetails(member.entity_id)}
-                            title="Click to see task breakdown"
+                            title={t("leaderboard.taskBreakdownHint")}
                           >
                             {member.name}
                           </Button>
@@ -558,7 +558,7 @@ export default function LeaderboardPage() {
                 </table>
               </div>
             ) : (
-              <p className="text-muted text-center py-4">No members found in this team.</p>
+              <p className="text-muted text-center py-4">{t("leaderboard.noTeamMembers")}</p>
             )}
           </>
         )}

@@ -7,7 +7,7 @@ const TaskCompletionDetailsModal = ({
   onClose,
   userTaskDetails,
   isLoading = false,
-  title = "Task Completion Details"
+  title
 }) => {
   const { t } = useTranslation();
 
@@ -15,7 +15,7 @@ const TaskCompletionDetailsModal = ({
     <Modal
       isVisible={isVisible}
       onClose={onClose}
-      title={title}
+      title={title || t("leaderboard.completionDetails")}
       subtitle={userTaskDetails?.real_name || userTaskDetails?.username}
       icon={<i className="fas fa-chart-bar" />}
       size="lg"
@@ -24,7 +24,7 @@ const TaskCompletionDetailsModal = ({
               {isLoading ? (
                 <div className="text-center py-4">
                   <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
+                    <span className="visually-hidden">{t("common.loading")}</span>
                   </div>
                 </div>
               ) : (
@@ -67,7 +67,7 @@ const TaskCompletionDetailsModal = ({
                                         <span
                                           key={variant.variant_id}
                                           className="badge bg-secondary bg-opacity-75 text-dark small"
-                                          title={`${variant.variant_name}: ${variant.completion_count}x completed, ${variant.total_points.toFixed(1)} pts`}
+                                          title={t("leaderboard.variantSummary", { name: variant.variant_name, count: variant.completion_count, points: variant.total_points.toFixed(1) })}
                                         >
                                           {variant.variant_name} ({variant.completion_count}×)
                                         </span>
@@ -103,7 +103,7 @@ const TaskCompletionDetailsModal = ({
                   ) : (
                     <p className="text-muted text-center py-4">
                       <i className="fas fa-info-circle me-2"></i>
-                      No completed tasks found.
+                      {t("leaderboard.noCompletedTasks")}
                     </p>
                   )}
                 </>

@@ -6,6 +6,7 @@ from ..dependencies import get_current_active_user, get_db
 from ..models import DirectUserPermission, DirectUserPermissionDeny, PermissionDefinition, PermissionGroup, PermissionGroupPermission, RegisteredModule, User
 from ..permissions import allows, permission_keys
 from ..modules import registry
+from ..modules.translations import localized_menu_item, localized_widget, module_translation_keys
 
 router = APIRouter(prefix="/modules", tags=["modules"])
 admin_router = APIRouter(prefix="/admin/access", tags=["access management"])
@@ -100,7 +101,25 @@ def list_modules(db: Session = Depends(get_db), current_user: User = Depends(get
     result = []
     for manifest in registry.manifests():
         if manifest.code not in records: continue
-        result.append({"code": manifest.code, "name": manifest.name, "description": manifest.description, "icon": manifest.icon, "route": manifest.route, "menu": [item for item in manifest.menu if item.get("permission") in permissions], "widgets": [item for item in manifest.widgets if item.get("permission") in permissions], "permissions": [p for p in permissions if p.startswith(f"{manifest.code}.")]})
+        result.append({
+            "code": manifest.code,
+            "name": manifest.name,
+            "description": manifest.description,
+            **module_translation_keys(manifest.code),
+            "icon": manifest.icon,
+            "route": manifest.route,
+            "menu": [
+                localized_menu_item(manifest.code, item, "menu")
+                for item in manifest.menu
+                if item.get("permission") in permissions
+            ],
+            "widgets": [
+                localized_widget(manifest.code, item)
+                for item in manifest.widgets
+                if item.get("permission") in permissions
+            ],
+            "permissions": [p for p in permissions if p.startswith(f"{manifest.code}.")],
+        })
     return result
 
 
@@ -108,7 +127,17 @@ def list_modules(db: Session = Depends(get_db), current_user: User = Depends(get
 def admin_menu(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     registry.seed(db); permissions = permission_keys(db, current_user)
     records = {m.code: m for m in db.query(RegisteredModule).filter_by(enabled=True, installed=True)}
-    return [dict(item, module=manifest.code) for manifest in registry.manifests() if manifest.code in records for item in manifest.admin_menu if item.get("permission") in permissions]
+    return [
+        {
+            **localized_menu_item(manifest.code, item, "admin"),
+            "module": manifest.code,
+            "section_key": f"modules.{manifest.code}.name",
+        }
+        for manifest in registry.manifests()
+        if manifest.code in records
+        for item in manifest.admin_menu
+        if item.get("permission") in permissions
+    ]
 
 
 @router.get("/all")
@@ -122,6 +151,7 @@ def list_all_modules(db: Session = Depends(get_db), _: User = Depends(require_mo
         manifest = manifests.get(m.code)
         result.append({
             "code": m.code, "name": m.name, "description": m.description,
+            **module_translation_keys(m.code),
             "enabled": m.enabled, "installed": m.installed, "settings": m.settings or {},
             "catalog": m.code in manifests,
             "dependencies": list(manifest.dependencies) if manifest else list(m.dependencies or []),
@@ -133,6 +163,7 @@ def list_all_modules(db: Session = Depends(get_db), _: User = Depends(require_mo
         if all(r["code"] != code for r in result):
             result.append({
                 "code": code, "name": manifest.name, "description": manifest.description,
+                **module_translation_keys(code),
                 "enabled": False, "installed": False, "settings": {},
                 "catalog": True,
                 "dependencies": list(manifest.dependencies),
@@ -157,6 +188,7 @@ def module_detail(code: str, db: Session = Depends(get_db), _: User = Depends(re
         "code": code,
         "name": (record or manifest).name,
         "description": (record or manifest).description,
+        **module_translation_keys(code),
         "enabled": record.enabled if record else False,
         "installed": record.installed if record else False,
         "settings": record.settings or {} if record else {},
@@ -164,9 +196,9 @@ def module_detail(code: str, db: Session = Depends(get_db), _: User = Depends(re
         "dependencies": list(manifest.dependencies) if manifest else list(record.dependencies or []),
         "dependents": [other.code for other in registry.manifests() if code in other.dependencies],
         "metadata": (record.module_metadata or {}) if record else (manifest.metadata if manifest else {}),
-        "menu": list(manifest.menu) if manifest else [],
-        "admin_menu": list(manifest.admin_menu) if manifest else [],
-        "widgets": list(manifest.widgets) if manifest else [],
+        "menu": [localized_menu_item(code, item, "menu") for item in manifest.menu] if manifest else [],
+        "admin_menu": [localized_menu_item(code, item, "admin") for item in manifest.admin_menu] if manifest else [],
+        "widgets": [localized_widget(code, item) for item in manifest.widgets] if manifest else [],
         "permissions": permissions,
     }
 

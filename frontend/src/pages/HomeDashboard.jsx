@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
 import { useAuth } from "../providers/AuthProvider";
@@ -11,6 +12,7 @@ import MessagesWidget from "../components/widgets/MessagesWidget";
 import WelcomeWidget from "../components/widgets/WelcomeWidget";
 import PlannedEventsWidget from "../components/widgets/PlannedEventsWidget";
 import PostsWidget from "../components/widgets/PostsWidget";
+import { localizeWidget } from "../utils/serverTranslations";
 
 const WIDGET_COMPONENTS = {
   welcome: WelcomeWidget,
@@ -23,12 +25,14 @@ const WIDGET_COMPONENTS = {
 };
 
 function DashboardWidget({ widget, className = "col-12" }) {
+  const { t, i18n } = useTranslation();
   if (!widget) return null;
-  const WidgetComponent = WIDGET_COMPONENTS[widget.component];
+  const translatedWidget = localizeWidget(widget, t, i18n);
+  const WidgetComponent = WIDGET_COMPONENTS[translatedWidget.component];
   return <div className={className}>
-    {WidgetComponent ? <WidgetComponent widget={widget} /> : (
-      <Link to={widget.route} className="card dashboard-link-tile h-100 shadow-sm text-decoration-none text-dark">
-        <div className="card-body"><i className={`fas ${widget.icon} fs-3 text-primary mb-3`} /><h2 className="h5">{widget.title}</h2><p className="text-muted mb-0">{widget.text}</p></div>
+    {WidgetComponent ? <WidgetComponent widget={translatedWidget} /> : (
+      <Link to={translatedWidget.route} className="card dashboard-link-tile h-100 shadow-sm text-decoration-none text-dark">
+        <div className="card-body"><i className={`fas ${translatedWidget.icon} fs-3 text-primary mb-3`} /><h2 className="h5">{translatedWidget.title}</h2><p className="text-muted mb-0">{translatedWidget.text}</p></div>
       </Link>
     )}
   </div>;

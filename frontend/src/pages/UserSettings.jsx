@@ -13,7 +13,7 @@ import Select from "../components/Select";
 import UserAvatar from "../components/UserAvatar";
 import PushNotificationSettings from "../components/PushNotificationSettings";
 import { processAvatarFile } from "../utils/avatar";
-import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../utils/username";
+import { normalizeUsernameInput, USERNAME_PATTERN } from "../utils/username";
 
 export default function UserSettingsPage() {
   const { t, i18n } = useTranslation();
@@ -303,11 +303,11 @@ export default function UserSettingsPage() {
                       value={formData.username}
                       onChange={(e) => handleInputChange("username", normalizeUsernameInput(e.target.value))}
                       pattern={USERNAME_PATTERN}
-                      title={USERNAME_HELP}
+                      title={t("userSettings.usernameHelp")}
                       readOnly={!canChangeUsername}
                       required
                     />
-                    <div className="form-text">{canChangeUsername ? USERNAME_HELP : "Uživatelské jméno může měnit pouze správce přihlašování."}</div>
+              <div className="form-text">{canChangeUsername ? t("userSettings.usernameHelp") : t("userSettings.usernameAdminOnly")}</div>
                   </div>
                   <div className="col-md-6">
                     <label className="form-label fw-medium d-flex align-items-center">
@@ -389,9 +389,9 @@ export default function UserSettingsPage() {
                 <h6 className="text-muted mb-1">{t("userSettings.role")}</h6>
                 <p className="mb-0">
                   <span className="badge bg-primary px-3 py-2">
-                    {profile?.user?.role === "admin" ? <><i className="fas fa-user-tie me-1"></i> Admin</> :
-                     profile?.user?.role === "group_admin" ? <><i className="fas fa-users me-1"></i> Group Admin</> :
-                     <><i className="fas fa-user me-1"></i> Member</>}
+                    {profile?.user?.role === "admin" ? <><i className="fas fa-user-tie me-1"></i> {t("navigation.roles.admin")}</> :
+                     profile?.user?.role === "group_admin" ? <><i className="fas fa-users me-1"></i> {t("navigation.roles.groupAdmin")}</> :
+                     <><i className="fas fa-user me-1"></i> {t("navigation.roles.member")}</>}
                   </span>
                 </p>
               </div>

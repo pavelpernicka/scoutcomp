@@ -1,4 +1,5 @@
 import { getLabelConfiguration, getLabelQrSize, LABEL_PADDING_MM, labelMetadata } from "./InventoryLabelPreview";
+import i18n from "../../../i18n";
 
 const qrDataUrl = async (value) => {
   const { BrowserQRCodeSvgWriter } = await import("@zxing/browser");
@@ -15,7 +16,7 @@ const qrDataUrl = async (value) => {
     URL.revokeObjectURL(svgUrl);
     resolve(canvas.toDataURL("image/png"));
   };
-  image.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error("QR se nepodařilo připravit pro PDF")); };
+  image.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error(i18n.t("inventory.qrPdfError"))); };
   image.src = svgUrl;
   });
 };
@@ -42,7 +43,7 @@ async function createLabelsPdf(items, template) {
     const textX = LABEL_PADDING_MM + qrSize + 1.25;
     const textWidth = Math.max(1, pageWidth - textX - LABEL_PADDING_MM);
     pdf.addImage(qr, "PNG", LABEL_PADDING_MM, qrY, qrSize, qrSize, undefined, "FAST");
-    const metadata = labelMetadata(item, configuration).map(({ value }) => value);
+    const metadata = labelMetadata(item, configuration, (key, options, fallback) => i18n.t(key, { ...options, defaultValue: fallback })).map(({ value }) => value);
     const nameLines = pdf.splitTextToSize(item.name, textWidth).slice(0, 2);
     const textHeight = nameLines.length * 3.9 + 3.2 + metadata.length * 2.8;
     let y = Math.max(LABEL_PADDING_MM + 2.1, (pageHeight - textHeight) / 2 + 3.1);

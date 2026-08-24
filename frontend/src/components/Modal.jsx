@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import PropTypes from 'prop-types';
+import { useTranslation } from 'react-i18next';
 import './Modal.css';
 
 // A small shared stack makes nested dialogs legible: every new dialog receives
@@ -13,6 +14,7 @@ const Modal = ({
   isVisible, onClose, title, subtitle, icon, children, footer, size = 'lg',
   headerStyle, headerGradient, className = '', ...props
 }) => {
+  const { t } = useTranslation();
   const dialogRef = useRef(null);
   const onCloseRef = useRef(onClose);
   const stackIdRef = useRef(null);
@@ -74,7 +76,7 @@ const Modal = ({
                 {icon && <span className="fs-4" aria-hidden="true">{icon}</span>}
                 <div><h2 id={titleId} className="modal-title h5 mb-0">{title}</h2>{subtitle && <small>{subtitle}</small>}</div>
               </div>
-              <button type="button" className="btn-close" aria-label="Close" onClick={onClose} />
+              <button type="button" className="btn-close" aria-label={t("common.close")} onClick={onClose} />
             </div>
             <div className="modal-body">{children}</div>
             {footer && <div className="modal-footer">{footer}</div>}

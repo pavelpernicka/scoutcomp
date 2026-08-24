@@ -10,7 +10,7 @@ import UserAvatar from "../../components/UserAvatar";
 import Alert from "../../components/Alert";
 import { useAuth } from "../../providers/AuthProvider";
 import { processAvatarFile } from "../../utils/avatar";
-import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
+import { normalizeUsernameInput, USERNAME_PATTERN } from "../../utils/username";
 
 const STATUS_BADGE = {
   active: "bg-success",
@@ -360,8 +360,8 @@ export default function MemberDetail() {
                         <>
                           <div className="col-md-6">
                             <Field label={t("members.username")}>
-                              <input type="text" className="form-control" value={accountForm.username} pattern={USERNAME_PATTERN} title={USERNAME_HELP} onChange={(e) => setAccountForm((f) => ({ ...f, username: normalizeUsernameInput(e.target.value) }))} />
-                              <div className="form-text">{USERNAME_HELP}</div>
+                              <input type="text" className="form-control" value={accountForm.username} pattern={USERNAME_PATTERN} title={t("userSettings.usernameHelp")} onChange={(e) => setAccountForm((f) => ({ ...f, username: normalizeUsernameInput(e.target.value) }))} />
+                              <div className="form-text">{t("userSettings.usernameHelp")}</div>
                             </Field>
                           </div>
                           <div className="col-md-6">
@@ -412,9 +412,9 @@ export default function MemberDetail() {
                         <div className="col-md-6">
                           <Field label={t("members.role")}>
                             {can("core.access.manage") ? <select className="form-select" value={accountForm.role} onChange={(e) => setAccountForm((f) => ({ ...f, role: e.target.value }))}>
-                              <option value="member">Člen</option>
-                              <option value="group_admin">Vedoucí družiny</option>
-                              <option value="admin">Administrátor</option>
+                      <option value="member">{t("adminUsers.roleMember")}</option>
+                      <option value="group_admin">{t("adminUsers.roleGroupAdmin")}</option>
+                      <option value="admin">{t("adminUsers.roleAdmin")}</option>
                             </select> : <input type="text" className="form-control" value={account.role.replace("_", " ")} disabled />}
                           </Field>
                         </div>

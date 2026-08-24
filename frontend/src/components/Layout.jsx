@@ -11,11 +11,12 @@ import Footer from "./Footer";
 import UserAvatar from "./UserAvatar";
 import defaultAppIcon from "../assets/default-app-icon.svg";
 import api from "../services/api";
+import { translateServerValue } from "../utils/serverTranslations";
 
 const navLinkClass = ({ isActive }) => `nav-link ${isActive ? "active fw-bold" : ""}`;
 
 export default function Layout({ children }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { profile, logout, isAuthenticated, isAdmin, isGroupAdmin, canManageUsers, canReviewCompletions } = useAuth();
   const { config } = useConfig();
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
@@ -32,13 +33,16 @@ export default function Layout({ children }) {
 
   const hasAdminAccess = isAdmin || isGroupAdmin || canManageUsers || canReviewCompletions || adminItems.length > 0;
   const groupedAdminItems = useMemo(
-    () => adminItems.reduce((groups, item) => ({ ...groups, [item.section]: [...(groups[item.section] || []), item] }), {}),
+    () => adminItems.reduce((groups, item) => {
+      const section = item.section_key || item.section;
+      return { ...groups, [section]: [...(groups[section] || []), item] };
+    }, {}),
     [adminItems]
   );
   const legacyAdminMenu = false;
 
   const moduleGroups = useMemo(
-    () => modules.filter((m) => m.menu?.length).map((m) => ({ code: m.code, name: m.name, icon: m.icon, items: m.menu })),
+    () => modules.filter((m) => m.menu?.length).map((m) => ({ code: m.code, name: m.name, nameKey: m.name_key, icon: m.icon, items: m.menu })),
     [modules]
   );
 
@@ -121,7 +125,7 @@ export default function Layout({ children }) {
             onClick={() => setShowMobileMenu(!showMobileMenu)}
             aria-controls="primaryNav"
             aria-expanded={showMobileMenu}
-            aria-label={showMobileMenu ? "Zavřít navigaci" : "Otevřít navigaci"}
+            aria-label={showMobileMenu ? t("navigation.closeNavigation") : t("navigation.openNavigation")}
           >
             <i className={`fas fa-${showMobileMenu ? "xmark" : "bars"} fs-4`}></i>
           </button>
@@ -129,21 +133,21 @@ export default function Layout({ children }) {
           <Link className="navbar-brand d-flex align-items-center text-white fw-bold fs-3" to="/">
             <img
               src={config.app_icon || defaultAppIcon}
-              alt="App Icon"
+              alt={t("navigation.appIcon")}
               className="me-2"
               style={{ width: "32px", height: "32px", objectFit: "contain" }}
             />
             {config.app_name}
-            {isAdmin && <span className="badge bg-warning text-dark ms-2 px-2 py-1">ADMIN</span>}
+            {isAdmin && <span className="badge bg-warning text-dark ms-2 px-2 py-1">{t("navigation.roles.admin")}</span>}
             {!isAdmin && isGroupAdmin && (
-              <span className="badge bg-info text-dark ms-2 px-2 py-1">GROUP ADMIN</span>
+              <span className="badge bg-info text-dark ms-2 px-2 py-1">{t("navigation.roles.groupAdmin")}</span>
             )}
           </Link>
 
           <div className={`collapse navbar-collapse app-mobile-drawer ${showMobileMenu ? 'show' : ''}`} id="primaryNav">
             <div className="app-mobile-drawer__heading d-lg-none">
-              <span>Menu</span>
-              <button type="button" className="btn btn-sm" onClick={() => setShowMobileMenu(false)} aria-label="Zavřít navigaci"><i className="fas fa-xmark" /></button>
+              <span>{t("navigation.menu")}</span>
+              <button type="button" className="btn btn-sm" onClick={() => setShowMobileMenu(false)} aria-label={t("navigation.closeNavigation")}><i className="fas fa-xmark" /></button>
             </div>
             {isAuthenticated && (
               <ul className="navbar-nav me-auto mb-2 mb-lg-0 flex-column flex-lg-row">
@@ -156,7 +160,7 @@ export default function Layout({ children }) {
                   module.items.length === 1 ? (
                     <li className="nav-item" key={module.code}>
                       <NavLink to={module.items[0].route} className={navLinkClass} style={{ color: 'white', fontSize: showMobileMenu ? '1.1rem' : 'inherit' }} onClick={() => setShowMobileMenu(false)}>
-                        <i className={`fas ${module.items[0].icon} me-1`} />{module.items[0].label}
+                        <i className={`fas ${module.items[0].icon} me-1`} />{translateServerValue(t, i18n, module.items[0].label_key, module.items[0].label)}
                       </NavLink>
                     </li>
                   ) : (
@@ -166,7 +170,7 @@ export default function Layout({ children }) {
                         className={`nav-link dropdown-toggle btn btn-link text-white border-0 p-2 d-flex align-items-center justify-content-between w-100 ${openModuleDropdown === module.code ? 'show' : ''}`}
                         onClick={() => setOpenModuleDropdown(openModuleDropdown === module.code ? null : module.code)}
                       >
-                        <span><i className={`fas ${module.icon} me-1`} />{module.name}</span>
+                        <span><i className={`fas ${module.icon} me-1`} />{translateServerValue(t, i18n, module.nameKey, module.name)}</span>
                       </button>
                       <ul className={`dropdown-menu shadow-lg border-0 ${showMobileMenu ? 'w-100' : ''} ${openModuleDropdown === module.code ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                         {module.items.map((item) => (
@@ -176,7 +180,7 @@ export default function Layout({ children }) {
                               className={({ isActive }) => `dropdown-item d-flex align-items-center ${isActive ? 'active' : ''}`}
                               onClick={() => { setOpenModuleDropdown(null); setShowMobileMenu(false); }}
                             >
-                              <i className={`fas ${item.icon} me-2`} />{item.label}
+                              <i className={`fas ${item.icon} me-2`} />{translateServerValue(t, i18n, item.label_key, item.label)}
                             </NavLink>
                           </li>
                         ))}
@@ -196,7 +200,7 @@ export default function Layout({ children }) {
                       <span>{t("navigation.admin")}</span>
                     </button>
                     <ul className={`dropdown-menu shadow-lg border-0 ${showMobileMenu ? 'w-100' : ''} ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
-                      {Object.entries(groupedAdminItems).map(([section, items]) => <li key={section} className="border-bottom"><button type="button" className="dropdown-item fw-bold d-flex justify-content-between" onClick={()=>setOpenAdminSections(current=>({...current,[section]:!current[section]}))}>{section}<i className={`fas fa-chevron-${openAdminSections[section]?"up":"down"}`}/></button>{openAdminSections[section]&&<ul className="list-unstyled mb-1">{items.map(item=><li key={item.route}><NavLink to={item.route} className="dropdown-item ps-4" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{item.label}</NavLink></li>)}</ul>}</li>)}
+                      {Object.entries(groupedAdminItems).map(([section, items]) => <li key={section} className="border-bottom"><button type="button" className="dropdown-item fw-bold d-flex justify-content-between" onClick={()=>setOpenAdminSections(current=>({...current,[section]:!current[section]}))}>{translateServerValue(t, i18n, section, items[0]?.section)}<i className={`fas fa-chevron-${openAdminSections[section]?"up":"down"}`}/></button>{openAdminSections[section]&&<ul className="list-unstyled mb-1">{items.map(item=><li key={item.route}><NavLink to={item.route} className="dropdown-item ps-4" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{translateServerValue(t, i18n, item.label_key, item.label)}</NavLink></li>)}</ul>}</li>)}
                       {legacyAdminMenu && canReviewCompletions && (
                         <li>
                           <NavLink to="/admin/approvals" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
@@ -233,7 +237,7 @@ export default function Layout({ children }) {
                         </li>
                       )}
                       {legacyAdminMenu && isAdmin && (
-                        <li><NavLink to="/admin/modules" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>Moduly aplikace</NavLink></li>
+                        <li><NavLink to="/admin/modules" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{t("navigation.modules")}</NavLink></li>
                       )}
                       {legacyAdminMenu && canManageUsers && (
                         <>
@@ -343,7 +347,7 @@ export default function Layout({ children }) {
           </div>
         </div>
       </header>
-      {showMobileMenu && <button type="button" className="app-mobile-menu-backdrop d-lg-none" aria-label="Zavřít navigaci" onClick={() => setShowMobileMenu(false)} />}
+      {showMobileMenu && <button type="button" className="app-mobile-menu-backdrop d-lg-none" aria-label={t("navigation.closeNavigation")} onClick={() => setShowMobileMenu(false)} />}
       <main className="app-content flex-grow-1 d-lg-flex align-items-stretch">
         {activeModule ? (
           <>
@@ -356,7 +360,7 @@ export default function Layout({ children }) {
                     className={({ isActive }) => `list-group-item list-group-item-action border-0 ${isActive ? 'active' : ''}`}
                     onClick={() => setShowMobileMenu(false)}
                   >
-                    <i className={`fas ${item.icon} me-2`} />{item.label}
+                    <i className={`fas ${item.icon} me-2`} />{translateServerValue(t, i18n, item.label_key, item.label)}
                   </NavLink>
                 ))}
               </nav>

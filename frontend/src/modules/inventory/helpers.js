@@ -1,10 +1,10 @@
 import { parseServerDate } from "../../utils/dateUtils";
 
 export const ITEM_PRESENCE_OPTIONS = [
-  { value: "", label: "Vše" },
-  { value: "available", label: "Dostupné" },
-  { value: "loaned", label: "Zapůjčeno" },
-  { value: "sold_out", label: "Došlo" },
+  { value: "", label: "Vše", labelKey: "inventory.all" },
+  { value: "available", label: "Dostupné", labelKey: "inventory.available" },
+  { value: "loaned", label: "Zapůjčeno", labelKey: "inventory.loaned" },
+  { value: "sold_out", label: "Došlo", labelKey: "inventory.soldOut" },
 ];
 
 const THEME_COLOR_STYLES = {
@@ -23,20 +23,20 @@ const THEME_COLOR_STYLES = {
 };
 
 export const LABEL_FIELD_OPTIONS = [
-  { value: "name", label: "Název" },
-  { value: "category", label: "Kategorie" },
-  { value: "current_location", label: "Aktuální lokace" },
-  { value: "default_location", label: "Výchozí lokace" },
-  { value: "status", label: "Stav" },
-  { value: "qr_identifier", label: "QR identifikátor" },
-  { value: "custom_text", label: "Textové pole" },
+  { value: "name", label: "Název", labelKey: "inventory.name" },
+  { value: "category", label: "Kategorie", labelKey: "inventory.category" },
+  { value: "current_location", label: "Aktuální lokace", labelKey: "inventory.currentLocation" },
+  { value: "default_location", label: "Výchozí lokace", labelKey: "inventory.defaultLocation" },
+  { value: "status", label: "Stav", labelKey: "inventory.status" },
+  { value: "qr_identifier", label: "QR identifikátor", labelKey: "inventory.qrIdentifier" },
+  { value: "custom_text", label: "Textové pole", labelKey: "inventory.customText" },
 ];
 
 export const INVENTORY_SCREENS = [
-  { id: "items", label: "Věci", icon: "fas fa-box-open" },
-  { id: "loans", label: "Vypůjčky", icon: "fas fa-handshake-angle" },
-  { id: "scanner", label: "Skener", icon: "fas fa-qrcode" },
-  { id: "settings", label: "Nastavení skladu", icon: "fas fa-sliders" },
+  { id: "items", label: "Věci", labelKey: "inventory.items", icon: "fas fa-box-open" },
+  { id: "loans", label: "Vypůjčky", labelKey: "inventory.loans", icon: "fas fa-handshake-angle" },
+  { id: "scanner", label: "Skener", labelKey: "inventory.scanner", icon: "fas fa-qrcode" },
+  { id: "settings", label: "Nastavení skladu", labelKey: "inventory.settings", icon: "fas fa-sliders" },
 ];
 
 export function getQrImageUrl(qrIdentifier) {
@@ -97,6 +97,7 @@ export function getItemFlagBadge(item) {
   if ((item.open_loan_quantity || 0) > 0) {
     return {
       label: "Vypůjčeno",
+      labelKey: "inventory.loaned",
       style: buildColorStyle("loan", 0.15),
     };
   }
@@ -108,6 +109,7 @@ export function getItemFlagBadge(item) {
   }
   return {
     label: "Bez příznaku",
+    labelKey: "inventory.noFlag",
     style: buildColorStyle("neutral", 0.14),
   };
 }
@@ -118,16 +120,16 @@ export function formatInventoryFlagName(flag) {
 
 export function buildFlagFilterOptions(flags) {
   return [
-    { value: "", label: "Vše", color: "neutral" },
+    { value: "", label: "Vše", labelKey: "inventory.all", color: "neutral" },
     ...flags.map((flag) => ({ value: String(flag.id), label: formatInventoryFlagName(flag), color: flag.color })),
   ];
 }
 
 export function getItemStatusBadge(item) {
   const presence = getItemPresence(item);
-  if (presence === "loaned") return { label: "Zapůjčeno", className: "text-bg-warning" };
-  if (presence === "sold_out") return { label: "Došlo", className: "text-bg-danger" };
-  return { label: "Dostupné", className: "text-bg-success" };
+  if (presence === "loaned") return { label: "Zapůjčeno", labelKey: "inventory.loaned", className: "text-bg-warning" };
+  if (presence === "sold_out") return { label: "Došlo", labelKey: "inventory.soldOut", className: "text-bg-danger" };
+  return { label: "Dostupné", labelKey: "inventory.available", className: "text-bg-success" };
 }
 
 export function getPresenceTone(presence) {
@@ -140,6 +142,8 @@ export function getItemCurrentLocation(item) {
   if ((item.locations || []).length > 1) {
     return {
       label: `Více lokací (${item.locations.length})`,
+      labelKey: "inventory.multipleLocations",
+      labelOptions: { count: item.locations.length },
       tone: "match",
     };
   }
@@ -151,7 +155,7 @@ export function getItemCurrentLocation(item) {
   }
   const current = item.current_location || item.default_location || "";
   if (!current) {
-    return { label: "Bez lokace", tone: "neutral" };
+    return { label: "Bez lokace", labelKey: "inventory.noLocation", tone: "neutral" };
   }
   return {
     label: current,

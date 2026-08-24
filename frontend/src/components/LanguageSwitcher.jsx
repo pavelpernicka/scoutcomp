@@ -5,7 +5,7 @@ import PropTypes from 'prop-types';
 import { getAvailableLanguages, getLanguageDisplayName, getLanguageFlag } from "../utils/translationLoader";
 
 export default function LanguageSwitcher({ isMobile = false }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [availableLanguages, setAvailableLanguages] = useState(["cs", "en"]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
@@ -42,7 +42,7 @@ export default function LanguageSwitcher({ isMobile = false }) {
         type="button"
         onClick={() => setShowDropdown(!showDropdown)}
         style={{ borderRadius: '20px' }}
-        aria-label="Select language"
+        aria-label={t("navigation.selectLanguage")}
       >
         <div className="d-flex align-items-center">
           <span className="me-2">{getLanguageFlag(i18n.language)}</span>

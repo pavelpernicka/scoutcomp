@@ -113,9 +113,9 @@ export default function PlannedEventsWidget() {
         <div className="row g-0">
           <div className="col-12 col-lg-7 p-2 dashboard-events-calendar-pane">
             <div className="d-flex align-items-center justify-content-between px-1 pb-2">
-              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label="Předchozí měsíc" onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))}><i className="fas fa-chevron-left" /></button>
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t("calendar.previousMonth")} onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() - 1, 1))}><i className="fas fa-chevron-left" /></button>
               <strong className="small text-capitalize">{calendarMonth.toLocaleDateString(locale, { month: "long", year: "numeric" })}</strong>
-              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label="Další měsíc" onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))}><i className="fas fa-chevron-right" /></button>
+              <button type="button" className="btn btn-sm btn-outline-secondary" aria-label={t("calendar.nextMonth")} onClick={() => setCalendarMonth((date) => new Date(date.getFullYear(), date.getMonth() + 1, 1))}><i className="fas fa-chevron-right" /></button>
             </div>
             <EventMonthCalendar
               events={events}
@@ -129,7 +129,7 @@ export default function PlannedEventsWidget() {
           </div>
           <div className="col-12 col-lg-5 d-flex flex-column dashboard-events-list">
           <div className="dashboard-events-list__heading">
-            <span>Nadcházející akce</span>
+            <span>{t("dashboard.upcomingEvents")}</span>
             <span>{upcoming.length}</span>
           </div>
           {upcoming.map((event, index) => {
@@ -174,9 +174,9 @@ export default function PlannedEventsWidget() {
                           minute: "2-digit",
                         })}
                       </span>
-                      {status === "attending" && <span className="badge bg-success small px-2 py-1"><i className="fas fa-check me-1" />Přihlášen</span>}
-                      {status === "not_attending" && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-xmark me-1" />Omluven</span>}
-                      {status === "unknown" && event.requires_planned && !deadlinePassed && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-triangle-exclamation me-1" />Nutnost přihlášení</span>}
+                      {status === "attending" && <span className="badge bg-success small px-2 py-1"><i className="fas fa-check me-1" />{t("calendar.registered")}</span>}
+                      {status === "not_attending" && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-xmark me-1" />{t("calendar.excused")}</span>}
+                      {status === "unknown" && event.requires_planned && !deadlinePassed && <span className="badge bg-warning text-dark small px-2 py-1"><i className="fas fa-triangle-exclamation me-1" />{t("calendar.registrationRequired")}</span>}
                       {event.location && (
                         <span>
                           <i className="fas fa-map-marker-alt me-1"></i>
@@ -193,11 +193,11 @@ export default function PlannedEventsWidget() {
                   </div>
                 </div>
                 <div className="mt-3 d-flex flex-wrap align-items-center gap-2">
-                  {!deadlinePassed && <div className="btn-group" role="group" aria-label={`Účast na akci ${event.title}`}>
+                  {!deadlinePassed && <div className="btn-group" role="group" aria-label={t("calendar.eventAttendance", { title: event.title })}>
                     {[
-                      ["attending", "btn-success", "fa-check", "Zúčastním se"],
-                      ["not_attending", "btn-warning", "fa-xmark", "Nezúčastním se"],
-                      ["unknown", "btn-outline-secondary", "fa-question", "Nevím"],
+                      ["attending", "btn-success", "fa-check", t("calendar.attending")],
+                      ["not_attending", "btn-warning", "fa-xmark", t("calendar.not_attending")],
+                      ["unknown", "btn-outline-secondary", "fa-question", t("calendar.unknownAttendance")],
                     ].map(([value, className, icon, label]) => <button key={value} type="button" className={`btn btn-sm ${status === value ? className : "btn-outline-secondary"}`} disabled={signupMutation.isPending} onClick={() => signupMutation.mutate({ eventId: event.id, status: value })}><i className={`fas ${icon} me-1`} /><span className="d-none d-xl-inline">{label}</span></button>)}
                   </div>}
                 </div>

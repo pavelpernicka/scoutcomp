@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
-const cameraErrorMessage = (error) => {
-  if (error?.name === "NotAllowedError") return "Přístup ke kameře byl zamítnut. Povol jej v nastavení prohlížeče.";
-  if (error?.name === "NotFoundError") return "Nebyla nalezena žádná dostupná kamera.";
-  if (error?.name === "NotReadableError") return "Kameru právě používá jiná aplikace nebo karta.";
-  return "Kameru se nepodařilo spustit. Zkus ji spustit znovu.";
+const cameraErrorMessage = (error, t) => {
+  if (error?.name === "NotAllowedError") return t("inventory.cameraDenied");
+  if (error?.name === "NotFoundError") return t("inventory.cameraNotFound");
+  if (error?.name === "NotReadableError") return t("inventory.cameraBusy");
+  return t("inventory.cameraStartError");
 };
 
 export default function InventoryQrScanner({ onDetected, disabled = false }) {
+  const { t } = useTranslation();
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
   const activeVideoRef = useRef(null);
@@ -48,7 +50,7 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
     if (disabled || startingRef.current || controlsRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia) {
       setStatus("unsupported");
-      setMessage("Tento prohlížeč nemá přístup k rozhraní kamery. Použij ruční nebo externí čtečku.");
+      setMessage(t("inventory.cameraUnsupported"));
       return;
     }
     if (!videoRef.current) return;
@@ -58,7 +60,7 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
     startingRef.current = true;
     detectedRef.current = false;
     setStatus("starting");
-    setMessage("Spouštím kameru…");
+    setMessage(t("inventory.startingCamera"));
     try {
       const { BrowserQRCodeReader, BrowserCodeReader } = await import("@zxing/browser");
       releaseAllStreamsRef.current = () => BrowserCodeReader.releaseAllStreams();
@@ -76,11 +78,11 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
           if (!mountedRef.current) return;
           if (!outcome?.found) {
             setStatus("error");
-            setMessage(outcome?.message || `Věc s QR kódem ${code} neexistuje.`);
+            setMessage(outcome?.message || t("inventory.qrItemNotFound", { code }));
             return;
           }
           setStatus("detected");
-          setMessage(`Načtena věc: ${outcome.item.name}`);
+          setMessage(t("inventory.itemLoaded", { name: outcome.item.name }));
         }
       );
       if (!mountedRef.current || detectedRef.current) {
@@ -99,14 +101,14 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
       startingRef.current = false;
       if (mountedRef.current) {
         setStatus("scanning");
-        setMessage("Namiř kameru na QR kód.");
+        setMessage(t("inventory.aimAtQr"));
       }
     } catch (error) {
       startingRef.current = false;
       stop("error");
-      if (mountedRef.current) setMessage(cameraErrorMessage(error));
+      if (mountedRef.current) setMessage(cameraErrorMessage(error, t));
     }
-  }, [disabled, stop]);
+  }, [disabled, stop, t]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -120,13 +122,13 @@ export default function InventoryQrScanner({ onDetected, disabled = false }) {
   }, [start, stop]);
 
   return (
-    <section className="inventory-camera-scanner" aria-label="Skenování QR kódu kamerou">
+    <section className="inventory-camera-scanner" aria-label={t("inventory.cameraQrScanning")}>
       <div className="inventory-camera-preview">
         <video ref={videoRef} muted playsInline className={status === "scanning" || status === "detected" || status === "starting" ? "is-visible" : ""} />
         {status !== "scanning" && status !== "detected" && status !== "starting" ? <i className="fas fa-qrcode" aria-hidden="true" /> : <span className="inventory-camera-frame" aria-hidden="true" />}
       </div>
       <div className="inventory-camera-controls">
-        {status === "scanning" || status === "starting" ? <button type="button" className="btn btn-outline-secondary" onClick={() => stop()}>Zastavit kameru</button> : <button type="button" className="btn btn-primary" onClick={start} disabled={disabled}>Spustit kameru</button>}
+        {status === "scanning" || status === "starting" ? <button type="button" className="btn btn-outline-secondary" onClick={() => stop()}>{t("inventory.stopCamera")}</button> : <button type="button" className="btn btn-primary" onClick={start} disabled={disabled}>{t("inventory.startCamera")}</button>}
         <span className="small text-muted" aria-live="polite">{message}</span>
       </div>
     </section>

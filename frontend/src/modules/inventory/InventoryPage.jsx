@@ -2,6 +2,7 @@ import React from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { inventoryApi } from "./api";
 import { formatServerDateToInputValue } from "../../utils/dateUtils";
@@ -67,17 +68,18 @@ function toIsoOrNull(value) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function inventoryErrorMessage(error, fallback) {
+function inventoryErrorMessage(error, fallback, invalidValue) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {
-    return detail.map((entry) => entry?.msg || entry?.message || "Neplatná hodnota").join(" ");
+    return detail.map((entry) => entry?.msg || entry?.message || invalidValue).join(" ");
   }
   if (detail && typeof detail === "object") return detail.msg || detail.message || fallback;
   return fallback;
 }
 
 export default function InventoryPage() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { screen } = useParams();
   const navigate = useNavigate();
@@ -438,14 +440,14 @@ export default function InventoryPage() {
       setLabelDialogVisible(true);
     } else {
       // No templates available
-      alert("Nejsou k dispozici žádné šablony štítků.");
+      alert(t("inventory.noLabelTemplates"));
     }
   };
 
   const openBulkLabelDialog = () => {
     if (!selectedItemIds.length) return;
     if (!templates.length) {
-      alert("Nejsou k dispozici žádné šablony štítků.");
+      alert(t("inventory.noLabelTemplates"));
       return;
     }
     setLabelItemIds(selectedItemIds);
@@ -526,30 +528,30 @@ export default function InventoryPage() {
   };
 
   const handleDeleteLocation = (location) => {
-    if (!window.confirm(`Smazat lokaci "${location.name}"?`)) return;
+    if (!window.confirm(t("inventory.confirmDeleteLocation", { name: location.name }))) return;
     deleteLocationMutation.mutate(location.id);
     if (locationFilter === location.path) setLocationFilter("");
   };
 
   const handleDeleteCategory = (category) => {
-    if (!window.confirm(`Smazat kategorii "${category.name}"?`)) return;
+    if (!window.confirm(t("inventory.confirmDeleteCategory", { name: category.name }))) return;
     deleteCategoryMutation.mutate(category.id);
     if (categoryFilter === category.path) setCategoryFilter("");
   };
 
   const handleDeleteFlag = (flag) => {
-    if (!window.confirm(`Smazat příznak "${flag.name}"?`)) return;
+    if (!window.confirm(t("inventory.confirmDeleteFlag", { name: flag.name }))) return;
     deleteFlagMutation.mutate(flag.id);
     if (flagFilter === String(flag.id)) setFlagFilter("");
   };
 
   const handleSaveItem = async ({ closeAfterSave = true, section = "all" } = {}) => {
     if (!itemForm.name.trim()) {
-      setItemSaveError("Vyplň název věci.");
+      setItemSaveError(t("inventory.itemNameRequired"));
       return;
     }
     if (!Number.isInteger(Number(itemForm.quantity)) || Number(itemForm.quantity) < 1) {
-      setItemSaveError("Množství musí být celé číslo alespoň 1.");
+      setItemSaveError(t("inventory.quantityInvalid"));
       return;
     }
     const locations = (itemForm.locations || []).map((location) => ({
@@ -564,7 +566,7 @@ export default function InventoryPage() {
       || locations.reduce((total, location) => total + location.quantity, 0) !== availableQuantity
     );
     if (hasInvalidAllocation) {
-      setItemSaveError(`Rozděl množství do lokací přesně na ${availableQuantity} ${itemForm.quantity_unit}. Každá lokace může být uvedena jen jednou.`);
+      setItemSaveError(t("inventory.locationAllocationInvalid", { quantity: availableQuantity, unit: itemForm.quantity_unit }));
       return;
     }
     setItemSaveError("");
@@ -600,7 +602,7 @@ export default function InventoryPage() {
         setItemDialogVisible(true);
       }
     } catch (error) {
-      setItemSaveError(inventoryErrorMessage(error, "Věc se nepodařilo uložit. Zkontroluj vyplněné údaje."));
+      setItemSaveError(inventoryErrorMessage(error, t("inventory.itemSaveError"), t("inventory.invalidValue")));
       return;
     }
   };
@@ -681,23 +683,23 @@ export default function InventoryPage() {
 
   const handleFindItem = async (value = scanValue) => {
     const qrIdentifier = String(value || "").trim();
-    if (!qrIdentifier) return { found: false, message: "Zadej QR identifikátor." };
+    if (!qrIdentifier) return { found: false, message: t("inventory.enterQrIdentifier") };
     try {
       const item = await inventoryApi.findByQr(qrIdentifier);
       openEditItem(item);
-      setScanFeedback(`Načtena věc: ${item.name}`);
+      setScanFeedback(t("inventory.itemLoaded", { name: item.name }));
       setScanValue("");
       return { found: true, item };
     } catch (error) {
       const missing = error?.response?.status === 404;
-      const message = missing ? `Věc s QR kódem ${qrIdentifier} neexistuje.` : "QR kód se nepodařilo ověřit. Zkus to znovu.";
+      const message = missing ? t("inventory.qrItemNotFound", { code: qrIdentifier }) : t("inventory.qrVerifyError");
       setScanFeedback(message);
       return { found: false, message };
     }
   };
 
-  if (isLoading) return <div className="loader">Načítám sklad…</div>;
-  if (error) return <div className="alert alert-danger">Nepodařilo se načíst skladový modul.</div>;
+  if (isLoading) return <div className="loader">{t("inventory.loading")}</div>;
+  if (error) return <div className="alert alert-danger">{t("inventory.loadError")}</div>;
 
   const locationParentOptions = flatLocations
     .filter((location) => !editingLocation || location.id !== editingLocation.id)

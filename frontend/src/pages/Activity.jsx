@@ -584,11 +584,11 @@ export default function Activity() {
           {view === "month" && (
             <>
               <div className="d-flex align-items-center gap-1 ms-lg-auto">
-                <Button variant="outline-secondary" size="sm" icon="fas fa-chevron-left" onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))} aria-label="Previous month" />
+                <Button variant="outline-secondary" size="sm" icon="fas fa-chevron-left" onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))} aria-label={t("common.previous")} />
                 <Button variant="outline-secondary" size="sm" onClick={() => setViewDate(new Date())}>
                   {t("calendar.today")}
                 </Button>
-                <Button variant="outline-secondary" size="sm" icon="fas fa-chevron-right" onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))} aria-label="Next month" />
+                <Button variant="outline-secondary" size="sm" icon="fas fa-chevron-right" onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))} aria-label={t("common.next")} />
               </div>
               <span className="fw-semibold fs-5 text-success ms-lg-3" style={{ textTransform: "capitalize" }}>
                 {monthLabel}
@@ -826,7 +826,7 @@ export default function Activity() {
               <div className="col-12">
                 <h3 className="h6 mb-2">
                   <i className="fas fa-newspaper me-2 text-primary" aria-hidden="true" />
-                  Související příspěvky
+                  {t("calendar.relatedPosts")}
                 </h3>
                 <div className="list-group">
                   {selectedEvent.linked_posts.map((post) => (

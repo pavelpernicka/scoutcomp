@@ -10,7 +10,7 @@ import Modal from "../../components/Modal";
 import Alert from "../../components/Alert";
 import AdminPageHeader from "../web/admin/AdminPageHeader";
 import { useAuth } from "../../providers/AuthProvider";
-import { normalizeUsernameInput, USERNAME_HELP, USERNAME_PATTERN } from "../../utils/username";
+import { normalizeUsernameInput, USERNAME_PATTERN } from "../../utils/username";
 
 const PAGE_SIZE = 50;
 
@@ -417,7 +417,7 @@ export default function MembersDirectory() {
                 className="form-control"
                 value={createForm.username}
                 pattern={USERNAME_PATTERN}
-                title={USERNAME_HELP}
+                title={t("userSettings.usernameHelp")}
                 onChange={(e) => setCreateForm((f) => ({ ...f, username: normalizeUsernameInput(e.target.value) }))}
                 required
               />

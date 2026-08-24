@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 import "./Toast.css";
 
 const icons = {
@@ -13,6 +14,7 @@ const icons = {
 
 /** A short-lived application notification. Persistent validation belongs beside its field. */
 export default function Toast({ type = "info", children, onDismiss, icon, duration = 5000 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!onDismiss || !duration) return undefined;
     const timer = window.setTimeout(onDismiss, duration);
@@ -25,7 +27,7 @@ export default function Toast({ type = "info", children, onDismiss, icon, durati
         {icon || <i className={`fas ${icons[type] || icons.info}`} />}
       </span>
       <div className="app-toast__content">{children}</div>
-      {onDismiss && <button type="button" className="btn-close" aria-label="Zavřít oznámení" onClick={onDismiss} />}
+      {onDismiss && <button type="button" className="btn-close" aria-label={t("common.closeNotification")} onClick={onDismiss} />}
     </div>,
     document.body
   );

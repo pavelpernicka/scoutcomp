@@ -369,7 +369,7 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
         onClick={(e) => e.stopPropagation()}
       >
         <header className="article-edit-modal__header">
-          <div><span className="article-edit-modal__eyebrow">{isNew ? "Nový obsah" : "Úprava obsahu"}</span><h2><i className="fas fa-newspaper me-2"></i>{isNew ? t("web.newPost") : t("web.editPost")}</h2></div>
+              <div><span className="article-edit-modal__eyebrow">{isNew ? t("web.newContent") : t("web.editingContent")}</span><h2><i className="fas fa-newspaper me-2"></i>{isNew ? t("web.newPost") : t("web.editPost")}</h2></div>
           <button type="button" className="btn-close" aria-label={t("web.close")} onClick={onCancel} />
         </header>
         <div className="article-edit-modal__body">
@@ -388,12 +388,12 @@ function ArticleEditBoxModal({ post, onCancel, onSaved }) {
             />
           </div>
           <section className="article-edit-modal__editor">
-            <div className="article-edit-modal__section-heading"><span>{t("web.postBody")}</span><small>Formátovaný text, odkazy, média a vložený obsah</small></div>
+                  <div className="article-edit-modal__section-heading"><span>{t("web.postBody")}</span><small>{t("web.postBodyHelp")}</small></div>
             <ArticleEditBox value={form.body} onChange={(body) => setForm((f) => ({ ...f, body }))} disabled={saveMutation.isPending} />
           </section>
           <div className="article-edit-modal__settings">
           <section className="article-edit-modal__panel">
-            <div className="article-edit-modal__section-heading"><span>{t("web.postCover")}</span><small>Titulní fotografie příspěvku</small></div>
+                  <div className="article-edit-modal__section-heading"><span>{t("web.postCover")}</span><small>{t("web.postCoverHelp")}</small></div>
             {form.cover_media_id && (
               <figure className="article-cover-preview">
                 <MediaPreview

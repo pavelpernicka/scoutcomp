@@ -506,7 +506,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                           <option value="rejected">{t('adminUsers.rejected')}</option>
                           {item.status === "pending" && (
                             <option value="pending" disabled>
-                              Pending
+                              {t("adminUsers.pending")}
                             </option>
                           )}
                         </select>
@@ -573,22 +573,22 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
             <div className="modal-dialog" role="document" onClick={(event) => event.stopPropagation()}>
               <div className="modal-content">
                 <div className="modal-header">
-                  <h5 className="modal-title">Add completion</h5>
+                  <h5 className="modal-title">{t("adminUsers.addCompletionBtn")}</h5>
                   <button
                     type="button"
                     className="btn-close"
-                    aria-label="Close"
+                    aria-label={t("common.close")}
                     onClick={closeCreateCompletionModal}
                   ></button>
                 </div>
                 {tasksLoading ? (
                   <div className="modal-body">
-                    <div className="text-center text-muted">Loading tasks…</div>
+                    <div className="text-center text-muted">{t("adminUsers.loadingTasks")}</div>
                   </div>
                 ) : assignableTasks.length === 0 ? (
                   <div className="modal-body">
                     <div className="alert alert-warning mb-0" role="alert">
-                      No compatible tasks available for this user.
+                      {t("adminUsers.noCompatibleTasks")}
                     </div>
                   </div>
                 ) : (
@@ -600,7 +600,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                         </div>
                       )}
                       <div className="mb-3">
-                        <label className="form-label">Task</label>
+                        <label className="form-label">{t("adminUsers.task")}</label>
                         <select
                           className="form-select"
                           value={newCompletionForm.taskId}
@@ -614,7 +614,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                           required
                         >
                           <option value="" disabled>
-                            Select task
+                            {t("adminUsers.selectTask")}
                           </option>
                           {assignableTasks.map((task) => (
                             <option key={task.value} value={task.value}>
@@ -625,7 +625,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                       </div>
                       {availableVariants.length > 0 && (
                         <div className="mb-3">
-                          <label className="form-label">Task Type</label>
+                          <label className="form-label">{t("adminUsers.taskType")}</label>
                           <select
                             className="form-select"
                             value={newCompletionForm.variantId}
@@ -638,7 +638,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                             required
                           >
                             <option value="" disabled>
-                              Select task type
+                              {t("adminUsers.selectTaskType")}
                             </option>
                             {availableVariants.map((variant) => (
                               <option key={variant.value} value={variant.value}>
@@ -650,7 +650,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                       )}
                       <div className="row g-3">
                         <div className="col-12 col-md-6">
-                          <label className="form-label">Count</label>
+                          <label className="form-label">{t("adminUsers.count")}</label>
                           <input
                             className="form-control"
                             type="number"
@@ -667,7 +667,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                           />
                         </div>
                         <div className="col-12 col-md-6">
-                          <label className="form-label">Status</label>
+                          <label className="form-label">{t("adminUsers.status")}</label>
                           <select
                             className="form-select"
                             value={newCompletionForm.status}
@@ -678,13 +678,13 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                               }))
                             }
                           >
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
+                            <option value="approved">{t("adminUsers.approved")}</option>
+                            <option value="rejected">{t("adminUsers.rejected")}</option>
                           </select>
                         </div>
                       </div>
                       <div className="mb-3 mt-3">
-                        <label className="form-label">Member note</label>
+                        <label className="form-label">{t("adminUsers.memberNote")}</label>
                         <textarea
                           className="form-control"
                           rows={2}
@@ -698,7 +698,7 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                         ></textarea>
                       </div>
                       <div className="mb-0">
-                        <label className="form-label">Admin note</label>
+                        <label className="form-label">{t("adminUsers.adminNote")}</label>
                         <textarea
                           className="form-control"
                           rows={2}
@@ -719,14 +719,14 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
                         onClick={closeCreateCompletionModal}
                         disabled={createCompletionMutation.isLoading}
                       >
-                        Cancel
+                        {t("common.cancel")}
                       </button>
                       <button
                         type="submit"
                         className="btn btn-primary"
                         disabled={createCompletionMutation.isLoading}
                       >
-                        Add completion
+                        {t("adminUsers.addCompletionBtn")}
                       </button>
                     </div>
                   </form>

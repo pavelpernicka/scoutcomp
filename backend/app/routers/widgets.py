@@ -6,6 +6,7 @@ from ..dependencies import get_current_active_user, get_db, require_action
 from ..models import RegisteredModule, User
 from ..permissions import permission_keys
 from ..modules import registry
+from ..modules.translations import localized_widget, module_translation_keys
 
 router = APIRouter(prefix="/widgets", tags=["widgets"])
 admin_router = APIRouter(prefix="/admin/widgets", tags=["admin", "widgets"])
@@ -27,6 +28,15 @@ def _enabled_ids(core: dict) -> set[str] | None:
 def _widget_config(core: dict, widget_id: str) -> dict:
     overrides = core.get("widget_config") or {}
     return overrides.get(widget_id) or {}
+
+
+def _localized_widget_with_config(module_code: str, item: dict, config: dict) -> dict:
+    """Keep administrator-provided copy verbatim instead of translating it as a catalogue default."""
+    result = {**localized_widget(module_code, item), **config}
+    for field in ("title", "text"):
+        if field in config:
+            result.pop(f"{field}_key", None)
+    return result
 
 
 def _known_widget_ids() -> set[str]:
@@ -55,7 +65,12 @@ def list_widgets(db: Session = Depends(get_db), current_user: User = Depends(get
                 continue
             if enabled_ids is not None and widget_id not in enabled_ids:
                 continue
-            result.append(dict(item, id=widget_id, module=manifest.code, **_widget_config(core, widget_id)))
+            config = _widget_config(core, widget_id)
+            result.append(dict(
+                _localized_widget_with_config(manifest.code, item, config),
+                id=widget_id,
+                module=manifest.code,
+            ))
     return result
 
 
@@ -71,21 +86,24 @@ def admin_list_widgets(db: Session = Depends(get_db), _: User = Depends(require_
     for code, manifest in modules.items():
         for item in manifest.widgets:
             widget_id = item.get("id") or f"{manifest.code}.{item['component']}"
+            config = _widget_config(core, widget_id)
+            localized = _localized_widget_with_config(code, item, config)
             result.append({
                 "id": widget_id,
                 "module": code,
                 "module_name": records[code].name if code in records else manifest.name,
+                "module_name_key": module_translation_keys(code)["name_key"],
                 "module_installed": code in records,
-                "title": item.get("title", ""),
-                "text": item.get("text", ""),
+                "title": localized.get("title", ""),
+                "text": localized.get("text", ""),
                 "icon": item.get("icon", "fa-puzzle-piece"),
                 "component": item.get("component", "link"),
                 "width": item.get("width", "col-xl-4"),
                 "route": item.get("route"),
                 "permission": item.get("permission"),
                 "enabled": enabled_ids is None or widget_id in enabled_ids,
-                **{key: value for key, value in _widget_config(core, widget_id).items()
-                   if key in ("title", "text", "icon")},
+                **{key: localized[key] for key in ("title_key", "text_key") if key in localized},
+                **{key: value for key, value in config.items() if key == "icon"},
             })
     return result
 

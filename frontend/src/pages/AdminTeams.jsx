@@ -569,7 +569,7 @@ export default function AdminTeams() {
                           setMemberSearch(user.real_name || user.username || "");
                         }}
                         disabled={updateUserMutation.isLoading}
-                        placeholder="Pište jméno nebo e-mail člena…"
+                      placeholder={t("memberPicker.placeholder")}
                       />
                     </div>
                     <button

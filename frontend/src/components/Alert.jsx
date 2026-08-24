@@ -1,4 +1,5 @@
 import PropTypes from 'prop-types';
+import { useTranslation } from 'react-i18next';
 import Toast from './Toast';
 
 const Alert = ({
@@ -11,6 +12,7 @@ const Alert = ({
   duration,
   ...props
 }) => {
+  const { t } = useTranslation();
   // Dismissible operation feedback should not move page content. Errors that
   // explain a field or an unavailable view deliberately remain inline.
   if (toast ?? Boolean(onDismiss)) {
@@ -46,7 +48,7 @@ const Alert = ({
           <button
             type="button"
             className="btn-close"
-            aria-label="Close"
+            aria-label={t("common.close")}
             onClick={onDismiss}
           ></button>
         )}

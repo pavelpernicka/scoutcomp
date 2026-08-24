@@ -1,21 +1,23 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { useTranslation } from "react-i18next";
 
 import Card from "../../../components/Card";
 import InventoryLocationTree from "../components/InventoryLocationTree";
 import { buildColorStyle, buildPathMetaMap } from "../helpers";
 
 export default function InventoryCategoriesScreen({ categories, selectedPath, onSelect, onCreateRoot, onCreateChild, onEdit, onDelete }) {
+  const { t } = useTranslation();
   const categoryMap = buildPathMetaMap(categories);
   const selectedCategory = selectedPath ? categoryMap[selectedPath] : null;
   return (
     <div className="row g-4 inventory-settings-grid">
       <div className="col-12 col-xl-8">
-        <Card className="border-0 shadow-lg" title="Strom kategorií" icon={<i className="fas fa-diagram-project"></i>}>
+        <Card className="border-0 shadow-lg" title={t("inventory.categoryTree")} icon={<i className="fas fa-diagram-project"></i>}>
           <div className="inventory-section-create mb-3">
-            <p className="text-muted mb-0">Kategorie se používají ve filtrech i při hromadných změnách.</p>
+            <p className="text-muted mb-0">{t("inventory.categoryTreeHelp")}</p>
             <button type="button" className="btn btn-primary w-100" onClick={onCreateRoot}>
-              <i className="fas fa-plus me-2"></i>Přidat kořenovou kategorii
+              <i className="fas fa-plus me-2"></i>{t("inventory.addRootCategory")}
             </button>
           </div>
           <InventoryLocationTree
@@ -25,12 +27,12 @@ export default function InventoryCategoriesScreen({ categories, selectedPath, on
             onEdit={onEdit}
             onCreateChild={onCreateChild}
             onDelete={onDelete}
-            allLabel="Všechny kategorie"
+            allLabel={t("inventory.allCategories")}
           />
         </Card>
       </div>
       <div className="col-12 col-xl-4">
-        <Card className="border-0 shadow-lg h-100" title="Vybraná kategorie" icon={<i className="fas fa-tag"></i>}>
+        <Card className="border-0 shadow-lg h-100" title={t("inventory.selectedCategory")} icon={<i className="fas fa-tag"></i>}>
           {selectedCategory ? (
             <div>
               <span className="inventory-inline-badge" style={buildColorStyle(selectedCategory.color, 0.16)}>
@@ -40,7 +42,7 @@ export default function InventoryCategoriesScreen({ categories, selectedPath, on
               {selectedCategory.description ? <div className="small text-muted mt-2">{selectedCategory.description}</div> : null}
             </div>
           ) : (
-            <div className="text-muted">Vyber kategorii ze stromu vlevo.</div>
+            <div className="text-muted">{t("inventory.chooseCategoryLeft")}</div>
           )}
         </Card>
       </div>

@@ -521,7 +521,7 @@ export default function Messages() {
                     <h2 className="h6 mb-0">{t("messages.system")}</h2>
                     <small className="text-muted">{t("messages.systemDescription")}</small>
                   </div>
-                  <button type="button" className="btn btn-sm btn-outline-secondary d-lg-none ms-auto" onClick={closeMobileThread} aria-label="Zavřít konverzaci"><i className="fas fa-xmark" /></button>
+<button type="button" className="btn btn-sm btn-outline-secondary d-lg-none ms-auto" onClick={closeMobileThread} aria-label={t("messages.closeConversation")}><i className="fas fa-xmark" /></button>
                 </div>
                 <div className="flex-grow-1 overflow-auto">
                   {notifications.length === 0 ? (
@@ -579,7 +579,7 @@ export default function Messages() {
                       {threadUser?.team_name || t("messages.directMessages")}
                     </small>
                   </div>
-                  <button type="button" className="btn btn-sm btn-outline-secondary d-lg-none" onClick={closeMobileThread} aria-label="Zavřít konverzaci"><i className="fas fa-xmark" /></button>
+<button type="button" className="btn btn-sm btn-outline-secondary d-lg-none" onClick={closeMobileThread} aria-label={t("messages.closeConversation")}><i className="fas fa-xmark" /></button>
                 </div>
 
                 <div
@@ -685,7 +685,7 @@ export default function Messages() {
           </div>
         </div>
       </div>
-      {selectedId && <button type="button" className="messages-thread-mobile-backdrop d-lg-none" aria-label="Zavřít konverzaci" onClick={closeMobileThread} />}
+      {selectedId && <button type="button" className="messages-thread-mobile-backdrop d-lg-none" aria-label={t("messages.closeConversation")} onClick={closeMobileThread} />}
     </>
   );
 }

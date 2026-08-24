@@ -1,10 +1,12 @@
 import React from "react";
 import PropTypes from "prop-types";
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import Card from "../../../components/Card";
 
 export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenReturnLoan }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
 
   const filteredEntries = useMemo(() => {
@@ -20,28 +22,28 @@ export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenRe
   }, [loanEntries, search]);
 
   return (
-    <Card className="border-0 shadow-sm" title="Výpůjčky" icon={<i className="fas fa-handshake-angle"></i>}>
+    <Card className="border-0 shadow-sm" title={t("inventory.loans")} icon={<i className="fas fa-handshake-angle"></i>}>
       <div className="inventory-searchbar-wrap mb-3">
         <i className="fas fa-magnifying-glass"></i>
         <input
           className="inventory-searchbar"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Hledej podle názvu věci nebo QR kódu"
+          placeholder={t("inventory.loanSearchPlaceholder")}
         />
       </div>
       {filteredEntries.length === 0 ? (
-        <div className="inventory-loans-empty">Teď není evidovaná žádná otevřená výpůjčka.</div>
+        <div className="inventory-loans-empty">{t("inventory.noOpenLoans")}</div>
       ) : (
       <div className="table-responsive inventory-loans-table-wrap">
         <table className="table inventory-modern-table inventory-loans-table align-middle">
           <thead>
             <tr>
-              <th>Věc</th>
-              <th>Komu</th>
+              <th>{t("inventory.item")}</th>
+              <th>{t("inventory.borrower")}</th>
               <th>QR</th>
-              <th>Množství</th>
-              <th className="text-end">Akce</th>
+              <th>{t("inventory.quantity")}</th>
+              <th className="text-end">{t("inventory.actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -57,7 +59,7 @@ export default function InventoryLoansScreen({ loanEntries, onOpenItem, onOpenRe
                   <td>{entry.quantity} {entry.quantityUnit}</td>
                   <td className="text-end">
                     <button type="button" className="btn btn-sm btn-outline-success" onClick={() => onOpenReturnLoan(entry, entry.item)}>
-                      Vrátit
+                      {t("inventory.return")}
                     </button>
                   </td>
                 </tr>

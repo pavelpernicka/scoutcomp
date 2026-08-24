@@ -1,6 +1,7 @@
 import React from "react";
 import PropTypes from "prop-types";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   buildFlagFilterOptions,
@@ -42,14 +43,15 @@ export default function InventoryItemsScreen({
   onOpenBulkAction,
   onGenerateLabels,
 }) {
+  const { t } = useTranslation();
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [expandedSetIds, setExpandedSetIds] = useState(() => new Set());
   const columns = [
-    ["name", "Název"],
-    ["category", "Kategorie"],
-    ["quantity", "Množství"],
-    ["current_location_display", "Aktuální lokace"],
-    ["flag", "Příznak"],
+    ["name", t("inventory.name")],
+    ["category", t("inventory.category")],
+    ["quantity", t("inventory.quantity")],
+    ["current_location_display", t("inventory.currentLocation")],
+    ["flag", t("inventory.flag")],
   ];
   const flagOptions = buildFlagFilterOptions(flags);
   const activeFilterCount = [
@@ -80,8 +82,10 @@ export default function InventoryItemsScreen({
   const renderItemRow = (item, isSetMember = false) => {
     const flagBadge = getItemFlagBadge(item);
     const currentLocation = getItemCurrentLocation(item);
+    const flagLabel = flagBadge.labelKey ? t(flagBadge.labelKey, flagBadge.labelOptions) : flagBadge.label;
+    const currentLocationLabel = currentLocation.labelKey ? t(currentLocation.labelKey, currentLocation.labelOptions) : currentLocation.label;
     const categoryMeta = item.category ? categoryMetaByPath[item.category] : null;
-    return <tr key={item.id} className={isSetMember ? "inventory-set-member-row" : ""} onClick={() => onOpenItem(item)} style={{ cursor: "pointer" }}><td onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={() => onToggleSelected(item.id)} /></td><td><div className="fw-semibold">{item.name}</div><div className="inventory-item-mobile-meta"><span className="inventory-item-mobile-meta__quantity">{item.available_quantity < item.quantity ? `${item.available_quantity}/${item.quantity}` : item.quantity} {item.quantity_unit}</span><span className="inventory-item-mobile-meta__location">{currentLocation.label}</span><span className="inventory-item-mobile-meta__flag">{flagBadge.label}</span></div></td><td>{item.category ? <span className="inventory-inline-badge" style={buildColorStyle(categoryMeta?.color || "#5b8def", 0.16)}>{item.category}</span> : "—"}</td><td>{item.available_quantity < item.quantity ? <span className="inventory-quantity-split"><strong className="is-available">{item.available_quantity}</strong><span>/</span><strong className="is-unavailable">{item.quantity}</strong><small>{item.quantity_unit}</small></span> : <>{item.quantity} {item.quantity_unit}</>}</td><td><span className={`inventory-location-pill is-${currentLocation.tone}`}>{currentLocation.label}</span></td><td><span className="inventory-inline-badge" style={flagBadge.style}>{flagBadge.label}</span></td></tr>;
+    return <tr key={item.id} className={isSetMember ? "inventory-set-member-row" : ""} onClick={() => onOpenItem(item)} style={{ cursor: "pointer" }}><td onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={() => onToggleSelected(item.id)} /></td><td><div className="fw-semibold">{item.name}</div><div className="inventory-item-mobile-meta"><span className="inventory-item-mobile-meta__quantity">{item.available_quantity < item.quantity ? `${item.available_quantity}/${item.quantity}` : item.quantity} {item.quantity_unit}</span><span className="inventory-item-mobile-meta__location">{currentLocationLabel}</span><span className="inventory-item-mobile-meta__flag">{flagLabel}</span></div></td><td>{item.category ? <span className="inventory-inline-badge" style={buildColorStyle(categoryMeta?.color || "#5b8def", 0.16)}>{item.category}</span> : "—"}</td><td>{item.available_quantity < item.quantity ? <span className="inventory-quantity-split"><strong className="is-available">{item.available_quantity}</strong><span>/</span><strong className="is-unavailable">{item.quantity}</strong><small>{item.quantity_unit}</small></span> : <>{item.quantity} {item.quantity_unit}</>}</td><td><span className={`inventory-location-pill is-${currentLocation.tone}`}>{currentLocationLabel}</span></td><td><span className="inventory-inline-badge" style={flagBadge.style}>{flagLabel}</span></td></tr>;
   };
   const clearFilters = () => {
     onPresenceFilterChange("");
@@ -110,26 +114,26 @@ export default function InventoryItemsScreen({
   const filtersPanel = (
     <>
       <div className="inventory-filters-header">
-        <h2>Filtry</h2>
+        <h2>{t("inventory.filters")}</h2>
         <button type="button" className="btn btn-sm btn-outline-primary" onClick={clearFilters}>
-          Reset
+          {t("common.reset")}
         </button>
       </div>
-      <label className="form-label mb-2 mt-4">Kategorie</label>
+      <label className="form-label mb-2 mt-4">{t("inventory.category")}</label>
       <InventoryFilterTree
         nodes={categories}
         selectedPath={categoryFilter}
         onSelect={handleCategorySelect}
-        allLabel="Vše"
+        allLabel={t("inventory.all")}
       />
-      <label className="form-label mb-2 mt-4">Defaultní lokace</label>
+      <label className="form-label mb-2 mt-4">{t("inventory.defaultLocation")}</label>
       <InventoryFilterTree
         nodes={locations}
         selectedPath={locationFilter}
         onSelect={handleLocationSelect}
-        allLabel="Vše"
+        allLabel={t("inventory.all")}
       />
-      <label className="form-label mt-4">Dostupnost</label>
+      <label className="form-label mt-4">{t("inventory.availability")}</label>
       <div className="inventory-chip-group mb-3">
         {ITEM_PRESENCE_OPTIONS.map((option) => (
           <button
@@ -138,11 +142,11 @@ export default function InventoryItemsScreen({
             className={`inventory-chip ${presenceFilter === option.value ? "active" : ""} ${option.value ? `inventory-chip-presence is-${getPresenceTone(option.value)}` : ""}`}
             onClick={() => handlePresenceSelect(option.value)}
           >
-            {option.label}
+            {option.labelKey ? t(option.labelKey) : option.label}
           </button>
         ))}
       </div>
-      <label className="form-label">Příznak</label>
+      <label className="form-label">{t("inventory.flag")}</label>
       <div className="inventory-chip-group mb-4">
         {flagOptions.map((option) => (
           <button
@@ -152,7 +156,7 @@ export default function InventoryItemsScreen({
             onClick={() => handleFlagSelect(option.value)}
             style={option.value ? (flagFilter === option.value ? buildSolidColorStyle(option.color) : buildColorStyle(option.color, 0.18)) : undefined}
           >
-            {option.label}
+            {option.labelKey ? t(option.labelKey) : option.label}
           </button>
         ))}
       </div>
@@ -167,18 +171,18 @@ export default function InventoryItemsScreen({
 
       <section className="inventory-main-panel">
         <div className="inventory-table-hero">
-          <div className="inventory-table-eyebrow">Všechny skladové zásoby</div>
+          <div className="inventory-table-eyebrow">{t("inventory.allStock")}</div>
           <button type="button" className="btn btn-primary" onClick={onCreateItem}>
-            <i className="fas fa-plus me-2"></i>Nová věc
+            <i className="fas fa-plus me-2"></i>{t("inventory.newItem")}
           </button>
         </div>
 
         <div className="inventory-mobile-filterbar">
           <button type="button" className="btn btn-outline-primary" onClick={() => setFiltersOpen(true)}>
-            <i className="fas fa-sliders me-2"></i>Filtry
+            <i className="fas fa-sliders me-2"></i>{t("inventory.filters")}
           </button>
           <div className="small text-muted">
-            {activeFilterCount > 0 ? `Aktivní filtry: ${activeFilterCount}` : "Bez aktivních filtrů"}
+            {activeFilterCount > 0 ? t("inventory.activeFilters", { count: activeFilterCount }) : t("inventory.noActiveFilters")}
           </div>
         </div>
 
@@ -188,30 +192,30 @@ export default function InventoryItemsScreen({
             className="inventory-searchbar"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Hledej podle názvu, popisu, kategorie nebo lokace"
+            placeholder={t("inventory.searchPlaceholder")}
           />
         </div>
 
         {selectedItemIds.length > 0 && (
           <div className="inventory-toolbar">
-            <span className="inventory-toolbar-count">Vybráno: {selectedItemIds.length}</span>
+            <span className="inventory-toolbar-count">{t("inventory.selectedCount", { count: selectedItemIds.length })}</span>
             <button type="button" className="btn btn-outline-danger" onClick={() => onOpenBulkAction("flag")}>
-              <i className="fas fa-palette me-2"></i>Příznak
+              <i className="fas fa-palette me-2"></i>{t("inventory.flag")}
             </button>
             <button type="button" className="btn btn-outline-secondary" onClick={() => onOpenBulkAction("location")}>
-              <i className="fas fa-location-dot me-2"></i>Defaultní lokace
+              <i className="fas fa-location-dot me-2"></i>{t("inventory.defaultLocation")}
             </button>
             <button type="button" className="btn btn-outline-dark" onClick={() => onOpenBulkAction("category")}>
-              <i className="fas fa-tags me-2"></i>Kategorie
+              <i className="fas fa-tags me-2"></i>{t("inventory.category")}
             </button>
             <button type="button" className="btn btn-primary" onClick={onGenerateLabels}>
-              <i className="fas fa-print me-2"></i>Generovat štítky
+              <i className="fas fa-print me-2"></i>{t("inventory.generateLabels")}
             </button>
             <button type="button" className="btn btn-outline-primary" onClick={() => onOpenBulkAction("set")}>
-              <i className="fas fa-layer-group me-2"></i>Přidat do setu
+              <i className="fas fa-layer-group me-2"></i>{t("inventory.addToSet")}
             </button>
             <button type="button" className="btn btn-outline-primary" onClick={() => onOpenBulkAction("loan")}>
-              <i className="fas fa-handshake-angle me-2"></i>Vypůjčit
+              <i className="fas fa-handshake-angle me-2"></i>{t("inventory.lend")}
             </button>
           </div>
         )}
@@ -220,7 +224,7 @@ export default function InventoryItemsScreen({
           <table className="table inventory-modern-table inventory-items-table align-middle">
             <thead>
               <tr>
-                <th><input type="checkbox" aria-label="Vybrat všechny zobrazené věci" checked={allVisibleSelected} disabled={!items.length} onChange={() => onToggleAll(items.map((item) => item.id))} /></th>
+                <th><input type="checkbox" aria-label={t("inventory.selectAllVisible")} checked={allVisibleSelected} disabled={!items.length} onChange={() => onToggleAll(items.map((item) => item.id))} /></th>
                 {columns.map(([key, label]) => (
                   <th key={key}>
                     <button type="button" className="btn btn-link p-0 text-decoration-none" onClick={() => onSortChange(key)}>
@@ -234,7 +238,7 @@ export default function InventoryItemsScreen({
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-5 text-muted">Žádná položka neodpovídá filtru.</td>
+                  <td colSpan={6} className="text-center py-5 text-muted">{t("inventory.noItemsMatch")}</td>
                 </tr>
               ) : (
                 rows.flatMap(({ set, items: groupItems }) => {
@@ -243,7 +247,7 @@ export default function InventoryItemsScreen({
                     const selected = groupItems.length > 0 && groupItems.every((item) => selectedItemIds.includes(item.id));
                     const loaned = groupItems.filter((item) => item.open_loan_quantity > 0).length;
                     const soldOut = groupItems.filter((item) => item.available_quantity <= 0 && item.open_loan_quantity === 0).length;
-                    const setRow = <tr key={`set-${set.id}`} className="inventory-set-row"><td onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={`Vybrat věci v setu ${set.name}`} disabled={!groupItems.length} checked={selected} onChange={() => toggleSetSelection(groupItems)} /></td><td colSpan={2}><div className="d-flex align-items-center gap-2"><button type="button" className="btn btn-link p-0 text-decoration-none fw-semibold" aria-expanded={expanded} onClick={() => setExpandedSetIds((current) => { const next = new Set(current); if (next.has(set.id)) next.delete(set.id); else next.add(set.id); return next; })}><i className={`fas fa-chevron-${expanded ? "down" : "right"} me-2`} /><i className="fas fa-layer-group me-2" />{set.name}</button><button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onOpenSet(set)}><i className="fas fa-sliders me-1" />Nastavit</button></div><div className="small text-muted ms-4">{groupItems.length ? `1 set · ${groupItems.length} ${groupItems.length === 1 ? "věc" : "věcí"}${search ? " · set → nalezené věci" : ""}` : "Set je prázdný"}</div></td><td>1 set</td><td>{loaned ? `${loaned} vypůjčeno` : "Dostupné"}</td><td>{soldOut ? `${soldOut} došlo` : "—"}</td></tr>;
+                    const setRow = <tr key={`set-${set.id}`} className="inventory-set-row"><td onClick={(event) => event.stopPropagation()}><input type="checkbox" aria-label={t("inventory.selectSetItems", { name: set.name })} disabled={!groupItems.length} checked={selected} onChange={() => toggleSetSelection(groupItems)} /></td><td colSpan={2}><div className="d-flex align-items-center gap-2"><button type="button" className="btn btn-link p-0 text-decoration-none fw-semibold" aria-expanded={expanded} onClick={() => setExpandedSetIds((current) => { const next = new Set(current); if (next.has(set.id)) next.delete(set.id); else next.add(set.id); return next; })}><i className={`fas fa-chevron-${expanded ? "down" : "right"} me-2`} /><i className="fas fa-layer-group me-2" />{set.name}</button><button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onOpenSet(set)}><i className="fas fa-sliders me-1" />{t("inventory.configure")}</button></div><div className="small text-muted ms-4">{groupItems.length ? t("inventory.setSummary", { count: groupItems.length, filtered: search ? t("inventory.filteredSetItems") : "" }) : t("inventory.emptySet")}</div></td><td>{t("inventory.oneSet")}</td><td>{loaned ? t("inventory.loanedCount", { count: loaned }) : t("inventory.available")}</td><td>{soldOut ? t("inventory.soldOutCount", { count: soldOut }) : "—"}</td></tr>;
                     return [setRow, ...(expanded ? groupItems.map((item) => renderItemRow(item, true)) : [])];
                   }
                   return groupItems.map((item) => renderItemRow(item, false));
@@ -256,11 +260,11 @@ export default function InventoryItemsScreen({
 
       {filtersOpen ? (
         <>
-          <button type="button" className="inventory-drawer-backdrop inventory-mobile-only" onClick={() => setFiltersOpen(false)} aria-label="Zavřít filtry" />
+          <button type="button" className="inventory-drawer-backdrop inventory-mobile-only" onClick={() => setFiltersOpen(false)} aria-label={t("inventory.closeFilters")} />
           <aside className="inventory-mobile-drawer inventory-mobile-only inventory-filters-drawer">
             <div className="inventory-drawer-head">
-              <strong>Filtry skladu</strong>
-              <button type="button" className="btn btn-sm btn-outline-secondary inventory-drawer-close" onClick={() => setFiltersOpen(false)} aria-label="Zavřít filtry">
+              <strong>{t("inventory.inventoryFilters")}</strong>
+              <button type="button" className="btn btn-sm btn-outline-secondary inventory-drawer-close" onClick={() => setFiltersOpen(false)} aria-label={t("inventory.closeFilters")}>
                 <i className="fas fa-xmark"></i>
               </button>
             </div>

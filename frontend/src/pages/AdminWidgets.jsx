@@ -7,9 +7,10 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import Alert from "../components/Alert";
 import Modal from "../components/Modal";
 import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
+import { translateServerValue } from "../utils/serverTranslations";
 
 export default function AdminWidgets() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const [feedback, setFeedback] = useState(null);
 
@@ -32,11 +33,17 @@ export default function AdminWidgets() {
     const result = {};
     for (const widget of widgets) {
       const moduleKey = widget.module || "core";
-      result[moduleKey] = result[moduleKey] || { name: widget.module_name || moduleKey, items: [] };
+      result[moduleKey] = result[moduleKey] || {
+        name: translateServerValue(t, i18n, widget.module_name_key, widget.module_name || moduleKey),
+        items: [],
+      };
       result[moduleKey].items.push(widget);
     }
     return result;
-  }, [widgets]);
+  }, [widgets, i18n, t]);
+
+  const widgetTitle = (widget) => translateServerValue(t, i18n, widget.title_key, widget.title);
+  const widgetText = (widget) => translateServerValue(t, i18n, widget.text_key, widget.text);
 
   const saveMutation = useMutation({
     mutationFn: async (enabledIds) => {
@@ -149,8 +156,8 @@ export default function AdminWidgets() {
                             <div className="admin-widget-identity">
                               <span className="admin-widget-icon" aria-hidden="true"><i className={`fas ${widget.icon}`}></i></span>
                               <div className="min-w-0">
-                                <div className="admin-widget-title">{widget.title}</div>
-                                {widget.text && <div className="admin-widget-description">{widget.text}</div>}
+                                <div className="admin-widget-title">{widgetTitle(widget)}</div>
+                                {widget.text && <div className="admin-widget-description">{widgetText(widget)}</div>}
                                 <code>{widget.id}</code>
                               </div>
                             </div>
@@ -164,7 +171,7 @@ export default function AdminWidgets() {
                                 type="button"
                                 className="btn btn-outline-secondary btn-sm admin-widget-edit"
                                 title={t("adminWidgets.editConfig")}
-                                aria-label={`${t("adminWidgets.editConfig")}: ${widget.title}`}
+                                aria-label={`${t("adminWidgets.editConfig")}: ${widgetTitle(widget)}`}
                                 onClick={() => openEditConfig(widget)}
                               >
                                 <i className="fas fa-pen"></i>
@@ -179,7 +186,7 @@ export default function AdminWidgets() {
                                   onChange={() => toggle(widget.id)}
                                 />
                                 <label className="form-check-label" htmlFor={`widget-${widget.id}`}>
-                                  <span className="visually-hidden">{widget.title}</span>
+                                  <span className="visually-hidden">{widgetTitle(widget)}</span>
                                 </label>
                               </div>
                             </div>
@@ -220,7 +227,7 @@ export default function AdminWidgets() {
         <Modal
           isVisible={Boolean(editingWidget)}
           onClose={() => setEditingWidget(null)}
-          title={`${t("adminWidgets.editConfig")} – ${editingWidget.title}`}
+          title={`${t("adminWidgets.editConfig")} – ${widgetTitle(editingWidget)}`}
           icon={<i className={`fas ${editingWidget.icon}`} />}
           size="lg"
           footer={(

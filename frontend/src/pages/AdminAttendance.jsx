@@ -493,7 +493,7 @@ export default function AdminAttendance() {
                       return (
                         <section key={groupKey} className="admin-attendance-mobile-group">
                           <button type="button" className="admin-attendance-mobile-group__heading" onClick={() => toggleGroup(groupKey)} aria-expanded={!isCollapsed}>
-                            <span><i className={`fas fa-chevron-${isCollapsed ? "right" : "down"}`} aria-hidden="true" /> {group.team_name || "Bez družiny"}</span>
+                            <span><i className={`fas fa-chevron-${isCollapsed ? "right" : "down"}`} aria-hidden="true" /> {group.team_name || t("adminUsers.noTeam")}</span>
                             <span className="badge bg-secondary">{group.members.length}</span>
                           </button>
                           {!isCollapsed && group.members.map((member) => (
