@@ -11,7 +11,13 @@ import "./MediaPickerModal.css";
 export default function MediaPickerModal({ onSelect, onClose, title }) {
   const { t } = useTranslation();
   return createPortal(
-    <div className="web-editor-media-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+    <div
+      className="web-editor-media-modal"
+      role="dialog"
+      aria-modal="true"
+      onClick={(event) => event.stopPropagation()}
+      onSubmit={(event) => event.stopPropagation()}
+    >
       <div className="web-media-picker-modal">
         <header className="web-media-picker-header">
           <h2>{title || t("web.nav.media")}</h2>
