@@ -1331,6 +1331,18 @@ def _add_web_publication_artifacts(conn: Connection) -> None:
             conn.execute(text(f"ALTER TABLE web_page_revisions ADD COLUMN {name} {definition}"))
 
 
+def _add_web_publication_dependencies(conn: Connection) -> None:
+    """Persist data-source dependencies for targeted public regeneration."""
+    inspector = inspect(conn)
+    if "web_page_revisions" not in inspector.get_table_names():
+        return
+    columns = {column["name"] for column in inspector.get_columns("web_page_revisions")}
+    if "render_dependencies" not in columns:
+        conn.execute(text(
+            "ALTER TABLE web_page_revisions ADD COLUMN render_dependencies JSON"
+        ))
+
+
 def _add_team_logo_column(conn: Connection) -> None:
     inspector = inspect(conn)
     if "teams" not in inspector.get_table_names():
@@ -3047,6 +3059,11 @@ MIGRATIONS: List[Migration] = [
         "20260824_create_push_deliveries",
         _create_push_deliveries_table,
         "Create durable per-device Web Push delivery queue",
+    ),
+    Migration(
+        "20260824_add_web_publication_dependencies",
+        _add_web_publication_dependencies,
+        "Track data-source dependencies for targeted public regeneration",
     ),
 ]
 

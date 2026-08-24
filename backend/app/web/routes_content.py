@@ -106,7 +106,7 @@ def _publish_menu_snapshot(db: Session, menu: WebMenu, current_user: User) -> We
     db.flush()
     menu.published_revision_id = revision.id
     db.flush()
-    rebuild_published_page_artifacts(db)
+    rebuild_published_page_artifacts(db, dependency_keys={"source:web.menu"})
     return revision
 
 
@@ -161,7 +161,7 @@ def delete_menu(menu_id: int, db: Session = Depends(get_db), current_user: User 
     db.query(WebMenuItem).filter_by(menu_id=menu_id).delete()
     db.delete(menu)
     db.flush()
-    rebuild_published_page_artifacts(db)
+    rebuild_published_page_artifacts(db, dependency_keys={"source:web.menu"})
     db.commit()
 
 
@@ -386,7 +386,10 @@ def _publish_post(
     if updated != 1:
         db.rollback()
         raise HTTPException(409, "Draft was changed by another editor")
-    rebuild_published_page_artifacts(db)
+    rebuild_published_page_artifacts(
+        db,
+        dependency_keys={"source:core.posts", "source:web.posts"},
+    )
     db.commit()
     db.refresh(post)
 
@@ -582,11 +585,13 @@ def create_post(payload: PostPayload, background_tasks: BackgroundTasks, db: Ses
         noindex=payload.noindex, sitemap_include=payload.sitemap_include,
     )
     db.add(post)
-    db.commit()
-    db.refresh(post)
+    db.flush()
     if payload.published:
         _require_post_publish(db, current_user)
         _publish_post(db, post, post.draft_version, current_user.id, background_tasks)
+    else:
+        db.commit()
+        db.refresh(post)
     return _serialize_post(post)
 
 
@@ -638,11 +643,12 @@ def update_post(post_id: int, payload: PostPayload, background_tasks: Background
         if db.query(WebPost).filter(WebPost.slug == slug, WebPost.id != post_id).one_or_none():
             raise HTTPException(400, "Slug is already used")
         post.slug = slug
-    db.commit()
-    db.refresh(post)
     if payload.published:
         _require_post_publish(db, current_user)
         _publish_post(db, post, post.draft_version, current_user.id, background_tasks)
+    else:
+        db.commit()
+        db.refresh(post)
     return _serialize_post(post)
 
 
@@ -666,7 +672,10 @@ def unpublish_post(post_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(404, "Post not found")
     post.published = False
     post.published_at = None
-    rebuild_published_page_artifacts(db)
+    rebuild_published_page_artifacts(
+        db,
+        dependency_keys={"source:core.posts", "source:web.posts"},
+    )
     db.commit()
     db.refresh(post)
     return _serialize_post(post)
@@ -680,8 +689,14 @@ def delete_post(post_id: int, db: Session = Depends(get_db), current_user: User 
         raise HTTPException(404, "Post not found")
     if post.published_revision_id or post.published:
         _require_post_publish(db, current_user)
+    was_public = bool(post.published)
     post.deleted_at = datetime.now(timezone.utc)
     post.published = False
+    if was_public:
+        rebuild_published_page_artifacts(
+            db,
+            dependency_keys={"source:core.posts", "source:web.posts"},
+        )
     db.commit()
 
 

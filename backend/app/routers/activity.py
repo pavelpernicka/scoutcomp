@@ -41,7 +41,7 @@ def _refresh_public_web_artifacts(db: Session, event: ScoutEvent | None) -> None
     """Keep static public event/team listings coherent before commit."""
     if event is not None and event.is_public:
         from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db)
+        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
 
 class EventPayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -310,7 +310,7 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
     for key, value in payload.model_dump().items(): setattr(event, key, value)
     if was_public or event.is_public:
         from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db)
+        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
     db.commit()
     posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
     return serialize(event, linked_posts=posts)
@@ -326,7 +326,7 @@ def delete_event(event_id: int, db: Session = Depends(get_db), current_user: Use
     db.delete(event)
     if was_public:
         from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db)
+        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
     db.commit()
 
 @router.post("/events/{event_id}/attendance")

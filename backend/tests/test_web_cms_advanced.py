@@ -146,9 +146,11 @@ def test_pagination_does_not_render_phantom_next_link_on_exact_final_page(db_ses
 
     rendered = render_project(
         db_session, compiled.tree, page={"query": {"page": "2"}}, resolver=resolver,
+        dependency_sink=(dependencies := set()),
     )
     assert 'rel="prev" href="?page=1"' in rendered
     assert 'rel="next"' not in rendered
+    assert dependencies == {"source:core.posts"}
 
 
 def test_pagination_binds_to_nearest_repeat_and_owns_its_page_size():
@@ -2211,6 +2213,7 @@ def test_page_publication_materialises_an_immutable_document_artifact(db_session
     assert revision.rendered_html
     assert "Published snapshot" in revision.rendered_html
     assert revision.rendered_at is not None
+    assert revision.render_dependencies == []
 
     from app.site_app import _render_revision
     page.title = "Mutable draft title"

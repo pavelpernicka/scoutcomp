@@ -873,6 +873,10 @@ class WebPageRevision(Base):
     rendered_html = Column(Text, nullable=True)
     rendered_variants = Column(JSON, nullable=True)
     rendered_at = Column(DateTime, nullable=True)
+    # Public data sources read while materialising this immutable revision.
+    # ``NULL`` means an older/unknown artifact and therefore requires a
+    # conservative rebuild; an empty list is a known static document.
+    render_dependencies = Column(JSON, nullable=True)
     reason = Column(String(32), nullable=True)
     is_publication = Column(Boolean, nullable=False, default=False)
     seo_title = Column(String(200), nullable=True)

@@ -11,7 +11,7 @@ from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from unidecode import unidecode
 
 from ..models import WebPage, WebPageRevision, WebTemplate
@@ -540,13 +540,20 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
     """
     from ..site_app import _render_revision
 
-    default = _render_revision(db, page, revision, query={}, use_artifact=False)
+    dependencies: set[str] = set()
+    default = _render_revision(
+        db, page, revision, query={}, use_artifact=False,
+        dependency_sink=dependencies,
+    )
     variants: dict[str, str] = {}
     current = 2
     previous = default
     pagination_next_marker = 'class="sc-pagination-link sc-pagination-next"'
     while pagination_next_marker in previous and current <= 100:
-        document = _render_revision(db, page, revision, query={"page": str(current)}, use_artifact=False)
+        document = _render_revision(
+            db, page, revision, query={"page": str(current)}, use_artifact=False,
+            dependency_sink=dependencies,
+        )
         variants[f"page={current}"] = document
         previous = document
         current += 1
@@ -567,20 +574,30 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
             month = date(absolute // 12, absolute % 12 + 1, 1).strftime("%Y-%m")
             variants[f"month={month}"] = _render_revision(
                 db, page, revision, query={"month": month}, use_artifact=False,
+                dependency_sink=dependencies,
             )
     revision.rendered_html = default
     revision.rendered_variants = variants
     revision.rendered_at = datetime.now(timezone.utc)
+    revision.render_dependencies = sorted(dependencies)
 
 
-def rebuild_published_page_artifacts(db: Session, *, page_ids: set[int] | None = None) -> int:
+def rebuild_published_page_artifacts(
+    db: Session,
+    *,
+    page_ids: set[int] | None = None,
+    dependency_keys: set[str] | None = None,
+) -> int:
     """Regenerate immutable output before a related publication is committed.
 
     Rebuilds happen in the caller's transaction: either all rendered documents
-    become visible together, or none do. ``page_ids`` enables future dependency
-    narrowing while the conservative default protects existing dynamic blocks.
+    become visible together, or none do. ``dependency_keys`` narrows content
+    changes to pages that actually read the affected public data source. Older
+    artifacts without dependency metadata are rebuilt once conservatively.
     """
-    query = db.query(WebPage).filter(
+    query = db.query(WebPage).options(
+        defer(WebPage.data), defer(WebPage.html),
+    ).filter(
         WebPage.published.is_(True),
         WebPage.published_revision_id.is_not(None),
         WebPage.deleted_at.is_(None),
@@ -589,10 +606,28 @@ def rebuild_published_page_artifacts(db: Session, *, page_ids: set[int] | None =
         if not page_ids:
             return 0
         query = query.filter(WebPage.id.in_(page_ids))
+    if dependency_keys is not None:
+        if not dependency_keys:
+            return 0
+        candidates = query.join(
+            WebPageRevision,
+            WebPage.published_revision_id == WebPageRevision.id,
+        ).with_entities(WebPage.id, WebPageRevision.render_dependencies).all()
+        dependent_ids = {
+            page_id
+            for page_id, recorded in candidates
+            if not isinstance(recorded, list) or bool(set(recorded) & dependency_keys)
+        }
+        if not dependent_ids:
+            return 0
+        query = query.filter(WebPage.id.in_(dependent_ids))
     pages = query.order_by(WebPage.id.asc()).all()
     count = 0
     for published_page in pages:
-        revision = db.query(WebPageRevision).filter_by(
+        revision = db.query(WebPageRevision).options(
+            defer(WebPageRevision.rendered_html),
+            defer(WebPageRevision.rendered_variants),
+        ).filter_by(
             id=published_page.published_revision_id, page_id=published_page.id,
             is_publication=True,
         ).one_or_none()

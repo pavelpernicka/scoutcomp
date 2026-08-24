@@ -693,7 +693,7 @@ def _format_value(value: Any, format_name: str | None) -> str:
 class _RenderState:
     def __init__(self, db: Session, *, page: dict[str, Any], site: dict[str, Any], resolver: Callable[..., Any] | None,
                  slot_tree: dict[str, Any] | None = None, css_layers: list[str] | None = None,
-                 published_resources: bool = True):
+                 published_resources: bool = True, dependency_sink: set[str] | None = None):
         self.db = db
         self.page = page
         self.site = site
@@ -711,8 +711,10 @@ class _RenderState:
         self.styled_global_parts: set[str] = set()
         self.styled_resources: set[tuple[str, str]] = set()
         self.published_resources = published_resources
+        self.dependencies = dependency_sink if dependency_sink is not None else set()
 
     def resolve_source(self, source: str, params: dict[str, Any]) -> Any:
+        self.dependencies.add(f"source:{source}")
         key = json.dumps([source, params], sort_keys=True, default=str)
         if key in self.cache:
             return self.cache[key]
@@ -1729,11 +1731,13 @@ def render_project(
     slot_tree: dict[str, Any] | None = None,
     css_layers: list[str] | None = None,
     published_resources: bool = True,
+    dependency_sink: set[str] | None = None,
 ) -> str:
     state = _RenderState(
         db, page=page or {}, site=site or {}, resolver=resolver,
         slot_tree=slot_tree, css_layers=css_layers,
         published_resources=published_resources,
+        dependency_sink=dependency_sink,
     )
     return _render_node(compiled_tree, state, None, 0)
 

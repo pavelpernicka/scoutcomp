@@ -624,6 +624,7 @@ def _render_revision(
     *,
     query: dict[str, str] | None = None,
     use_artifact: bool = True,
+    dependency_sink: set[str] | None = None,
 ) -> str:
     # A visitor request must never invoke the compiler/data-source renderer.
     # Publication produces the immutable document variants atomically instead.
@@ -706,6 +707,7 @@ def _render_revision(
         page=page_context,
         site=_site_settings(db),
         css_layers=part_css,
+        dependency_sink=dependency_sink,
     )
     # Editor assets use the authenticated API URL; the visitor application
     # serves only publication-referenced media from its own public endpoint.
