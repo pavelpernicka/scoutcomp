@@ -22,7 +22,8 @@ from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
-from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.orm import Session, defer, load_only
 
 from .config import settings
 from .database import SessionLocal
@@ -361,6 +362,7 @@ def _main_page(db: Session) -> WebPage | None:
         return page
     page = (
         db.query(WebPage)
+        .options(defer(WebPage.data), defer(WebPage.html))
         .join(WebPageRevision, WebPage.published_revision_id == WebPageRevision.id)
         .filter(WebPage.published.is_(True), WebPage.deleted_at.is_(None))
         .order_by(WebPageRevision.created_at.desc())
@@ -368,7 +370,7 @@ def _main_page(db: Session) -> WebPage | None:
     )
     if page:
         return page
-    return db.query(WebPage).filter(
+    return db.query(WebPage).options(defer(WebPage.data), defer(WebPage.html)).filter(
         WebPage.published.is_(True), WebPage.published_revision_id.is_(None),
         WebPage.deleted_at.is_(None),
     ).order_by(WebPage.updated_at.desc()).first()
@@ -378,6 +380,7 @@ def _find_published_page(db: Session, path: str) -> WebPage | None:
     path = "/" + path.strip("/") if path != "/" else "/"
     page = (
         db.query(WebPage)
+        .options(defer(WebPage.data), defer(WebPage.html))
         .join(WebPageRevision, WebPage.published_revision_id == WebPageRevision.id)
         .filter(
             WebPageRevision.path == path,
@@ -391,7 +394,7 @@ def _find_published_page(db: Session, path: str) -> WebPage | None:
     if page:
         return page
     # Pre-snapshot compatibility only.
-    query = db.query(WebPage).filter(
+    query = db.query(WebPage).options(defer(WebPage.data), defer(WebPage.html)).filter(
         WebPage.published.is_(True), WebPage.published_revision_id.is_(None), WebPage.deleted_at.is_(None)
     )
     if path == "/":
@@ -519,10 +522,29 @@ def _detail_meta(author: User | None, published_date: datetime | None, *, date_l
 
 def _render(db: Session, page: WebPage, extra_head: str = "", query: dict[str, str] | None = None) -> str:
     if page.published_revision_id:
-        revision = db.query(WebPageRevision).filter_by(id=page.published_revision_id, page_id=page.id).one_or_none()
-        if not revision:
+        key = _artifact_query_key(query)
+        document_column = (
+            WebPageRevision.rendered_html
+            if key == ""
+            else WebPageRevision.rendered_variants[key].as_string()
+        )
+        artifact = db.query(
+            document_column.label("document"),
+            WebPageRevision.reason,
+        ).filter_by(id=page.published_revision_id, page_id=page.id).one_or_none()
+        if not artifact:
             raise HTTPException(404, "Published page is unavailable")
-        return _render_revision(db, page, revision, query=query)
+        if isinstance(artifact.document, str) and artifact.document:
+            return artifact.document
+        if artifact.reason != "migration":
+            raise HTTPException(503, "Published output is being generated")
+        # Only old migration snapshots may fall back to compilation. Load
+        # their full record lazily; ordinary visitor requests never deserialize
+        # the multi-megabyte variant map or draft/compiler payloads.
+        revision = db.query(WebPageRevision).filter_by(
+            id=page.published_revision_id, page_id=page.id,
+        ).one()
+        return _render_revision(db, page, revision, query=query, use_artifact=False)
     # Compatibility path for records published before immutable snapshots were
     # introduced. Any subsequent publish sets the pointer and bypasses it.
     settings_data = _site_settings(db)
@@ -607,8 +629,11 @@ def _render_revision(
     # Publication produces the immutable document variants atomically instead.
     if use_artifact:
         key = _artifact_query_key(query)
-        variants = revision.rendered_variants if isinstance(revision.rendered_variants, dict) else {}
-        document = revision.rendered_html if key == "" else variants.get(key)
+        if key == "":
+            document = revision.rendered_html
+        else:
+            variants = revision.rendered_variants if isinstance(revision.rendered_variants, dict) else {}
+            document = variants.get(key)
         if isinstance(document, str) and document:
             return document
         if revision.reason != "migration":
@@ -723,6 +748,14 @@ def _render_revision(
 
 @app.get("/healthz", tags=["meta"])
 def healthcheck():
+    # Readiness also warms the site's pooled database connection, avoiding a
+    # cold SQLite/WAL setup penalty on the first real visitor request.
+    session = SessionLocal()
+    try:
+        session.execute(text("SELECT 1"))
+        _main_page(session)
+    finally:
+        session.close()
     return {"status": "ok"}
 
 
@@ -1050,8 +1083,18 @@ def site_post(slug: str):
 def site_media(media_id: int):
     session = SessionLocal()
     try:
-        record = session.query(WebMedia).filter_by(id=media_id).one_or_none()
-        if not record or not _media_is_published(session, media_id):
+        record = session.query(WebMedia).options(load_only(
+            WebMedia.id,
+            WebMedia.filename,
+            WebMedia.path,
+            WebMedia.mime,
+            WebMedia.size,
+            WebMedia.is_public,
+        )).filter_by(id=media_id).one_or_none()
+        # Avoid a second database lookup for explicitly public files. Media
+        # referenced only by a publication still goes through the exact
+        # snapshot-boundary check.
+        if not record or (not record.is_public and not _media_is_published(session, media_id)):
             raise HTTPException(404, "Media not found")
         path = _media_path(record)
         if not path.is_file():

@@ -16,7 +16,7 @@ import re
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, MutableMapping, Sequence
 
-from sqlalchemy import func, or_
+from sqlalchemy import Text, and_, cast, func, or_
 from sqlalchemy.orm import Session
 
 from ..models import Config, RegisteredModule, ScoutEvent, Team, User, WebMedia, WebMenu, WebMenuRevision, WebPage, WebPageRevision, WebPost, WebPostRevision
@@ -382,7 +382,14 @@ def published_media_ids(db: Session) -> set[int]:
         row[0] for row in db.query(WebMedia.id).filter(WebMedia.is_public.is_(True)).all()
     }
     page_revisions = (
-        db.query(WebPageRevision)
+        db.query(
+            WebPageRevision.og_image_id,
+            WebPageRevision.compiled_tree,
+            WebPageRevision.compiled_css,
+            WebPageRevision.data,
+            WebPageRevision.html,
+            WebPageRevision.reason,
+        )
         .join(WebPage, WebPage.published_revision_id == WebPageRevision.id)
         .filter(WebPage.published.is_(True), WebPage.deleted_at.is_(None))
         .all()
@@ -397,7 +404,7 @@ def published_media_ids(db: Session) -> set[int]:
             result.update(_media_references(revision.html))
 
     post_revisions = (
-        db.query(WebPostRevision)
+        db.query(WebPostRevision.cover_media_id, WebPostRevision.og_image_id)
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
         .filter(WebPost.published.is_(True), WebPost.deleted_at.is_(None))
         .all()
@@ -417,7 +424,54 @@ def published_media_ids(db: Session) -> set[int]:
 
 
 def is_media_published(db: Session, media_id: int) -> bool:
-    return media_id in published_media_ids(db)
+    """Check one public-media capability without materializing the whole site.
+
+    This endpoint guard runs once for every requested image.  The catalogue
+    helper above intentionally returns a complete set, but using it here used
+    to deserialize every current page tree and its large rendered artifact for
+    every single file request.  Keep the same publication boundary while
+    asking SQLite/PostgreSQL only whether a matching current snapshot exists.
+    """
+    if db.query(WebMedia.id).filter(
+        WebMedia.id == media_id,
+        WebMedia.is_public.is_(True),
+    ).first() is not None:
+        return True
+
+    reference = f"%/media/{media_id}/file%"
+    page_reference = db.query(WebPageRevision.id).join(
+        WebPage, WebPage.published_revision_id == WebPageRevision.id,
+    ).filter(
+        WebPage.published.is_(True),
+        WebPage.deleted_at.is_(None),
+        or_(
+            WebPageRevision.og_image_id == media_id,
+            cast(WebPageRevision.compiled_tree, Text).like(reference),
+            WebPageRevision.compiled_css.like(reference),
+            cast(WebPageRevision.data, Text).like(reference),
+            and_(WebPageRevision.reason == "migration", WebPageRevision.html.like(reference)),
+        ),
+    ).first()
+    if page_reference is not None:
+        return True
+
+    post_reference = db.query(WebPostRevision.id).join(
+        WebPost, WebPost.published_revision_id == WebPostRevision.id,
+    ).filter(
+        WebPost.published.is_(True),
+        WebPost.deleted_at.is_(None),
+        or_(
+            WebPostRevision.cover_media_id == media_id,
+            WebPostRevision.og_image_id == media_id,
+        ),
+    ).first()
+    if post_reference is not None:
+        return True
+
+    return db.query(Config.key).filter(
+        Config.key.in_(("web.site_logo", "web.favicon", "web.og_image")),
+        Config.value.like(reference),
+    ).first() is not None
 
 
 def _plain_public_text(value: str | None, *, limit: int = 500) -> str:
