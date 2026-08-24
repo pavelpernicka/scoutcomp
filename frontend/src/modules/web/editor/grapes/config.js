@@ -19,6 +19,46 @@ export const fontFamilyOptions = (fontSets = []) => {
     .map((item) => ({ id: item.value, label: item.label }));
 };
 
+const RTE_LABELS = {
+  cs: {
+    bulletedList: "Odrážkový seznam",
+    numberedList: "Číslovaný seznam",
+  },
+  en: {
+    bulletedList: "Bulleted list",
+    numberedList: "Numbered list",
+  },
+};
+
+const listAction = (name, command, icon, title) => ({
+  name,
+  icon,
+  attributes: { title, "aria-label": title },
+  result: (rte) => rte.exec(command),
+  state: (_rte, doc) => doc.queryCommandState(command) ? 1 : 0,
+});
+
+/** Semantic formatting exposed by the native GrapesJS inline text editor. */
+export const richTextActions = (language = "cs") => {
+  const labels = RTE_LABELS[String(language).toLowerCase().split("-")[0]] || RTE_LABELS.en;
+  return [
+    "bold",
+    "italic",
+    "underline",
+    listAction("bulletedList", "insertUnorderedList", "&#8226;", labels.bulletedList),
+    listAction("numberedList", "insertOrderedList", "1.", labels.numberedList),
+    "strikethrough",
+    "link",
+    "wrap",
+  ];
+};
+
+export const inlineCanvasCss = (canvasStyles = []) => (Array.isArray(canvasStyles) ? canvasStyles : [])
+  .filter((item) => item && typeof item === "object" && !item.href && typeof item.css === "string")
+  .map((item) => item.css)
+  .filter(Boolean)
+  .join("\n");
+
 export const editorCanvasCss = (translate = (key) => key) => `
 [data-sc-type="slot"][data-sc-slot="content"] {
   box-sizing: border-box !important;
@@ -109,16 +149,6 @@ export function createEditorConfig({
       } : property);
     }
   });
-  // Build inline canvas CSS from the same source the public renderer uses.
-  // GrapesJS places `baseCss` into a <style> element inside the iframe body,
-  // making tokens, theme styles, and site-wide CSS active for every component.
-  const sourceCss = canvasStyles
-    .filter((item) => item && !item.href)  // href items are external <link>s
-    .map((item) => item.css || "")
-    .filter(Boolean)
-    .join("\n");
-  const baseCss = [sourceCss, editorCanvasCss(translate)].filter(Boolean).join("\n");
-
   return {
     container,
     fromElement: false,
@@ -144,10 +174,14 @@ export function createEditorConfig({
     colorPicker: {
       appendTo: ".web-editor-inspector",
     },
-    // Inline canvas styles delivered through GrapesJS's own baseCss channel.
-    // This is the native mechanism for injecting tokens + theme CSS + global
-    // CSS into the editor iframe; no manual DOM surgery needed.
-    baseCss,
+    // Canvas-only helpers stay in GrapesJS's base layer. Public theme/global/
+    // template CSS is owned by one stable prepended frame-head node in the
+    // hook, so it is neither duplicated nor placed after page-owned rules.
+    baseCss: editorCanvasCss(translate),
+    // GrapesJS otherwise appends its own `body { margin: 0 }` and universal
+    // box-sizing reset after the theme. The published renderer has no such
+    // editor-only layer, so it can change spacing and text layout in canvas.
+    protectedCss: "",
     // Leave escapeName unset so GrapesJS uses its built-in selector escaping.
     // The option accepts a function; passing a boolean breaks CssComposer.
     selectorManager: { componentFirst: true },
@@ -156,6 +190,9 @@ export function createEditorConfig({
       styles: canvasStyles
         .filter((item) => typeof item === "string" || (item && item.href))
         .map((item) => (typeof item === "string" ? item : item.href)),
+    },
+    richTextEditor: {
+      actions: richTextActions(language),
     },
     // GrapesJS v0.21.9 ships English i18n defaults; overlay Czech when the
     // user is browsing in that language so buttons/labels/tooltips are

@@ -12,6 +12,7 @@ import { cloneResourceComponents, filterCatalogResources, hydrateMenuComponents 
 import { DataBindings, ImageContentPanel, LinkedResourceProps, QuickContentPanel, RepeatConfigurator } from "../editor/EditorInspector";
 import EditorNavigator from "../editor/EditorNavigator";
 import EditorBreadcrumbs from "../editor/EditorBreadcrumbs";
+import { setImageComponentSource } from "../editor/grapes/imageSource";
 import useGrapesEditor from "../editor/useGrapesEditor";
 import MediaPreview from "../media/MediaPreview";
 import MediaPickerModal from "../media/MediaPickerModal";
@@ -222,12 +223,11 @@ export default function DesignResourceEditorPage({ kind }) {
       markComponentChanged();
       return;
     }
-    targetComponent.addAttributes?.({
+    setImageComponentSource(targetComponent, {
       src,
       alt: mediaItem.alt || "",
-      "data-sc-media-id": String(mediaItem.id),
+      mediaId: mediaItem.id,
     });
-    targetComponent.set?.("src", src);
     markComponentChanged();
   };
   const startResourceDrag = (event, blockId) => {

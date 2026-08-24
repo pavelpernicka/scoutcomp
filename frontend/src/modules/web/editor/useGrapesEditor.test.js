@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { calculateFitZoom, clampCanvasToolbar, subscribeToEditorChanges } from "./useGrapesEditor";
+import { applyInlineCanvasStyles, calculateFitZoom, clampCanvasToolbar, subscribeToEditorChanges } from "./useGrapesEditor";
 
 const emitter = () => {
   const listeners = new Map();
@@ -51,5 +51,23 @@ describe("GrapesJS change tracking", () => {
     expect(calculateFitZoom(1400, 375)).toBe(240);
     expect(calculateFitZoom(280, 375)).toBe(66);
     expect(calculateFitZoom(0, 375)).toBe(100);
+  });
+
+  it("places late theme CSS before page-owned GrapesJS CSS", () => {
+    const frameDocument = document.implementation.createHTMLDocument("canvas");
+    const pageStyles = frameDocument.createElement("style");
+    pageStyles.id = "gjs-css-rules";
+    pageStyles.textContent = "p { line-height: 1; }";
+    frameDocument.head.appendChild(pageStyles);
+    const editor = { Canvas: { getDocument: () => frameDocument } };
+
+    applyInlineCanvasStyles(editor, "p { line-height: 1.8; }");
+    applyInlineCanvasStyles(editor, "p { line-height: 1.8; }");
+
+    expect(frameDocument.head.firstElementChild.id).toBe("sc-canvas-styles");
+    const sharedStyles = frameDocument.head.querySelectorAll("#sc-canvas-styles");
+    expect(sharedStyles).toHaveLength(1);
+    expect(sharedStyles[0].textContent).toContain("line-height: 1.8");
+    expect(sharedStyles[0].compareDocumentPosition(pageStyles) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

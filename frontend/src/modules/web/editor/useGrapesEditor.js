@@ -7,6 +7,7 @@ import {
   createEditorConfig,
   fontFamilyOptions,
   getEditorSnapshot,
+  inlineCanvasCss,
   loadEditorProject,
   registerBuilderBlocks,
 } from "./grapes";
@@ -70,6 +71,28 @@ export const calculateFitZoom = (availableWidth, deviceWidth, { maximum = 240, g
   const logical = Number(deviceWidth);
   if (!Number.isFinite(available) || !Number.isFinite(logical) || available <= 0 || logical <= 0) return 100;
   return Math.round(Math.max(50, Math.min(maximum, ((available - gutter) / logical) * 100)));
+};
+
+/** Keep shared theme CSS before GrapesJS page-owned rules in the iframe. */
+export const applyInlineCanvasStyles = (editor, css) => {
+  const head = editor?.Canvas?.getDocument?.()?.head;
+  if (!head) return null;
+  let styleNode = head.querySelector("#sc-canvas-styles");
+  if (!css) {
+    styleNode?.remove();
+    return null;
+  }
+  if (!styleNode) {
+    styleNode = head.ownerDocument.createElement("style");
+    styleNode.id = "sc-canvas-styles";
+    styleNode.setAttribute("data-scoutcomp", "canvas");
+    // The public cascade is theme/global/template first and page-owned
+    // GrapesJS CSS last. Appending here would reverse that order when the
+    // shared styles arrive after editor initialization.
+    head.prepend(styleNode);
+  }
+  if (styleNode.textContent !== css) styleNode.textContent = css;
+  return styleNode;
 };
 
 /**
@@ -273,36 +296,13 @@ export function useGrapesEditor({
     const editor = editorRef.current;
     if (!editor || !isReady) return undefined;
 
-    const css = (canvasStyles || [])
-      .map((item) => item.css || item.href || "")
-      .filter(Boolean)
-      .join("\n");
-
-    if (!css) return undefined;
+    const css = inlineCanvasCss(canvasStyles);
 
     // GrapesJS renders the canvas inside an iframe. Inline CSS cannot go
     // through `canvas.styles` (that config expects <link> URLs), so we keep
     // a dedicated <style id="sc-canvas-styles"> element in the frame head and
     // update its textContent whenever the published tokens/theme CSS change.
-    const getFrameHead = () => {
-      const doc = editor.Canvas?.getDocument?.();
-      return doc?.head || null;
-    };
-
-    const applyCanvasStyles = () => {
-      const head = getFrameHead();
-      if (!head) return;
-      let styleNode = head.querySelector("#sc-canvas-styles");
-      if (!styleNode) {
-        styleNode = head.ownerDocument.createElement("style");
-        styleNode.id = "sc-canvas-styles";
-        styleNode.setAttribute("data-scoutcomp", "canvas");
-        head.appendChild(styleNode);
-      }
-      if (styleNode.textContent !== css) {
-        styleNode.textContent = css;
-      }
-    };
+    const applyCanvasStyles = () => applyInlineCanvasStyles(editor, css);
 
     // GrapesJS fires these events at different stages of frame lifecycle.
     // We try to apply on each one to cover both initial load and re-renders.

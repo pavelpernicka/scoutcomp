@@ -13,5 +13,5 @@ export {
 } from "./bindings";
 export { createDataSourceBlocks, createPrimitiveBlocks, registerBuilderBlocks } from "./blocks";
 export { registerScoutCompTypes } from "./componentTypes";
-export { configureEditor, createEditorConfig, fontFamilyOptions } from "./config";
+export { configureEditor, createEditorConfig, fontFamilyOptions, inlineCanvasCss, richTextActions } from "./config";
 export { createLegacyProject, getEditorSnapshot, loadEditorProject, normalizeProjectData } from "./projectData";

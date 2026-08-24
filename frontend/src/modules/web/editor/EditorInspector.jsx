@@ -7,6 +7,7 @@ import { ResourcePropsEditor } from "../props/PropEditorRegistry";
 import { getTemplateOwnerId } from "./componentOwnership";
 import CharacteristicContentPanel from "./CharacteristicContentPanel";
 import ThemeContentControls from "./ThemeContentControls";
+import { setImageComponentSource } from "./grapes/imageSource";
 
 
 const tabs = ["content", "style", "data", "code", "advanced"];
@@ -94,18 +95,13 @@ export function ImageContentPanel({ selected, onSelectMedia, onContentChange }) 
     onContentChange?.();
   };
   const removeMedia = () => {
-    selected?.removeAttributes?.("data-sc-media-id");
-    selected?.removeAttributes?.("src");
-    selected?.set?.("src", "");
+    setImageComponentSource(selected, { src: "", mediaId: null });
     setSrc("");
     onContentChange?.();
   };
   const setSource = (value) => {
     const clean = value.trim();
-    selected?.removeAttributes?.("data-sc-media-id");
-    if (clean) selected?.addAttributes?.({ src: clean });
-    else selected?.removeAttributes?.("src");
-    selected?.set?.("src", clean);
+    setImageComponentSource(selected, { src: clean, mediaId: null });
     onContentChange?.();
   };
   const imageStyle = selected.getStyle?.() || {};

@@ -21,6 +21,7 @@ import useGrapesEditor from "./useGrapesEditor";
 import MediaPickerModal from "../media/MediaPickerModal";
 import { hydrateEditorMediaPreviews } from "../media/editorMedia";
 import api from "../../../services/api";
+import { setImageComponentSource } from "./grapes/imageSource";
 import "../styles/editor.css";
 
 const safeId = (value) => String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -369,8 +370,11 @@ export default function WebEditorPage() {
         return;
       }
       if (targetComponent && targetComponent !== "insert" && targetComponent.get?.("type") === "image") {
-        targetComponent.addAttributes?.(attributes);
-        targetComponent.set?.("src", src);
+        setImageComponentSource(targetComponent, {
+          src,
+          mediaId: mediaItem.id,
+          alt: mediaItem.alt || "",
+        });
         autosaveRef.current?.schedule();
         return;
       }
