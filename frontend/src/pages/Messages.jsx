@@ -656,9 +656,19 @@ export default function Messages() {
                   </Alert>
                 )}
 
-                <form className="p-3 bg-white border-top d-flex gap-2" onSubmit={handleSend}>
+                <form className="p-3 bg-white border-top d-flex gap-2" autoComplete="off" onSubmit={handleSend}>
                   <input
                     type="text"
+                    name="scoutcomp-chat-composer"
+                    autoComplete="off"
+                    inputMode="text"
+                    autoCapitalize="sentences"
+                    spellCheck="true"
+                    aria-autocomplete="none"
+                    data-form-type="other"
+                    data-lpignore="true"
+                    data-1p-ignore="true"
+                    data-bwignore="true"
                     className="form-control"
                     placeholder={t("messages.placeholder")}
                     value={body}
