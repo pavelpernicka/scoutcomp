@@ -1903,7 +1903,7 @@
       "registerMember": "Registrace člena/ky",
       "registerAdmin": "Registrace admina"
     },
-    "welcome": "Vítej v aplikaci {{appName}}",
+    "welcome": "Vítej v aplikaci {{appName}}",
     "memberArea": "Členská sekce",
     "intro": "Jedno místo pro oddílové dění, úkoly a společné akce.",
     "accountAction": "Přihlášení a registrace",

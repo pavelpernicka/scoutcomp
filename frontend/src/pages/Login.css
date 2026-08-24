@@ -116,14 +116,10 @@
 }
 
 .auth-brand-mark {
-  width: 3.4rem;
-  height: 3.4rem;
-  display: grid;
-  place-items: center;
   align-self: flex-end;
-  border: 1px solid rgba(255, 255, 255, 0.22);
   color: #ffd985;
-  font-size: 1.25rem;
+  font-size: 1.5rem;
+  line-height: 1;
   transform: rotate(-7deg);
 }
 
