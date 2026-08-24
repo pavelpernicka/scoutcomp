@@ -1,4 +1,5 @@
 import { insertEditorComponents } from "./editorInsertion";
+import { withEditorMediaPlaceholders } from "./grapes/projectData";
 
 export const getResourceComponent = (resource = {}) => {
   const project = resource.project_data || resource.data || {};
@@ -42,7 +43,7 @@ export const cloneResourceComponents = (resource) => {
   const insertable = root?.type === "wrapper" && Array.isArray(root.components)
     ? root.components
     : root;
-  return JSON.parse(JSON.stringify(insertable));
+  return withEditorMediaPlaceholders(JSON.parse(JSON.stringify(insertable)));
 };
 
 export const getResourceStyles = (resource = {}) => {
@@ -78,7 +79,9 @@ export const linkedResourceInstance = (resource, kind) => ({
   resourceKind: kind === "sections" || kind === "section" ? "section" : "component",
   resourceId: resource.qualified_key || String(resource.id),
   resourceName: resource.name || resource.qualified_key || String(resource.id),
-  previewUrl: resource.preview_url || "",
+  // Protected preview artifacts are hydrated to blob URLs by the editor.
+  // Never let a raw API URL mount in the unauthenticated canvas iframe.
+  previewUrl: String(resource.preview_url || "").startsWith("data:image/") ? resource.preview_url : "",
   props: JSON.parse(JSON.stringify(resource.default_props || {})),
 });
 

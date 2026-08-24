@@ -6,7 +6,6 @@ import { useTranslation } from "react-i18next";
 
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { useAuth } from "../../../providers/AuthProvider";
-import api from "../../../services/api";
 import { cmsApi } from "../api/cms";
 import { cloneResourceComponents, filterCatalogResources, hydrateMenuComponents } from "../editor/resourceBlocks";
 import { DataBindings, ImageContentPanel, LinkedResourceProps, QuickContentPanel, RepeatConfigurator } from "../editor/EditorInspector";
@@ -205,26 +204,20 @@ export default function DesignResourceEditorPage({ kind }) {
     editGenerationRef.current += 1;
     setStatus("unsaved");
   };
-  const handleMediaSelect = async (mediaItem) => {
+  const handleMediaSelect = (mediaItem) => {
     const target = mediaPickerTarget;
     setMediaPickerTarget(null);
     const targetComponent = target?.component || target;
     if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
     if (!targetComponent || (target?.mode !== "background" && targetComponent.get?.("type") !== "image")) return;
-    let src = mediaItem.url;
-    try {
-      const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
-      src = URL.createObjectURL(data);
-    } catch { /* the durable media id still renders on the public site */ }
     if (target?.mode === "background" && targetComponent?.addStyle) {
+      targetComponent.addStyle({ "background-image": "none" });
       targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
-      targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
-      targetComponent.getEl?.()?.style?.setProperty("background-image", `url("${src}")`);
       markComponentChanged();
       return;
     }
     setImageComponentSource(targetComponent, {
-      src,
+      src: `/media/${mediaItem.id}/file`,
       alt: mediaItem.alt || "",
       mediaId: mediaItem.id,
     });

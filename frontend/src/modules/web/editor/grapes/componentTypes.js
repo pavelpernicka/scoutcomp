@@ -1,4 +1,5 @@
 import { SC_COMPONENT_TYPES } from "./constants";
+import { replaceEditorMediaUrls } from "./projectData";
 
 const trait = (type, name, label, extra = {}) => ({
   type,
@@ -15,7 +16,7 @@ const matchesType = (name) => (element) =>
 
 const safePreviewUrl = (value) => {
   const url = String(value || "").trim();
-  return /^(?:https?:|data:image\/|blob:|\/)/i.test(url) ? url : "";
+  return /^(?:data:image\/|blob:)/i.test(url) ? url : "";
 };
 
 /**
@@ -868,8 +869,8 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           this.el.appendChild(preview);
         }
         preview.replaceChildren();
-        const liveHtml = String(this.model.get("livePreviewHtml") || "");
-        const liveCss = String(this.model.get("livePreviewCss") || "");
+        const liveHtml = replaceEditorMediaUrls(this.model.get("livePreviewHtml"));
+        const liveCss = replaceEditorMediaUrls(this.model.get("livePreviewCss"));
         const url = safePreviewUrl(this.model.get("previewUrl"));
         const name = String(this.model.get("resourceName") || this.model.get("resourceId") || "?");
         const values = Object.values(this.model.get("props") || {})

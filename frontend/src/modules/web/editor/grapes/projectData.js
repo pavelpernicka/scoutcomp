@@ -2,6 +2,69 @@ const isObject = (value) => value !== null && typeof value === "object" && !Arra
 
 const serializableClone = (value) => JSON.parse(JSON.stringify(value));
 
+// A persisted public URL cannot be requested from the authenticated editor
+// iframe before its bearer-authenticated blob preview is ready. A transparent
+// data image keeps the native image component mounted without a broken-image
+// flash; it is replaced asynchronously and never leaves the editor snapshot.
+export const EDITOR_MEDIA_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+
+const editorMediaPattern = () => /(https?:\/\/[^/"'()\s]+)?(?:\/api\/web)?\/media\/([1-9][0-9]{0,9})\/file/g;
+const sameEditorOrigin = (origin) => !origin
+  || typeof window === "undefined"
+  || origin === window.location.origin;
+
+export const editorMediaIds = (value) => [...String(value || "").matchAll(editorMediaPattern())]
+  .filter((match) => sameEditorOrigin(match[1]))
+  .map((match) => match[2]);
+
+export const replaceEditorMediaUrls = (value, replacement = EDITOR_MEDIA_PLACEHOLDER) => String(value || "").replace(
+  editorMediaPattern(),
+  (url, origin, mediaId) => {
+    if (!sameEditorOrigin(origin)) return url;
+    return typeof replacement === "function" ? replacement(mediaId, url) : replacement;
+  },
+);
+
+const placeholderizeEditorMarkup = (value) => String(value || "").replace(/<[a-z][^>]*>/gi, (tag) => {
+  const isImage = /^<img\b/i.test(tag);
+  const inlineStyle = tag.match(/\bstyle\s*=\s*(?:"[^"]*"|'[^']*')/i)?.[0] || "";
+  const mediaId = editorMediaIds(isImage ? tag : inlineStyle)[0];
+  if (!mediaId) return tag;
+  const marker = isImage ? "data-sc-media-id" : "data-sc-background-media-id";
+  // `data:,` is a valid empty CSS image without the semicolon that GrapesJS'
+  // inline-style parser would otherwise truncate in an unquoted url(...).
+  const hydratedTag = replaceEditorMediaUrls(tag, isImage ? EDITOR_MEDIA_PLACEHOLDER : "data:,");
+  if (new RegExp(`\\b${marker}\\s*=`, "i").test(hydratedTag)) return hydratedTag;
+  return hydratedTag.replace(/\s*\/?>(?=$)/, (end) => ` ${marker}="${mediaId}"${end}`);
+});
+
+export const withEditorMediaPlaceholders = (value) => {
+  if (Array.isArray(value)) return value.map(withEditorMediaPlaceholders);
+  if (typeof value === "string" && /<[a-z][^>]*>/i.test(value)) return placeholderizeEditorMarkup(value);
+  if (!isObject(value)) return value;
+  const next = Object.fromEntries(Object.entries(value).map(([key, child]) => [key, withEditorMediaPlaceholders(child)]));
+  const attributes = isObject(next.attributes) ? next.attributes : null;
+  const mediaId = String(attributes?.["data-sc-media-id"]
+    || editorMediaIds(attributes?.src || next.src)[0]
+    || "");
+  const isImage = next.type === "image"
+    || String(next.tagName || "").toLowerCase() === "img"
+    || Boolean(attributes?.src);
+  if (isImage && /^\d+$/.test(mediaId)) {
+    next.attributes = { ...attributes, src: EDITOR_MEDIA_PLACEHOLDER, "data-sc-media-id": mediaId };
+    if ("src" in next) next.src = EDITOR_MEDIA_PLACEHOLDER;
+  }
+  const backgroundMediaId = String(attributes?.["data-sc-background-media-id"]
+    || (isObject(next.style) ? editorMediaIds(next.style["background-image"])[0] : "")
+    || "");
+  if (/^\d+$/.test(backgroundMediaId) && isObject(next.style)) {
+    next.attributes = { ...(isObject(next.attributes) ? next.attributes : {}), "data-sc-background-media-id": backgroundMediaId };
+    next.style = { ...next.style, "background-image": "none" };
+  }
+  if ("previewUrl" in next && !String(next.previewUrl || "").startsWith("data:image/")) next.previewUrl = "";
+  return next;
+};
+
 // These values hydrate the authenticated editor canvas only. A linked
 // resource's persisted contract remains resourceKind/resourceId/props/variant;
 // storing the materialized fragment would make snapshots stale and duplicate
@@ -11,7 +74,7 @@ const stripEditorOnlyPreview = (value) => {
   if (!isObject(value)) return value;
   const next = {};
   Object.entries(value).forEach(([key, child]) => {
-    if (key === "livePreviewHtml" || key === "livePreviewCss" || key === "menuItems") return;
+    if (key === "livePreviewHtml" || key === "livePreviewCss" || key === "previewUrl" || key === "menuItems") return;
     next[key] = stripEditorOnlyPreview(child);
   });
   const attributes = isObject(next.attributes) ? next.attributes : null;
@@ -72,7 +135,7 @@ export function createLegacyProject(html = "", css = "") {
  */
 export function loadEditorProject(editor, { projectData, legacyHtml = "", legacyCss = "" } = {}) {
   const canonical = normalizeProjectData(projectData);
-  const project = canonical || createLegacyProject(legacyHtml, legacyCss);
+  const project = withEditorMediaPlaceholders(canonical || createLegacyProject(legacyHtml, legacyCss));
 
   editor.loadProjectData(project);
   editor.UndoManager.clear();

@@ -14,4 +14,4 @@ export {
 export { createDataSourceBlocks, createPrimitiveBlocks, registerBuilderBlocks } from "./blocks";
 export { registerScoutCompTypes } from "./componentTypes";
 export { configureEditor, createEditorConfig, fontFamilyOptions, inlineCanvasCss, richTextActions } from "./config";
-export { createLegacyProject, getEditorSnapshot, loadEditorProject, normalizeProjectData } from "./projectData";
+export { createLegacyProject, editorMediaIds, EDITOR_MEDIA_PLACEHOLDER, getEditorSnapshot, loadEditorProject, normalizeProjectData, replaceEditorMediaUrls, withEditorMediaPlaceholders } from "./projectData";

@@ -19,9 +19,10 @@ import { insertEditorComponents } from "./editorInsertion";
 import useDraftAutosave from "./useDraftAutosave";
 import useGrapesEditor from "./useGrapesEditor";
 import MediaPickerModal from "../media/MediaPickerModal";
-import { hydrateEditorMediaPreviews } from "../media/editorMedia";
+import { hydrateEditorFragmentMedia, hydrateEditorMediaPreviews } from "../media/editorMedia";
 import api from "../../../services/api";
 import { setImageComponentSource } from "./grapes/imageSource";
+import { EDITOR_MEDIA_PLACEHOLDER } from "./grapes/projectData";
 import "../styles/editor.css";
 
 const safeId = (value) => String(value || "unknown").replace(/[^a-zA-Z0-9_-]/g, "-");
@@ -59,7 +60,6 @@ export default function WebEditorPage() {
   const sourcesQuery = useQuery({ queryKey: ["web", "data-sources"], queryFn: cmsApi.listDataSources, retry: 1 });
   const sectionsQuery = useQuery({ queryKey: ["web", "design", "sections"], queryFn: () => cmsApi.listDesignResources("sections"), retry: 1 });
   const componentsQuery = useQuery({ queryKey: ["web", "design", "components"], queryFn: () => cmsApi.listDesignResources("components"), retry: 1 });
-  const mediaQuery = useQuery({ queryKey: ["web", "media"], queryFn: () => cmsApi.listMedia({ limit: 100, offset: 0 }), retry: 1 });
   const templatesQuery = useQuery({ queryKey: ["web", "templates"], queryFn: cmsApi.listTemplates, retry: 1 });
   const menusQuery = useQuery({
     queryKey: ["web", "menus"],
@@ -184,52 +184,28 @@ export default function WebEditorPage() {
   autosaveRef.current = autosave;
 
   useEffect(() => {
-    const media = Array.isArray(mediaQuery.data) ? mediaQuery.data : mediaQuery.data?.items || [];
-    if (media.length === 0) return;
-    let cancelled = false;
-    // Fetch protected media as blobs so the editor iframe can display them
-    // without requiring browser auth headers on raw <img src> requests.
-    Promise.all(media.filter((item) => item.is_image).map(async (item) => {
-      try {
-        const { data } = await api.get(item.url.replace(/^\/api\//, "/"), { responseType: "blob" });
-        return { ...item, blobUrl: URL.createObjectURL(data) };
-      } catch { return null; }
-    })).then((results) => {
-      if (cancelled) return;
-      const assets = results.filter(Boolean).map((item) => ({ src: item.blobUrl, name: item.filename, attributes: { alt: item.alt || "" } }));
-      if (editor.editorRef.current && assets.length) {
-        const instance = editor.editorRef.current;
-        instance.AssetManager.add(assets);
-        const previewById = new Map(results.filter(Boolean).map((item) => [String(item.id), item.blobUrl]));
-        const replacePersistedMediaUrls = (component) => {
-          const mediaId = component?.getAttributes?.()?.["data-sc-media-id"];
-          const previewUrl = previewById.get(String(mediaId || ""));
-          if (previewUrl) component.addAttributes?.({ src: previewUrl });
-          component?.components?.().forEach?.(replacePersistedMediaUrls);
-        };
-        replacePersistedMediaUrls(instance.getWrapper?.());
-      }
-    });
-    return () => { cancelled = true; };
-  }, [editor.editorRef, mediaQuery.data]);
-
-  useEffect(() => {
     const instance = editor.editorRef.current;
     const definitions = [...components, ...sections].filter((item) => item.preview_url);
     if (!instance || definitions.length === 0) return undefined;
     let cancelled = false;
+    const objectUrls = [];
     Promise.all(definitions.map(async (item) => {
       try {
         const previewUrl = item.preview_url;
         if (previewUrl.startsWith("data:")) {
-          return [String(item.qualified_key || item.id), previewUrl];
+          return [String(item.qualified_key || item.id), previewUrl, false];
         }
         const { data } = await api.get(previewUrl.replace(/^\/api\//, "/"), { responseType: "blob" });
-        return [String(item.qualified_key || item.id), URL.createObjectURL(data)];
+        return [String(item.qualified_key || item.id), URL.createObjectURL(data), true];
       } catch { return null; }
     })).then((entries) => {
-      if (cancelled) return;
-      const previews = new Map(entries.filter(Boolean));
+      const loaded = entries.filter(Boolean);
+      if (cancelled) {
+        loaded.filter((entry) => entry[2]).forEach((entry) => URL.revokeObjectURL(entry[1]));
+        return;
+      }
+      objectUrls.push(...loaded.filter((entry) => entry[2]).map((entry) => entry[1]));
+      const previews = new Map(loaded.map(([key, url]) => [key, url]));
       const apply = (component) => {
         if (component?.get?.("type") === "sc-resource-instance") {
           const url = previews.get(String(component.get("resourceId") || ""));
@@ -239,7 +215,18 @@ export default function WebEditorPage() {
       };
       apply(instance.getWrapper?.());
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      const revoked = new Set(objectUrls);
+      const clear = (component) => {
+        if (component?.get?.("type") === "sc-resource-instance" && revoked.has(component.get("previewUrl"))) {
+          component.set("previewUrl", "", { avoidStore: true });
+        }
+        component?.components?.().forEach?.(clear);
+      };
+      clear(instance.getWrapper?.());
+      objectUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
   }, [activeThemeVersionId, componentsQuery.data, editor.editorRef, sectionsQuery.data]);
 
   // A linked resource must look like the section the author will publish, not
@@ -255,12 +242,16 @@ export default function WebEditorPage() {
       [String(resource.qualified_key || ""), resource],
     ].filter(([key]) => key)));
     const pending = new Map();
+    const generations = new Map();
+    const previewCleanups = new Map();
     let cancelled = false;
     const hydrate = (component) => {
       if (cancelled || component?.get?.("type") !== "sc-resource-instance") return;
       const definition = resourcesByKey.get(String(component.get("resourceId") || ""));
       if (!definition?.id || !definition.draft_version || definition.can_materialize === false) return;
       const key = component.cid || component.getId?.();
+      const generation = (generations.get(key) || 0) + 1;
+      generations.set(key, generation);
       if (pending.has(key)) window.clearTimeout(pending.get(key));
       pending.set(key, window.setTimeout(async () => {
         pending.delete(key);
@@ -271,7 +262,15 @@ export default function WebEditorPage() {
             variant: component.get("variant") || null,
             expected_version: definition.draft_version,
           });
-          if (!cancelled) component.set?.({ livePreviewHtml: fragment.html || "", livePreviewCss: fragment.css || "" }, { avoidStore: true });
+          const preview = await hydrateEditorFragmentMedia(fragment.html || "", fragment.css || "");
+          if (cancelled || generations.get(key) !== generation) {
+            preview.cleanup();
+            return;
+          }
+          const previousCleanup = previewCleanups.get(key);
+          previewCleanups.set(key, preview.cleanup);
+          component.set?.({ livePreviewHtml: preview.html, livePreviewCss: preview.css }, { avoidStore: true });
+          previousCleanup?.();
         } catch {
           // A preview artifact remains available for bindings, stale drafts or
           // any fragment that cannot intentionally be materialized.
@@ -284,14 +283,29 @@ export default function WebEditorPage() {
     };
     const onAdd = (component) => hydrateTree(component);
     const onUpdate = (component) => hydrate(component);
+    const onRemove = (component) => {
+      const release = (item) => {
+        const key = item?.cid || item?.getId?.();
+        generations.set(key, (generations.get(key) || 0) + 1);
+        if (pending.has(key)) window.clearTimeout(pending.get(key));
+        pending.delete(key);
+        previewCleanups.get(key)?.();
+        previewCleanups.delete(key);
+        item?.components?.().forEach?.(release);
+      };
+      release(component);
+    };
     hydrateTree(instance.getWrapper?.());
     instance.on("component:add", onAdd);
+    instance.on("component:remove", onRemove);
     instance.on("component:update:props", onUpdate);
     instance.on("component:update:variant", onUpdate);
     return () => {
       cancelled = true;
       pending.forEach((timer) => window.clearTimeout(timer));
+      previewCleanups.forEach((cleanup) => cleanup());
       instance.off("component:add", onAdd);
+      instance.off("component:remove", onRemove);
       instance.off("component:update:props", onUpdate);
       instance.off("component:update:variant", onUpdate);
     };
@@ -341,37 +355,30 @@ export default function WebEditorPage() {
     autosave.schedule();
   };
   const openMediaPicker = useCallback((target = "insert") => setMediaPickerTarget(target), []);
-  const handleMediaSelect = useCallback(async (mediaItem) => {
+  const handleMediaSelect = useCallback((mediaItem) => {
     const target = mediaPickerTarget;
     setMediaPickerTarget(null);
     const instance = editor.editorRef.current;
     if (!instance) return;
     if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
     if (mediaItem.is_image || (mediaItem.mime && mediaItem.mime.startsWith("image/"))) {
-      let src = mediaItem.url;
-      // GrapesJS iframe has no auth; fetch the blob so it displays.
-      try {
-        const { data } = await api.get(mediaItem.url.replace(/^\/api\//, "/"), { responseType: "blob" });
-        src = URL.createObjectURL(data);
-      } catch { /* fall back to raw URL (broken icon if auth-required) */ }
       const attributes = {
-        // Keep a blob URL only in the currently-open authenticated canvas.
-        // The renderer derives the durable public URL from data-sc-media-id.
-        src,
+        // Never mount the protected URL in the iframe. The media hydrator
+        // replaces this neutral source with one authenticated blob preview.
+        src: `/media/${mediaItem.id}/file`,
         alt: mediaItem.alt || "",
         "data-sc-media-id": String(mediaItem.id),
       };
       const targetComponent = target?.component || target;
       if (target?.mode === "background" && targetComponent?.addStyle) {
+        targetComponent.addStyle({ "background-image": "none" });
         targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
-        targetComponent.addStyle({ "background-image": `url("/media/${mediaItem.id}/file")` });
-        targetComponent.getEl?.()?.style?.setProperty("background-image", `url("${src}")`);
         autosaveRef.current?.schedule();
         return;
       }
       if (targetComponent && targetComponent !== "insert" && targetComponent.get?.("type") === "image") {
         setImageComponentSource(targetComponent, {
-          src,
+          src: attributes.src,
           mediaId: mediaItem.id,
           alt: mediaItem.alt || "",
         });
@@ -380,7 +387,7 @@ export default function WebEditorPage() {
       }
       insertEditorComponents(instance, {
         type: "image",
-        attributes,
+        attributes: { ...attributes, src: EDITOR_MEDIA_PLACEHOLDER },
       });
     } else {
       insertEditorComponents(instance, {
