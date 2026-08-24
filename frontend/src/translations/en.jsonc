@@ -967,7 +967,7 @@
     "messageAttendees": "Message attendees",
     "messageAttendeesPlaceholder": "Message for attendees…",
     "send": "Send",
-    "plannedDeadline": "Sign-up by {date}",
+    "plannedDeadline": "Sign-up by {{date}}",
     "allGroups": "All groups",
     "registeredOn": "Registered on",
     "unregister": "Unregister",

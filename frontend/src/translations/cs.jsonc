@@ -977,7 +977,7 @@
     "messageAttendees": "Napsat přítomným",
     "messageAttendeesPlaceholder": "Zpráva pro přítomné…",
     "send": "Odeslat",
-    "plannedDeadline": "Nahlášení do {date}",
+    "plannedDeadline": "Nahlášení do {{date}}",
     "allGroups": "Všechny skupiny",
     "registeredOn": "Přihlášen",
     "unregister": "Odhlásit se",
