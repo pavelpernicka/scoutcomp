@@ -10,6 +10,7 @@ import pytest
 
 from app.models import (
     WebPage,
+    WebPageRevision,
     WebPreviewArtifact,
     WebReusableComponent,
     WebSiteStyle,
@@ -498,6 +499,38 @@ def test_uninstall_rejects_draft_linked_resource_reference(db_session, tmp_path)
     with pytest.raises(ThemeInUseError, match="linked resource"):
         uninstall_theme(db_session, old.id, storage_root=tmp_path / "themes")
     assert db_session.get(WebThemeVersion, old.id) is not None
+
+
+def test_uninstall_allows_immutable_revision_reference(db_session, tmp_path):
+    old = _install(db_session, tmp_path, version="1.0.0", files=_files_with_linked_part("1.0.0"))
+    new = _install(db_session, tmp_path, version="2.0.0")
+    activate_theme(db_session, new.id)
+    template = db_session.query(WebTemplate).filter_by(theme_version_id=old.id).one()
+    section = db_session.query(WebSection).filter_by(theme_version_id=old.id).one()
+    page = WebPage(slug="history", title="History", data={"type": "main"}, published=False)
+    db_session.add(page)
+    db_session.flush()
+    revision = WebPageRevision(
+        page_id=page.id,
+        template_id=template.id,
+        data={"type": "sc-template-part", "resourceId": section.qualified_key},
+        compiled_tree={"type": "main"},
+        compiled_css=f".historic{{background:url('/theme-assets/{old.id}/assets/marker.png')}}",
+        rendered_html="<html><body>Immutable snapshot</body></html>",
+        reason="snapshot",
+    )
+    db_session.add(revision)
+    db_session.commit()
+    revision_id = revision.id
+
+    uninstall_theme(db_session, old.id, storage_root=tmp_path / "themes")
+
+    db_session.expire_all()
+    stored_revision = db_session.get(WebPageRevision, revision_id)
+    assert stored_revision is not None
+    assert stored_revision.template_id is None
+    assert stored_revision.rendered_html == "<html><body>Immutable snapshot</body></html>"
+    assert db_session.get(WebThemeVersion, old.id) is None
 
 
 def test_uninstall_removes_theme_owned_legacy_clone_and_package_files(db_session, tmp_path):

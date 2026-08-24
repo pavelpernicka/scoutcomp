@@ -1369,15 +1369,27 @@ def uninstall_theme(db: Session, theme_version_id: int, *, storage_root: str | P
         if ids:
             qualified_keys.update(row[0] for row in db.query(model.qualified_key).filter(model.id.in_(ids)).all() if row[0])
     legacy_template_keys = {row.key for row in templates}
-    if template_ids and db.query(WebPageRevision).filter(WebPageRevision.template_id.in_(template_ids)).first():
-        raise ThemeInUseError("A page revision references this theme")
+    published_revision_ids = [
+        row[0] for row in db.query(WebPage.published_revision_id)
+        .filter(WebPage.published_revision_id.is_not(None)).all()
+    ]
+    published_revisions = (
+        db.query(WebPageRevision).filter(WebPageRevision.id.in_(published_revision_ids)).all()
+        if published_revision_ids else []
+    )
+    if template_ids and any(revision.template_id in template_ids for revision in published_revisions):
+        raise ThemeInUseError("A currently published page references this theme")
     if template_ids and db.query(WebPage).filter(WebPage.template_id.in_(template_ids)).first():
         raise ThemeInUseError("A page draft references this theme")
     if legacy_template_keys and db.query(WebPage).filter(WebPage.template.in_(legacy_template_keys)).first():
         raise ThemeInUseError("A page draft references this theme")
     json_owners: list[tuple[Any, ...]] = []
     json_owners.extend((page.data,) for page in db.query(WebPage).all())
-    json_owners.extend((revision.data, revision.compiled_tree) for revision in db.query(WebPageRevision).all())
+    # Revisions are immutable snapshots. Their rendered/compiled payload stays
+    # available after uninstall and their template link is cleared before the
+    # theme-owned template is removed. Only mutable CMS content may block an
+    # uninstall; otherwise an old revision would retain a theme forever.
+    json_owners.extend((revision.data, revision.compiled_tree) for revision in published_revisions)
     json_owners.extend(
         (row.project_data, row.published_project_data)
         for row in db.query(WebTemplate).all()
@@ -1396,8 +1408,8 @@ def uninstall_theme(db: Session, theme_version_id: int, *, storage_root: str | P
     asset_owners: list[Any] = []
     asset_owners.extend((page.data, page.html) for page in db.query(WebPage).all())
     asset_owners.extend(
-        (revision.data, revision.compiled_tree, revision.compiled_css, revision.html)
-        for revision in db.query(WebPageRevision).all()
+        (revision.data, revision.compiled_tree, revision.compiled_css, revision.html, revision.rendered_html)
+        for revision in published_revisions
     )
     asset_owners.extend(
         (row.project_data, row.published_project_data, row.css, row.published_css)
@@ -1437,6 +1449,9 @@ def uninstall_theme(db: Session, theme_version_id: int, *, storage_root: str | P
         # Theme-owned custom definitions share the same lifecycle as their
         # active theme. Uninstall must not leave detached catalog remnants.
         if template_ids:
+            db.query(WebPageRevision).filter(
+                WebPageRevision.template_id.in_(template_ids)
+            ).update({WebPageRevision.template_id: None}, synchronize_session=False)
             db.query(WebTemplate).filter(WebTemplate.id.in_(template_ids)).delete(synchronize_session=False)
         for model in (WebReusableComponent, WebSection, WebPattern):
             ids = owned_resource_ids[model]
