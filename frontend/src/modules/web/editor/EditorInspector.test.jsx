@@ -459,6 +459,33 @@ describe("EditorInspector linked props", () => {
     expect(onEditTemplate).toHaveBeenCalledWith(42);
   });
 
+  it("keeps the native style manager mount stable after selecting a template-owned component", () => {
+    const editable = new FakeSelected({ type: "default", tagName: "section" });
+    const templateOwned = new FakeSelected({
+      type: "default",
+      attributes: { "data-sc-template-owner": "42" },
+    });
+    const props = {
+      dataSources: [],
+      resources: { components: [], sections: [] },
+      onDuplicate: vi.fn(),
+      onDelete: vi.fn(),
+    };
+    const { container, rerender } = render(<EditorInspector selected={editable} {...props} />);
+    const styleMount = container.querySelector(".web-editor-style-manager");
+    const nativeContent = document.createElement("div");
+    nativeContent.textContent = "GrapesJS style controls";
+    styleMount.append(nativeContent);
+
+    rerender(<EditorInspector selected={templateOwned} {...props} />);
+    expect(container.querySelector(".web-editor-style-manager")).toBe(styleMount);
+
+    rerender(<EditorInspector selected={editable} {...props} />);
+    fireEvent.click(screen.getAllByRole("tab")[1]);
+    expect(container.querySelector(".web-editor-style-manager")).toBe(styleMount);
+    expect(screen.getByText("GrapesJS style controls")).toBeVisible();
+  });
+
   it("applies raw component code through GrapesJS and reports a persistence change", () => {
     const replacement = {};
     const editor = {

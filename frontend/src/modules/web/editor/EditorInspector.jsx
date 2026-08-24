@@ -24,36 +24,35 @@ export default function EditorInspector({ selected, dataSources, resources, font
     <div className="web-editor-inspector-tabs" role="tablist">{tabs.map((key) => <button key={key} type="button" role="tab" aria-selected={tab === key} className={tab === key ? "active" : ""} onClick={() => setTab(key)}>{t(`web.editor.inspectorTabs.${key}`)}</button>)}</div>
     {!selected && <div className="web-editor-inspector-empty"><i className="fas fa-arrow-pointer" /><p>{t("web.editor.noSelection")}</p></div>}
     <div className={`web-editor-inspector-body ${selected ? "" : "web-editor-mounts-only"}`}>
-      {selected && templateOwnerId ? <TemplateOwnedInfo templateId={templateOwnerId} onEdit={onEditTemplate} /> : <>
-        {/* GrapesJS resolves appendTo only during initialization.  Keep both
-            native mounts in the DOM before the first selection; otherwise
-            React creates empty cards later but Traits/StyleManager stay
-            detached and every ordinary component appears uneditable. */}
-        <div className={tab === "content" ? "" : "d-none"}>
-          {linked && <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} />}
-          <div className={linked ? "d-none" : ""}>
-            {selected && <CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />}
-            {type === "image" && <ImageContentPanel selected={selected} onSelectMedia={onSelectMedia} onContentChange={onContentChange} />}
-            {selected && <>
-              <QuickContentPanel selected={selected} fontAwesomeIcons={fontAwesomeIcons} themeControls={themeControls} onSelectMedia={onSelectMedia} onContentChange={onContentChange} />
-            </>}
-            <div className="web-editor-trait-manager" />
-          </div>
+      {selected && templateOwnerId && <TemplateOwnedInfo templateId={templateOwnerId} onEdit={onEditTemplate} />}
+      {/* GrapesJS resolves appendTo only during initialization. Keep both
+          native mounts in the DOM for the entire editor lifetime. In
+          particular, selecting a template-owned component must only hide
+          them; unmounting would leave StyleManager attached to a stale node. */}
+      <div className={!templateOwnerId && tab === "content" ? "" : "d-none"}>
+        {linked && <LinkedResourceProps key={selected?.cid} selected={selected} resources={resources} onClone={onClone} onDetach={onDetach} onEditDefinition={onEditDefinition} onContentChange={onContentChange} />}
+        <div className={linked ? "d-none" : ""}>
+          {selected && <CharacteristicContentPanel selected={selected} onContentChange={onContentChange} />}
+          {type === "image" && <ImageContentPanel selected={selected} onSelectMedia={onSelectMedia} onContentChange={onContentChange} />}
+          {selected && <>
+            <QuickContentPanel selected={selected} fontAwesomeIcons={fontAwesomeIcons} themeControls={themeControls} onSelectMedia={onSelectMedia} onContentChange={onContentChange} />
+          </>}
+          <div className="web-editor-trait-manager" />
         </div>
-        <div className={tab === "style" ? "" : "d-none"}>
-          {linked && <LinkedStyleInfo selected={selected} resources={resources} />}
-          <div className={linked ? "d-none" : ""}><div className="web-editor-style-manager" /></div>
-        </div>
-        {selected && tab === "data" && (type === "sc-repeat"
-          ? <RepeatConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
-          : type === "sc-pagination"
-            ? <PaginationConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
-            : type === "sc-calendar"
-              ? <CalendarConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
-              : <DataBindings selected={selected} dataSources={dataSources} />)}
-        <div className={selected && tab === "code" ? "" : "d-none"}>{selected && <CodePanel key={selected.cid} selected={selected} onApplied={onContentChange} />}</div>
-        {selected && tab === "advanced" && <AdvancedInspector selected={selected} />}
-      </>}
+      </div>
+      <div className={!templateOwnerId && tab === "style" ? "" : "d-none"}>
+        {linked && <LinkedStyleInfo selected={selected} resources={resources} />}
+        <div className={linked ? "d-none" : ""}><div className="web-editor-style-manager" /></div>
+      </div>
+      {selected && !templateOwnerId && tab === "data" && (type === "sc-repeat"
+        ? <RepeatConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
+        : type === "sc-pagination"
+          ? <PaginationConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
+          : type === "sc-calendar"
+            ? <CalendarConfigurator selected={selected} dataSources={dataSources} onContentChange={onContentChange} />
+            : <DataBindings selected={selected} dataSources={dataSources} />)}
+      <div className={selected && !templateOwnerId && tab === "code" ? "" : "d-none"}>{selected && !templateOwnerId && <CodePanel key={selected.cid} selected={selected} onApplied={onContentChange} />}</div>
+      {selected && !templateOwnerId && tab === "advanced" && <AdvancedInspector selected={selected} />}
     </div>
   </aside>;
 }
