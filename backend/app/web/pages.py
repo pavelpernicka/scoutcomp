@@ -405,14 +405,17 @@ def save_draft(
     # page-owned content (slot children); otherwise the next editor load would
     # nest the template shell inside itself. When the page has no template the
     # project is stored verbatim.
-    template_project = editor_template.project_data if editor_template is not None else None
+    template_project = (
+        editor_template.published_project_data or editor_template.project_data
+        if editor_template is not None else None
+    )
     if metadata.get("replace_content_with_template") and selected_template is not None:
         # A confirmed layout switch intentionally adopts the new layout's
         # authored slot content. The layout shell itself remains linked; only
         # this page-owned initial content is copied into the page draft.
         page.data = _extract_page_content(
-            selected_template.project_data or selected_template.published_project_data or _legacy_project(page),
-            selected_template.project_data or selected_template.published_project_data or _legacy_project(page),
+            selected_template.published_project_data or selected_template.project_data or _legacy_project(page),
+            selected_template.published_project_data or selected_template.project_data or _legacy_project(page),
         )
     else:
         page.data = _extract_page_content(project, template_project)

@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { createEditorConfig, inlineCanvasCss } from "./config";
 
 describe("GrapesJS editor configuration", () => {
-  it("uses one intentional content-slot placeholder and renders column blocks as a grid", () => {
+  it("keeps public layout primitives out of the later editor-only CSS layer", () => {
     const config = createEditorConfig({ container: document.createElement("div") });
-    expect(config.baseCss).toContain(".sc-layout-columns");
+    expect(config.baseCss).not.toContain(".sc-layout-columns");
     expect(config.baseCss).not.toContain(":where(div, section, article");
   });
 

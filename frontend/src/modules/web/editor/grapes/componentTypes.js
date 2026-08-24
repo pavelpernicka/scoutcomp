@@ -564,16 +564,6 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         presentation: "",
         menuItems: [],
         content: "",
-        style: {
-          padding: "8px",
-          border: "2px dashed #79c49a",
-          borderRadius: "4px",
-          minHeight: "28px",
-          color: "#2f7a4d",
-          fontFamily: "monospace",
-          fontSize: "12px",
-          background: "rgba(121,196,154,.08)",
-        },
         traits: [
           trait("text", "location", translate("web.editor.data.menuLocation")),
           trait("select", "presentation", translate("web.editor.data.menuPresentation"), {
@@ -620,6 +610,13 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           if (event.target.closest("a")) event.preventDefault();
         };
         const presentation = this.model.get("presentation") || "";
+        const isBootstrapMenu = ["bootstrap-navbar", "ontario-mobile-navbar"].includes(presentation);
+        [...this.el.classList]
+          .filter((name) => name === "sc-menu--footer" || name.startsWith("sc-menu--bootstrap-") || name === "sc-menu--ontario-mobile-navbar")
+          .forEach((name) => this.el.classList.remove(name));
+        this.el.classList.add("sc-menu");
+        if ((this.model.get("location") || "main") === "footer") this.el.classList.add("sc-menu--footer");
+        if (presentation) this.el.classList.add(`sc-menu--${presentation}`);
         const items = Array.isArray(this.model.get("menuItems")) ? this.model.get("menuItems") : [];
         const renderFooter = (rows) => {
           const grid = documentRef.createElement("div");
@@ -639,12 +636,12 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
         };
         const renderItems = (rows, level = 0) => {
           const list = documentRef.createElement("ul");
-          list.className = `sc-menu-${level ? "dropdown" : "list"} ${presentation === "bootstrap-navbar" ? (level ? "dropdown-menu" : "navbar-nav") : ""}`;
+          list.className = `sc-menu-${level ? "dropdown" : "list"}${isBootstrapMenu ? ` ${level ? "dropdown-menu" : "navbar-nav"}` : ""}`;
           rows.forEach((item) => {
             const children = Array.isArray(item.children) ? item.children : [];
             const li = documentRef.createElement("li");
-            li.className = `sc-menu-item nav-item${children.length ? " dropdown has-children" : ""}`;
-            if (children.length) {
+            li.className = `sc-menu-item${isBootstrapMenu ? ` nav-item${children.length ? " dropdown has-children" : ""}` : ""}`;
+            if (children.length && presentation === "ontario-mobile-navbar") {
               const details = documentRef.createElement("details");
               details.className = "sc-menu-details";
               const summary = documentRef.createElement("summary");
@@ -659,10 +656,11 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
             }
             else {
               const link = documentRef.createElement("a");
-              link.className = `sc-menu-link ${level ? "dropdown-item" : "nav-link"}`;
+              link.className = `sc-menu-link${isBootstrapMenu ? ` ${level ? "dropdown-item" : "nav-link"}` : ""}${children.length && presentation === "bootstrap-navbar" && !level ? " dropdown-toggle" : ""}`;
               link.textContent = String(item.label || "");
               link.setAttribute("href", "#");
               li.appendChild(link);
+              if (children.length) li.appendChild(renderItems(children, level + 1));
             }
             list.appendChild(li);
           });
@@ -677,6 +675,16 @@ export function registerScoutCompTypes(editor, translate = (key) => key) {
           const empty = documentRef.createElement("span");
           empty.className = "sc-menu-editor-empty";
           empty.textContent = `☰ menu: ${this.model.get("location") || "main"}`;
+          Object.assign(empty.style, {
+            display: "inline-block",
+            minHeight: "28px",
+            padding: "8px",
+            border: "2px dashed #79c49a",
+            borderRadius: "4px",
+            color: "#2f7a4d",
+            background: "rgba(121,196,154,.08)",
+            font: "12px/1.4 monospace",
+          });
           preview.appendChild(empty);
         }
       },

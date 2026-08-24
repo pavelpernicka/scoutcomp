@@ -346,10 +346,17 @@ def _merged_editor_project(page: WebPage, db: Session) -> dict | None:
         template = db.query(WebTemplate).filter_by(id=page.template_id).one_or_none()
     elif page.template:
         template = db.query(WebTemplate).filter_by(key=page.template).one_or_none()
-    if not template or not template.project_data:
+    template_project = (
+        template.published_project_data or template.project_data
+        if template else None
+    )
+    if not template_project:
         return canonical_project_data(page)
 
-    merged = deepcopy(template.project_data)
+    # A page is rendered publicly through the published linked layout. Its
+    # editor must use that same shell rather than an unpublished template
+    # draft, otherwise structure and CSS can never be WYSIWYG.
+    merged = deepcopy(template_project)
     page_project = canonical_project_data(page)
     page_root = _project_root_component(page_project)
     page_content = page_root.get("components", []) if page_root else []

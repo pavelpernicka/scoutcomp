@@ -63,13 +63,17 @@ export const editorCanvasCss = (translate = (key) => key) => `
 [data-sc-type="slot"][data-sc-slot="content"] {
   box-sizing: border-box !important;
   position: relative !important;
+}
+[data-sc-type="slot"][data-sc-slot="content"]:empty {
   min-height: 112px !important;
-  outline: 2px dashed #d7a157 !important;
-  outline-offset: -2px !important;
-  background-color: rgba(215, 161, 87, .08) !important;
+}
+[data-sc-type="slot"][data-sc-slot="content"]:hover,
+[data-sc-type="slot"][data-sc-slot="content"].gjs-selected {
+  box-shadow: inset 0 0 0 2px rgba(138, 90, 25, .72) !important;
 }
 [data-sc-type="slot"][data-sc-slot="content"]::before {
   content: ${cssContent(translate("web.editor.component.contentSlot"))};
+  display: none;
   position: absolute;
   z-index: 2;
   top: 6px;
@@ -80,6 +84,11 @@ export const editorCanvasCss = (translate = (key) => key) => `
   color: #fff8e8;
   font: 700 11px/1.4 system-ui, sans-serif;
   pointer-events: none;
+}
+[data-sc-type="slot"][data-sc-slot="content"]:hover::before,
+[data-sc-type="slot"][data-sc-slot="content"].gjs-selected::before,
+[data-sc-type="slot"][data-sc-slot="content"]:empty::before {
+  display: block;
 }
 [data-sc-type="slot"][data-sc-slot="content"]:empty::after {
   content: ${cssContent(translate("web.editor.placeholder.contentSlot"))};
@@ -92,31 +101,10 @@ export const editorCanvasCss = (translate = (key) => key) => `
   text-align: center;
   pointer-events: none;
 }
-.sc-layout-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem;
-}
-.sc-layout-responsive-grid {
-  display: grid;
-  grid-template-columns: repeat(var(--sc-layout-columns, 2), minmax(0, 1fr));
-  gap: 1rem;
-}
-.sc-layout-flex { display: flex; }
-.sc-layout-flex-column { display: flex; flex-direction: column; }
-.sc-list-inline { display: flex; flex-wrap: wrap; gap: 1rem; padding-left: 0; list-style: none; }
-.sc-shape-soft { border-radius: 1.75rem 2.2rem 1.6rem 2rem / 2rem 1.6rem 2.2rem 1.7rem !important; }
-.sc-shape-blob { border-radius: 2.8rem 1.8rem 2.5rem 2rem / 2rem 2.6rem 1.8rem 2.4rem !important; }
-.sc-shape-oval { border-radius: 50% !important; }
-.sc-shape-rounded { border-radius: 1rem !important; }
 /* Transparent Bootstrap headers need a deliberate canvas-only backdrop when
    their hero sibling is not part of the resource being edited. */
-.navbar:has([data-sc-menu-preview]) {
+body:not(:has(.ontario-page-top, .ontario-hero)) .navbar:has([data-sc-menu-preview]) {
   background-color: #24384b !important;
-}
-@media (max-width: 575px) {
-  .sc-layout-columns,
-  .sc-layout-responsive-grid { grid-template-columns: 1fr; }
 }
 `;
 

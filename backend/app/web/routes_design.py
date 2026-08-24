@@ -404,6 +404,8 @@ def publish_global_styles(payload: PublishPayload, db: Session = Depends(get_db)
 
 @router.get("/design/canvas-styles")
 def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    from .renderer import BUILDER_LAYOUT_CSS
+
     _require_action(db, current_user, "web.pages.manage")
     style = db.query(WebSiteStyle).filter_by(id=1).one_or_none()
     tokens = (style.published_tokens if style else {}) or {}
@@ -454,7 +456,10 @@ def get_canvas_styles(db: Session = Depends(get_db), current_user: User = Depend
     token_css = f':root{{{";".join(root_vars)}}}' if root_vars else ""
 
     return {
-        "css": f"{token_css}\n{base_css}\n{css}",
+        # Match render_document's public cascade exactly: shared builder
+        # primitives first, then tokens, active theme and global site CSS.
+        # Page/template-owned GrapesJS rules remain later in the iframe.
+        "css": f"{BUILDER_LAYOUT_CSS}\n{token_css}\n{base_css}\n{css}",
         "active_theme_version_id": style.active_theme_version_id if style else None,
         "font_sets": font_sets,
         "font_awesome_icons": font_awesome_icons,
