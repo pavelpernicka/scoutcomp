@@ -404,7 +404,7 @@ def published_media_ids(db: Session) -> set[int]:
             result.update(_media_references(revision.html))
 
     post_revisions = (
-        db.query(WebPostRevision.cover_media_id, WebPostRevision.og_image_id)
+        db.query(WebPostRevision.cover_media_id, WebPostRevision.og_image_id, WebPostRevision.body)
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
         .filter(WebPost.published.is_(True), WebPost.deleted_at.is_(None))
         .all()
@@ -414,6 +414,7 @@ def published_media_ids(db: Session) -> set[int]:
             result.add(revision.cover_media_id)
         if revision.og_image_id is not None:
             result.add(revision.og_image_id)
+        result.update(_media_references(revision.body))
 
     identity_assets = db.query(Config.value).filter(
         Config.key.in_(("web.site_logo", "web.favicon", "web.og_image")),
@@ -463,6 +464,7 @@ def is_media_published(db: Session, media_id: int) -> bool:
         or_(
             WebPostRevision.cover_media_id == media_id,
             WebPostRevision.og_image_id == media_id,
+            WebPostRevision.body.like(reference),
         ),
     ).first()
     if post_reference is not None:

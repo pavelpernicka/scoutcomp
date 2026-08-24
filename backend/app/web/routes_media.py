@@ -339,11 +339,20 @@ async def upload_media(
 
 
 @router.get("/media/{media_id}/file")
-def serve_media(media_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    _require_media_manage(db, current_user)
+def serve_media(
+    media_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_active_user),
+):
     record = db.query(WebMedia).filter_by(id=media_id).one_or_none()
     if not record:
         raise HTTPException(404, "Media not found")
+    publicly_available = bool(record.is_public) or _media_has_published_reference(db, media_id)
+    if not publicly_available:
+        if current_user is None:
+            # Do not reveal draft-only media identifiers to anonymous callers.
+            raise HTTPException(404, "Media not found")
+        _require_media_manage(db, current_user)
     path = _stored_media_path(record)
     if not path.is_file():
         raise HTTPException(404, "Media file is missing")

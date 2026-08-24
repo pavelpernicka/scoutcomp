@@ -12,6 +12,7 @@ from .permissions import permission_scopes
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -46,6 +47,22 @@ def get_current_active_user(current_user: User = Depends(get_current_user)) -> U
     if not current_user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User inactive")
     return current_user
+
+
+def get_optional_current_active_user(
+    token: str | None = Depends(optional_oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User | None:
+    """Return an active bearer user when present, without blocking public reads."""
+    if not token:
+        return None
+    try:
+        payload = decode_token(token)
+        user_id = payload.get("sub")
+        user = db.get(User, int(user_id)) if user_id is not None else None
+    except (JWTError, TypeError, ValueError):
+        return None
+    return user if user and user.is_active else None
 
 
 def get_managed_team_ids(user: User) -> set[int]:

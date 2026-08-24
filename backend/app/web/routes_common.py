@@ -22,7 +22,7 @@ from unidecode import unidecode
 from html import escape as html_escape
 
 from ..config import settings
-from ..dependencies import get_current_active_user, get_db
+from ..dependencies import get_current_active_user, get_db, get_optional_current_active_user
 from ..models import (
     Config,
     RegisteredModule,
