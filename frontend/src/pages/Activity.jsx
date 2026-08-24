@@ -26,6 +26,17 @@ const KIND_STYLES = {
 };
 
 const KIND_CHIP_HEX = { meeting: "#0d6efd", trip: "#198754", other: "#0dcaf0" };
+const ACTIVITY_VIEW_STORAGE_KEY = "scoutcomp.activity.view";
+
+const loadPreferredActivityView = () => {
+  if (typeof window === "undefined") return "month";
+  try {
+    const stored = window.localStorage.getItem(ACTIVITY_VIEW_STORAGE_KEY);
+    return stored === "list" || stored === "month" ? stored : "month";
+  } catch {
+    return "month";
+  }
+};
 
 const PLANNED_STATUS_META = {
   attending: { badge: "bg-success", icon: "fa-check", label: "calendar.attending" },
@@ -138,7 +149,7 @@ export default function Activity() {
   const { can, userId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [view, setView] = useState("month");
+  const [view, setView] = useState(loadPreferredActivityView);
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -157,6 +168,14 @@ export default function Activity() {
   const [groupFilterOpen, setGroupFilterOpen] = useState(false);
   const teamFilterRef = useRef(null);
   const processedEventParam = useRef(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ACTIVITY_VIEW_STORAGE_KEY, view);
+    } catch {
+      // Storage may be unavailable in private or restricted browser contexts.
+    }
+  }, [view]);
 
   useEffect(() => {
     if (!teamFilterOpen) return;
