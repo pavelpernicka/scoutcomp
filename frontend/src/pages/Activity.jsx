@@ -405,7 +405,11 @@ export default function Activity() {
 
   useEffect(() => {
     const eventId = searchParams.get("event");
-    if (!eventId || processedEventParam.current === eventId || isLoading) return;
+    if (!eventId) {
+      processedEventParam.current = null;
+      return;
+    }
+    if (processedEventParam.current === eventId || isLoading) return;
     if (events.length === 0) return;
     const target = events.find((event) => event.id === Number(eventId));
     if (!target) return;

@@ -138,21 +138,27 @@ self.addEventListener("notificationclick", (event) => {
   const data = event.notification.data || {};
   const actionTarget = event.action && data.actionUrls && data.actionUrls[event.action];
   const target = sameOriginTarget(actionTarget || data.url) || "/";
+  const absoluteTarget = new URL(target, self.location.origin).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true })
-      .then((clients) => {
-        for (const client of clients) {
-          if (client.url.startsWith(self.location.origin) && "focus" in client) {
-            if ("navigate" in client) {
-              return client.navigate(target).then((navigated) => (
-                navigated ? navigated.focus() : self.clients.openWindow(target)
-              ));
-            }
-            return client.focus();
+      .then(async (clients) => {
+        const appClients = clients.filter((client) => (
+          client.url.startsWith(self.location.origin) && "focus" in client
+        ));
+        const exactClient = appClients.find((client) => client.url === absoluteTarget);
+        if (exactClient) return exactClient.focus();
+
+        const appClient = appClients.find((client) => client.visibilityState === "visible") || appClients[0];
+        if (appClient && "navigate" in appClient) {
+          try {
+            const navigated = await appClient.navigate(absoluteTarget);
+            if (navigated) return navigated.focus();
+          } catch (_) {
+            // Fall back to opening the exact deep link in a new app window.
           }
         }
-        return self.clients.openWindow(target);
+        return self.clients.openWindow(absoluteTarget);
       })
   );
 });

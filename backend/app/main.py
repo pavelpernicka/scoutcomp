@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from html import escape
@@ -15,6 +16,7 @@ from .modules import registry
 from .modules.registration import register_all_modules
 from .migrations import run_migrations
 from .module_gate import ModuleGateMiddleware
+from .services.web_push import start_push_dispatcher, stop_push_dispatcher
 from .routers import (
     announcements,
     auth,
@@ -71,13 +73,24 @@ def _app_shell(db: Session) -> str:
 Base.metadata.create_all(bind=engine)
 run_migrations(engine)
 
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    dispatcher = start_push_dispatcher()
+    try:
+        yield
+    finally:
+        stop_push_dispatcher(dispatcher)
+
+
 app = FastAPI(
     title="ScoutComp API",
     version="1.0.1",
     description="Modulární aplikace pro skautské oddíly",
     openapi_url=None, # disable automatic docs - managed by myself to fix issue with proxy
     docs_url=None,
-    redoc_url=None
+    redoc_url=None,
+    lifespan=_lifespan,
 )
 
 app.add_middleware(

@@ -166,6 +166,12 @@ SCOUTCOMP_PUSH_VAPID_PRIVATE_KEY="..."
 SCOUTCOMP_PUSH_VAPID_SUBJECT="mailto:admin@some.address.tld"
 # Optional comma-separated override; defaults cover Chrome, Firefox, Safari and Edge:
 SCOUTCOMP_PUSH_ALLOWED_HOSTS="fcm.googleapis.com,updates.push.services.mozilla.com,web.push.apple.com,.notify.windows.com"
+# Optional delivery tuning; defaults are sized for roughly 100 subscribed devices:
+SCOUTCOMP_PUSH_DELIVERY_WORKERS=10
+SCOUTCOMP_PUSH_DELIVERY_BATCH_SIZE=100
+SCOUTCOMP_PUSH_DELIVERY_MAX_ATTEMPTS=7
+SCOUTCOMP_PUSH_DELIVERY_POLL_SECONDS=1
+SCOUTCOMP_PUSH_DELIVERY_TTL_SECONDS=86400
 ```
 - Generate value of `SCOUTCOMP_SECRET_KEY` using f.e. `openssl rand -hex 32`
 - `SCOUTCOMP_SITE_PUBLIC_URL` is the canonical **origin of the public website**.
@@ -212,6 +218,18 @@ Users can then enable notifications themselves in their account settings;
 the browser permission prompt is only shown after they click the enable
 button. Keep `private_key.pem` backed up and never commit it. Changing or losing
 the key requires users to create new push subscriptions.
+
+Notifications are first stored in the shared database as per-device delivery
+records and are then sent by a bounded worker pool in the API process. The queue
+survives a process restart, reclaims interrupted deliveries after five minutes,
+removes expired browser subscriptions (`404`/`410`) and retries temporary network,
+rate-limit and provider failures with increasing delays. Successful rows are
+removed; exhausted rows are retained for seven days for diagnosis and then
+cleaned automatically. Keep all API replicas on the same database. The defaults
+use at most ten simultaneous provider requests and claim 100 devices per batch;
+raise them only after measuring CPU, outbound bandwidth and provider responses.
+Accepted notifications remain eligible for delivery by the browser push service
+for 24 hours by default, so a temporarily offline phone can receive them later.
 
 - Test current setup using `docker compose -f docker-compose.prod.yml up -d --build`
 - If a loopback port is already occupied, change the matching

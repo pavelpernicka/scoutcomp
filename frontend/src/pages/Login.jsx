@@ -71,6 +71,12 @@ export default function LoginPage() {
   const [passwordChangeError, setPasswordChangeError] = useState(null);
   const [isSubmittingLogin, setIsSubmittingLogin] = useState(false);
   const [isSubmittingPasswordChange, setIsSubmittingPasswordChange] = useState(false);
+  const requestedDestination = location.state?.from;
+  const returnTo = (
+    typeof requestedDestination === "string"
+    && requestedDestination.startsWith("/")
+    && !requestedDestination.startsWith("//")
+  ) ? requestedDestination : "/";
 
   const updateLoginField = (field, value) => {
     setLoginError(null);
@@ -98,7 +104,7 @@ export default function LoginPage() {
     setLoginError(null);
     try {
       await login(loginState);
-      navigate("/");
+      navigate(returnTo, { replace: true });
     } catch (error) {
       if (error instanceof PasswordChangeRequiredError) {
         setPasswordChangeForm((previous) => ({
@@ -130,7 +136,7 @@ export default function LoginPage() {
         newPassword: passwordChangeForm.newPassword,
         rememberMe: loginState.rememberMe,
       });
-      navigate("/");
+      navigate(returnTo, { replace: true });
     } catch (error) {
       setPasswordChangeError(extractErrorMessage(error, t("login.passwordChange.changePasswordFailed"), t));
     } finally {
@@ -162,7 +168,7 @@ export default function LoginPage() {
   });
 
   if (isAuthenticated) {
-    return <Navigate to={location.state?.from ?? "/"} replace />;
+    return <Navigate to={returnTo} replace />;
   }
 
   const appName = config?.app_name || "ScoutComp";

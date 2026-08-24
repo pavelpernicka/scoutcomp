@@ -28,6 +28,7 @@ import ModuleSettings from "./pages/ModuleSettings";
 import AdminWidgets from "./pages/AdminWidgets";
 import MembersDirectory from "./modules/members/MembersDirectory";
 import MemberDetail from "./modules/members/MemberDetail";
+import PwaNotificationOnboarding from "./components/PwaNotificationOnboarding";
 
 const WebAdminRoute = React.lazy(() => import("./modules/web/WebAdminRoute"));
 const PagesPage = React.lazy(() => import("./modules/web/pages/PagesPage"));
@@ -150,5 +151,10 @@ export default function App() {
       </Suspense>
   );
 
-  return isWebEditor || isAuthRoute ? routes : <Layout>{routes}</Layout>;
+  return (
+    <>
+      {isWebEditor || isAuthRoute ? routes : <Layout>{routes}</Layout>}
+      <PwaNotificationOnboarding />
+    </>
+  );
 }

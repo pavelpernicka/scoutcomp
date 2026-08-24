@@ -1246,3 +1246,43 @@ class PushSubscription(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     user = relationship("User", back_populates="push_subscriptions")
+    deliveries = relationship(
+        "PushDelivery",
+        back_populates="subscription",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class PushDelivery(Base):
+    """Durable per-device Web Push delivery waiting for the dispatcher."""
+
+    __tablename__ = "push_deliveries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    subscription_id = Column(
+        Integer,
+        ForeignKey("push_subscriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    payload = Column(Text, nullable=False)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    available_at = Column(DateTime, nullable=False, default=func.now(), index=True)
+    locked_at = Column(DateTime, nullable=True)
+    lock_token = Column(String(64), nullable=True, index=True)
+    failed_at = Column(DateTime, nullable=True, index=True)
+    last_status_code = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    subscription = relationship("PushSubscription", back_populates="deliveries")
+
+    __table_args__ = (
+        Index(
+            "ix_push_deliveries_ready",
+            "failed_at",
+            "available_at",
+            "locked_at",
+        ),
+    )

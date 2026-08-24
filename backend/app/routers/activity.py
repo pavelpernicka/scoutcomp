@@ -24,6 +24,7 @@ from ..models import (
 )
 from ..permissions import allows, managed_team_ids, permission_keys, permission_scopes
 from ..services.web_push import (
+    deliver_personalized_pushes,
     deliver_push_to_user_ids,
     notification_text,
     notification_timestamp,
@@ -402,35 +403,40 @@ def message_attendees(event_id: int, payload: EventMessagePayload, background_ta
     body = payload.message.strip()
     if not body:
         raise HTTPException(422, "Message cannot be empty")
-    sent_users = []
+    sent_messages = []
     for user in present_users:
         if not user.is_active:
             continue
         if not user.receive_messages and not override:
             continue
-        db.add(DirectMessage(sender_id=current_user.id, recipient_id=user.id, body=body))
-        sent_users.append(user)
+        message = DirectMessage(sender_id=current_user.id, recipient_id=user.id, body=body)
+        db.add(message)
+        sent_messages.append((user, message))
     db.commit()
-    background_tasks.add_task(deliver_push_to_user_ids, {user.id for user in sent_users}, {
-        "title": "Nová zpráva",
-        "body": "Máš novou soukromou zprávu.",
-        "url": f"/messages?user={current_user.id}",
-        "kind": "message",
-        "tag": f"message-thread-{current_user.id}",
-        "timestamp": notification_timestamp(datetime.now(timezone.utc)),
-        "actions": [
-            {"action": "reply", "title": "Odpovědět", "url": f"/messages?user={current_user.id}"},
-            {"action": "overview", "title": "Zprávy", "url": "/messages"},
-        ],
-        "preview": {
-            "title": notification_text(
-                f"Zpráva od {current_user.real_name or current_user.username}",
-                limit=100,
-            ),
-            "body": notification_text(body, limit=200),
-        },
-    })
-    return {"sent": len(sent_users), "total": len(rows)}
+    payloads_by_user_id = {}
+    for user, message in sent_messages:
+        target = f"/messages?user={current_user.id}&message={message.id}"
+        payloads_by_user_id[user.id] = {
+            "title": "Nová zpráva",
+            "body": "Máš novou soukromou zprávu.",
+            "url": target,
+            "kind": "message",
+            "tag": f"message-thread-{current_user.id}",
+            "timestamp": notification_timestamp(message.created_at),
+            "actions": [
+                {"action": "reply", "title": "Odpovědět", "url": target},
+                {"action": "overview", "title": "Zprávy", "url": "/messages"},
+            ],
+            "preview": {
+                "title": notification_text(
+                    f"Zpráva od {current_user.real_name or current_user.username}",
+                    limit=100,
+                ),
+                "body": notification_text(body, limit=200),
+            },
+        }
+    background_tasks.add_task(deliver_personalized_pushes, payloads_by_user_id)
+    return {"sent": len(sent_messages), "total": len(rows)}
 
 
 def require_attendance_manage(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> User:

@@ -2002,5 +2002,14 @@
     "configMissing": "Server is not configured for notifications.",
     "subscribeFailed": "Failed to enable notifications.",
     "unsubscribeFailed": "Failed to disable notifications."
+  },
+  "pushOnboarding": {
+    "title": "Enable notifications?",
+    "description": "Would you like alerts about new messages, posts, and events even when the app is closed?",
+    "privacy": "Titles and content previews stay hidden by default. You can change this at any time.",
+    "enable": "Enable notifications",
+    "notNow": "Not now",
+    "denied": "Notifications were not allowed. You can enable them later in your browser settings.",
+    "failed": "Notifications could not be enabled. Try again or use the application settings."
   }
 }

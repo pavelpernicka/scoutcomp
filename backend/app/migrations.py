@@ -2607,6 +2607,51 @@ def _create_push_subscriptions_table(conn: Connection) -> None:
     conn.execute(text("CREATE INDEX IF NOT EXISTS ix_push_subscriptions_endpoint ON push_subscriptions(endpoint)"))
 
 
+def _create_push_deliveries_table(conn: Connection) -> None:
+    """Create the durable per-device Web Push delivery queue."""
+    tables = set(inspect(conn).get_table_names())
+    if "push_deliveries" not in tables:
+        logger.info("Creating 'push_deliveries' table")
+        conn.execute(text(
+            """
+            CREATE TABLE push_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                subscription_id INTEGER NOT NULL
+                    REFERENCES push_subscriptions(id) ON DELETE CASCADE,
+                payload TEXT NOT NULL,
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                available_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                locked_at TIMESTAMP,
+                lock_token VARCHAR(64),
+                failed_at TIMESTAMP,
+                last_status_code INTEGER,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_push_deliveries_subscription_id "
+        "ON push_deliveries(subscription_id)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_push_deliveries_available_at "
+        "ON push_deliveries(available_at)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_push_deliveries_lock_token "
+        "ON push_deliveries(lock_token)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_push_deliveries_failed_at "
+        "ON push_deliveries(failed_at)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_push_deliveries_ready "
+        "ON push_deliveries(failed_at, available_at, locked_at)"
+    ))
+
+
 def _generalize_public_event_settings(conn: Connection) -> None:
     """Copy legacy meeting settings to event settings without losing custom URLs."""
     if "config" not in set(inspect(conn).get_table_names()):
@@ -2997,6 +3042,11 @@ MIGRATIONS: List[Migration] = [
         "20260823_add_push_preview_preference",
         _add_push_preview_preference,
         "Add opt-in rich notification previews per user",
+    ),
+    Migration(
+        "20260824_create_push_deliveries",
+        _create_push_deliveries_table,
+        "Create durable per-device Web Push delivery queue",
     ),
 ]
 

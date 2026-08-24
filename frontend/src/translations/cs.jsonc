@@ -2013,5 +2013,14 @@
     "configMissing": "Server není pro notifikace nastaven.",
     "subscribeFailed": "Nepodařilo se zapnout notifikace.",
     "unsubscribeFailed": "Nepodařilo se vypnout notifikace."
+  },
+  "pushOnboarding": {
+    "title": "Zapnout oznámení?",
+    "description": "Chceš dostávat upozornění na nové zprávy, příspěvky a akce, i když aplikace není otevřená?",
+    "privacy": "Náhled názvů a obsahu zůstane ve výchozím stavu skrytý. Nastavení můžeš kdykoli změnit.",
+    "enable": "Zapnout oznámení",
+    "notNow": "Teď ne",
+    "denied": "Oznámení nebyla povolena. Můžeš je později zapnout v nastavení prohlížeče.",
+    "failed": "Oznámení se nepodařilo zapnout. Zkus to znovu nebo použij nastavení aplikace."
   }
 }

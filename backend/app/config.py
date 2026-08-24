@@ -5,7 +5,7 @@ import os
 from urllib.parse import urlsplit
 
 import yaml
-from pydantic import BaseModel, field_validator, ConfigDict
+from pydantic import BaseModel, field_validator, ConfigDict, Field
 
 
 class DatabaseSettings(BaseModel):
@@ -38,6 +38,13 @@ class PushSettings(BaseModel):
         "web.push.apple.com",
         ".notify.windows.com",
     ]
+    # Ten concurrent HTTPS requests keep a 100-device broadcast bounded while
+    # avoiding one thread per subscription.
+    delivery_workers: int = Field(default=10, ge=1, le=32)
+    delivery_batch_size: int = Field(default=100, ge=1, le=500)
+    delivery_max_attempts: int = Field(default=7, ge=1, le=12)
+    delivery_poll_seconds: float = Field(default=1.0, ge=0.2, le=30.0)
+    delivery_ttl_seconds: int = Field(default=86400, ge=0, le=2419200)
 
 
 class AppSettings(BaseModel):
@@ -173,6 +180,21 @@ def get_settings() -> Settings:
         push_cfg["allowed_hosts"] = [
             host.strip().lower() for host in push_allowed_hosts_env.split(",") if host.strip()
         ]
+    push_workers_env = os.getenv("SCOUTCOMP_PUSH_DELIVERY_WORKERS")
+    if push_workers_env is not None:
+        push_cfg["delivery_workers"] = int(push_workers_env)
+    push_batch_size_env = os.getenv("SCOUTCOMP_PUSH_DELIVERY_BATCH_SIZE")
+    if push_batch_size_env is not None:
+        push_cfg["delivery_batch_size"] = int(push_batch_size_env)
+    push_max_attempts_env = os.getenv("SCOUTCOMP_PUSH_DELIVERY_MAX_ATTEMPTS")
+    if push_max_attempts_env is not None:
+        push_cfg["delivery_max_attempts"] = int(push_max_attempts_env)
+    push_poll_seconds_env = os.getenv("SCOUTCOMP_PUSH_DELIVERY_POLL_SECONDS")
+    if push_poll_seconds_env is not None:
+        push_cfg["delivery_poll_seconds"] = float(push_poll_seconds_env)
+    push_ttl_env = os.getenv("SCOUTCOMP_PUSH_DELIVERY_TTL_SECONDS")
+    if push_ttl_env is not None:
+        push_cfg["delivery_ttl_seconds"] = int(push_ttl_env)
     app_cfg["push"] = push_cfg
 
     app_cfg = {

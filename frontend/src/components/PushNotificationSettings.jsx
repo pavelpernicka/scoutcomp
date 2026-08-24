@@ -2,33 +2,14 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import api from "../services/api";
+import {
+  browserSupportsPush,
+  enableCurrentPushSubscription,
+  pushSubscriptionPayload,
+  readyServiceWorker,
+} from "../utils/pushNotifications";
 import Alert from "./Alert";
 import Button from "./Button";
-
-export function urlBase64ToUint8Array(value) {
-  const padding = "=".repeat((4 - (value.length % 4)) % 4);
-  const base64 = (value + padding).replace(/-/g, "+").replace(/_/g, "/");
-  return Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
-}
-
-const browserSupportsPush = () => (
-  window.isSecureContext
-  && "Notification" in window
-  && "serviceWorker" in navigator
-  && "PushManager" in window
-);
-
-const readyServiceWorker = (timeoutMs = 5000) => Promise.race([
-  navigator.serviceWorker.ready,
-  new Promise((_, reject) => {
-    window.setTimeout(() => reject(new Error("service-worker-timeout")), timeoutMs);
-  }),
-]);
-
-const subscriptionPayload = (subscription) => {
-  const json = subscription.toJSON();
-  return { endpoint: subscription.endpoint, keys: json.keys };
-};
 
 export function PushNotificationSettings() {
   const { t } = useTranslation();
@@ -63,7 +44,7 @@ export function PushNotificationSettings() {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
           // Reconcile ownership after a shared browser profile changes account.
-          await api.put("/push", subscriptionPayload(subscription));
+          await api.put("/push", pushSubscriptionPayload(subscription));
         }
         if (active) setState(subscription ? "subscribed" : "unsubscribed");
       } catch {
@@ -81,18 +62,7 @@ export function PushNotificationSettings() {
     setBusy(true);
     setFeedback(null);
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setState("denied");
-        return;
-      }
-      if (!vapidPublicKey) throw new Error("missing-vapid-key");
-      const registration = await readyServiceWorker();
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-      });
-      await api.put("/push", subscriptionPayload(subscription));
+      await enableCurrentPushSubscription(vapidPublicKey);
       setState("subscribed");
       setFeedback({ type: "success", message: t("pushSettings.subscribed") });
     } catch (error) {

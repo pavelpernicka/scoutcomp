@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..dependencies import get_current_active_user, get_db
-from ..models import PushSubscription, User
+from ..models import PushDelivery, PushSubscription, User
 from ..services.web_push import endpoint_host_allowed, push_enabled
 
 router = APIRouter(prefix="/push", tags=["push"])
@@ -133,6 +133,12 @@ def upsert_subscription(
     else:
         # Possession of the endpoint and both browser-generated keys is the
         # capability needed to rebind a shared browser profile after logout.
+        if subscription.user_id != current_user.id:
+            # Never deliver notifications queued for the previous account on a
+            # shared browser profile after the subscription changes ownership.
+            db.query(PushDelivery).filter_by(subscription_id=subscription.id).delete(
+                synchronize_session=False,
+            )
         subscription.user_id = current_user.id
     subscription.p256dh = payload.keys.p256dh
     subscription.auth = payload.keys.auth
