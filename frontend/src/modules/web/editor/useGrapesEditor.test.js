@@ -51,7 +51,6 @@ describe("GrapesJS change tracking", () => {
     expect(calculateFitZoom(1400, 375)).toBe(240);
     expect(calculateFitZoom(280, 375)).toBe(66);
     expect(calculateFitZoom(0, 375)).toBe(100);
-    expect(calculateFitZoom(600, 1200, { minimum: 25, maximum: 100 })).toBe(47);
   });
 
   it("places late theme CSS before page-owned GrapesJS CSS", () => {

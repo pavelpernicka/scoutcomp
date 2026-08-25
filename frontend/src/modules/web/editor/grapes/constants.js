@@ -13,10 +13,7 @@ export const SC_COMPONENT_TYPES = Object.freeze({
 });
 
 export const DEFAULT_DEVICES = Object.freeze([
-  // Keep a real CSS viewport for every preview. An empty desktop width makes
-  // Bootstrap/media-query output depend on how many editor sidebars happen to
-  // be open, so editable content wraps and scales differently from the site.
-  { id: "desktop", name: "Desktop", width: "1200px" },
+  { id: "desktop", name: "Desktop", width: "" },
   { id: "tablet", name: "Tablet", width: "768px", widthMedia: "991px" },
   { id: "mobile", name: "Mobile", width: "375px", widthMedia: "575px" },
 ]);
