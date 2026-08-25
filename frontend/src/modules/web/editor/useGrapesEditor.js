@@ -9,6 +9,7 @@ import {
   getEditorSnapshot,
   inlineCanvasCss,
   loadEditorProject,
+  normalizeInvalidParagraphComponents,
   registerBuilderBlocks,
 } from "./grapes";
 import { insertEditorComponents } from "./editorInsertion";
@@ -219,6 +220,7 @@ export function useGrapesEditor({
       };
       const onHistory = () => updateHistoryState(editor);
       let toolbarFrame = 0;
+      let textNormalizationTimer = 0;
       const scheduleToolbarClamp = () => {
         if (toolbarFrame) window.cancelAnimationFrame(toolbarFrame);
         toolbarFrame = window.requestAnimationFrame(() => {
@@ -227,9 +229,20 @@ export function useGrapesEditor({
         });
       };
       const unsubscribeChanges = subscribeToEditorChanges(editor, onUpdate);
+      const normalizeRichText = (view) => {
+        window.clearTimeout(textNormalizationTimer);
+        // GrapesJS emits rte:disable before ComponentTextView has copied the
+        // edited innerHTML back into its component model. Normalize in the
+        // following task, after that synchronization has completed.
+        textNormalizationTimer = window.setTimeout(() => {
+          textNormalizationTimer = 0;
+          normalizeInvalidParagraphComponents(editor, view?.model);
+        }, 0);
+      };
 
       editor.on("component:selected", onSelection);
       editor.on("component:deselected", onDeselection);
+      editor.on("rte:disable", normalizeRichText);
       editor.on("undo", onHistory);
       editor.on("redo", onHistory);
       const toolbarEvents = [
@@ -258,11 +271,13 @@ export function useGrapesEditor({
         unsubscribeChanges();
         editor.off("component:selected", onSelection);
         editor.off("component:deselected", onDeselection);
+        editor.off("rte:disable", normalizeRichText);
         editor.off("undo", onHistory);
         editor.off("redo", onHistory);
         toolbarEvents.forEach((event) => editor.off(event, scheduleToolbarClamp));
         window.removeEventListener("resize", scheduleToolbarClamp);
         if (toolbarFrame) window.cancelAnimationFrame(toolbarFrame);
+        if (textNormalizationTimer) window.clearTimeout(textNormalizationTimer);
         editor.destroy();
         if (editorRef.current === editor) editorRef.current = null;
       };

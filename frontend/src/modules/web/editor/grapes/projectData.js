@@ -2,6 +2,50 @@ const isObject = (value) => value !== null && typeof value === "object" && !Arra
 
 const serializableClone = (value) => JSON.parse(JSON.stringify(value));
 
+// A <p> element only accepts phrasing content. Chromium's contenteditable
+// implementation nevertheless creates <div>/<p>/<ul> children when Enter or
+// a list action is used inside a GrapesJS text component. GrapesJS stores that
+// invalid tree literally and renders it literally in the canvas, while a real
+// page reparses the same HTML and hoists the block children out of the <p>.
+// Normalize through GrapesJS' browser-backed parser so the canonical model and
+// the public browser use the same HTML tree.
+const PARAGRAPH_BLOCK_CHILDREN = new Set([
+  "address", "article", "aside", "blockquote", "details", "dialog", "div", "dl",
+  "fieldset", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
+  "header", "hgroup", "hr", "main", "menu", "nav", "ol", "p", "pre", "section",
+  "table", "ul",
+]);
+
+const componentTagName = (component) => String(component?.get?.("tagName") || "").toLowerCase();
+const componentChildren = (component) => component?.components?.()?.models || [];
+
+export function normalizeInvalidParagraphComponents(editor, roots) {
+  const rootComponents = roots
+    ? (Array.isArray(roots) ? roots : [roots])
+    : componentChildren(editor?.getWrapper?.());
+  const invalid = [];
+  const visit = (component) => {
+    const children = componentChildren(component);
+    children.forEach(visit);
+    const type = String(component?.get?.("type") || "default");
+    if ((type === "text" || type === "default")
+      && !component?.get?.("scBindings")
+      && componentTagName(component) === "p"
+      && children.some((child) => PARAGRAPH_BLOCK_CHILDREN.has(componentTagName(child)))) {
+      invalid.push(component);
+    }
+  };
+  rootComponents.filter(Boolean).forEach(visit);
+
+  let normalized = 0;
+  invalid.forEach((component) => {
+    if (!component.collection || typeof component.toHTML !== "function" || typeof component.replaceWith !== "function") return;
+    component.replaceWith(component.toHTML(), { fromScoutCompTextNormalization: true });
+    normalized += 1;
+  });
+  return normalized;
+}
+
 // A persisted public URL cannot be requested from the authenticated editor
 // iframe before its bearer-authenticated blob preview is ready. A transparent
 // data image keeps the native image component mounted without a broken-image
@@ -138,6 +182,7 @@ export function loadEditorProject(editor, { projectData, legacyHtml = "", legacy
   const project = withEditorMediaPlaceholders(canonical || createLegacyProject(legacyHtml, legacyCss));
 
   editor.loadProjectData(project);
+  normalizeInvalidParagraphComponents(editor);
   editor.UndoManager.clear();
   editor.clearDirtyCount();
   return { project, importedLegacy: !canonical };

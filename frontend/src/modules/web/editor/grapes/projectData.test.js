@@ -170,6 +170,19 @@ describe("GrapesJS project helpers", () => {
               "style.color": { scope: "context", field: "color" },
               "style.opacity": { scope: "context", field: "opacity" },
             },
+          }, {
+            type: "text",
+            tagName: "p",
+            attributes: { id: "legacy-rich-text", class: "lead" },
+            components: [{
+              type: "default",
+              tagName: "div",
+              components: [{ type: "text", tagName: "strong", content: "Doprava:" }],
+            }, {
+              type: "default",
+              tagName: "div",
+              content: "Text odstavce",
+            }],
           }],
         },
         styles: [],
@@ -196,6 +209,21 @@ describe("GrapesJS project helpers", () => {
         "style.color": { scope: "context", field: "color" },
         "style.opacity": { scope: "context", field: "opacity" },
       },
+    });
+    const normalizedContent = getEditorSnapshot(editor).projectData.pages[0].frames[0].component.components;
+    expect(normalizedContent[2]).toMatchObject({
+      tagName: "p",
+      classes: ["lead"],
+      attributes: { id: "legacy-rich-text" },
+    });
+    expect(normalizedContent[2].components).toBeUndefined();
+    expect(normalizedContent[3].components[0]).toMatchObject({
+      tagName: "strong",
+      components: [{ type: "textnode", content: "Doprava:" }],
+    });
+    expect(normalizedContent[4]).toMatchObject({
+      type: "text",
+      components: [{ type: "textnode", content: "Text odstavce" }],
     });
     editor.destroy();
   });

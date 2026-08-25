@@ -1,16 +1,65 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
-// Use the same logical CSS viewports as GrapesJS. The stage may scroll on a
-// physically narrower screen, but wrapping, media queries and text geometry
-// remain identical between the editor canvas and its server-rendered preview.
-const DEVICE_WIDTHS = { Desktop: "1200px", Tablet: "768px", Mobile: "375px" };
+// Keep the iframe's CSS viewport identical to GrapesJS and scale only its
+// visual presentation when the dialog is narrower. Shrinking the iframe
+// itself would activate different breakpoints; leaving it unscaled would crop.
+const DEVICE_WIDTHS = { Desktop: 1200, Tablet: 768, Mobile: 375 };
+
+export const calculatePreviewFit = (availableWidth, availableHeight, logicalWidth) => {
+  const width = Number(availableWidth);
+  const height = Number(availableHeight);
+  const logical = Number(logicalWidth);
+  if (![width, height, logical].every(Number.isFinite) || width <= 0 || height <= 0 || logical <= 0) {
+    return { scale: 1, displayWidth: logical || 1, displayHeight: Math.max(1, height || 1), logicalHeight: Math.max(1, height || 1) };
+  }
+  const scale = Math.min(1, width / logical);
+  return {
+    scale,
+    displayWidth: logical * scale,
+    displayHeight: height,
+    logicalHeight: height / scale,
+  };
+};
 
 export default function PreviewDialog({ html, loading, error, device, onClose }) {
   const { t } = useTranslation();
-  const width = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.Desktop;
+  const logicalWidth = DEVICE_WIDTHS[device] || DEVICE_WIDTHS.Desktop;
   const dialogRef = useRef(null);
+  const stageRef = useRef(null);
+  const [fit, setFit] = useState(() => calculatePreviewFit(0, 0, logicalWidth));
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return undefined;
+    const update = () => {
+      const style = window.getComputedStyle(stage);
+      const horizontalPadding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+      const verticalPadding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+      const next = calculatePreviewFit(
+        stage.clientWidth - (Number.isFinite(horizontalPadding) ? horizontalPadding : 0),
+        stage.clientHeight - (Number.isFinite(verticalPadding) ? verticalPadding : 0),
+        logicalWidth,
+      );
+      setFit((current) => (
+        current.scale === next.scale
+        && current.displayWidth === next.displayWidth
+        && current.displayHeight === next.displayHeight
+        && current.logicalHeight === next.logicalHeight
+          ? current
+          : next
+      ));
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(stage);
+    window.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [logicalWidth, loading, error]);
 
   useEffect(() => {
     const previousFocus = document.activeElement;
@@ -58,9 +107,16 @@ export default function PreviewDialog({ html, loading, error, device, onClose })
         ) : error ? (
           <div className="alert alert-danger m-3" role="alert">{error}</div>
         ) : (
-          <div className="web-editor-preview-stage">
-            <div className="web-editor-preview-frame-wrapper" data-device={device || "Desktop"} style={{ maxWidth: width }}>
-              <iframe title={t("web.editor.draftPreview")} sandbox="allow-same-origin" srcDoc={html} />
+          <div ref={stageRef} className="web-editor-preview-stage">
+            <div className="web-editor-preview-viewport" style={{ width: `${fit.displayWidth}px`, height: `${fit.displayHeight}px` }}>
+              <div
+                className="web-editor-preview-frame-wrapper"
+                data-device={device || "Desktop"}
+                data-scale={fit.scale}
+                style={{ width: `${logicalWidth}px`, height: `${fit.logicalHeight}px`, transform: `scale(${fit.scale})` }}
+              >
+                <iframe title={t("web.editor.draftPreview")} sandbox="allow-same-origin" srcDoc={html} />
+              </div>
             </div>
           </div>
         )}
