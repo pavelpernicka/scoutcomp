@@ -94,6 +94,19 @@ SAFE_COLOR = re.compile(
 SAFE_LENGTH = re.compile(r"^(?:0|-?(?:\d+(?:\.\d+)?|\.\d+)(?:px|rem|em|%|vw|vh|ch|vmin|vmax))$", re.I)
 SAFE_FONT = re.compile(r"^[A-Za-z0-9 '\",._-]{1,160}$")
 SLOT_NAME = re.compile(r"^[a-z][a-z0-9_-]{0,49}$")
+# GrapesJS omits model properties which equal a component type's defaults.
+# The public compiler must therefore use the same implicit tags as the editor;
+# otherwise the same editable node can be an H2/DIV in the canvas and a
+# DIV/SPAN on the published page, changing Bootstrap/theme typography and
+# spacing.  Built-in `text` inherits GrapesJS's default DIV tag.
+GRAPES_COMPONENT_DEFAULT_TAGS = {
+    # GrapesJS mounts its virtual wrapper as the canvas' block-level DIV.
+    # Rendering it as MAIN changed flex layout and tag-dependent selectors.
+    "wrapper": "div",
+    "heading": "h2",  # ScoutComp custom type in componentTypes.js
+    "link": "a",
+    "image": "img",
+}
 # Builder primitives must render correctly even with a minimalist custom theme.
 # Authors can still override these classes in their own theme/resource CSS.
 BUILDER_LAYOUT_CSS = (
@@ -291,12 +304,47 @@ def _normalise_calendar_boolean(value: Any, *, default: bool) -> bool:
     raise CompileError("Calendar boolean parameter is invalid")
 
 
+def _normalise_style_declarations(style: Any) -> list[str]:
+    """Return the safe CSS declarations GrapesJS stores on a component/rule."""
+    if not isinstance(style, dict):
+        return []
+    declarations: list[str] = []
+    # Declaration order is semantic when shorthand and longhand properties
+    # coexist. JSON/Python preserve the GrapesJS model order, so do not sort
+    # it away (eg. margin-top before/after margin must behave like the canvas).
+    for raw_prop, value in style.items():
+        raw_name = str(raw_prop).strip()
+        prop = (
+            raw_name.lower()
+            if raw_name.startswith("--")
+            else re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "-", raw_name).lower().replace("_", "-")
+        )
+        text = str(value).strip()
+        if prop not in SAFE_CSS_PROPERTIES:
+            continue
+        if len(text) > 500 or UNSAFE_CSS.search(text) or CSS_TAG_BREAKOUT.search(text) or CSS_VALUE_BREAKOUT.search(text):
+            raise CompileError(f"CSS value for '{prop}' violates the public rendering policy")
+        if prop in {"--sc-edge-fill", "--sc-hero-tint", "--sc-overlay-color"} and not SAFE_COLOR.fullmatch(text):
+            raise CompileError(f"CSS value for '{prop}' must be a safe color")
+        if prop in {"--sc-hero-tint-opacity", "--sc-overlay-opacity"} and not re.fullmatch(r"(?:0(?:\.\d+)?|1(?:\.0+)?)", text):
+            raise CompileError(f"CSS value for '{prop}' must be between 0 and 1")
+        if prop == "--sc-layout-columns" and not re.fullmatch(r"[1-9][0-9]{0,2}", text):
+            raise CompileError("CSS value for '--sc-layout-columns' must be a positive integer")
+        declarations.append(f"{prop}:{text}")
+    if declarations:
+        # Inline declarations do not pass through render_document's CSS layer,
+        # so apply the same URL/import/breakout policy here as for stylesheet
+        # rules. Same-origin published media and theme assets remain allowed.
+        validate_render_css(";".join(declarations))
+    return declarations
+
+
 def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, Any]:
     if depth > MAX_DEPTH:
         raise CompileError("Component nesting is too deep")
     if not isinstance(node, dict):
         if isinstance(node, str):
-            return {"type": "text", "content": node[:MAX_TEXT]}
+            return {"type": "textnode", "content": node[:MAX_TEXT]}
         raise CompileError("Component must be an object")
     counter[0] += 1
     if counter[0] > MAX_NODES:
@@ -306,11 +354,21 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
     result: dict[str, Any] = {"type": component_type}
     children = node.get("components", [])
     if isinstance(children, str):
-        children = [{"type": "text", "content": children}]
+        children = [{"type": "textnode", "content": children}]
     if not isinstance(children, list):
         raise CompileError("Component children must be a list")
 
-    if component_type == "sc-repeat":
+    if component_type == "textnode":
+        # GrapesJS represents the text between inline elements as a component
+        # with an empty tagName. Rendering it as the generic DIV changes line
+        # breaks and can split <strong>/<u>/<li> content into invalid block
+        # markup. Keep it as escaped text, exactly like ComponentTextNode.toHTML.
+        content = node.get("content", "")
+        if not isinstance(content, (str, int, float, bool)):
+            raise CompileError("Text node content must be text")
+        result["content"] = str(content)[:MAX_TEXT]
+        children = []
+    elif component_type == "sc-repeat":
         source = node.get("source") if "source" in node else node.get("dataSource")
         if source in (None, ""):
             # A repeat without a data source is a safe work-in-progress state:
@@ -459,10 +517,19 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
                 raise CompileError("Menu presentation is invalid")
             result["presentation"] = presentation
     else:
+        # The GrapesJS wrapper is a virtual root whose canvas view is always a
+        # DIV; legacy projects may still carry tagName="main", but the editor
+        # ignores it. Honor the actual canvas DOM so tag selectors, flex-item
+        # blockification and text geometry stay identical after publishing.
         tag = (
-            "main" if component_type == "wrapper" else
-            str(node.get("tagName") or ({"text": "span", "link": "a", "image": "img"}.get(component_type, "div"))).lower()
+            "div" if component_type == "wrapper" else
+            str(node.get("tagName") or GRAPES_COMPONENT_DEFAULT_TAGS.get(component_type, "div")).lower()
         )
+        # Chromium's legacy execCommand API (used by GrapesJS RTE) emits the
+        # obsolete <strike> element. Publish its semantic equivalent instead
+        # of rejecting a formatting action offered by our editor toolbar.
+        if tag == "strike":
+            tag = "s"
         if tag not in SAFE_TAGS:
             raise CompileError(f"HTML tag '{tag}' is not allowed")
         result["tagName"] = tag
@@ -486,6 +553,12 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
             value = _classes(class_value)
             if value:
                 clean_attrs["class"] = value
+        component_id = attributes.get("id") or node.get("id")
+        if component_id and ID_TOKEN.fullmatch(str(component_id)):
+            # Component-first/page CSS generated by GrapesJS addresses the
+            # model id. The editor adds it to the canvas element even though it
+            # is stored as a top-level project property, not in attributes.
+            clean_attrs["id"] = str(component_id)
         for key, value in attributes.items():
             key = str(key).lower()
             if key == "class" or key.startswith("on"):
@@ -498,6 +571,9 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
                 if key == "id" and not ID_TOKEN.fullmatch(str(value)):
                     continue
                 clean_attrs[key] = str(value)[:1000]
+        inline_declarations = _normalise_style_declarations(node.get("style"))
+        if inline_declarations:
+            clean_attrs["style"] = ";".join(inline_declarations)
         result["attributes"] = clean_attrs
         bindings = node.get("scBindings") or node.get("sc_bindings")
         if bindings is not None:
@@ -552,21 +628,7 @@ def _normalise_styles(project: dict[str, Any]) -> str:
                         selector_parts.append(f".{raw}")
         if not selector_parts:
             continue
-        declarations = []
-        for prop, value in sorted(rule["style"].items()):
-            prop = str(prop).lower()
-            text = str(value).strip()
-            if prop not in SAFE_CSS_PROPERTIES:
-                continue
-            if len(text) > 500 or UNSAFE_CSS.search(text) or CSS_TAG_BREAKOUT.search(text) or CSS_VALUE_BREAKOUT.search(text):
-                raise CompileError(f"CSS value for '{prop}' violates the public rendering policy")
-            if prop in {"--sc-edge-fill", "--sc-hero-tint", "--sc-overlay-color"} and not SAFE_COLOR.fullmatch(text):
-                raise CompileError(f"CSS value for '{prop}' must be a safe color")
-            if prop in {"--sc-hero-tint-opacity", "--sc-overlay-opacity"} and not re.fullmatch(r"(?:0(?:\.\d+)?|1(?:\.0+)?)", text):
-                raise CompileError(f"CSS value for '{prop}' must be between 0 and 1")
-            if prop == "--sc-layout-columns" and not re.fullmatch(r"[1-9][0-9]{0,2}", text):
-                raise CompileError("CSS value for '--sc-layout-columns' must be a positive integer")
-            declarations.append(f"{prop}:{text}")
+        declarations = _normalise_style_declarations(rule["style"])
         if declarations:
             state = str(rule.get("state") or "").strip().lower()
             if state:
@@ -1377,6 +1439,8 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
     if depth > MAX_DEPTH or state.nodes > MAX_NODES + MAX_REPEAT * 100:
         raise CompileError("Rendered page exceeds complexity limits")
     component_type = node.get("type")
+    if component_type == "textnode":
+        return escape(str(node.get("content") or ""))
     if component_type == "sc-repeat":
         source = node["source"]
         if not source:
@@ -1577,7 +1641,18 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
             state.props_stack.pop()
             state.resources.remove(marker)
     if component_type == "sc-slot":
-        return _render_node(state.slot_tree, state, context, depth + 1) if state.slot_tree else _render_nodes(node.get("components", []), state, context, depth + 1)
+        # The editor renders a slot as a real DIV. Keep that boundary in draft
+        # previews and published output as well; otherwise direct-child/grid/
+        # flex selectors and inherited layout differ only after rendering.
+        slot_tree = state.slot_tree
+        if slot_tree and slot_tree.get("type") == "wrapper":
+            slot_content = _render_nodes(slot_tree.get("components", []), state, context, depth + 1)
+        elif slot_tree:
+            slot_content = _render_node(slot_tree, state, context, depth + 1)
+        else:
+            slot_content = _render_nodes(node.get("components", []), state, context, depth + 1)
+        slot_name = escape(str(node.get("name") or "content"), quote=True)
+        return f'<div data-sc-slot="{slot_name}" data-sc-type="slot">{slot_content}</div>'
 
     tag = node.get("tagName", "div")
     attrs = dict(node.get("attributes") or {})
@@ -1630,7 +1705,9 @@ def _render_node(node: dict[str, Any], state: _RenderState, context: Any, depth:
         )
         return f"<div{placeholder_html}></div>"
     if bound_styles:
-        attrs["style"] = ";".join(f"{key}:{value}" for key, value in sorted(bound_styles.items()))
+        authored_style = str(attrs.get("style") or "").rstrip(";")
+        dynamic_style = ";".join(f"{key}:{value}" for key, value in sorted(bound_styles.items()))
+        attrs["style"] = ";".join(filter(None, (authored_style, dynamic_style)))
     attr_html = "".join(f' {key}="{escape(str(value), quote=True)}"' for key, value in sorted(attrs.items()))
     if tag in VOID_TAGS:
         return f"<{tag}{attr_html}>"

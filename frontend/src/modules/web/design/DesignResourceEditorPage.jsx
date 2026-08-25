@@ -182,6 +182,22 @@ export default function DesignResourceEditorPage({ kind }) {
   });
 
   useEffect(() => {
+    if (!editor.isReady || !canvasElement) return undefined;
+    let frame = 0;
+    const fit = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => editor.fitDevice(device));
+    };
+    fit();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(fit);
+    observer?.observe(canvasElement);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
+  }, [canvasElement, device, editor.fitDevice, editor.isReady]);
+
+  useEffect(() => {
     if (!editor.isReady) return undefined;
     return hydrateMenuComponents(editor.editorRef.current, menusQuery.data || []);
   }, [editor.editorRef, editor.isReady, menusQuery.data]);

@@ -73,8 +73,8 @@ def test_real_grapes_project_repeat_bind_condition_and_empty(db_session):
         ],
     )
     assert rendered == (
-        "<main><h2>Tábor &lt;script&gt;</h2><p>Výprava</p>"
-        "<h2>Schůzka</h2></main>"
+        "<div><h2>Tábor &lt;script&gt;</h2><p>Výprava</p>"
+        "<h2>Schůzka</h2></div>"
     )
     empty = render_project(db_session, compiled.tree, resolver=lambda *_: [])
     assert "Nic tu není" in empty
@@ -123,7 +123,7 @@ def test_pagination_accepts_grapesjs_omitted_default_source(db_session):
     compiled = compile_project(project({"type": "sc-pagination", "limit": 6, "params": {"limit": 6}}))
 
     assert compiled.tree["components"][0]["source"] == "core.posts"
-    assert render_project(db_session, compiled.tree, resolver=lambda *_: []) == "<main></main>"
+    assert render_project(db_session, compiled.tree, resolver=lambda *_: []) == "<div></div>"
 
 
 def test_unconfigured_pagination_saves_and_fails_closed(db_session):
@@ -133,7 +133,7 @@ def test_unconfigured_pagination_saves_and_fails_closed(db_session):
     assert render_project(
         db_session, compiled.tree,
         resolver=lambda *_: pytest.fail("resolver must not run"),
-    ) == "<main></main>"
+    ) == "<div></div>"
 
 
 def test_pagination_does_not_render_phantom_next_link_on_exact_final_page(db_session):
@@ -663,7 +663,7 @@ def test_renderer_rejects_xss_unsafe_urls_and_css_breakout(db_session):
         "type": "link", "tagName": "a", "attributes": {"href": "javascript:alert(1)", "onclick": "x"},
         "content": "link",
     }))
-    assert render_project(db_session, compiled.tree) == "<main><a>link</a></main>"
+    assert render_project(db_session, compiled.tree) == "<div><a>link</a></div>"
     with pytest.raises(CompileError):
         compile_project(project(text("x"), styles=[{
             "selectors": [{"name": "x"}], "style": {"color": "red;</style><script>alert(1)</script>"},
@@ -672,6 +672,36 @@ def test_renderer_rejects_xss_unsafe_urls_and_css_breakout(db_session):
         render_document("", title="x", css="</style><script>alert(1)</script>")
     with pytest.raises(CompileError):
         render_document("", title="x", tokens={"color": "red;</style><script>"})
+
+
+def test_renderer_matches_implicit_grapesjs_text_and_heading_tags(db_session):
+    compiled = compile_project(project(
+        {"type": "heading", "content": "Heading", "classes": ["h4"]},
+        {"type": "text", "content": "Text"},
+        {"type": "text", "tagName": "p", "id": "rich-copy", "style": {
+            "fontWeight": "700", "lineHeight": "1.8", "textDecoration": "underline",
+        }, "components": [
+            {"type": "textnode", "content": "Normal "},
+            {"type": "text", "tagName": "strong", "components": [
+                {"type": "textnode", "content": "bold"},
+            ]},
+            {"type": "default", "tagName": "br"},
+            {"type": "textnode", "content": "next line"},
+            {"type": "text", "tagName": "strike", "components": [
+                {"type": "textnode", "content": " old"},
+            ]},
+        ]},
+        styles=[{
+        "selectors": [{"name": "rich-copy", "type": 2}],
+        "style": {"letterSpacing": ".02em"},
+    }]))
+
+    assert render_project(db_session, compiled.tree) == (
+        '<div><h2 class="h4">Heading</h2><div>Text</div>'
+        '<p id="rich-copy" style="font-weight:700;line-height:1.8;text-decoration:underline">'
+        'Normal <strong>bold</strong><br>next line<s> old</s></p></div>'
+    )
+    assert compiled.css == "#rich-copy{letter-spacing:.02em}"
 
 
 def test_renderer_accepts_legacy_empty_feature_test_url_but_not_external_css_url():
@@ -826,7 +856,7 @@ def test_global_part_draft_only_when_unpublished(db_session):
     db_session.add(section); db_session.commit()
     compiled = compile_project(project({"type": "sc-global-part", "resourceId": section.qualified_key}))
     assert "draft only" in render_project(db_session, compiled.tree, published_resources=False)
-    assert render_project(db_session, compiled.tree) == "<main></main>"
+    assert render_project(db_session, compiled.tree) == "<div></div>"
 
 
 def test_global_part_nested_resource_instance(db_session):
@@ -890,7 +920,7 @@ def test_linked_component_uses_published_definition_props_and_css(db_session):
     }))
     css_layers = []
     assert render_project(db_session, compiled.tree, css_layers=css_layers) == (
-        '<main><article class="contact-card">Write &lt;now&gt;</article></main>'
+        '<div><article class="contact-card">Write &lt;now&gt;</article></div>'
     )
     assert any(".contact-card{color:red}" in layer for layer in css_layers)
 
@@ -918,7 +948,7 @@ def test_linked_component_draft_preview_and_prop_validation(db_session):
     validate_linked_resource_instances(db_session, raw, published=False)
     compiled = compile_project(raw)
     assert "Draft" in render_project(db_session, compiled.tree, published_resources=False)
-    assert render_project(db_session, compiled.tree) == "<main></main>"
+    assert render_project(db_session, compiled.tree) == "<div></div>"
     raw["pages"][0]["frames"][0]["component"]["components"][0]["props"] = {"unknown": "x"}
     with pytest.raises(ResourcePropsError, match="Unknown resource prop"):
         validate_linked_resource_instances(db_session, raw, published=False)
@@ -1289,7 +1319,10 @@ def test_template_slot_composes_page_tree(db_session):
     ))
     page_tree = compile_project(project(text("Page body"))).tree
     rendered = render_project(db_session, template.tree, slot_tree=page_tree)
-    assert rendered == "<main><header>Header</header><main><p>Page body</p></main><footer>Footer</footer></main>"
+    assert rendered == (
+        '<div><header>Header</header><div data-sc-slot="content" data-sc-type="slot">'
+        '<p>Page body</p></div><footer>Footer</footer></div>'
+    )
 
 
 def test_slot_name_defaults_when_grapes_omits_default_model_property():

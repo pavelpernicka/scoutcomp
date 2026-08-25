@@ -66,11 +66,11 @@ export const clampCanvasToolbar = (editor, inset = 8) => {
 };
 
 /** Keep the device viewport real while making narrow previews useful to edit. */
-export const calculateFitZoom = (availableWidth, deviceWidth, { maximum = 240, gutter = 32 } = {}) => {
+export const calculateFitZoom = (availableWidth, deviceWidth, { minimum = 50, maximum = 240, gutter = 32 } = {}) => {
   const available = Number(availableWidth);
   const logical = Number(deviceWidth);
   if (!Number.isFinite(available) || !Number.isFinite(logical) || available <= 0 || logical <= 0) return 100;
-  return Math.round(Math.max(50, Math.min(maximum, ((available - gutter) / logical) * 100)));
+  return Math.round(Math.max(minimum, Math.min(maximum, ((available - gutter) / logical) * 100)));
 };
 
 /** Keep shared theme CSS before GrapesJS page-owned rules in the iframe. */
@@ -388,8 +388,11 @@ export function useGrapesEditor({
     const width = String(device?.get?.("width") || device?.width || "");
     const logicalWidth = Number.parseFloat(width);
     const availableWidth = canvas.getElement?.()?.clientWidth || containerRef?.current?.clientWidth || 0;
-    const zoom = requested === "mobile"
-      ? calculateFitZoom(availableWidth, logicalWidth || 375)
+    const zoom = Number.isFinite(logicalWidth) && logicalWidth > 0
+      ? calculateFitZoom(availableWidth, logicalWidth, {
+        minimum: requested === "desktop" ? 25 : requested === "tablet" ? 40 : 50,
+        maximum: requested === "mobile" ? 240 : 100,
+      })
       : 100;
     canvas.setZoom?.(zoom);
     editor.refresh?.({ tools: true });

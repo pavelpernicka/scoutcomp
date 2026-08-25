@@ -2,7 +2,10 @@ import { useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
-const DEVICE_WIDTHS = { Desktop: "100%", Tablet: "768px", Mobile: "375px" };
+// Use the same logical CSS viewports as GrapesJS. The stage may scroll on a
+// physically narrower screen, but wrapping, media queries and text geometry
+// remain identical between the editor canvas and its server-rendered preview.
+const DEVICE_WIDTHS = { Desktop: "1200px", Tablet: "768px", Mobile: "375px" };
 
 export default function PreviewDialog({ html, loading, error, device, onClose }) {
   const { t } = useTranslation();
