@@ -3,12 +3,18 @@ import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
 import AdminPanel from "./AdminPanel";
+import PermissionGroupBadges from "./PermissionGroupBadges";
 
 export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSelectUser, loading, headerExtra }) {
   const { t } = useTranslation();
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userTeamFilter, setUserTeamFilter] = useState("all");
-  const [userRoleFilter, setUserRoleFilter] = useState("all");
+  const [permissionGroupFilter, setPermissionGroupFilter] = useState("all");
+
+  const permissionGroupNames = useMemo(
+    () => Array.from(new Set(scopedUsers.flatMap((user) => user.permission_group_names || []))).sort(),
+    [scopedUsers]
+  );
 
   const teamNameById = useMemo(() => {
     const map = new Map();
@@ -22,7 +28,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
       if (userTeamFilter !== "all" && String(user.team_id ?? "") !== userTeamFilter) {
         return false;
       }
-      if (userRoleFilter !== "all" && user.role !== userRoleFilter) {
+      if (permissionGroupFilter !== "all" && !(user.permission_group_names || []).includes(permissionGroupFilter)) {
         return false;
       }
       if (!query) {
@@ -35,12 +41,12 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
         .toLowerCase();
       return haystack.includes(query);
     });
-  }, [scopedUsers, teamNameById, userRoleFilter, userSearchQuery, userTeamFilter]);
+  }, [permissionGroupFilter, scopedUsers, teamNameById, userSearchQuery, userTeamFilter]);
 
   const handleResetFilters = () => {
     setUserSearchQuery("");
     setUserTeamFilter("all");
-    setUserRoleFilter("all");
+    setPermissionGroupFilter("all");
   };
 
   return (
@@ -84,16 +90,14 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                   </select>
                 </div>
                 <div>
-                  <label className="form-label mb-1 small">{t('adminUsers.role')}</label>
+                  <label className="form-label mb-1 small">{t('adminUsers.permissionGroups')}</label>
                   <select
                     className="form-select form-select-sm"
-                    value={userRoleFilter}
-                    onChange={(event) => setUserRoleFilter(event.target.value)}
+                    value={permissionGroupFilter}
+                    onChange={(event) => setPermissionGroupFilter(event.target.value)}
                   >
-                    <option value="all">{t('adminUsers.allRoles')}</option>
-                    <option value="member">{t('adminUsers.roleMember')}</option>
-                    <option value="group_admin">{t('adminUsers.roleGroupAdmin')}</option>
-                    <option value="admin">{t('adminUsers.roleAdmin')}</option>
+                    <option value="all">{t('adminUsers.allPermissionGroups')}</option>
+                    {permissionGroupNames.map((name) => <option key={name} value={name}>{name}</option>)}
                   </select>
                 </div>
                 <div className="competition-audit-filter-grid__action">
@@ -115,13 +119,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
             ) : (
               <>
               <div className="competition-audit-users-mobile d-md-none">
-                {filteredUsers.map((user) => {
-                  const roleLabel = user.role === "admin"
-                    ? t("adminUsers.roleAdmin")
-                    : user.role === "group_admin"
-                    ? t("adminUsers.roleGroupAdmin")
-                    : t("adminUsers.roleMember");
-                  return (
+                {filteredUsers.map((user) => (
                     <button
                       key={user.id}
                       type="button"
@@ -130,10 +128,11 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                     >
                       <span className="competition-audit-user-card__name">{user.real_name || user.username}</span>
                       <span className="competition-audit-user-card__meta">{user.team_id ? teamNameById.get(user.team_id) || "—" : "—"}</span>
-                      <span className="competition-audit-user-card__role">{roleLabel}</span>
+                      <span className="competition-audit-user-card__role">
+                        {(user.permission_group_names || []).join(", ") || "—"}
+                      </span>
                     </button>
-                  );
-                })}
+                ))}
               </div>
               <div className="table-responsive d-none d-md-block" style={{ maxHeight: "340px" }}>
                 <table className="table table-hover table-sm align-middle mb-0">
@@ -142,7 +141,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                       <th>{t('adminUsers.name')}</th>
                       <th>{t('adminUsers.username')}</th>
                       <th>{t('adminUsers.email')}</th>
-                      <th>{t('adminUsers.role')}</th>
+                      <th>{t('adminUsers.permissionGroups')}</th>
                       <th>{t('adminUsers.team')}</th>
                     </tr>
                   </thead>
@@ -164,7 +163,7 @@ export default function UserListPanel({ scopedUsers, teams, selectedUserId, onSe
                         <td>{user.real_name || user.username}</td>
                         <td className="font-monospace text-muted">{user.username}</td>
                         <td className="text-truncate" style={{ maxWidth: "220px" }}>{user.email || "—"}</td>
-                        <td className="text-capitalize">{user.role.replace("_", " ")}</td>
+                        <td><PermissionGroupBadges names={user.permission_group_names} /></td>
                         <td>
                           {user.team_id
                             ? teamNameById.get(user.team_id) || "—"

@@ -83,7 +83,12 @@ def register_all_modules() -> None:
          ("categories.manage", "Správa kategorií", "Spravovat kategorie", False, ("any",)),
          ("flags.manage", "Správa flagů", "Spravovat flagy", False, ("any",)),
          ("templates.manage", "Správa štítků", "Spravovat šablony a generovat štítky", False, ("any",))),
-         menu=({"label":"Věci", "route":"/inventory/items", "icon":"fa-box-open", "permission":"inventory.read"}, {"label":"Vypůjčky", "route":"/inventory/loans", "icon":"fa-handshake-angle", "permission":"inventory.read"}, {"label":"Skener", "route":"/inventory/scanner", "icon":"fa-qrcode", "permission":"inventory.read"}, {"label":"Nastavení skladu", "route":"/inventory/settings", "icon":"fa-sliders", "permission":"inventory.manage"}), routers=(inventory_router,), dependencies=("core",)))
+         menu=(
+             {"label":"Věci", "route":"/inventory/items", "icon":"fa-box-open", "permissions":("inventory.read", "inventory.manage", "inventory.items.read", "inventory.items.manage")},
+             {"label":"Vypůjčky", "route":"/inventory/loans", "icon":"fa-handshake-angle", "permissions":("inventory.read", "inventory.manage", "inventory.items.read", "inventory.loans.manage")},
+             {"label":"Skener", "route":"/inventory/scanner", "icon":"fa-qrcode", "permissions":("inventory.read", "inventory.manage", "inventory.items.read", "inventory.items.manage")},
+             {"label":"Nastavení skladu", "route":"/inventory/settings", "icon":"fa-sliders", "permissions":("inventory.manage", "inventory.items.manage", "inventory.locations.manage", "inventory.categories.manage", "inventory.flags.manage", "inventory.templates.manage")},
+         ), routers=(inventory_router,), dependencies=("core",)))
     registry.register(ModuleManifest("web", "Webové stránky", "Vizuální CMS a veřejný web", "fa-globe", "/admin/web/pages",
         (("manage", "Správa webu", "Úplná správa CMS", False, ("any",)),
          ("pages.manage", "Správa stránek", "Vytvářet a upravovat stránky", False, ("any",)),

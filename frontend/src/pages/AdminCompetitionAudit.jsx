@@ -9,7 +9,8 @@ import { useTranslation } from "react-i18next";
 import AdminPageHeader from "../modules/web/admin/AdminPageHeader";
 
 export default function AdminCompetitionAudit() {
-  const { isAdmin, managedTeamIds } = useAuth();
+  const { canGlobally, managedTeamIds } = useAuth();
+  const hasGlobalAuditAccess = canGlobally("competitions.approvals.audit");
   const { t } = useTranslation();
   const [selectedUserId, setSelectedUserId] = useState(null);
 
@@ -34,9 +35,9 @@ export default function AdminCompetitionAudit() {
   const managedTeamIdSet = useMemo(() => new Set(managedTeamIds), [managedTeamIds]);
 
   const scopedUsers = useMemo(() => {
-    if (isAdmin) return users;
+    if (hasGlobalAuditAccess) return users;
     return users.filter((user) => user.team_id != null && managedTeamIdSet.has(user.team_id));
-  }, [isAdmin, managedTeamIdSet, users]);
+  }, [hasGlobalAuditAccess, managedTeamIdSet, users]);
 
   const selectedUser = useMemo(
     () => scopedUsers.find((user) => user.id === selectedUserId) || null,

@@ -17,7 +17,7 @@ const navLinkClass = ({ isActive }) => `nav-link ${isActive ? "active fw-bold" :
 
 export default function Layout({ children }) {
   const { t, i18n } = useTranslation();
-  const { profile, logout, isAuthenticated, isAdmin, isGroupAdmin, canManageUsers, canReviewCompletions } = useAuth();
+  const { profile, logout, isAuthenticated } = useAuth();
   const { config } = useConfig();
   const [showAdminDropdown, setShowAdminDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -31,7 +31,7 @@ export default function Layout({ children }) {
   const adminDropdownRef = useRef(null);
   const userDropdownRef = useRef(null);
 
-  const hasAdminAccess = isAdmin || isGroupAdmin || canManageUsers || canReviewCompletions || adminItems.length > 0;
+  const hasAdminAccess = adminItems.length > 0;
   const groupedAdminItems = useMemo(
     () => adminItems.reduce((groups, item) => {
       const section = item.section_key || item.section;
@@ -39,8 +39,6 @@ export default function Layout({ children }) {
     }, {}),
     [adminItems]
   );
-  const legacyAdminMenu = false;
-
   const moduleGroups = useMemo(
     () => modules.filter((m) => m.menu?.length).map((m) => ({ code: m.code, name: m.name, nameKey: m.name_key, icon: m.icon, items: m.menu })),
     [modules]
@@ -138,10 +136,6 @@ export default function Layout({ children }) {
               style={{ width: "32px", height: "32px", objectFit: "contain" }}
             />
             {config.app_name}
-            {isAdmin && <span className="badge bg-warning text-dark ms-2 px-2 py-1">{t("navigation.roles.admin")}</span>}
-            {!isAdmin && isGroupAdmin && (
-              <span className="badge bg-info text-dark ms-2 px-2 py-1">{t("navigation.roles.groupAdmin")}</span>
-            )}
           </Link>
 
           <div className={`collapse navbar-collapse app-mobile-drawer ${showMobileMenu ? 'show' : ''}`} id="primaryNav">
@@ -201,64 +195,6 @@ export default function Layout({ children }) {
                     </button>
                     <ul className={`dropdown-menu shadow-lg border-0 ${showMobileMenu ? 'w-100' : ''} ${showAdminDropdown ? 'show' : ''}`} style={{ position: showMobileMenu ? 'static' : 'absolute' }}>
                       {Object.entries(groupedAdminItems).map(([section, items]) => <li key={section} className="border-bottom"><button type="button" className="dropdown-item fw-bold d-flex justify-content-between" onClick={()=>setOpenAdminSections(current=>({...current,[section]:!current[section]}))}>{translateServerValue(t, i18n, section, items[0]?.section)}<i className={`fas fa-chevron-${openAdminSections[section]?"up":"down"}`}/></button>{openAdminSections[section]&&<ul className="list-unstyled mb-1">{items.map(item=><li key={item.route}><NavLink to={item.route} className="dropdown-item ps-4" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{translateServerValue(t, i18n, item.label_key, item.label)}</NavLink></li>)}</ul>}</li>)}
-                      {legacyAdminMenu && canReviewCompletions && (
-                        <li>
-                          <NavLink to="/admin/approvals" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.approvals")}
-                          </NavLink>
-                        </li>
-                      )}
-                      {legacyAdminMenu && (isAdmin || isGroupAdmin) && (
-                        <li>
-                          <NavLink to="/inventory" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.inventory")}
-                          </NavLink>
-                        </li>
-                      )}
-                      {legacyAdminMenu && isAdmin && (
-                        <li>
-                          <NavLink to="/admin/tasks" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.tasksAdmin")}
-                          </NavLink>
-                        </li>
-                      )}
-                      {legacyAdminMenu && isAdmin && (
-                        <li>
-                          <NavLink to="/admin/stats" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.stats")}
-                          </NavLink>
-                        </li>
-                      )}
-                      {legacyAdminMenu && isAdmin && (
-                        <li>
-                          <NavLink to="/admin/config" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                            {t("navigation.config")}
-                          </NavLink>
-                        </li>
-                      )}
-                      {legacyAdminMenu && isAdmin && (
-                        <li><NavLink to="/admin/modules" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>{t("navigation.modules")}</NavLink></li>
-                      )}
-                      {legacyAdminMenu && canManageUsers && (
-                        <>
-                          <li><hr className="dropdown-divider" /></li>
-                          <li>
-                            <NavLink to="/admin/teams" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.teams")}
-                            </NavLink>
-                          </li>
-                          <li>
-                            <NavLink to="/admin/users" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.users")}
-                            </NavLink>
-                          </li>
-                          <li>
-                            <NavLink to="/admin/announcements" className="dropdown-item d-flex align-items-center" onClick={() => { setShowAdminDropdown(false); setShowMobileMenu(false); }}>
-                              {t("navigation.announcements")}
-                            </NavLink>
-                          </li>
-                        </>
-                      )}
                     </ul>
                   </li>
                 )}

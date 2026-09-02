@@ -41,65 +41,41 @@ def _implied_actions(action: str) -> set[str]:
     return {action}
 
 
-def permission_keys(db: Session, user) -> set[str]:
-    """Return effective module.permission keys; explicit deny takes precedence."""
+def effective_permission_scopes(db: Session, user) -> dict[str, set[str]]:
+    """Return effective actions and scopes; explicit deny takes precedence."""
     # Also makes isolated test databases and new deployments self-initialising.
     from .modules import registry
     registry.seed(db)
-    group_permissions = {
-        f"{permission.module_code}.{permission.code}"
-        for group in user.permission_groups for permission in group.permissions
-    }
-    direct = {
-        f"{row.permission.module_code}.{row.permission.code}"
-        for row in db.query(DirectUserPermission).filter_by(user_id=user.id).all()
-    }
-    defaults = {
-        f"{p.module_code}.{p.code}" for p in db.query(PermissionDefinition)
-        .filter_by(default_for_member=True).all()
-    }
-    denied = {
-        f"{row.permission.module_code}.{row.permission.code}"
+    denied_actions = {
+        implied
         for row in db.query(DirectUserPermissionDeny).filter_by(user_id=user.id).all()
+        for implied in _implied_actions(f"{row.permission.module_code}.{row.permission.code}")
     }
-    granted = {implied for key in defaults | group_permissions | direct for implied in _implied_actions(key)}
-    denied_with_implications = {implied for key in denied for implied in _implied_actions(key)}
-    return granted - denied_with_implications
+    result: dict[str, set[str]] = {}
+
+    def add(action: str, scope: str) -> None:
+        for implied in _implied_actions(action):
+            if implied not in denied_actions:
+                result.setdefault(implied, set()).add(scope)
+
+    for group in user.permission_groups:
+        for grant in group.grants:
+            add(f"{grant.permission.module_code}.{grant.permission.code}", grant.scope)
+    for permission in db.query(PermissionDefinition).filter_by(default_for_member=True):
+        add(f"{permission.module_code}.{permission.code}", "any")
+    for grant in db.query(DirectUserPermission).filter_by(user_id=user.id):
+        add(f"{grant.permission.module_code}.{grant.permission.code}", "any")
+    return result
+
+
+def permission_keys(db: Session, user) -> set[str]:
+    """Return effective module.permission keys; explicit deny takes precedence."""
+    return set(effective_permission_scopes(db, user))
 
 
 def permission_scopes(db: Session, user, action: str) -> set[str]:
     """Effective scopes for an action. `any` includes all lower scopes."""
-    from .modules import registry
-    registry.seed(db)
-    denied_rows = db.query(DirectUserPermissionDeny).filter_by(user_id=user.id).all()
-    denied = {row.permission_id for row in denied_rows}
-    denied_actions = {
-        implied
-        for row in denied_rows
-        for implied in _implied_actions(f"{row.permission.module_code}.{row.permission.code}")
-    }
-    if action in denied_actions:
-        return set()
-    scopes = set()
-    for grant in (grant for group in user.permission_groups for grant in group.grants):
-        if grant.permission_id in denied:
-            continue
-        grant_action = f"{grant.permission.module_code}.{grant.permission.code}"
-        if action in _implied_actions(grant_action):
-            scopes.add(grant.scope)
-    for permission in db.query(PermissionDefinition).filter_by(default_for_member=True):
-        if permission.id in denied:
-            continue
-        permission_action = f"{permission.module_code}.{permission.code}"
-        if action in _implied_actions(permission_action):
-            scopes.add("any")
-    for grant in db.query(DirectUserPermission).filter_by(user_id=user.id):
-        if grant.permission_id in denied:
-            continue
-        grant_action = f"{grant.permission.module_code}.{grant.permission.code}"
-        if action in _implied_actions(grant_action):
-            scopes.add("any")
-    return scopes
+    return effective_permission_scopes(db, user).get(action, set())
 
 
 def has_any_scope(db: Session, user, action: str) -> bool:

@@ -122,7 +122,10 @@ def require_inventory_access(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)
 ) -> User:
     permissions = permission_keys(db, current_user)
-    if not ({"inventory.read", "inventory.manage"} & permissions):
+    # The inventory UI loads a shared overview for all of its screens.  Access
+    # therefore follows every declared inventory capability, not a legacy app
+    # role nor only the two coarse compatibility permissions.
+    if not any(permission.startswith("inventory.") for permission in permissions):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing inventory permission")
     return current_user
 

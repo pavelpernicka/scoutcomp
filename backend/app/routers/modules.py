@@ -28,6 +28,15 @@ SUPERADMIN_GROUP_NAME = "Superadmin"
 MEMBER_GROUP_NAME = "Člen"
 
 
+def _menu_item_allowed(item: dict, permissions: set[str]) -> bool:
+    """Support one or several alternative capabilities for a menu entry."""
+    alternatives = item.get("permissions")
+    if alternatives is not None:
+        return any(permission in permissions for permission in alternatives)
+    required = item.get("permission")
+    return required is None or required in permissions
+
+
 def superadmin_group(db: Session) -> PermissionGroup | None:
     return db.query(PermissionGroup).filter_by(name=SUPERADMIN_GROUP_NAME).one_or_none()
 
@@ -111,7 +120,7 @@ def list_modules(db: Session = Depends(get_db), current_user: User = Depends(get
             "menu": [
                 localized_menu_item(manifest.code, item, "menu")
                 for item in manifest.menu
-                if item.get("permission") in permissions
+                if _menu_item_allowed(item, permissions)
             ],
             "widgets": [
                 localized_widget(manifest.code, item)
@@ -136,7 +145,7 @@ def admin_menu(db: Session = Depends(get_db), current_user: User = Depends(get_c
         for manifest in registry.manifests()
         if manifest.code in records
         for item in manifest.admin_menu
-        if item.get("permission") in permissions
+        if _menu_item_allowed(item, permissions)
     ]
 
 

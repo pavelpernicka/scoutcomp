@@ -109,7 +109,17 @@ export default function App() {
             <Route path="/admin/competition/stats" element={<AdminStats />} />
             <Route path="/admin/stats" element={<AdminStats />} />
           </Route>
-          <Route element={<ProtectedRoute allowedRoles={["admin", "group_admin"]} />}>
+          <Route element={<ProtectedRoute allowedPermissions={[
+            "inventory.read",
+            "inventory.manage",
+            "inventory.items.read",
+            "inventory.items.manage",
+            "inventory.loans.manage",
+            "inventory.locations.manage",
+            "inventory.categories.manage",
+            "inventory.flags.manage",
+            "inventory.templates.manage",
+          ]} />}>
             <Route path="/inventory" element={<Navigate to="/inventory/items" replace />} />
             <Route path="/inventory/:screen" element={<InventoryPage />} />
           </Route>

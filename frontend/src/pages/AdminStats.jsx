@@ -73,7 +73,8 @@ const getErrorMessage = (error, fallbackMessage) => {
 export default function AdminStats() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canReadStatistics = can("competitions.statistics.read");
 
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [createForm, setCreateForm] = useState(emptyCategoryForm);
@@ -92,7 +93,7 @@ export default function AdminStats() {
       const { data } = await api.get("/stats-categories/manage");
       return data;
     },
-    enabled: isAdmin,
+    enabled: canReadStatistics,
     staleTime: 30_000,
   });
 
@@ -102,7 +103,7 @@ export default function AdminStats() {
       const { data } = await api.get("/tasks", { params: { include_archived: true } });
       return data;
     },
-    enabled: isAdmin,
+    enabled: canReadStatistics,
     staleTime: 30_000,
   });
 
@@ -375,7 +376,7 @@ export default function AdminStats() {
     deleteComponentMutation.mutate(componentId);
   };
 
-  if (!isAdmin) {
+  if (!canReadStatistics) {
     return <div className="alert alert-danger">{t('adminStats.noAccess')}</div>;
   }
 

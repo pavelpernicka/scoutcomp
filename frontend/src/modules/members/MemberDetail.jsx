@@ -11,6 +11,7 @@ import Alert from "../../components/Alert";
 import { useAuth } from "../../providers/AuthProvider";
 import { processAvatarFile } from "../../utils/avatar";
 import { normalizeUsernameInput, USERNAME_PATTERN } from "../../utils/username";
+import PermissionGroupBadges from "../../components/PermissionGroupBadges";
 
 const STATUS_BADGE = {
   active: "bg-success",
@@ -117,7 +118,6 @@ export default function MemberDetail() {
       preferred_language: account.preferred_language || "cs",
       team_id: account.team_id != null ? String(account.team_id) : "",
       is_active: account.is_active !== false,
-      role: account.role || "member",
     });
   }, [account]);
 
@@ -221,9 +221,6 @@ export default function MemberDetail() {
       if (accountForm.is_active !== (account.is_active !== false)) {
         payload.is_active = accountForm.is_active;
       }
-    }
-    if (can("core.access.manage") && accountForm.role !== (account.role || "member")) {
-      payload.role = accountForm.role;
     }
     return payload;
   };
@@ -408,17 +405,14 @@ export default function MemberDetail() {
                           </select>
                         </Field>
                       </div>
-                      {account.role && (
-                        <div className="col-md-6">
-                          <Field label={t("members.role")}>
-                            {can("core.access.manage") ? <select className="form-select" value={accountForm.role} onChange={(e) => setAccountForm((f) => ({ ...f, role: e.target.value }))}>
-                      <option value="member">{t("adminUsers.roleMember")}</option>
-                      <option value="group_admin">{t("adminUsers.roleGroupAdmin")}</option>
-                      <option value="admin">{t("adminUsers.roleAdmin")}</option>
-                            </select> : <input type="text" className="form-control" value={account.role.replace("_", " ")} disabled />}
-                          </Field>
-                        </div>
-                      )}
+                      <div className="col-md-6">
+                        <Field label={t("members.permissionGroups")}>
+                          <PermissionGroupBadges names={account.permission_group_names} />
+                          {can("core.access.manage") && (
+                            <div className="form-text">{t("members.permissionGroupsManagedElsewhere")}</div>
+                          )}
+                        </Field>
+                      </div>
                       {account.managed_team_ids?.length > 0 && (
                         <div className="col-12">
                           <Field label={t("members.managedTeams")}>

@@ -11,26 +11,28 @@ import Alert from "../components/Alert";
 import Modal from "../components/Modal";
 import AdminPanel from "../components/AdminPanel";
 
-const initialCreateScope = (isAdmin) => (isAdmin ? "global" : "team");
+const initialCreateScope = (canManageGlobally) => (canManageGlobally ? "global" : "team");
 
 export default function AdminAnnouncements() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAdmin, managedTeamIds, canManageUsers } = useAuth();
+  const { can, canGlobally, managedTeamIds } = useAuth();
+  const canManageAnnouncements = can("competitions.announcements.manage");
+  const canManageGlobally = canGlobally("competitions.announcements.manage");
 
   const [feedback, setFeedback] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [createForm, setCreateForm] = useState(() => ({
     title: "",
     body: "",
-    scope: initialCreateScope(isAdmin),
+    scope: initialCreateScope(canManageGlobally),
     teamId: "",
   }));
   const [editingMessage, setEditingMessage] = useState(null);
   const [editForm, setEditForm] = useState({
     title: "",
     body: "",
-    scope: initialCreateScope(isAdmin),
+    scope: initialCreateScope(canManageGlobally),
     teamId: "",
   });
 
@@ -46,7 +48,7 @@ export default function AdminAnnouncements() {
       const { data } = await api.get("/teams");
       return data;
     },
-    enabled: canManageUsers,
+    enabled: canManageAnnouncements,
     staleTime: 30_000,
   });
 
@@ -56,20 +58,20 @@ export default function AdminAnnouncements() {
       const { data } = await api.get("/announcements/manage");
       return data;
     },
-    enabled: canManageUsers,
+    enabled: canManageAnnouncements,
   });
 
   const managedTeams = useMemo(() => {
-    if (isAdmin) return teams;
+    if (canManageGlobally) return teams;
     return teams.filter((team) => managedTeamIds.includes(team.id));
-  }, [isAdmin, managedTeamIds, teams]);
+  }, [canManageGlobally, managedTeamIds, teams]);
 
   useEffect(() => {
     setCreateForm((prev) => ({
       ...prev,
-      scope: initialCreateScope(isAdmin),
+      scope: initialCreateScope(canManageGlobally),
     }));
-  }, [isAdmin]);
+  }, [canManageGlobally]);
 
   useEffect(() => {
     if (createForm.scope === "team" && !createForm.teamId && managedTeams.length > 0) {
@@ -82,7 +84,7 @@ export default function AdminAnnouncements() {
       setEditForm({
         title: "",
         body: "",
-        scope: initialCreateScope(isAdmin),
+        scope: initialCreateScope(canManageGlobally),
         teamId: "",
       });
       return;
@@ -91,10 +93,10 @@ export default function AdminAnnouncements() {
     setEditForm({
       title: editingMessage.title || "",
       body: editingMessage.body || "",
-      scope: editingMessage.team_id ? "team" : initialCreateScope(isAdmin),
+      scope: editingMessage.team_id ? "team" : initialCreateScope(canManageGlobally),
       teamId: editingMessage.team_id ? String(editingMessage.team_id) : "",
     });
-  }, [editingMessage, isAdmin]);
+  }, [editingMessage, canManageGlobally]);
 
   const teamOptions = managedTeams.map((team) => ({
     value: String(team.id),
@@ -108,7 +110,7 @@ export default function AdminAnnouncements() {
       setCreateForm({
         title: "",
         body: "",
-        scope: initialCreateScope(isAdmin),
+        scope: initialCreateScope(canManageGlobally),
         teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "",
       });
       setIsCreateOpen(false);
@@ -152,7 +154,7 @@ export default function AdminAnnouncements() {
     },
   });
 
-  if (!canManageUsers) {
+  if (!canManageAnnouncements) {
     return <div className="alert alert-danger">{t('adminAnnouncements.noAccess')}</div>;
   }
 
@@ -205,7 +207,7 @@ export default function AdminAnnouncements() {
       payload.title = trimmedTitle || null;
     }
 
-    if (isAdmin) {
+    if (canManageGlobally) {
       if (editForm.scope === "global" && editingMessage.team_id !== null) {
         payload.team_id = null;
       } else if (editForm.scope === "team") {
@@ -316,9 +318,9 @@ export default function AdminAnnouncements() {
         title={t('adminAnnouncements.createAnnouncement')}
         icon={<i className="fas fa-bullhorn" />}
         size="lg"
-        footer={<AnnouncementModalActions formId="create-announcement" cancelLabel={t('adminAnnouncements.clear')} submitLabel={t('adminAnnouncements.publish')} loading={createMessageMutation.isLoading} onCancel={() => setCreateForm({ title: "", body: "", scope: initialCreateScope(isAdmin), teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "" })} />}
+        footer={<AnnouncementModalActions formId="create-announcement" cancelLabel={t('adminAnnouncements.clear')} submitLabel={t('adminAnnouncements.publish')} loading={createMessageMutation.isLoading} onCancel={() => setCreateForm({ title: "", body: "", scope: initialCreateScope(canManageGlobally), teamId: managedTeams.length > 0 ? String(managedTeams[0].id) : "" })} />}
       >
-        <AnnouncementForm id="create-announcement" form={createForm} setForm={setCreateForm} isAdmin={isAdmin} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleCreateSubmit} t={t} />
+        <AnnouncementForm id="create-announcement" form={createForm} setForm={setCreateForm} canManageGlobally={canManageGlobally} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleCreateSubmit} t={t} />
       </Modal>
 
       <Modal
@@ -329,7 +331,7 @@ export default function AdminAnnouncements() {
         size="lg"
         footer={<AnnouncementModalActions formId="edit-announcement" cancelLabel={t('adminAnnouncements.cancel')} submitLabel={t('adminAnnouncements.save')} loading={updateMessageMutation.isLoading} onCancel={handleCancelEdit} />}
       >
-        <AnnouncementForm id="edit-announcement" form={editForm} setForm={setEditForm} isAdmin={isAdmin} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleEditSubmit} t={t} />
+        <AnnouncementForm id="edit-announcement" form={editForm} setForm={setEditForm} canManageGlobally={canManageGlobally} teams={teamOptions} teamsLoading={teamsLoading} managedTeams={managedTeams} onSubmit={handleEditSubmit} t={t} />
       </Modal>
     </div>
   );
@@ -344,8 +346,8 @@ function AnnouncementModalActions({ formId, cancelLabel, submitLabel, loading, o
   );
 }
 
-function AnnouncementForm({ id, form, setForm, isAdmin, teams, teamsLoading, managedTeams, onSubmit, t }) {
-  const requiresTeam = form.scope === "team" || !isAdmin;
+function AnnouncementForm({ id, form, setForm, canManageGlobally, teams, teamsLoading, managedTeams, onSubmit, t }) {
+  const requiresTeam = form.scope === "team" || !canManageGlobally;
   return (
     <form id={id} className="row g-3" onSubmit={onSubmit}>
       <div className="col-12">
@@ -356,7 +358,7 @@ function AnnouncementForm({ id, form, setForm, isAdmin, teams, teamsLoading, man
         <label className="form-label" htmlFor={`${id}-body`}>{t('adminAnnouncements.message')}</label>
         <textarea id={`${id}-body`} className="form-control" rows={5} value={form.body} onChange={(event) => setForm((prev) => ({ ...prev, body: event.target.value }))} required />
       </div>
-      {isAdmin && (
+      {canManageGlobally && (
         <fieldset className="col-12">
           <legend className="form-label">{t('adminAnnouncements.audience')}</legend>
           <div className="form-check"><input className="form-check-input" type="radio" id={`${id}-scope-global`} name={`${id}-scope`} checked={form.scope === "global"} onChange={() => setForm((prev) => ({ ...prev, scope: "global" }))} /><label className="form-check-label" htmlFor={`${id}-scope-global`}>{t('adminAnnouncements.globalAllTeams')}</label></div>
@@ -394,7 +396,7 @@ AnnouncementForm.propTypes = {
     teamId: PropTypes.string.isRequired,
   }).isRequired,
   setForm: PropTypes.func.isRequired,
-  isAdmin: PropTypes.bool.isRequired,
+  canManageGlobally: PropTypes.bool.isRequired,
   teams: PropTypes.arrayOf(PropTypes.shape({ value: PropTypes.string, label: PropTypes.string })).isRequired,
   teamsLoading: PropTypes.bool,
   managedTeams: PropTypes.array.isRequired,

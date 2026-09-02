@@ -15,7 +15,8 @@ import MarkdownEditor from "../components/MarkdownEditor";
 
 export default function RulesPage() {
   const { t } = useTranslation();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canManageRules = can("competitions.rules.manage");
   const queryClient = useQueryClient();
 
   const [feedback, setFeedback] = useState(null);
@@ -109,7 +110,7 @@ export default function RulesPage() {
           icon="📜"
           headerGradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
           shadow={true}
-          rightContent={isAdmin && (
+          rightContent={canManageRules && (
             <div className="d-flex align-items-center gap-2">
               {isEditing && hasChanges && (
                 <span className="badge text-dark px-3 py-2 d-flex align-items-center" style={{ backgroundColor: '#ffc107' }}>
@@ -165,7 +166,7 @@ export default function RulesPage() {
               </div>
             )}
 
-            {isAdmin && isEditing ? (
+            {canManageRules && isEditing ? (
               <div className="mb-3">
                 <label className="form-label fw-bold d-flex align-items-center">
                   <span className="me-2">📝</span>

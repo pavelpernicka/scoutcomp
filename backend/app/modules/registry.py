@@ -238,14 +238,18 @@ class ModuleRegistry:
                     db.add(PermissionGroupPermission(group_id=group.id, permission_id=permission.id, scope=scope))
         db.flush()
         for user in db.query(User).all():
-            target = {RoleEnum.MEMBER: "Člen", RoleEnum.GROUP_ADMIN: "Vedoucí družiny", RoleEnum.ADMIN: "Superadmin"}.get(user.role, "Člen")
-            if user.role == RoleEnum.GROUP_ADMIN:
-                member = groups.get("Člen")
-                if member is not None and member in user.permission_groups:
-                    user.permission_groups.remove(member)
-            group = groups[target]
-            if group not in user.permission_groups:
-                user.permission_groups.append(group)
+            # Legacy roles are migration input only.  Once an account has at
+            # least one permission group, its access is owned exclusively by
+            # those groups and must not be silently restored from ``role`` on
+            # every permission check (for example after an administrator
+            # deliberately removes the Superadmin group).
+            if not user.permission_groups:
+                target = {RoleEnum.MEMBER: "Člen", RoleEnum.GROUP_ADMIN: "Vedoucí družiny", RoleEnum.ADMIN: "Superadmin"}.get(user.role, "Člen")
+                user.permission_groups.append(groups[target])
+            # Keep the non-null legacy column in a neutral state until a
+            # future schema migration can remove it.  No authorization or UI
+            # behavior may depend on it after the group migration above.
+            user.role = RoleEnum.MEMBER
         db.commit()
 
     def member_group(self, db: Session) -> PermissionGroup | None:

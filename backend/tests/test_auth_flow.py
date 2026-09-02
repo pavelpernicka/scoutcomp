@@ -128,7 +128,8 @@ def test_admin_bootstrap_allowed_in_developer_mode(client, db_session):
     assert tokens["token_type"] == "bearer"
 
     created = db_session.query(User).filter(User.username == "admin2").one()
-    assert created.role == RoleEnum.ADMIN
+    assert created.role == RoleEnum.MEMBER
+    assert {group.name for group in created.permission_groups} == {"Superadmin"}
 
 
 def test_registration_rejects_noncanonical_username(client, db_session):

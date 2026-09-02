@@ -17,7 +17,7 @@ from ..models import RoleEnum, Team, User
 from ..schemas import BulkRegistrationResult, BulkUserRegistration, MeResponse, PasswordChangeRequest, UserCreate, UserPublic, UserUpdate, UserWithPassword
 from ..core.security import get_password_hash, verify_password
 from ..usernames import is_canonical_username, normalize_legacy_username
-from ..permissions import allows_team, managed_team_ids, permission_keys, permission_scopes
+from ..permissions import allows_team, effective_permission_scopes, managed_team_ids, permission_keys, permission_scopes
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -27,13 +27,13 @@ def _user_to_public(user: User, db: Session | None = None) -> UserPublic:
     # defensive as well, so a legacy record cannot turn the users list into a
     # 500 error before the migration is applied.
     username = user.username if is_canonical_username(user.username) else normalize_legacy_username(user.username, user.id)
+    scopes = effective_permission_scopes(db, user) if db is not None else {}
     return UserPublic(
         id=user.id,
         username=username,
         real_name=user.real_name,
         email=user.email,
         preferred_language=user.preferred_language,
-        role=user.role,
         team_id=user.team_id,
         is_active=user.is_active,
         receive_messages=user.receive_messages,
@@ -43,23 +43,11 @@ def _user_to_public(user: User, db: Session | None = None) -> UserPublic:
         needs_password_change=user.first_login_at is None,  # First login requires password change
         managed_team_ids=[team.id for team in getattr(user, "managed_teams", [])],
         team_name=user.team.name if hasattr(user, 'team') and user.team else None,
-        permission_group_ids=[group.id for group in getattr(user, "permission_groups", [])],
-        permission_group_names=[group.name for group in getattr(user, "permission_groups", [])],
-        permissions=sorted(permission_keys(db, user)) if db is not None else [],
+        permission_group_ids=sorted(group.id for group in getattr(user, "permission_groups", [])),
+        permission_group_names=sorted(group.name for group in getattr(user, "permission_groups", [])),
+        permissions=sorted(scopes),
+        permission_scopes={action: sorted(values) for action, values in scopes.items()},
     )
-
-
-def _set_managed_teams(db: Session, user: User, team_ids: Optional[List[int]]) -> None:
-    if team_ids is None:
-        return
-    unique_ids = list(dict.fromkeys(team_ids))
-    if not unique_ids:
-        user.managed_teams = []
-        return
-    teams = db.query(Team).filter(Team.id.in_(unique_ids)).all()
-    if len(teams) != len(unique_ids):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="One or more teams not found")
-    user.managed_teams = teams
 
 
 @router.get("/me", response_model=MeResponse)
@@ -93,7 +81,6 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_action("core.users.read")),
     team_id: Optional[int] = Query(default=None),
-    role: Optional[RoleEnum] = Query(default=None),
 ) -> List[UserPublic]:
     query = db.query(User).options(joinedload(User.team), joinedload(User.managed_teams))
     managed_ids = managed_team_ids(current_user)
@@ -104,9 +91,6 @@ def list_users(
         if "any" not in permission_scopes(db, current_user, "core.users.read") and team_id not in managed_ids:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team outside managed scope")
         query = query.filter(User.team_id == team_id)
-
-    if role is not None:
-        query = query.filter(User.role == role)
 
     return [_user_to_public(user) for user in query.all()]
 
@@ -162,12 +146,10 @@ def create_user(
     try:
         db.flush()
         if payload.managed_team_ids is not None:
-            if payload.role != RoleEnum.GROUP_ADMIN:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Managed teams can only be assigned to group admins",
-                )
-            _set_managed_teams(db, user, payload.managed_team_ids)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Managed teams are administered through permission groups",
+            )
         db.commit()
     except HTTPException:
         db.rollback()
@@ -223,12 +205,6 @@ def update_user(
         if "any" not in permission_scopes(db, current_user, "core.users.edit"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Team assignment cannot be removed")
         user.team_id = None
-    if payload.role is not None:
-        if "core.access.manage" not in permission_keys(db, current_user):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Missing core.access.manage")
-        if current_user.id == user.id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You cannot change your own role")
-        user.role = payload.role
     if payload.managed_team_ids is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Managed teams are administered through permission groups")
     if payload.is_active is not None:
@@ -357,7 +333,7 @@ def bulk_register_users(
                 password_hash=get_password_hash(plain_password),
                 preferred_language=payload.preferred_language,
                 team_id=payload.team_id,
-                role=payload.role,
+                role=RoleEnum.MEMBER,
             )
             from ..modules import registry
             member = registry.member_group(db)

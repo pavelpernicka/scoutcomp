@@ -52,7 +52,6 @@ class RegistrationSettings(BaseModel):
 class TokenPayload(BaseModel):
     sub: int
     exp: int
-    role: RoleEnum
 
 
 class RefreshTokenResponse(BaseModel):
@@ -88,14 +87,12 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str = Field(min_length=8)
     team_id: Optional[int] = None
-    role: RoleEnum = RoleEnum.MEMBER
     managed_team_ids: Optional[List[int]] = None
 
 
 class BulkUserRegistration(BaseModel):
     names: List[str] = Field(min_length=1, max_length=100)
     team_id: Optional[int] = None
-    role: RoleEnum = RoleEnum.MEMBER
     preferred_language: str = Field(default="cs", max_length=8)
 
 
@@ -107,7 +104,6 @@ class UserUpdate(BaseModel):
     preferred_language: Optional[str] = Field(default=None, max_length=8)
     avatar: Optional[str] = Field(default=None, max_length=200000)
     team_id: Optional[int] = None
-    role: Optional[RoleEnum] = None
     is_active: Optional[bool] = None
     managed_team_ids: Optional[List[int]] = None
 
@@ -119,7 +115,6 @@ class PasswordChangeRequest(BaseModel):
 
 class UserPublic(UserBase):
     id: int
-    role: RoleEnum
     team_id: Optional[int]
     team_name: Optional[str] = None
     is_active: bool
@@ -132,6 +127,7 @@ class UserPublic(UserBase):
     permission_group_ids: List[int] = Field(default_factory=list)
     permission_group_names: List[str] = Field(default_factory=list)
     permissions: List[str] = Field(default_factory=list)
+    permission_scopes: dict[str, List[str]] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
 

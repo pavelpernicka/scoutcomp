@@ -158,14 +158,13 @@ export function AuthProvider({ children }) {
     await fetchProfile(nextTokens.accessToken);
   };
 
-  const role = profile?.user?.role ?? null;
   const userId = profile?.user?.id ?? null;
   const managedTeamIds = profile?.user?.managed_team_ids ?? [];
-  const isAdmin = role === "admin";
-  const isGroupAdmin = role === "group_admin";
-  const canManageUsers = isAdmin || isGroupAdmin;
   const permissions = profile?.user?.permissions ?? [];
-  const can = (permission) => isAdmin || permissions.includes(permission);
+  const permissionScopes = profile?.user?.permission_scopes ?? {};
+  const can = (permission) => permissions.includes(permission);
+  const hasPermissionScope = (permission, scope) => (permissionScopes[permission] || []).includes(scope);
+  const canGlobally = (permission) => hasPermissionScope(permission, "any");
 
   const updateProfile = (patch) => {
     setProfile((prev) =>
@@ -178,14 +177,13 @@ export function AuthProvider({ children }) {
     isLoading: !isLoaded,
     isAuthenticated: Boolean(profile),
     userId,
-    role,
     managedTeamIds,
-    isAdmin,
-    isGroupAdmin,
-    canManageUsers,
-    canReviewCompletions: canManageUsers,
+    canReviewCompletions: can("competitions.approvals.audit"),
     permissions,
+    permissionScopes,
     can,
+    hasPermissionScope,
+    canGlobally,
     login,
     logout,
     register,

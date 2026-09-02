@@ -147,7 +147,8 @@ TaskActionButtons.propTypes = {
 export default function AdminTasks() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
+  const canManageTasks = can("competitions.tasks.manage");
   const [createForm, setCreateForm] = useState(emptyTaskForm);
   const [showCreateTaskModal, setShowCreateTaskModal] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
@@ -233,7 +234,7 @@ export default function AdminTasks() {
       const { data } = await api.get("/tasks", { params: { include_archived: true } });
       return data;
     },
-    enabled: isAdmin,
+    enabled: canManageTasks,
     staleTime: 30_000,
   });
 
@@ -243,7 +244,7 @@ export default function AdminTasks() {
       const { data } = await api.get("/teams");
       return data;
     },
-    enabled: isAdmin,
+    enabled: canManageTasks,
     staleTime: 60_000,
   });
 

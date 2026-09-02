@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import PropTypes from "prop-types";
 
 import { useAuth } from "../providers/AuthProvider";
+import PermissionGroupBadges from "../components/PermissionGroupBadges";
 import api from "../services/api";
 import Button from "../components/Button";
 import MemberSearchPicker from "../components/MemberSearchPicker";
@@ -84,7 +85,7 @@ const emptyTeamForm = { name: "", description: "", logo: null };
 
 export default function AdminTeams() {
   const { t } = useTranslation();
-  const { isAdmin, managedTeamIds, userId, can } = useAuth();
+  const { managedTeamIds, can } = useAuth();
   const canManageTeams = can("core.teams.manage");
   const queryClient = useQueryClient();
   const [teamForm, setTeamForm] = useState(emptyTeamForm);
@@ -249,7 +250,7 @@ export default function AdminTeams() {
     return users
       .filter((user) => user.team_id !== activeTeam.id)
       .filter((user) => {
-        if (isAdmin) return true;
+        if (canManageTeams) return true;
         if (user.team_id == null) return true;
         return managedTeamIds.includes(user.team_id);
       })
@@ -261,10 +262,10 @@ export default function AdminTeams() {
         );
       })
       .sort((a, b) => (a.real_name || a.username).localeCompare(b.real_name || b.username));
-  }, [activeTeam, isAdmin, managedTeamIds, memberSearch, users]);
+  }, [activeTeam, canManageTeams, managedTeamIds, memberSearch, users]);
 
   const handleDeleteTeam = (team) => {
-    if (!isAdmin) return;
+    if (!canManageTeams) return;
     const confirmed = window.confirm(
       t('adminTeams.confirmDeleteTeam', { teamName: team.name })
     );
@@ -277,7 +278,7 @@ export default function AdminTeams() {
   };
 
   const handleRotateCode = (team) => {
-    if (!isAdmin) return;
+    if (!canManageTeams) return;
     if (!window.confirm(t('adminTeams.confirmRotateCode', { teamName: team.name }))) {
       return;
     }
@@ -285,7 +286,7 @@ export default function AdminTeams() {
   };
 
   const handleOpenEditTeam = (team) => {
-    if (!isAdmin) return;
+    if (!canManageTeams) return;
     setEditingTeam(team);
     setEditTeamForm({ name: team.name, description: team.description ?? "", logo: team.logo ?? null });
     setLogoError(null);
@@ -367,12 +368,6 @@ export default function AdminTeams() {
     setMemberSearch("");
   };
 
-  const roleLabel = (role) => {
-    if (role === "admin") return t('adminTeams.roleAdmin');
-    if (role === "group_admin") return t('adminTeams.roleGroupAdmin');
-    return t('adminTeams.roleMember');
-  };
-
   const openCreateTeamModal = () => {
     setTeamForm(emptyTeamForm);
     createTeamMutation.reset();
@@ -387,32 +382,12 @@ export default function AdminTeams() {
     setShowCreateTeamModal(false);
   };
 
-  const handleRoleChange = (user, nextRole) => {
-    if (!isAdmin) return;
-    if (user.id === userId && user.role === "admin" && nextRole !== "admin") {
-      window.alert(t('adminTeams.cannotRemoveOwnAdminRole'));
-      return;
-    }
-
-    const payload = { role: nextRole };
-    if (nextRole === "group_admin" && activeTeam) {
-      const existing = Array.isArray(user.managed_team_ids)
-        ? user.managed_team_ids.map((value) => Number(value))
-        : [];
-      const nextManaged = new Set(existing);
-      nextManaged.add(activeTeam.id);
-      payload.managed_team_ids = Array.from(nextManaged);
-    }
-
-    updateUserMutation.mutate({ id: user.id, payload });
-  };
-
   return (
     <div className="admin-teams-page">
       <AdminPageHeader
         title={t("adminTeams.title")}
         description={t("adminTeams.subtitle")}
-        action={isAdmin && (
+        action={canManageTeams && (
           <Button variant="primary" icon="fas fa-plus" onClick={openCreateTeamModal}>
             {t("adminTeams.addTeam")}
           </Button>
@@ -428,7 +403,7 @@ export default function AdminTeams() {
             </div>
           ) : teams.length === 0 ? (
             <p className="text-muted mb-0">
-              {isAdmin ? t('adminTeams.noTeamsYet') : t('adminTeams.noTeamsAssigned')}
+              {canManageTeams ? t('adminTeams.noTeamsYet') : t('adminTeams.noTeamsAssigned')}
             </p>
           ) : (
             <div className="row g-3">
@@ -450,7 +425,7 @@ export default function AdminTeams() {
                           <span>{t('adminTeams.joinCode')}</span>
                           <div>
                             <code>{team.join_code}</code>
-                            {isAdmin && (
+                            {canManageTeams && (
                               <button
                                 type="button"
                                 className="btn btn-outline-secondary btn-sm"
@@ -472,7 +447,7 @@ export default function AdminTeams() {
                             <i className="fas fa-users" aria-hidden="true"></i>
                             {t('adminTeams.editMembers')}
                           </button>
-                          {isAdmin && (
+                          {canManageTeams && (
                             <button
                               type="button"
                               className="btn btn-outline-secondary admin-team-card__icon-action"
@@ -483,7 +458,7 @@ export default function AdminTeams() {
                               <i className="fas fa-pen" aria-hidden="true"></i>
                             </button>
                           )}
-                          {isAdmin && (
+                          {canManageTeams && (
                             <button
                               type="button"
                               className="btn btn-outline-danger admin-team-card__icon-action"
@@ -601,7 +576,7 @@ export default function AdminTeams() {
                           <tr>
                             <th>{t('adminTeams.member')}</th>
                             <th>{t('adminTeams.email')}</th>
-                            <th>{t('adminTeams.role')}</th>
+                            <th>{t('adminTeams.permissionGroups')}</th>
                             <th className="text-end">{t('adminTeams.actions')}</th>
                           </tr>
                         </thead>
@@ -610,38 +585,7 @@ export default function AdminTeams() {
                             <tr key={user.id}>
                               <td>{user.real_name || user.username}</td>
                               <td>{user.email}</td>
-                              <td>
-                                {isAdmin ? (
-                                  (() => {
-                                    const isSelfAdmin = user.id === userId && user.role === "admin";
-                                    if (isSelfAdmin) {
-                                      return (
-                                        <span className="badge bg-light text-dark">
-                                          {roleLabel(user.role)}
-                                        </span>
-                                      );
-                                    }
-                                    return (
-                                      <select
-                                        className="form-select form-select-sm"
-                                        value={user.role}
-                                        disabled={updateUserMutation.isLoading}
-                                        onChange={(event) =>
-                                          handleRoleChange(user, event.target.value)
-                                        }
-                                      >
-                                        <option value="member">{t('adminTeams.roleMember')}</option>
-                                        <option value="group_admin">{t('adminTeams.roleGroupAdmin')}</option>
-                                        <option value="admin">{t('adminTeams.roleAdmin')}</option>
-                                      </select>
-                                    );
-                                  })()
-                                ) : (
-                                  <span className="badge bg-light text-dark">
-                                    {roleLabel(user.role)}
-                                  </span>
-                                )}
-                              </td>
+                              <td><PermissionGroupBadges names={user.permission_group_names} /></td>
                               <td className="text-end">
                                 <button
                                   type="button"
@@ -789,7 +733,7 @@ export default function AdminTeams() {
         </>
       )}
 
-      {isAdmin && showCreateTeamModal && (
+      {canManageTeams && showCreateTeamModal && (
         <>
           <div
             className="modal fade show d-block"

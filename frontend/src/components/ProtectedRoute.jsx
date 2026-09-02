@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next";
 
 import { useAuth } from "../providers/AuthProvider";
 
-export default function ProtectedRoute({ allowedRoles = [], allowedPermissions = [] }) {
+export default function ProtectedRoute({ allowedPermissions = [] }) {
   const { t } = useTranslation();
-  const { isAuthenticated, role, isLoading, can } = useAuth();
+  const { isAuthenticated, isLoading, can } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -19,10 +19,6 @@ export default function ProtectedRoute({ allowedRoles = [], allowedPermissions =
     return <Navigate to="/login" replace state={{ from: returnTo }} />;
   }
 
-  if (allowedRoles.length > 0 && (!role || !allowedRoles.includes(role))) {
-    return <Navigate to="/" replace />;
-  }
-
   if (allowedPermissions.length > 0 && !allowedPermissions.some(permission => can(permission))) {
     return <Navigate to="/" replace />;
   }
@@ -31,6 +27,5 @@ export default function ProtectedRoute({ allowedRoles = [], allowedPermissions =
 }
 
 ProtectedRoute.propTypes = {
-  allowedRoles: PropTypes.arrayOf(PropTypes.string),
   allowedPermissions: PropTypes.arrayOf(PropTypes.string),
 };

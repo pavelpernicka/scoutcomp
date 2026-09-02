@@ -10,7 +10,7 @@ from ..core.security import (
     verify_password,
 )
 from ..dependencies import get_current_active_user, get_db
-from ..models import RefreshToken, RoleEnum, Team, User
+from ..models import PermissionGroup, RefreshToken, RoleEnum, Team, User
 from ..config import settings
 from .config import get_config_bool
 from ..schemas import (
@@ -29,8 +29,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _allow_admin_bootstrap(db: Session) -> bool:
-    admin_exists = db.query(User).filter(User.role == RoleEnum.ADMIN).first() is not None
-    return settings.app.developer_mode or not admin_exists
+    from ..modules import registry
+
+    registry.seed(db)
+    superadmin = db.query(PermissionGroup).filter_by(name="Superadmin", is_system=True).one_or_none()
+    superadmin_exists = bool(superadmin and any(user.is_active for user in superadmin.members))
+    return settings.app.developer_mode or not superadmin_exists
 
 
 @router.get("/options", response_model=RegistrationSettings)
@@ -81,21 +85,22 @@ def register(payload: RegistrationRequest, db: Session = Depends(get_db)) -> Tok
         email=payload.email,
         password_hash=get_password_hash(payload.password),
         preferred_language=payload.preferred_language or settings.app.default_language,
-        role=role,
+        role=RoleEnum.MEMBER,
         team_id=team_id,
         # The registrant chose this password themselves.  Forced password
         # changes are reserved for credentials assigned by somebody else.
         first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     from ..modules import registry
-    member = registry.member_group(db)
-    if member:
-        user.permission_groups.append(member)
+    group_name = "Superadmin" if role == RoleEnum.ADMIN else "Člen"
+    group = db.query(PermissionGroup).filter_by(name=group_name, is_system=True).one_or_none()
+    if group:
+        user.permission_groups.append(group)
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    access_token, expires_in = create_access_token(user.id, user.role)
+    access_token, expires_in = create_access_token(user.id)
     refresh_token_value, refresh_expires = create_refresh_token()
 
     refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)
@@ -121,7 +126,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if user.first_login_at is None:
         return PasswordChangeRequired()
 
-    access_token, expires_in = create_access_token(user.id, user.role)
+    access_token, expires_in = create_access_token(user.id)
     refresh_token_value, refresh_expires = create_refresh_token(remember_me=payload.remember_me)
 
     refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)
@@ -149,7 +154,7 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> Ref
     if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    access_token, expires_in = create_access_token(user.id, user.role)
+    access_token, expires_in = create_access_token(user.id)
     return RefreshTokenResponse(access_token=access_token, expires_in=expires_in)
 
 
@@ -180,7 +185,7 @@ def change_password(
     db.add(current_user)
     db.commit()
 
-    access_token, expires_in = create_access_token(current_user.id, current_user.role)
+    access_token, expires_in = create_access_token(current_user.id)
     refresh_token_value, refresh_expires = create_refresh_token()
 
     refresh_token = RefreshToken(user_id=current_user.id, token=refresh_token_value, expires_at=refresh_expires)
@@ -212,7 +217,7 @@ def force_change_password(payload: ForcePasswordChangeRequest, db: Session = Dep
     db.add(user)
     db.commit()
 
-    access_token, expires_in = create_access_token(user.id, user.role)
+    access_token, expires_in = create_access_token(user.id)
     refresh_token_value, refresh_expires = create_refresh_token(remember_me=payload.remember_me)
 
     refresh_token = RefreshToken(user_id=user.id, token=refresh_token_value, expires_at=refresh_expires)

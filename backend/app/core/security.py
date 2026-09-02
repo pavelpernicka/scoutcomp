@@ -6,9 +6,6 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from ..config import settings
-from ..models import RoleEnum
-
-
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -28,9 +25,15 @@ def _create_token(data: Dict[str, Any], expires_delta: timedelta) -> str:
     return encoded_jwt
 
 
-def create_access_token(user_id: int, role: RoleEnum) -> Tuple[str, int]:
+def create_access_token(user_id: int, _legacy_role: object | None = None) -> Tuple[str, int]:
+    """Create an identity-only access token.
+
+    Authorization is resolved from the user's current permission groups on
+    every request.  The optional second argument keeps older callers source
+    compatible but roles are deliberately not embedded in the token.
+    """
     expires_delta = timedelta(minutes=settings.app.token.access_expire_minutes)
-    token = _create_token({"sub": str(user_id), "role": role.value}, expires_delta)
+    token = _create_token({"sub": str(user_id)}, expires_delta)
     return token, int(expires_delta.total_seconds())
 
 

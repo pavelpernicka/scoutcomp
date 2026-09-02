@@ -53,7 +53,8 @@ const haveSameDrafts = (current, next) => {
 export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { isAdmin, managedTeamIds } = useAuth();
+  const { canGlobally, managedTeamIds } = useAuth();
+  const hasGlobalAuditAccess = canGlobally("competitions.approvals.audit");
 
   const [completionDrafts, setCompletionDrafts] = useState({});
   const [completionError, setCompletionError] = useState(null);
@@ -115,14 +116,14 @@ export default function UserCompetitionHistory({ selectedUserId, userTeamId }) {
         if (task.team_id == null) {
           return true;
         }
-        if (isAdmin) {
+        if (hasGlobalAuditAccess) {
           return userTeamId != null && task.team_id === userTeamId;
         }
         return managedTeamIds.includes(task.team_id) && userTeamId === task.team_id;
       })
       .map((task) => ({ value: String(task.id), label: task.name, task }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [activeTasks, isAdmin, managedTeamIds, userTeamId]);
+  }, [activeTasks, hasGlobalAuditAccess, managedTeamIds, userTeamId]);
 
   const selectedTaskForCompletion = useMemo(() => {
     if (!newCompletionForm.taskId) return null;

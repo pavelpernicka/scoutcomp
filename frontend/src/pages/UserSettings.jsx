@@ -12,6 +12,7 @@ import Input from "../components/Input";
 import Select from "../components/Select";
 import UserAvatar from "../components/UserAvatar";
 import PushNotificationSettings from "../components/PushNotificationSettings";
+import PermissionGroupBadges from "../components/PermissionGroupBadges";
 import { processAvatarFile } from "../utils/avatar";
 import { normalizeUsernameInput, USERNAME_PATTERN } from "../utils/username";
 
@@ -386,14 +387,8 @@ export default function UserSettingsPage() {
                 <p className="mb-0 fw-bold">{profile?.user?.real_name || profile?.user?.username}</p>
               </div>
               <div className="mb-3">
-                <h6 className="text-muted mb-1">{t("userSettings.role")}</h6>
-                <p className="mb-0">
-                  <span className="badge bg-primary px-3 py-2">
-                    {profile?.user?.role === "admin" ? <><i className="fas fa-user-tie me-1"></i> {t("navigation.roles.admin")}</> :
-                     profile?.user?.role === "group_admin" ? <><i className="fas fa-users me-1"></i> {t("navigation.roles.groupAdmin")}</> :
-                     <><i className="fas fa-user me-1"></i> {t("navigation.roles.member")}</>}
-                  </span>
-                </p>
+                <h6 className="text-muted mb-1">{t("userSettings.permissionGroups")}</h6>
+                <PermissionGroupBadges names={profile?.user?.permission_group_names} />
               </div>
               {profile?.user?.team_name && (
                 <div className="mb-3">
