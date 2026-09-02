@@ -146,7 +146,7 @@ KindBadge.propTypes = { kind: PropTypes.string, t: PropTypes.func };
 export default function Activity() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const { can, userId } = useAuth();
+  const { can, profile, userId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState(loadPreferredActivityView);
@@ -158,6 +158,7 @@ export default function Activity() {
   const [formError, setFormError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [selectedTeamIds, setSelectedTeamIds] = useState([]);
+  const [councilOnly, setCouncilOnly] = useState(false);
   const [teamFilterOpen, setTeamFilterOpen] = useState(false);
   const [endsAtAuto, setEndsAtAuto] = useState(false);
   const [attendanceEvent, setAttendanceEvent] = useState(null);
@@ -167,6 +168,7 @@ export default function Activity() {
   const [selectedGroupIds, setSelectedGroupIds] = useState([]);
   const [groupFilterOpen, setGroupFilterOpen] = useState(false);
   const teamFilterRef = useRef(null);
+  const filterDefaultsApplied = useRef(false);
   const processedEventParam = useRef(null);
 
   useEffect(() => {
@@ -194,6 +196,14 @@ export default function Activity() {
   const canAttendance = can("core.attendance.manage");
   const canPickTeam = can("core.teams.manage");
   const isLeader = can("core.is_leader");
+
+  useEffect(() => {
+    if (filterDefaultsApplied.current || !profile?.user) return;
+    filterDefaultsApplied.current = true;
+    if (!isLeader && profile.user.team_id) {
+      setSelectedTeamIds([profile.user.team_id]);
+    }
+  }, [isLeader, profile]);
 
   const { data: events = [], isLoading } = useQuery({
     queryKey: ["activity-events"],
@@ -314,6 +324,9 @@ export default function Activity() {
 
   const teamOptions = useMemo(() => {
     const byId = new Map();
+    if (profile?.user?.team_id && profile.user.team_name) {
+      byId.set(profile.user.team_id, profile.user.team_name);
+    }
     for (const event of events) {
       if (event.team_id && event.team_name) {
         byId.set(event.team_id, event.team_name);
@@ -322,12 +335,14 @@ export default function Activity() {
     return [...byId.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
-  }, [events, i18n.language]);
+  }, [events, i18n.language, profile]);
 
   const filteredEvents = useMemo(() => {
-    if (selectedTeamIds.length === 0) return events;
-    return events.filter((event) => !event.team_id || selectedTeamIds.includes(event.team_id));
-  }, [events, selectedTeamIds]);
+    const byTeam = selectedTeamIds.length === 0
+      ? events
+      : events.filter((event) => !event.team_id || selectedTeamIds.includes(event.team_id));
+    return councilOnly ? byTeam.filter((event) => event.audience === "leaders") : byTeam;
+  }, [councilOnly, events, selectedTeamIds]);
 
   const toggleTeam = (id) => {
     setSelectedTeamIds((prev) =>
@@ -598,6 +613,24 @@ export default function Activity() {
                 </div>
               )}
             </div>
+          )}
+
+          {isLeader && (
+            <label
+              className={`d-inline-flex align-items-center gap-2 border rounded px-2 py-1 small user-select-none ${
+                councilOnly ? "border-success bg-success-subtle text-success-emphasis" : "border-secondary-subtle"
+              }`}
+              style={{ cursor: "pointer", minHeight: "31px" }}
+            >
+              <input
+                type="checkbox"
+                className="form-check-input m-0"
+                checked={councilOnly}
+                onChange={(event) => setCouncilOnly(event.target.checked)}
+              />
+              <i className="fas fa-user-shield" aria-hidden="true" />
+              <span>{t("calendar.councilOnly")}</span>
+            </label>
           )}
 
           {view === "month" && (

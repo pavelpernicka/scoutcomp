@@ -246,6 +246,20 @@ class ModuleRegistry:
             if not user.permission_groups:
                 target = {RoleEnum.MEMBER: "Člen", RoleEnum.GROUP_ADMIN: "Vedoucí družiny", RoleEnum.ADMIN: "Superadmin"}.get(user.role, "Člen")
                 user.permission_groups.append(groups[target])
+            elif len(user.permission_groups) > 1:
+                # Permission-group membership is intentionally singular. Older
+                # versions appended a new group to the default Člen group.
+                # Preserve Superadmin when present; otherwise keep the most
+                # capable non-default group deterministically.
+                current_groups = list(user.permission_groups)
+                superadmin = next((group for group in current_groups if group.name == "Superadmin"), None)
+                non_default = [group for group in current_groups if group.name != "Člen"]
+                candidates = non_default or current_groups
+                selected = superadmin or max(
+                    candidates,
+                    key=lambda group: (len(group.grants), -group.id),
+                )
+                user.permission_groups = [selected]
             # Keep the non-null legacy column in a neutral state until a
             # future schema migration can remove it.  No authorization or UI
             # behavior may depend on it after the group migration above.

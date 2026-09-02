@@ -98,9 +98,7 @@ export default function AdminAccess() {
 
   const addUserMutation = useMutation({
     mutationFn: async ({ userId, groupId }) => {
-      const user = usersById.get(userId);
-      const next = [...new Set([...(user?.permission_group_ids || []), groupId])];
-      return (await api.put(`/admin/access/users/${userId}/groups`, next)).data;
+      return (await api.put(`/admin/access/users/${userId}/groups`, [groupId])).data;
     },
     onSuccess: () => {
       setAddUserGroup(null);

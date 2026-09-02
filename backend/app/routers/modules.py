@@ -314,11 +314,16 @@ def remove_user_from_group(group_id: int, user_id: int, db: Session = Depends(ge
     user = db.get(User, user_id)
     if not group or not user: raise HTTPException(404, "Unknown permission group or user")
     if group not in user.permission_groups: raise HTTPException(404, "User is not a member of the group")
+    replacement = member_group(db)
+    if replacement is None or group.id == replacement.id:
+        raise HTTPException(400, "Každý uživatel musí mít právě jednu skupinu oprávnění")
     if user_id == current_user.id and group.id in _access_manage_group_ids(db, current_user):
         _ensure_access_manage_retained(db, current_user, {group.id})
-    user.permission_groups.remove(group)
     if group.name == SUPERADMIN_GROUP_NAME:
-        _ensure_superadmin_exists(db, current_user)
+        other_admin_exists = any(other.id != user.id and other.is_active for other in group.members)
+        if not other_admin_exists:
+            raise HTTPException(400, "Alespoň jeden uživatel musí zůstat v superadmin skupině")
+    user.permission_groups = [replacement]
     db.commit()
 
 
@@ -326,15 +331,21 @@ def remove_user_from_group(group_id: int, user_id: int, db: Session = Depends(ge
 def assign_user_groups(user_id: int, group_ids: list[int], db: Session = Depends(get_db), current_user: User = Depends(require_core_access)):
     user = db.get(User, user_id)
     if not user: raise HTTPException(404, "Unknown user")
-    user.permission_groups = db.query(PermissionGroup).filter(PermissionGroup.id.in_(group_ids)).all()
-    if user_id == current_user.id and "core.access.manage" not in permission_keys(db, current_user):
-        db.rollback()
-        raise HTTPException(400, "Nelze odebrat poslední oprávnění ke správě oprávnění (core.access.manage)")
+    unique_group_ids = set(group_ids)
+    if len(unique_group_ids) != 1:
+        raise HTTPException(400, "Každý uživatel musí mít právě jednu skupinu oprávnění")
+    selected = db.get(PermissionGroup, next(iter(unique_group_ids)))
+    if selected is None:
+        raise HTTPException(404, "Unknown permission group")
+    removed_access_groups = _access_manage_group_ids(db, user) - {selected.id}
+    if user_id == current_user.id and removed_access_groups and not _grants_access_manage(db, selected):
+        _ensure_access_manage_retained(db, current_user, removed_access_groups)
     admin = superadmin_group(db)
-    if admin is not None and admin not in user.permission_groups and not any(other.is_active for other in admin.members):
-        db.rollback()
-        raise HTTPException(400, "Alespoň jeden uživatel musí zůstat v superadmin skupině")
-    db.commit(); return {"user_id": user_id, "group_ids": [g.id for g in user.permission_groups]}
+    if admin is not None and admin in user.permission_groups and selected.id != admin.id:
+        if not any(other.id != user.id and other.is_active for other in admin.members):
+            raise HTTPException(400, "Alespoň jeden uživatel musí zůstat v superadmin skupině")
+    user.permission_groups = [selected]
+    db.commit(); return {"user_id": user_id, "group_ids": [selected.id]}
 
 
 class UserPermissionsPayload(BaseModel):

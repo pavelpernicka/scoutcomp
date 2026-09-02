@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from app.models import RoleEnum, Team, User
+from app.models import PermissionGroup, RoleEnum, Team, User
 from app.modules import registry
 from app.permissions import allows, allows_team, permission_scopes
 
@@ -32,6 +32,20 @@ def test_legacy_roles_are_migrated_to_system_groups(db_session):
     assert allows(db_session, admin, "core.modules.manage")
     assert allows_team(db_session, leader, "core.users.read", team.id)
     assert "team" in permission_scopes(db_session, leader, "core.events.edit")
+
+
+def test_seed_removes_default_member_group_when_user_has_a_specific_group(db_session):
+    registry.seed(db_session)
+    member_group = db_session.query(PermissionGroup).filter_by(name="Člen").one()
+    admin_group = db_session.query(PermissionGroup).filter_by(name="Superadmin").one()
+    user = _user("duplicate-groups", RoleEnum.MEMBER)
+    user.permission_groups = [member_group, admin_group]
+    db_session.add(user)
+    db_session.commit()
+
+    registry.seed(db_session)
+
+    assert [group.name for group in user.permission_groups] == ["Superadmin"]
 
 
 def test_team_scope_does_not_escape_managed_team(db_session):

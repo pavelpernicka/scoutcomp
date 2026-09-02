@@ -19,6 +19,7 @@ from app.routers.activity import (
     AttendancePayload,
     admin_attendance_matrix,
     list_activity_members,
+    list_events,
     set_attendance,
 )
 from app.web.data_sources import resolve_data_source
@@ -164,24 +165,33 @@ def test_event_public_visibility_is_explicit_and_available_to_cms(client, db_ses
     assert [event["title"] for event in public_events] == ["Interní akce"]
 
 
-def test_member_sees_only_own_and_unit_wide_events(client, db_session):
+def test_member_can_browse_other_team_events_but_not_leader_only_events(client, db_session):
     alpha = Team(name="Alpha", join_code="JOINALPHA")
     beta = Team(name="Beta", join_code="JOINBETA")
     member = _user("member", RoleEnum.MEMBER, alpha)
+    leader = _user("leader", RoleEnum.GROUP_ADMIN, alpha)
+    leader.managed_teams.append(alpha)
     admin = _user("admin", RoleEnum.ADMIN)
-    db_session.add_all([alpha, beta, member, admin])
+    db_session.add_all([alpha, beta, member, leader, admin])
     db_session.commit()
 
     admin_token = _login(client, "admin")
     admin_headers = _headers(admin_token)
-    own = client.post("/activity/events", json=_event_payload(team_id=alpha.id, title="Alpha akce"), headers=admin_headers).json()
-    other = client.post("/activity/events", json=_event_payload(team_id=beta.id, title="Beta akce"), headers=admin_headers).json()
-    unit = client.post("/activity/events", json=_event_payload(team_id=None, title="Oddílová akce"), headers=admin_headers).json()
+    client.post("/activity/events", json=_event_payload(team_id=alpha.id, title="Alpha akce"), headers=admin_headers)
+    client.post("/activity/events", json=_event_payload(team_id=beta.id, title="Beta akce"), headers=admin_headers)
+    client.post("/activity/events", json=_event_payload(team_id=None, title="Oddílová akce"), headers=admin_headers)
+    client.post("/activity/events", json=_event_payload(team_id=beta.id, title="Rada", audience="leaders"), headers=admin_headers)
 
     token = _login(client, "member")
     titles = {event["title"] for event in client.get("/activity/events", headers=_headers(token)).json()}
-    assert titles == {"Alpha akce", "Oddílová akce"}
-    assert "Beta akce" not in titles
+    assert titles == {"Alpha akce", "Beta akce", "Oddílová akce"}
+    assert "Rada" not in titles
+
+    leader_titles = {
+        event["title"]
+        for event in client.get("/activity/events", headers=_headers(_login(client, "leader"))).json()
+    }
+    assert leader_titles == {"Alpha akce", "Beta akce", "Oddílová akce", "Rada"}
 
 
 def test_attendance_requires_permission_and_records_status(client, db_session):
@@ -293,8 +303,19 @@ def test_attendance_uses_complete_event_scope_including_team_leaders(db_session)
         starts_at=datetime.now(timezone.utc).replace(tzinfo=None),
         audience="leaders",
     )
-    db_session.add_all([event, leader_event])
+    other_team_event = ScoutEvent(
+        team_id=other_team.id,
+        title="Other team event",
+        starts_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        audience="members",
+    )
+    db_session.add_all([event, leader_event, other_team_event])
     db_session.commit()
+
+    member_titles = {row["title"] for row in list_events(None, db_session, member)}
+    assert member_titles == {"Team event", "Other team event"}
+    leader_titles = {row["title"] for row in list_events(None, db_session, team_leader)}
+    assert leader_titles == {"Team event", "Leader event", "Other team event"}
 
     scoped = list_activity_members(event.id, db_session, managing_leader)
     assert {row["id"] for row in scoped} == {
@@ -343,7 +364,17 @@ def test_attendance_uses_complete_event_scope_including_team_leaders(db_session)
         for group in matrix["groups"]
         for row in group["members"]
     }
-    assert set(matrix_members) == {member.id, team_leader.id, managing_leader.id}
+    assert {row["title"] for row in matrix["events"]} == {
+        "Team event",
+        "Leader event",
+        "Other team event",
+    }
+    assert set(matrix_members) == {
+        member.id,
+        team_leader.id,
+        managing_leader.id,
+        outsider.id,
+    }
     assert event.id in matrix_members[member.id]["applicable_event_ids"]
     assert leader_event.id not in matrix_members[member.id]["applicable_event_ids"]
     assert leader_event.id in matrix_members[team_leader.id]["applicable_event_ids"]

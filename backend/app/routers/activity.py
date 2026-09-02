@@ -266,7 +266,6 @@ def list_events(team_id: int | None = Query(None), db: Session = Depends(get_db)
         selectinload(ScoutEvent.attendances).selectinload(ScoutAttendance.user).selectinload(User.permission_groups),
     )
     if team_id is not None: query = query.filter(ScoutEvent.team_id == team_id)
-    elif current_user.team_id: query = query.filter((ScoutEvent.team_id == current_user.team_id) | (ScoutEvent.team_id.is_(None)))
     if not _is_leader(db, current_user):
         query = query.filter(ScoutEvent.audience == "members")
     events = query.order_by(ScoutEvent.starts_at.desc()).all()
@@ -286,8 +285,6 @@ def list_event_options(
     if not allows(db, current_user, "core.events.read"):
         raise HTTPException(403, "Missing permission")
     visible = db.query(ScoutEvent).options(joinedload(ScoutEvent.team))
-    if current_user.team_id:
-        visible = visible.filter((ScoutEvent.team_id == current_user.team_id) | (ScoutEvent.team_id.is_(None)))
     if not _is_leader(db, current_user):
         visible = visible.filter(ScoutEvent.audience == "members")
 
