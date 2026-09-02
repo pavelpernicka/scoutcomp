@@ -1,7 +1,26 @@
 from datetime import datetime, timezone, timedelta
 
+import pytest
+from fastapi import HTTPException
+
 from app.core.security import get_password_hash
-from app.models import RoleEnum, Team, User
+from app.models import (
+    DirectUserPermissionDeny,
+    PermissionDefinition,
+    PermissionGroup,
+    PermissionGroupPermission,
+    RoleEnum,
+    ScoutEvent,
+    Team,
+    User,
+)
+from app.modules import registry
+from app.routers.activity import (
+    AttendancePayload,
+    admin_attendance_matrix,
+    list_activity_members,
+    set_attendance,
+)
 from app.web.data_sources import resolve_data_source
 
 
@@ -199,6 +218,135 @@ def test_attendance_requires_permission_and_records_status(client, db_session):
         entry["user_id"] == member.id and entry["status"] == "present"
         for entry in event_after["attendance"]
     )
+
+
+def test_attendance_uses_complete_event_scope_including_team_leaders(db_session):
+    registry.seed(db_session)
+    target_team = Team(name="Alpha", join_code="JOINALPHA")
+    other_team = Team(name="Beta", join_code="JOINBETA")
+    db_session.add_all([target_team, other_team])
+    db_session.flush()
+
+    permissions = {
+        f"{permission.module_code}.{permission.code}": permission
+        for permission in db_session.query(PermissionDefinition).all()
+    }
+    leader_group = PermissionGroup(name="Alpha leaders")
+    db_session.add(leader_group)
+    db_session.flush()
+    db_session.add_all([
+        PermissionGroupPermission(
+            group_id=leader_group.id,
+            permission_id=permissions["core.is_leader"].id,
+            scope="any",
+        ),
+        PermissionGroupPermission(
+            group_id=leader_group.id,
+            permission_id=permissions["core.attendance.manage"].id,
+            scope="team",
+        ),
+    ])
+
+    def scoped_user(username, team=None, *, active=True):
+        return User(
+            username=username,
+            real_name=username.title(),
+            password_hash="not-used",
+            role=RoleEnum.MEMBER,
+            preferred_language="cs",
+            is_active=active,
+            team=team,
+            first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+
+    member = scoped_user("alpha-member", target_team)
+    team_leader = scoped_user("alpha-leader", target_team)
+    team_leader.permission_groups.append(leader_group)
+    managing_leader = scoped_user("alpha-manager", other_team)
+    managing_leader.permission_groups.append(leader_group)
+    managing_leader.managed_teams.append(target_team)
+    outsider = scoped_user("beta-member", other_team)
+    denied_member = scoped_user("alpha-denied", target_team)
+    inactive_member = scoped_user("alpha-inactive", target_team, active=False)
+    db_session.add_all([
+        member,
+        team_leader,
+        managing_leader,
+        outsider,
+        denied_member,
+        inactive_member,
+    ])
+    db_session.flush()
+    db_session.add(DirectUserPermissionDeny(
+        user_id=denied_member.id,
+        permission_id=permissions["core.events.read"].id,
+    ))
+    event = ScoutEvent(
+        team_id=target_team.id,
+        title="Team event",
+        starts_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        audience="members",
+    )
+    leader_event = ScoutEvent(
+        team_id=target_team.id,
+        title="Leader event",
+        starts_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        audience="leaders",
+    )
+    db_session.add_all([event, leader_event])
+    db_session.commit()
+
+    scoped = list_activity_members(event.id, db_session, managing_leader)
+    assert {row["id"] for row in scoped} == {
+        member.id,
+        team_leader.id,
+        managing_leader.id,
+    }
+    assert {row["id"] for row in scoped if row["is_leader"]} == {
+        team_leader.id,
+        managing_leader.id,
+    }
+
+    marked = set_attendance(
+        event.id,
+        AttendancePayload(user_id=managing_leader.id, mode="real", status="present"),
+        db_session,
+        managing_leader,
+    )
+    assert marked["status"] == "present"
+    with pytest.raises(HTTPException) as caught:
+        set_attendance(
+            event.id,
+            AttendancePayload(user_id=outsider.id, mode="real", status="present"),
+            db_session,
+            managing_leader,
+        )
+    assert caught.value.status_code == 422
+
+    leaders_only = list_activity_members(leader_event.id, db_session, managing_leader)
+    assert {row["id"] for row in leaders_only} == {
+        team_leader.id,
+        managing_leader.id,
+    }
+
+    matrix = admin_attendance_matrix(
+        date_from=None,
+        date_to=None,
+        kind=None,
+        offset=0,
+        limit=40,
+        db=db_session,
+        current_user=managing_leader,
+    )
+    matrix_members = {
+        row["id"]: row
+        for group in matrix["groups"]
+        for row in group["members"]
+    }
+    assert set(matrix_members) == {member.id, team_leader.id, managing_leader.id}
+    assert event.id in matrix_members[member.id]["applicable_event_ids"]
+    assert leader_event.id not in matrix_members[member.id]["applicable_event_ids"]
+    assert leader_event.id in matrix_members[team_leader.id]["applicable_event_ids"]
 
 
 def test_member_hides_leader_only_events(client, db_session):

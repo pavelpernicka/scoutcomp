@@ -34,6 +34,11 @@ const PLANNED_STATUS_META = {
 const CYCLE_ORDER = ["present", "excused", "absent"];
 const MATRIX_EVENT_LIMIT = 40;
 
+const isEventApplicable = (member, eventId) => (
+  !Array.isArray(member.applicable_event_ids)
+  || member.applicable_event_ids.includes(eventId)
+);
+
 const schoolYearStart = () => {
   const now = new Date();
   const year = now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1;
@@ -141,15 +146,18 @@ export default function AdminAttendance() {
     const counts = {};
     for (const group of matrixData?.groups || []) {
       for (const member of group.members || []) {
-        for (const [eventId, status] of Object.entries(member.attendance || {})) {
+        for (const event of events) {
+          if (!isEventApplicable(member, event.id)) continue;
+          const eventId = String(event.id);
+          const status = member.attendance?.[eventId];
           if (!counts[eventId]) counts[eventId] = { present: 0, total: 0 };
-          counts[eventId].total++;
-          if (status === "present") counts[eventId].present++;
+          counts[eventId].total += 1;
+          if (status === "present") counts[eventId].present += 1;
         }
       }
     }
     return counts;
-  }, [matrixData]);
+  }, [events, matrixData]);
   const mobileEvents = events.slice(0, 5);
 
   const { data: memberResults = [] } = useQuery({
@@ -216,7 +224,7 @@ export default function AdminAttendance() {
   };
 
   const cycleCell = (groupKey, member, event) => {
-    if (!editingEnabled) return;
+    if (!editingEnabled || !isEventApplicable(member, event.id)) return;
     const key = String(event.id);
     const cellKey = `${groupKey}:${member.id}:${key}`;
     if (savingCells.has(cellKey)) return;
@@ -279,27 +287,33 @@ export default function AdminAttendance() {
   };
 
   const memberPercent = (member) => {
-    if (events.length === 0) return 0;
+    const applicableEvents = events.filter((event) => isEventApplicable(member, event.id));
+    if (applicableEvents.length === 0) return 0;
     let present = 0;
-    for (const event of events) {
+    for (const event of applicableEvents) {
       if (member.attendance?.[String(event.id)] === "present") present++;
     }
-    return Math.round((present / events.length) * 100);
+    return Math.round((present / applicableEvents.length) * 100);
   };
 
   const groupPercent = (members) => {
     if (events.length === 0 || members.length === 0) return 0;
-    const total = members.reduce((sum, m) => {
-      let present = 0;
+    let applicableCount = 0;
+    const present = members.reduce((sum, member) => {
       for (const event of events) {
-        if (m.attendance?.[String(event.id)] === "present") present++;
+        if (!isEventApplicable(member, event.id)) continue;
+        applicableCount += 1;
+        if (member.attendance?.[String(event.id)] === "present") sum += 1;
       }
-      return sum + present;
+      return sum;
     }, 0);
-    return Math.round((total / (events.length * members.length)) * 100);
+    return applicableCount ? Math.round((present / applicableCount) * 100) : 0;
   };
 
   const renderMatrixCell = (groupKey, member, event) => {
+    if (!isEventApplicable(member, event.id)) {
+      return <td className="text-center text-body-tertiary px-1" key={event.id}>·</td>;
+    }
     const status = member.attendance?.[String(event.id)] || null;
     const meta = status ? REAL_STATUS_META[status] : null;
     const cellKey = `${groupKey}:${member.id}:${event.id}`;
@@ -320,6 +334,13 @@ export default function AdminAttendance() {
   };
 
   const renderMobileMatrixCell = (groupKey, member, event) => {
+    if (!isEventApplicable(member, event.id)) {
+      return (
+        <span key={event.id} className="admin-attendance-mobile-cell text-body-tertiary" aria-hidden="true">
+          ·
+        </span>
+      );
+    }
     const status = member.attendance?.[String(event.id)] || null;
     const meta = status ? REAL_STATUS_META[status] : null;
     const cellKey = `${groupKey}:${member.id}:${event.id}`;

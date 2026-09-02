@@ -204,11 +204,11 @@ export default function Activity() {
   });
 
   const { data: members = [], isLoading: membersLoading } = useQuery({
-    queryKey: ["activity-members", attendanceEvent?.team_id ?? selectedEvent?.team_id ?? "all"],
+    queryKey: ["activity-members", attendanceEvent?.id ?? selectedEvent?.id ?? null],
     queryFn: async () => {
-      const teamId = attendanceEvent?.team_id ?? selectedEvent?.team_id;
+      const eventId = attendanceEvent?.id ?? selectedEvent?.id;
       const { data } = await api.get("/activity/members", {
-        params: teamId ? { team_id: teamId } : {},
+        params: { event_id: eventId },
       });
       return data;
     },
@@ -487,11 +487,11 @@ export default function Activity() {
 
   const selectedAttendance = selectedEvent ? attendanceByEvent[selectedEvent.id] || {} : {};
 
-  const countedMemberIds = useMemo(
-    () => new Set(members.filter((member) => !member.is_leader).map((member) => member.id)),
+  const scopedMemberIds = useMemo(
+    () => new Set(members.map((member) => member.id)),
     [members]
   );
-  const isCountedMember = (entry) => countedMemberIds.has(entry.user_id);
+  const isScopedMember = (entry) => scopedMemberIds.has(entry.user_id);
 
   const plannedEntries = selectedEvent
     ? Object.values(selectedAttendance).filter((entry) => entry.mode === "planned")
@@ -501,7 +501,7 @@ export default function Activity() {
     if (["not_attending", "absent", "excused"].includes(status)) return "no";
     return "unknown";
   };
-  const plannedRows = plannedEntries.filter((entry) => isCountedMember(entry));
+  const plannedRows = plannedEntries.filter((entry) => isScopedMember(entry));
   const plannedYes = plannedRows.filter((entry) => plannedAnswer(entry.status) === "yes").length;
   const plannedNo = plannedRows.filter((entry) => plannedAnswer(entry.status) === "no").length;
 
@@ -911,7 +911,7 @@ export default function Activity() {
                           (entry) =>
                             entry.mode === "real" &&
                             entry.status === "present" &&
-                            isCountedMember(entry)
+                            isScopedMember(entry)
                         ).length}
                       </span>
                     </div>

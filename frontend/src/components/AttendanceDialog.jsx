@@ -45,30 +45,27 @@ export default function AttendanceDialog({
 
   const byUser = attendanceByEvent[event?.id] || {};
 
-  const countableMembers = useMemo(
-    () => (members || []).filter((member) => !member.is_leader),
-    [members]
-  );
-  const countableMemberIds = useMemo(
-    () => new Set(countableMembers.map((member) => member.id)),
-    [countableMembers]
+  const scopedMembers = useMemo(() => members || [], [members]);
+  const scopedMemberIds = useMemo(
+    () => new Set(scopedMembers.map((member) => member.id)),
+    [scopedMembers]
   );
 
   const filteredMembers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return countableMembers;
-    return countableMembers.filter((member) => member.name?.toLowerCase().includes(query));
-  }, [countableMembers, search]);
+    if (!query) return scopedMembers;
+    return scopedMembers.filter((member) => member.name?.toLowerCase().includes(query));
+  }, [scopedMembers, search]);
 
   const counts = useMemo(() => {
     const result = { present: 0, absent: 0, excused: 0 };
     for (const entry of Object.values(byUser)) {
       if (entry.mode !== mode) continue;
-      if (!countableMemberIds.has(entry.user_id)) continue;
+      if (!scopedMemberIds.has(entry.user_id)) continue;
       result[entry.status] = (result[entry.status] || 0) + 1;
     }
     return result;
-  }, [byUser, mode, countableMemberIds]);
+  }, [byUser, mode, scopedMemberIds]);
 
   const deadlinePassed = useMemo(() => {
     if (!event?.requires_planned || !event?.planned_deadline) return false;
@@ -101,7 +98,7 @@ export default function AttendanceDialog({
   const realStats = useMemo(() => {
     const result = { present: 0, absent: 0, excused: 0 };
     const plannedNotAttending = new Set(["not_attending", "absent", "excused"]);
-    for (const member of countableMembers) {
+    for (const member of scopedMembers) {
       const real = realByMember[member.id];
       const planned = plannedByMember[member.id];
       if (real?.status === "present") result.present++;
@@ -110,13 +107,13 @@ export default function AttendanceDialog({
       else result.absent++;
     }
     return result;
-  }, [countableMembers, realByMember, plannedByMember]);
+  }, [scopedMembers, realByMember, plannedByMember]);
 
   const statCounts = mode === "real" ? realStats : counts;
 
   const realPresent = realStats.present;
   const plannedPresent = Object.values(byUser).filter(
-    (entry) => entry.mode === "planned" && entry.status === "present" && countableMemberIds.has(entry.user_id)
+    (entry) => entry.mode === "planned" && entry.status === "present" && scopedMemberIds.has(entry.user_id)
   ).length;
 
   const handleSend = () => {

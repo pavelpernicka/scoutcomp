@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import text, func, or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_current_active_user, get_db
@@ -107,44 +107,118 @@ def _is_leader(db: Session, user: User) -> bool:
 
 def _leader_user_ids(db: Session, user_ids: list[int]) -> set[int]:
     """Resolve the leader permission for many users without per-user queries."""
+    return _permission_user_ids(db, user_ids, "core", "is_leader")
+
+
+def _permission_user_ids(
+    db: Session,
+    user_ids: list[int],
+    module_code: str,
+    code: str,
+) -> set[int]:
+    """Resolve one effective permission for many users without N+1 queries."""
     if not user_ids:
         return set()
-    permission_id = (
-        db.query(PermissionDefinition.id)
-        .filter_by(module_code="core", code="is_leader")
-        .scalar()
+    permission = (
+        db.query(PermissionDefinition)
+        .filter_by(module_code=module_code, code=code)
+        .one_or_none()
     )
-    if permission_id is None:
+    if permission is None:
         return set()
 
-    group_ids = {
+    granted_ids = set(user_ids) if permission.default_for_member else set()
+    granted_ids.update({
         user_id
         for (user_id,) in (
             db.query(UserPermissionGroup.user_id)
             .join(PermissionGroupPermission, PermissionGroupPermission.group_id == UserPermissionGroup.group_id)
             .filter(
                 UserPermissionGroup.user_id.in_(user_ids),
-                PermissionGroupPermission.permission_id == permission_id,
+                PermissionGroupPermission.permission_id == permission.id,
             )
             .distinct()
             .all()
         )
-    }
-    direct_ids = {
+    })
+    granted_ids.update({
         user_id
         for (user_id,) in db.query(DirectUserPermission.user_id).filter(
             DirectUserPermission.user_id.in_(user_ids),
-            DirectUserPermission.permission_id == permission_id,
+            DirectUserPermission.permission_id == permission.id,
         )
-    }
+    })
     denied_ids = {
         user_id
         for (user_id,) in db.query(DirectUserPermissionDeny.user_id).filter(
             DirectUserPermissionDeny.user_id.in_(user_ids),
-            DirectUserPermissionDeny.permission_id == permission_id,
+            DirectUserPermissionDeny.permission_id == permission.id,
         )
     }
-    return (group_ids | direct_ids) - denied_ids
+    return granted_ids - denied_ids
+
+
+def _event_scope_users(
+    db: Session,
+    events: list[ScoutEvent],
+) -> tuple[list[User], dict[int, set[int]], set[int]]:
+    """Return active users targeted by each event's team and audience.
+
+    Team events target both members assigned to that team and people managing
+    that team. A ``members`` audience includes its leaders; ``leaders`` narrows
+    the same organizational scope to users with ``core.is_leader``. Users who
+    cannot read events are not attendance candidates.
+    """
+    if not events:
+        return [], {}, set()
+    users = (
+        db.query(User)
+        .options(
+            joinedload(User.team),
+            selectinload(User.managed_teams),
+            selectinload(User.permission_groups),
+        )
+        .filter(User.is_active.is_(True))
+        .order_by(User.real_name, User.id)
+        .all()
+    )
+    user_ids = [user.id for user in users]
+    readable_ids = _permission_user_ids(db, user_ids, "core", "events.read")
+    leader_ids = _leader_user_ids(db, user_ids)
+    managed_by_user = {
+        user.id: {team.id for team in user.managed_teams}
+        for user in users
+    }
+    users_by_event: dict[int, set[int]] = {}
+    for event in events:
+        scoped_ids: set[int] = set()
+        for user in users:
+            if user.id not in readable_ids:
+                continue
+            if event.team_id is not None and (
+                user.team_id != event.team_id
+                and event.team_id not in managed_by_user[user.id]
+            ):
+                continue
+            if event.audience == "leaders" and user.id not in leader_ids:
+                continue
+            scoped_ids.add(user.id)
+        users_by_event[event.id] = scoped_ids
+    return users, users_by_event, leader_ids
+
+
+def _user_is_in_event_scope(db: Session, event: ScoutEvent, user: User) -> bool:
+    """Constant-size scope check used by attendance write endpoints."""
+    if not user.is_active:
+        return False
+    if user.id not in _permission_user_ids(db, [user.id], "core", "events.read"):
+        return False
+    if event.team_id is not None and (
+        user.team_id != event.team_id
+        and event.team_id not in {team.id for team in user.managed_teams}
+    ):
+        return False
+    return event.audience != "leaders" or user.id in _leader_user_ids(db, [user.id])
 
 def _linked_posts(db: Session, event_ids: list[int]) -> dict[int, list[dict]]:
     if not event_ids:
@@ -264,27 +338,15 @@ def update_event_presets(payload: list[EventPresetPayload], db: Session = Depend
 
 
 @router.get("/members")
-def list_activity_members(team_id: int | None = Query(None), audience: str = Query("members"), db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    if not allows(db, current_user, "core.attendance.manage", team_id=current_user.team_id):
+def list_activity_members(event_id: int = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    event = db.get(ScoutEvent, event_id)
+    if event is None:
+        raise HTTPException(404, "Event not found")
+    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id):
         raise HTTPException(403, "Missing permission")
-    query = db.query(User).filter(User.is_active.is_(True))
-    if "any" in permission_scopes(db, current_user, "core.attendance.manage"):
-        if team_id is not None:
-            query = query.filter(User.team_id == team_id)
-    else:
-        managed_ids = managed_team_ids(current_user)
-        if team_id is not None:
-            if team_id not in managed_ids:
-                raise HTTPException(403, "Team outside managed scope")
-            query = query.filter(User.team_id == team_id)
-        else:
-            query = query.filter(User.team_id.in_(managed_ids)) if managed_ids else query.filter(text("0 = 1"))
-    users = query.order_by(User.real_name).all()
-    if audience == "leaders":
-        users = [user for user in users if _is_leader(db, user)]
-    elif team_id is not None:
-        users = [user for user in users if not _is_leader(db, user)]
-    leader_ids = {user.id for user in users if _is_leader(db, user)}
+    users, users_by_event, leader_ids = _event_scope_users(db, [event])
+    scoped_ids = users_by_event[event.id]
+    users = [user for user in users if user.id in scoped_ids]
     return [{"id": user.id, "name": user.real_name, "team_id": user.team_id,
              "is_leader": user.id in leader_ids} for user in users]
 
@@ -332,8 +394,11 @@ def delete_event(event_id: int, db: Session = Depends(get_db), current_user: Use
 @router.post("/events/{event_id}/attendance")
 def set_attendance(event_id: int, payload: AttendancePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     event = db.get(ScoutEvent, event_id)
-    if not event or not db.get(User, payload.user_id): raise HTTPException(404, "Event or user not found")
+    target_user = db.get(User, payload.user_id)
+    if not event or not target_user: raise HTTPException(404, "Event or user not found")
     if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id): raise HTTPException(403, "Missing permission")
+    if not _user_is_in_event_scope(db, event, target_user):
+        raise HTTPException(422, "User is outside the event scope")
     if payload.mode not in ("planned", "real"):
         raise HTTPException(422, "mode must be 'planned' or 'real'")
     entry = db.query(ScoutAttendance).filter_by(event_id=event_id, user_id=payload.user_id, mode=payload.mode).one_or_none()
@@ -349,6 +414,8 @@ def set_own_planned_attendance(event_id: int, payload: SelfPlannedPayload, db: S
         raise HTTPException(404, "Event not found")
     if not allows(db, current_user, "core.events.read"):
         raise HTTPException(403, "Missing permission")
+    if not _user_is_in_event_scope(db, event, current_user):
+        raise HTTPException(403, "Event is outside user scope")
     if payload.status not in ("present", "absent", "excused", "attending", "not_attending", "unknown"):
         raise HTTPException(422, "status must be 'present', 'absent', 'excused', 'attending', 'not_attending' or 'unknown'")
     if event.requires_planned and event.planned_deadline:
@@ -440,12 +507,23 @@ def message_attendees(event_id: int, payload: EventMessagePayload, background_ta
 
 
 def require_attendance_manage(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)) -> User:
-    if not allows(db, current_user, "core.attendance.manage"):
+    if not permission_scopes(db, current_user, "core.attendance.manage"):
         raise HTTPException(403, "Missing core.attendance.manage")
     return current_user
 
 
-def serialize_admin_event(event, include_members=False):
+def _scope_attendance_event_query(query, db: Session, user: User):
+    """Limit attendance administration to the actor's effective team scope."""
+    scopes = permission_scopes(db, user, "core.attendance.manage")
+    if "any" in scopes:
+        return query
+    team_ids = managed_team_ids(user) if "team" in scopes else set()
+    if not team_ids:
+        return query.filter(ScoutEvent.id == -1)
+    return query.filter(ScoutEvent.team_id.in_(team_ids))
+
+
+def serialize_admin_event(event, include_members=False, db: Session | None = None):
     real_count = sum(1 for a in event.attendances if a.mode == "real" and a.status == "present")
     planned_count = sum(1 for a in event.attendances if a.mode == "planned")
     data = {
@@ -471,9 +549,11 @@ def serialize_admin_event(event, include_members=False):
         ],
     }
     if include_members:
-        # Include member info for the detail view
-        member_ids = [a.user_id for a in event.attendances]
-        members = db.query(User).options(joinedload(User.team)).filter(User.id.in_(member_ids)).all() if member_ids else []
+        if db is None:
+            raise RuntimeError("A database session is required to include event members")
+        users, users_by_event, _ = _event_scope_users(db, [event])
+        member_ids = users_by_event[event.id]
+        members = [user for user in users if user.id in member_ids]
         data["members"] = [
             {
                 "id": m.id,
@@ -499,12 +579,13 @@ def admin_list_events(
     page_size: int = Query(20, ge=1, le=100),
     export: str | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_attendance_manage),
+    current_user: User = Depends(require_attendance_manage),
 ):
     query = db.query(ScoutEvent).options(
         joinedload(ScoutEvent.team),
         joinedload(ScoutEvent.attendances),
     )
+    query = _scope_attendance_event_query(query, db, current_user)
     if date_from:
         query = query.filter(ScoutEvent.starts_at >= date_from)
     if date_to:
@@ -542,7 +623,7 @@ def admin_list_events(
 def admin_get_event(
     event_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_attendance_manage),
+    current_user: User = Depends(require_attendance_manage),
 ):
     event = db.query(ScoutEvent).options(
         joinedload(ScoutEvent.team),
@@ -550,21 +631,36 @@ def admin_get_event(
     ).filter(ScoutEvent.id == event_id).one_or_none()
     if not event:
         raise HTTPException(404, "Event not found")
-    return serialize_admin_event(event, include_members=True)
+    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id):
+        raise HTTPException(403, "Missing permission")
+    return serialize_admin_event(event, include_members=True, db=db)
 
 
 @admin_router.get("/members/search")
 def admin_search_members(
     q: str = Query("", max_length=100),
     db: Session = Depends(get_db),
-    _: User = Depends(require_attendance_manage),
+    current_user: User = Depends(require_attendance_manage),
 ):
     """Search active members by name for the attendance member overview."""
-    query = db.query(User).options(joinedload(User.team)).filter(User.is_active == True)  # noqa: E712
+    query = (
+        db.query(User)
+        .options(joinedload(User.team), selectinload(User.managed_teams))
+        .filter(User.is_active == True)  # noqa: E712
+    )
     if q.strip():
         term = f"%{q.strip()}%"
         query = query.filter(User.real_name.ilike(term))
-    users = query.order_by(User.real_name).limit(20).all()
+    scopes = permission_scopes(db, current_user, "core.attendance.manage")
+    if "any" in scopes:
+        users = query.order_by(User.real_name).limit(20).all()
+    else:
+        team_ids = managed_team_ids(current_user) if "team" in scopes else set()
+        users = [
+            user
+            for user in query.order_by(User.real_name).all()
+            if user.team_id in team_ids or team_ids.intersection(managed_team_ids(user))
+        ][:20]
     return [
         {
             "id": u.id,
@@ -581,12 +677,17 @@ def admin_member_attendance(
     date_from: str | None = Query(None),
     date_to: str | None = Query(None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_attendance_manage),
+    current_user: User = Depends(require_attendance_manage),
 ):
     """Overview of one member's attendance across events in a date range."""
     user = db.query(User).options(joinedload(User.team)).filter(User.id == user_id).one_or_none()
     if not user:
         raise HTTPException(404, "User not found")
+    scopes = permission_scopes(db, current_user, "core.attendance.manage")
+    if "any" not in scopes:
+        team_ids = managed_team_ids(current_user) if "team" in scopes else set()
+        if user.team_id not in team_ids and not team_ids.intersection(managed_team_ids(user)):
+            raise HTTPException(404, "User not found")
 
     query = (
         db.query(ScoutEvent)
@@ -595,6 +696,7 @@ def admin_member_attendance(
         .filter(ScoutAttendance.user_id == user_id)
         .distinct()
     )
+    query = _scope_attendance_event_query(query, db, current_user)
     if date_from:
         query = query.filter(ScoutEvent.starts_at >= date_from)
     if date_to:
@@ -648,10 +750,11 @@ def admin_attendance_matrix(
     offset: int = Query(0, ge=0),
     limit: int = Query(40, ge=1, le=80),
     db: Session = Depends(get_db),
-    _: User = Depends(require_attendance_manage),
+    current_user: User = Depends(require_attendance_manage),
 ):
     """Attendance matrix: events as columns, members grouped by team with per-event real status."""
     event_query = db.query(ScoutEvent)
+    event_query = _scope_attendance_event_query(event_query, db, current_user)
     if date_from:
         event_query = event_query.filter(ScoutEvent.starts_at >= date_from)
     if date_to:
@@ -673,15 +776,12 @@ def admin_attendance_matrix(
         ):
             by_member.setdefault(user_id, {})[event_id] = status
 
-    users = (
-        db.query(User)
-        .options(joinedload(User.team))
-        .filter(User.is_active.is_(True))
-        .order_by(User.real_name)
-        .all()
-    )
-    leader_ids = _leader_user_ids(db, [user.id for user in users])
-    users = [user for user in users if user.id not in leader_ids]
+    users, users_by_event, leader_ids = _event_scope_users(db, events)
+    applicable_by_user: dict[int, set[int]] = {}
+    for event_id, scoped_user_ids in users_by_event.items():
+        for user_id in scoped_user_ids:
+            applicable_by_user.setdefault(user_id, set()).add(event_id)
+    users = [user for user in users if user.id in applicable_by_user]
 
     groups: list[dict] = []
     grouped: dict[int | None, list[dict]] = {}
@@ -690,13 +790,15 @@ def admin_attendance_matrix(
         grouped.setdefault(key, []).append({
             "id": user.id,
             "real_name": user.real_name,
+            "is_leader": user.id in leader_ids,
+            "applicable_event_ids": sorted(applicable_by_user[user.id]),
             "attendance": {str(event_id): status for event_id, status in by_member.get(user.id, {}).items()},
         })
     for key in sorted(grouped, key=lambda k: (k is None, k)):
         team = next((user.team for user in users if user.team_id == key and user.team), None)
         groups.append({
             "team_id": key,
-            "name": team.name if team else None,
+            "team_name": team.name if team else None,
             "members": grouped[key],
         })
 
