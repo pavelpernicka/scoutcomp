@@ -282,6 +282,7 @@ def test_calendar_component_normalises_configuration_and_renders_accessible_mont
     # storage contract as the authenticated application calendar.
     assert upcoming_params["from"] == datetime(2026, 5, 19, 10, 0)
     assert 'data-sc-calendar-month="2026-05"' in rendered
+    assert 'data-sc-calendar-time-zone="Europe/Prague"' in rendered
     assert "Květen 2026" in rendered
     assert 'href="?month=2026-04"' in rendered
     assert 'href="?month=2026-06"' in rendered

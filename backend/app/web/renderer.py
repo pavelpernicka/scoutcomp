@@ -1162,8 +1162,14 @@ def _calendar_agenda_event_markup(
     )
     style_attribute = f' style="{style}"' if style else ""
     modifier = " sc-calendar-agenda-event--continuing" if continuing else ""
+    boundary = span.ends_at if span.ends_at is not None else span.starts_at
+    has_end = "true" if span.ends_at is not None else "false"
+    dynamic_attributes = (
+        f' data-calendar-boundary="{escape(boundary.isoformat(), quote=True)}"'
+        f' data-calendar-has-end="{has_end}"'
+    )
     return (
-        f'<li class="sc-calendar-agenda-event{modifier}"{style_attribute}>'
+        f'<li class="sc-calendar-agenda-event{modifier}"{style_attribute}{dynamic_attributes}>'
         f'{title_html}{range_html}{description_html}</li>'
     )
 
@@ -1377,11 +1383,14 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
             f'<ul class="sc-calendar-agenda-events">{items}</ul></section>'
         )
     agenda = "".join(agenda_days)
-    if not agenda:
-        agenda = '<p class="sc-calendar-empty">Nejsou naplánované žádné probíhající ani budoucí akce.</p>'
+    empty_state = (
+        '<p class="sc-calendar-empty"'
+        + (" hidden" if agenda else "")
+        + '>Nejsou naplánované žádné probíhající ani budoucí akce.</p>'
+    )
     agenda = (
         '<h2 class="sc-calendar-agenda-title">Probíhající a budoucí akce</h2>'
-        f'{agenda}'
+        f'{agenda}{empty_state}'
     )
     previous_month = _shift_month(selected, -1).strftime("%Y-%m")
     next_month = _shift_month(selected, 1).strftime("%Y-%m")
@@ -1408,8 +1417,11 @@ def _render_calendar(node: dict[str, Any], state: _RenderState) -> str:
         if selected < maximum_month else
         '<span class="sc-calendar-nav sc-calendar-nav--next" aria-hidden="true">›</span>'
     )
+    calendar_time_zone = escape(application_timezone().key, quote=True)
     return (
-        f'<section id="{calendar_id}" class="sc-calendar" data-sc-calendar-month="{selected.strftime("%Y-%m")}">'
+        f'<section id="{calendar_id}" class="sc-calendar" '
+        f'data-sc-calendar-month="{selected.strftime("%Y-%m")}" '
+        f'data-sc-calendar-time-zone="{calendar_time_zone}">'
         '<fieldset class="sc-calendar-view-switch">'
         '<legend>Zobrazení kalendáře</legend>'
         f'<input class="sc-calendar-view-input sc-calendar-view-month" type="radio" '

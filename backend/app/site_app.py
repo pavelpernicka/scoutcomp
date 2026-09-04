@@ -69,6 +69,73 @@ _SITE_RUNTIME_JS = r'''(() => {
   "use strict";
   const navigationSelector = ".sc-calendar-nav[href],.sc-calendar-today[href]";
   const requests = new WeakMap();
+  const calendarDate = (calendar) => {
+    const timeZone = calendar.dataset.scCalendarTimeZone || "Europe/Prague";
+    try {
+      const parts = Object.fromEntries(new Intl.DateTimeFormat("en", {
+        timeZone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+      return { day: `${parts.year}-${parts.month}-${parts.day}`, month: `${parts.year}-${parts.month}` };
+    } catch (_error) {
+      const now = new Date();
+      const year = String(now.getFullYear()).padStart(4, "0");
+      const month = String(now.getMonth() + 1).padStart(2, "0");
+      const day = String(now.getDate()).padStart(2, "0");
+      return { day: `${year}-${month}-${day}`, month: `${year}-${month}` };
+    }
+  };
+  const syncCalendarToday = (calendar) => {
+    const current = calendarDate(calendar);
+    calendar.querySelectorAll(".sc-calendar-day--today").forEach((cell) => {
+      cell.classList.remove("sc-calendar-day--today");
+    });
+    calendar.querySelectorAll('.sc-calendar-day-number[aria-current="date"]').forEach((number) => {
+      number.removeAttribute("aria-current");
+    });
+    const currentCell = calendar.querySelector(`[data-date="${current.day}"]`);
+    if (currentCell) {
+      currentCell.classList.add("sc-calendar-day--today");
+      currentCell.querySelector(".sc-calendar-day-number")?.setAttribute("aria-current", "date");
+    }
+    const todayLink = calendar.querySelector(".sc-calendar-today[href]");
+    if (todayLink) {
+      const target = new URL(todayLink.href, window.location.href);
+      target.searchParams.set("month", current.month);
+      todayLink.href = target.href;
+    }
+    return current;
+  };
+  const syncCalendarAgenda = (calendar) => {
+    const agenda = calendar.querySelector(".sc-calendar-agenda");
+    if (!agenda) return;
+    const now = Date.now();
+    let visibleCount = 0;
+    agenda.querySelectorAll(".sc-calendar-agenda-event[data-calendar-boundary]").forEach((item) => {
+      const boundary = Date.parse(item.dataset.calendarBoundary || "");
+      const hasEnd = item.dataset.calendarHasEnd === "true";
+      const visible = Number.isFinite(boundary) && (hasEnd ? boundary > now : boundary >= now);
+      item.hidden = !visible;
+      if (visible) visibleCount += 1;
+    });
+    agenda.querySelectorAll(".sc-calendar-agenda-day").forEach((group) => {
+      group.hidden = !group.querySelector(".sc-calendar-agenda-event:not([hidden])");
+    });
+    const emptyState = agenda.querySelector(".sc-calendar-empty");
+    if (emptyState) emptyState.hidden = visibleCount > 0;
+    const count = calendar.querySelector(".sc-calendar-upcoming-count");
+    if (count) {
+      const label = visibleCount === 1 || [2, 3, 4].includes(visibleCount % 100) ? "akce" : "akcí";
+      count.textContent = `${visibleCount} ${label}`;
+    }
+  };
+  const syncCalendar = (calendar) => {
+    const current = syncCalendarToday(calendar);
+    syncCalendarAgenda(calendar);
+    return current;
+  };
   // The class fallback keeps already-published Ontario snapshots working;
   // newly rendered themes opt in through the generic data attribute.
   const scrollNavigations = Array.from(document.querySelectorAll("[data-sc-scroll-nav],.ontario-navbar"));
@@ -118,10 +185,40 @@ _SITE_RUNTIME_JS = r'''(() => {
       const listControl = imported.querySelector(".sc-calendar-view-list");
       if (listControl) listControl.checked = true;
     }
+    syncCalendar(imported);
     source.replaceWith(imported);
-    renderedLocation = documentLocation(targetUrl);
     if (updateHistory) history.pushState({ scoutcompCalendar: true }, "", targetUrl);
+    renderedLocation = documentLocation();
     imported.querySelector(`.${focusClass}`)?.focus({ preventScroll: true });
+    return imported;
+  }
+
+  async function refreshCalendars() {
+    const explicitMonth = new URL(window.location.href).searchParams.has("month");
+    const calendars = Array.from(document.querySelectorAll(".sc-calendar"));
+    for (const calendar of calendars) {
+      const current = syncCalendar(calendar);
+      // The default document is an immutable publication artifact. When a
+      // month rolls over, load its already-published variant without reloading
+      // the page or leaving a stale publication-month grid on screen.
+      if (
+        !explicitMonth
+        && calendar.dataset.scCalendarMonth !== current.month
+        && calendar.dataset.scCalendarUnavailableMonth !== current.month
+      ) {
+        const target = new URL(window.location.href);
+        target.search = "";
+        target.searchParams.set("month", current.month);
+        try {
+          await replaceCalendar(calendar, target, false);
+        } catch (_error) {
+          // Links remain a functional no-JavaScript fallback. A missing old
+          // publication variant must neither break the public page nor cause
+          // another request on every minute-long date refresh.
+          calendar.dataset.scCalendarUnavailableMonth = current.month;
+        }
+      }
+    }
   }
 
   document.addEventListener("click", (event) => {
@@ -142,9 +239,27 @@ _SITE_RUNTIME_JS = r'''(() => {
     // dialog flash and immediately disappear.
     if (documentLocation() === renderedLocation) return;
     document.querySelectorAll(".sc-calendar").forEach((calendar) => {
-      replaceCalendar(calendar, window.location.href, false).catch(() => window.location.reload());
+      const target = new URL(window.location.href);
+      if (!target.searchParams.has("month")) {
+        target.search = "";
+        target.searchParams.set("month", calendarDate(calendar).month);
+      }
+      replaceCalendar(calendar, target, false).catch(() => window.location.reload());
     });
   });
+
+  let pendingCalendarRefresh = null;
+  const scheduleCalendarRefresh = () => {
+    if (!pendingCalendarRefresh) {
+      pendingCalendarRefresh = refreshCalendars().finally(() => {
+        pendingCalendarRefresh = null;
+      });
+    }
+    return pendingCalendarRefresh;
+  };
+  scheduleCalendarRefresh();
+  window.addEventListener("pageshow", scheduleCalendarRefresh);
+  window.setInterval(scheduleCalendarRefresh, 60 * 1000);
 })();'''
 
 
