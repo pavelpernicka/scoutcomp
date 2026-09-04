@@ -196,9 +196,10 @@
 .admin-attendance-page .nav-tabs { margin-bottom: 1rem; }
 .admin-attendance-filters .card-body { padding: 1rem !important; }
 .admin-attendance-filters .form-label { color: #425349; font-size: .78rem; font-weight: 720; }
-.admin-attendance-matrix { overflow: hidden; }
+.admin-attendance-matrix { min-width: 0; overflow: hidden; }
+.admin-attendance-matrix .card-body { min-width: 0; }
 .admin-attendance-matrix .card-header { min-height: 3.75rem; }
-.admin-attendance-matrix .table-responsive { max-height: calc(100dvh - 19rem); }
+.admin-attendance-table-scroll { max-width: 100%; max-height: calc(100dvh - 19rem); overflow: auto; overscroll-behavior-inline: contain; scrollbar-gutter: stable; }
 .admin-attendance-matrix .table { border-color: #d9dfd8; }
 .admin-attendance-matrix .table th { background: #f7f9f5; }
 .admin-attendance-matrix .table thead > tr > th { color: #40544a; font-size: .82rem; font-weight: 760; }
@@ -215,21 +216,18 @@
 .admin-attendance-matrix .table tbody tr:hover .sticky-col,
 .admin-attendance-matrix .table tbody tr:hover .sticky-right { background: #f3f7f2; }
 .admin-attendance-member-overview .card-body { padding: 1rem !important; }
-.admin-attendance-mobile-matrix { display: none; }
+.admin-attendance-mobile-scroll { display: none; }
+.admin-attendance-mobile-matrix { display: grid; gap: .7rem; }
 @media (max-width: 767.98px) {
   .admin-attendance-matrix .card-header > div { width: 100%; justify-content: space-between; }
-  .admin-attendance-matrix .table-responsive { max-height: calc(100dvh - 15rem); }
-  /* Two sticky sides leave an event column unreadably narrow on a phone. */
-  .admin-attendance-matrix .table { min-width: 34rem !important; }
-  .admin-attendance-matrix .table th.sticky-right,
-  .admin-attendance-matrix .table td.sticky-right { position: static; box-shadow: none; }
-  .admin-attendance-matrix .table th.sticky-col,
-  .admin-attendance-matrix .table td.sticky-col { min-width: 10.5rem !important; }
-  .admin-attendance-mobile-matrix { display: grid; gap: .7rem; padding: .75rem; background: #fafbf8; }
+  .admin-attendance-mobile-scroll { display: block; max-width: 100%; overflow-x: auto; overscroll-behavior-inline: contain; background: #fafbf8; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; }
+  .admin-attendance-mobile-matrix { padding: .75rem; }
   .admin-attendance-mobile-events,
   .admin-attendance-mobile-member { display: grid; align-items: center; gap: .2rem; }
   .admin-attendance-mobile-events { padding: 0 .4rem; color: #65756b; font-size: .68rem; font-weight: 750; letter-spacing: .02em; text-align: center; text-transform: uppercase; }
   .admin-attendance-mobile-events > span:first-child { text-align: left; }
+  .admin-attendance-mobile-events > span:first-child,
+  .admin-attendance-mobile-member > div:first-child { position: sticky; z-index: 2; left: 0; align-self: stretch; display: flex; justify-content: center; flex-direction: column; background: #fafbf8; box-shadow: .45rem 0 .55rem -.55rem rgba(28, 53, 37, .55); }
   .admin-attendance-mobile-event { display: grid; grid-template-rows: auto minmax(0, 1fr); justify-items: center; min-width: 0; min-height: 4.9rem; gap: .18rem; }
   .admin-attendance-mobile-event__date { font-size: .66rem; }
   .admin-attendance-mobile-event__title { display: block; max-height: 3.45rem; overflow: hidden; color: #4b6254; font-size: .62rem; font-weight: 750; line-height: 1; text-align: left; text-overflow: ellipsis; text-transform: none; white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); }
@@ -239,6 +237,7 @@
   .admin-attendance-mobile-member { min-height: 3.35rem; padding: .42rem .7rem; border-bottom: 1px solid #edf0ec; }
   .admin-attendance-mobile-member:last-child { border-bottom: 0; }
   .admin-attendance-mobile-member > div { min-width: 0; line-height: 1.2; }
+  .admin-attendance-mobile-member > div:first-child { background: #fff; }
   .admin-attendance-mobile-member strong { display: block; overflow: hidden; font-size: .83rem; text-overflow: ellipsis; white-space: nowrap; }
   .admin-attendance-mobile-member small { color: #6a786f; font-size: .7rem; }
   .admin-attendance-mobile-cell { display: grid; width: 2rem; height: 2rem; place-items: center; justify-self: center; padding: 0; border: 0; border-radius: .38rem; background: #f6f8f5; font-size: .9rem; }

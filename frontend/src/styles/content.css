@@ -226,6 +226,13 @@
 @media (max-width: 575.98px) { .post-event-choice-group { display:flex; width:100%; }.post-event-choice-group .btn { flex:1 1 0; min-width:0; min-height:2.55rem; padding:.4rem .18rem; font-size:.73rem; line-height:1.15; white-space:normal; }.post-event-choice-group .btn i { display:none; } }
 .event-month-calendar { overflow: hidden; width: 100%; }
 .event-month-calendar .calendar-event-bar { max-width: 100%; font-size: .9rem !important; font-weight: 700; }
+.attendance-member-list { border: 1px solid var(--scout-line); border-radius: .5rem; background: #fff; }
+.attendance-member-group + .attendance-member-group { border-top: 1px solid var(--scout-line); }
+.attendance-member-group__heading { position: sticky; z-index: 1; top: 0; display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 0; padding: .55rem .8rem; background: #eef3ec; color: var(--scout-forest-dark); font-size: .78rem; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
+.attendance-member-group__heading i { width: 1rem; color: var(--scout-forest); text-align: center; }
+.attendance-member-group__empty { padding: .5rem .8rem; color: var(--bs-secondary-color); }
+.attendance-member-row { min-width: 0; }
+@media (max-width: 575.98px) { .attendance-member-row { align-items: stretch !important; flex-direction: column; }.attendance-member-row .form-select { width: 100% !important; } }
 .dashboard-primary-row > [class*="col-"] { display: flex; }
 .dashboard-primary-row > [class*="col-"] > .card { width: 100%; }
 .dashboard-message-list { max-height: 610px; overflow-y: auto; }

@@ -995,6 +995,8 @@
     "close": "Zavřít",
     "deadlinePassed": "termín uplynul",
     "searchMembers": "Hledat člena…",
+    "attendanceMembers": "Členové",
+    "attendanceLeaders": "Vedoucí",
     "loading": "Načítám…",
     "noMembers": "Pro tuto akci nejsou žádní členové k docházce.",
     "notFilledYet": "Zatím nevyplněno",

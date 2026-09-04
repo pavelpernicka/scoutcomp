@@ -995,6 +995,8 @@
     "close": "Close",
     "deadlinePassed": "deadline passed",
     "searchMembers": "Search member…",
+    "attendanceMembers": "Members",
+    "attendanceLeaders": "Leaders",
     "loading": "Loading…",
     "noMembers": "There are no members to take attendance for this event.",
     "notFilledYet": "Not filled yet",

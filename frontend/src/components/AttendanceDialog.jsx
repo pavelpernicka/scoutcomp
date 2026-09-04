@@ -57,6 +57,21 @@ export default function AttendanceDialog({
     return scopedMembers.filter((member) => member.name?.toLowerCase().includes(query));
   }, [scopedMembers, search]);
 
+  const memberGroups = useMemo(() => [
+    {
+      key: "members",
+      label: t("calendar.attendanceMembers"),
+      icon: "fa-user",
+      members: filteredMembers.filter((member) => !member.is_leader),
+    },
+    {
+      key: "leaders",
+      label: t("calendar.attendanceLeaders"),
+      icon: "fa-user-shield",
+      members: filteredMembers.filter((member) => member.is_leader),
+    },
+  ], [filteredMembers, t]);
+
   const counts = useMemo(() => {
     const result = { present: 0, absent: 0, excused: 0 };
     for (const entry of Object.values(byUser)) {
@@ -121,6 +136,53 @@ export default function AttendanceDialog({
     if (!text) return;
     onSendMessage(text);
     setMessageText("");
+  };
+
+  const renderMemberRow = (member) => {
+    const record = Object.values(byUser).find(
+      (entry) => entry.user_id === member.id && entry.mode === mode
+    );
+    const status = record?.status || "";
+    return (
+      <div
+        key={member.id}
+        className="list-group-item attendance-member-row d-flex align-items-center justify-content-between gap-2"
+      >
+        <span className="text-truncate">
+          {member.name}
+          {member.id === userId && (
+            <span className="badge bg-success ms-1">★</span>
+          )}
+          {mode === "real" && (
+            <>
+              {" "}
+              {status ? (
+                <span className={`badge ${STATUS_BADGE[status] || "bg-secondary"} ms-1`}>
+                  <i className={`fas ${STATUS_ICON[status] || "fa-minus"} me-1`}></i>
+                  {t(`calendar.${status}`)}
+                </span>
+              ) : (
+                <span className="badge bg-secondary-subtle text-secondary ms-1">
+                  {t("calendar.notFilledYet")}
+                </span>
+              )}
+            </>
+          )}
+        </span>
+        <Select
+          className="form-select-sm"
+          style={{ width: "140px" }}
+          value={status}
+          onChange={(e) => onAttendanceChange(event.id, member.id, mode, e.target.value)}
+          placeholder={t("calendar.notFilledYet")}
+          options={[
+            { value: "present", label: t("calendar.present") },
+            { value: "absent", label: t("calendar.absent") },
+            { value: "excused", label: t("calendar.excused") },
+          ]}
+        />
+      </div>
+    );
   };
 
   return (
@@ -205,7 +267,7 @@ export default function AttendanceDialog({
             />
           </div>
 
-          <div className="list-group list-group-flush" style={{ maxHeight: "320px", overflowY: "auto" }}>
+          <div className="attendance-member-list" style={{ maxHeight: "320px", overflowY: "auto" }}>
             {membersLoading ? (
               <div className="py-4">
                 <LoadingSpinner text={t("calendar.loading")} />
@@ -213,52 +275,21 @@ export default function AttendanceDialog({
             ) : filteredMembers.length === 0 ? (
               <em className="text-muted">{t("calendar.noMembers")}</em>
             ) : (
-              filteredMembers.map((member) => {
-                const record = Object.values(byUser).find(
-                  (entry) => entry.user_id === member.id && entry.mode === mode
-                );
-                const status = record?.status || "";
-                return (
-                  <div
-                    key={member.id}
-                    className="list-group-item d-flex align-items-center justify-content-between gap-2"
-                  >
-                    <span className="text-truncate">
-                      {member.name}
-                      {member.id === userId && (
-                        <span className="badge bg-success ms-1">★</span>
-                      )}
-                      {mode === "real" && (
-                        <>
-                          {" "}
-                          {status ? (
-                            <span className={`badge ${STATUS_BADGE[status] || "bg-secondary"} ms-1`}>
-                              <i className={`fas ${STATUS_ICON[status] || "fa-minus"} me-1`}></i>
-                              {t(`calendar.${status}`)}
-                            </span>
-                          ) : (
-                            <span className="badge bg-secondary-subtle text-secondary ms-1">
-                              {t("calendar.notFilledYet")}
-                            </span>
-                          )}
-                        </>
-                      )}
-                    </span>
-                    <Select
-                      className="form-select-sm"
-                      style={{ width: "140px" }}
-                      value={status}
-                      onChange={(e) => onAttendanceChange(event.id, member.id, mode, e.target.value)}
-                      placeholder={t("calendar.notFilledYet")}
-                      options={[
-                        { value: "present", label: t("calendar.present") },
-                        { value: "absent", label: t("calendar.absent") },
-                        { value: "excused", label: t("calendar.excused") },
-                      ]}
-                    />
-                  </div>
-                );
-              })
+              memberGroups.map((group) => (
+                <section className="attendance-member-group" key={group.key} aria-labelledby={`attendance-${group.key}`}>
+                  <h3 id={`attendance-${group.key}`} className="attendance-member-group__heading">
+                    <span><i className={`fas ${group.icon}`} aria-hidden="true" /> {group.label}</span>
+                    <span className="badge bg-secondary">{group.members.length}</span>
+                  </h3>
+                  {group.members.length > 0 ? (
+                    <div className="list-group list-group-flush">
+                      {group.members.map(renderMemberRow)}
+                    </div>
+                  ) : (
+                    <div className="attendance-member-group__empty" aria-hidden="true">—</div>
+                  )}
+                </section>
+              ))
             )}
           </div>
 

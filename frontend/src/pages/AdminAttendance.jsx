@@ -158,7 +158,10 @@ export default function AdminAttendance() {
     }
     return counts;
   }, [events, matrixData]);
-  const mobileEvents = events.slice(0, 5);
+  const mobileMatrixColumns = `9rem repeat(${events.length}, 3.25rem)`;
+  // Include column gaps and matrix padding so the last event stays inside the
+  // horizontal scroll surface and remains reachable on narrow screens.
+  const mobileMatrixWidth = `calc(10.5rem + ${events.length} * 3.45rem)`;
 
   const { data: memberResults = [] } = useQuery({
     queryKey: ["admin-attendance-member-search", debouncedQuery],
@@ -498,37 +501,44 @@ export default function AdminAttendance() {
                 </div>
               ) : (
                 <>
-                  <div className="admin-attendance-mobile-matrix d-md-none">
-                    <div className="admin-attendance-mobile-events" style={{ gridTemplateColumns: `minmax(7.5rem, 1fr) repeat(${mobileEvents.length}, minmax(2rem, .55fr))` }}>
-                      <span>{t("calendar.member")}</span>
-                      {mobileEvents.map((event) => (
-                        <span key={event.id} className="admin-attendance-mobile-event" title={event.title}>
-                          <span className="admin-attendance-mobile-event__date">{formatDate(event.starts_at).replace(/\s.*$/, "")}</span>
-                          <span className="admin-attendance-mobile-event__title">{event.title}</span>
-                        </span>
-                      ))}
+                  <div
+                    className="admin-attendance-mobile-scroll d-md-none"
+                    role="region"
+                    aria-label={t("admin.attendance.matrixTitle")}
+                    tabIndex={0}
+                  >
+                    <div className="admin-attendance-mobile-matrix" style={{ minWidth: mobileMatrixWidth }}>
+                      <div className="admin-attendance-mobile-events" style={{ gridTemplateColumns: mobileMatrixColumns }}>
+                        <span>{t("calendar.member")}</span>
+                        {events.map((event) => (
+                          <span key={event.id} className="admin-attendance-mobile-event" title={event.title}>
+                            <span className="admin-attendance-mobile-event__date">{formatDate(event.starts_at).replace(/\s.*$/, "")}</span>
+                            <span className="admin-attendance-mobile-event__title">{event.title}</span>
+                          </span>
+                        ))}
+                      </div>
+                      {(matrixData?.groups || []).map((group) => {
+                        const groupKey = group.team_id ?? "none";
+                        const isCollapsed = !!collapsed[groupKey];
+                        return (
+                          <section key={groupKey} className="admin-attendance-mobile-group">
+                            <button type="button" className="admin-attendance-mobile-group__heading" onClick={() => toggleGroup(groupKey)} aria-expanded={!isCollapsed}>
+                              <span><i className={`fas fa-chevron-${isCollapsed ? "right" : "down"}`} aria-hidden="true" /> {group.team_name || t("adminUsers.noTeam")}</span>
+                              <span className="badge bg-secondary">{group.members.length}</span>
+                            </button>
+                            {!isCollapsed && group.members.map((member) => (
+                              <div key={member.id} className="admin-attendance-mobile-member" style={{ gridTemplateColumns: mobileMatrixColumns }}>
+                                <div><strong>{member.real_name}</strong><small>{memberPercent(member)} %</small></div>
+                                {events.map((event) => renderMobileMatrixCell(groupKey, member, event))}
+                              </div>
+                            ))}
+                          </section>
+                        );
+                      })}
                     </div>
-                    {(matrixData?.groups || []).map((group) => {
-                      const groupKey = group.team_id ?? "none";
-                      const isCollapsed = !!collapsed[groupKey];
-                      return (
-                        <section key={groupKey} className="admin-attendance-mobile-group">
-                          <button type="button" className="admin-attendance-mobile-group__heading" onClick={() => toggleGroup(groupKey)} aria-expanded={!isCollapsed}>
-                            <span><i className={`fas fa-chevron-${isCollapsed ? "right" : "down"}`} aria-hidden="true" /> {group.team_name || t("adminUsers.noTeam")}</span>
-                            <span className="badge bg-secondary">{group.members.length}</span>
-                          </button>
-                          {!isCollapsed && group.members.map((member) => (
-                            <div key={member.id} className="admin-attendance-mobile-member" style={{ gridTemplateColumns: `minmax(7.5rem, 1fr) repeat(${mobileEvents.length}, minmax(2rem, .55fr))` }}>
-                              <div><strong>{member.real_name}</strong><small>{memberPercent(member)} %</small></div>
-                              {mobileEvents.map((event) => renderMobileMatrixCell(groupKey, member, event))}
-                            </div>
-                          ))}
-                        </section>
-                      );
-                    })}
                   </div>
-                  <div className="table-responsive d-none d-md-block" style={{ overflowX: "auto", overscrollBehaviorInline: "contain" }}>
-                  <table className="table table-sm table-bordered align-middle mb-0" style={{ minWidth: `${events.length * 90 + 220}px` }}>
+                  <div className="table-responsive admin-attendance-table-scroll d-none d-md-block" tabIndex={0} role="region" aria-label={t("admin.attendance.matrixTitle")}>
+                  <table className="table table-sm table-bordered align-middle mb-0" style={{ minWidth: `${events.length * 118 + 270}px` }}>
                     <thead className="table-light" style={{ position: "sticky", top: 0, zIndex: 2 }}>
                       <tr>
                         <th className="sticky-col" style={{ minWidth: "180px" }}>{t("calendar.member")}</th>
