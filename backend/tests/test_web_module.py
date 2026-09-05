@@ -284,6 +284,8 @@ def test_site_app_public_pages(client, db_session, monkeypatch):
     assert home.status_code == 200
     assert "Uvod" in home.text
     assert "<!doctype html>" in home.text
+    assert home.headers["cache-control"] == "no-cache, max-age=0, must-revalidate"
+    assert home.headers["x-accel-expires"] == "0"
 
     direct = site.get("/uvod")
     assert direct.status_code == 200

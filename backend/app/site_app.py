@@ -284,9 +284,12 @@ async def public_security_headers(request: Request, call_next):
         "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com; "
         "font-src 'self' data:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     )
-    # Public output contains no session-specific data. Short HTML caching lets
-    # an edge proxy absorb crawlers and traffic spikes while keeping publishes
-    # visible quickly; immutable theme assets retain their route-level policy.
+    # Published HTML is already materialised as an immutable revision artifact,
+    # but the pointer to the active revision can change at any publish.  Do not
+    # give browsers or shared proxies a freshness window here: even a one-minute
+    # max-age made a successful publish appear delayed.  ``no-cache`` still
+    # permits conditional storage/revalidation, while X-Accel-Expires also keeps
+    # nginx from serving an older HTML object from its proxy cache.
     if response.status_code == 200 and "Cache-Control" not in response.headers:
         if request.url.path == "/robots.txt":
             response.headers["Cache-Control"] = "public, max-age=3600"
@@ -295,9 +298,8 @@ async def public_security_headers(request: Request, call_next):
         elif request.url.path.startswith("/media/"):
             response.headers["Cache-Control"] = "public, max-age=3600, stale-if-error=86400"
         elif response.headers.get("content-type", "").startswith("text/html"):
-            response.headers["Cache-Control"] = (
-                "public, max-age=60, stale-while-revalidate=300, stale-if-error=86400"
-            )
+            response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+            response.headers["X-Accel-Expires"] = "0"
     return response
 
 DEFAULT_SITE_TITLE = "Skautský oddíl"

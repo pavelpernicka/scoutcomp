@@ -13,6 +13,16 @@ proxy_cache_path /var/cache/nginx/scoutcomp-public
     inactive=24h
     use_temp_path=off;
 
+# Published HTML must become visible immediately after the active revision is
+# switched. Cache only immutable theme resources and media; all page, post,
+# event and calendar document requests bypass even already-populated cache
+# entries. Upstream Cache-Control/X-Accel-Expires remains an additional guard.
+map $uri $scoutcomp_public_cache_bypass {
+    default 1;
+    ~^/theme-assets/[0-9]+/ 0;
+    ~^/media/[0-9]+/file$ 0;
+}
+
 limit_req_zone $binary_remote_addr zone=scoutcomp_public_rate:10m rate=30r/s;
 limit_conn_zone $binary_remote_addr zone=scoutcomp_per_ip:10m;
 
@@ -151,8 +161,8 @@ server {
         proxy_cache scoutcomp_public;
         proxy_cache_key "$scheme$host$request_uri";
         proxy_cache_methods GET HEAD;
-        proxy_cache_bypass $http_authorization;
-        proxy_no_cache $http_authorization $upstream_http_set_cookie;
+        proxy_cache_bypass $http_authorization $scoutcomp_public_cache_bypass;
+        proxy_no_cache $http_authorization $upstream_http_set_cookie $scoutcomp_public_cache_bypass;
         proxy_cache_lock on;
         proxy_cache_lock_timeout 5s;
         proxy_cache_background_update on;
@@ -160,7 +170,6 @@ server {
         proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
         proxy_cache_valid 200 1m;
         proxy_cache_valid 301 302 10m;
-        proxy_cache_valid 404 30s;
         add_header X-Cache-Status $upstream_cache_status always;
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
         add_header X-Content-Type-Options "nosniff" always;

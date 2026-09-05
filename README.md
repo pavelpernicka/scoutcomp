@@ -268,9 +268,11 @@ for example `https://www.example.cz:8443`, although port 443 is recommended.
 - The included SQLite setup is intended for a small, single-node installation.
   Connections use WAL, foreign-key enforcement and a 30-second busy timeout so
   short publication/write bursts do not unnecessarily block public reads.
-  The sample nginx caches public GET/HEAD responses briefly, locks cache fills
-  and can serve stale pages during upstream failures, which absorbs normal
-  crawler traffic and short spikes.
+  Public HTML is served from pre-rendered publication artifacts and is always
+  revalidated, so a publish is visible on the next request. The sample nginx
+  proxy cache is limited to media and immutable theme assets; it locks cache
+  fills and can serve those files stale during upstream failures without ever
+  delaying a newly published page, post, menu or calendar document.
 - For sustained traffic or multiple application replicas, use PostgreSQL,
   shared media/object storage and a separate one-shot migration job before
   starting multiple API/site workers. Do not scale SQLite writers horizontally.
