@@ -826,7 +826,7 @@ def _render_revision(
     )
     # Editor assets use the authenticated API URL; the visitor application
     # serves only publication-referenced media from its own public endpoint.
-    body = body.replace('"/api/web/media/', '"/media/')
+    body = re.sub(r"/api/web/media/([1-9][0-9]{0,9})/file", r"/media/\1/file", body)
     tokens, global_css, base_css = _published_style(db)
     linked_css = "\n".join(part_css)
     settings_data = _site_settings(db)

@@ -102,8 +102,10 @@ export const withEditorMediaPlaceholders = (value) => {
     || (isObject(next.style) ? editorMediaIds(next.style["background-image"])[0] : "")
     || "");
   if (/^\d+$/.test(backgroundMediaId) && isObject(next.style)) {
+    const safePreviewStyle = { ...next.style };
+    delete safePreviewStyle["background-image"];
     next.attributes = { ...(isObject(next.attributes) ? next.attributes : {}), "data-sc-background-media-id": backgroundMediaId };
-    next.style = { ...next.style, "background-image": "none" };
+    next.style = safePreviewStyle;
   }
   if ("previewUrl" in next && !String(next.previewUrl || "").startsWith("data:image/")) next.previewUrl = "";
   return next;
@@ -129,9 +131,9 @@ const stripEditorOnlyPreview = (value) => {
     if ("src" in next) next.src = `/media/${mediaId}/file`;
   }
   const backgroundMediaId = String(attributes?.["data-sc-background-media-id"] || "");
-  if (/^\d+$/.test(backgroundMediaId) && isObject(next.style)) {
+  if (/^\d+$/.test(backgroundMediaId)) {
     next.style = {
-      ...next.style,
+      ...(isObject(next.style) ? next.style : {}),
       "background-image": `url("/media/${backgroundMediaId}/file")`,
     };
   }

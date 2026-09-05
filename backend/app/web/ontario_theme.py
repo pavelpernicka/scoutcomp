@@ -31,7 +31,7 @@ from ..models import (
 )
 
 ONTARIO_THEME_ID = "ontario"
-ONTARIO_THEME_VERSION = "1.4.0"
+ONTARIO_THEME_VERSION = "1.4.1"
 ONTARIO_THEME_NAME = "Skautský oddíl"
 ONTARIO_THEME_DESCRIPTION = (
     "Téma pro skautský oddíl nebo středisko založené na Bootstrap 5 "
@@ -168,7 +168,7 @@ ONTARIO_HEADER = _element("nav", "navbar ontario-navbar", name="Horní navigace"
         ]),
     ])], **{"aria-label": "Hlavní navigace", "data-sc-scroll-nav": "true"})
 
-ONTARIO_HERO = _element("header", "ontario-hero sc-edge-rolling sc-edge-bottom sc-edge-white sc-edge-lg", name="Hero", components=[
+ONTARIO_HERO = _element("header", "ontario-hero sc-edge-bottom-shape-rolling sc-edge-bottom-color-white sc-edge-size-lg", name="Hero", components=[
     _element("div", "ontario-photo-mask ontario-hero-overlay", **{"aria-hidden": "true"}),
     _element("div", "container ontario-hero-content", components=[
         _image("assets/round_notext.png", "Znak skautského oddílu", "ontario-round-logo", lazy=False, template_logo="hero-mark"),
@@ -177,7 +177,7 @@ ONTARIO_HERO = _element("header", "ontario-hero sc-edge-rolling sc-edge-bottom s
     ]),
 ], **{"data-sc-overlay": "true"})
 
-ONTARIO_COMPACT_HERO = _element("header", "ontario-compact-hero sc-edge-soft sc-edge-bottom sc-edge-white sc-edge-md", name="Kompaktní záhlaví", components=[
+ONTARIO_COMPACT_HERO = _element("header", "ontario-compact-hero sc-edge-bottom-shape-soft sc-edge-bottom-color-white sc-edge-size-md", name="Kompaktní záhlaví", components=[
     _element("div", "ontario-photo-mask", **{"aria-hidden": "true"}),
     _element("div", "container", components=[
         _heading("h1", "Název stránky", "display-4 skaut"),
@@ -386,11 +386,25 @@ ONTARIO_GALLERY_HUB = _element("section", "ontario-gallery-hub ontario-section",
     ]),
 ])
 
-def _person_card(name: str, role: str) -> dict:
+def _person_card(
+    name: str,
+    role: str,
+    *,
+    phone: str = "1234567789",
+    email: str = "mail@etc.com",
+) -> dict:
     return _element("article", "ontario-person text-center", components=[
         _image("assets/mockups/scout-planning-v1.webp", name, "ontario-person-photo sc-shape-oval"),
         _text(role, "ontario-person-role skaut mb-1"),
         _heading("h3", name, "h5 skaut"),
+        _element("p", "ontario-person-contact", components=[
+            _element("span", content="Telefon: "),
+            _element("a", content=phone, href=f"tel:{phone}"),
+        ]),
+        _element("p", "ontario-person-contact", components=[
+            _element("span", content="E-mail: "),
+            _element("a", content=email, href=f"mailto:{email}"),
+        ]),
     ])
 
 
@@ -402,23 +416,23 @@ ONTARIO_CONTACT_HERO = _element("header", "ontario-contact-hero", name="Kontaktn
     ]),
 ], **{"data-sc-overlay": "true"})
 
-ONTARIO_LEADERS = _element("section", "ontario-leaders ontario-section sc-edge-peaks sc-edge-bottom sc-edge-pale sc-edge-md", name="Vedoucí oddílu", components=[
+ONTARIO_LEADERS = _element("section", "ontario-leaders ontario-section text-center sc-section-edges sc-edge-bottom-shape-peaks sc-edge-bottom-color-pale sc-edge-size-md", name="Vedoucí oddílu", components=[
     _element("div", "container", components=[
-        _heading("h2", "Vůdcové", "text-center display-5 skaut"),
+        _heading("h2", "Vedoucí oddílu", "text-center display-5 skaut"),
         _element("div", "ontario-competencies", components=[
             _text("Kompetence:", "text-muted", "span"),
             _element("span", "badge bg-primary", content="Registrace"),
             _element("span", "badge bg-danger", content="Tábory"),
             _element("span", "badge ontario-badge-magenta", content="Oddílové věci"),
         ]),
-        _element("div", "row row-cols-1 row-cols-sm-2 g-5 ontario-leader-grid", components=[
+        _element("div", "row row-cols-1 row-cols-sm-2 g-5 justify-content-center ontario-leader-grid", components=[
             _element("div", "col", components=[_person_card("Jan Novák", "Vůdce")]),
             _element("div", "col", components=[_person_card("Petr Svoboda", "Zástupce vůdce")]),
         ]),
     ]),
 ])
 
-ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section", name="Oddílová rada", components=[
+ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section text-center sc-section-edges", name="Oddílová rada", components=[
     _element("div", "container", components=[
         _heading("h2", "Oddílová rada", "text-center display-5 skaut"),
         _element("div", "ontario-competencies", components=[
@@ -426,7 +440,7 @@ ONTARIO_COUNCIL = _element("section", "ontario-council ontario-section", name="O
             _element("span", "badge ontario-badge-magenta", content="Organizační věci"),
             _element("span", "badge bg-primary", content="Výpravy"),
         ]),
-        _element("div", "row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-5 mt-4", components=[
+        _element("div", "row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-5 mt-4 justify-content-center", components=[
             _element("div", "col", components=[_person_card("Eva Novotná", "Rádkyně")]),
             _element("div", "col", components=[_person_card("Tomáš Dvořák", "Rádce")]),
             _element("div", "col", components=[_person_card("Anna Černá", "Vedoucí družiny")]),
@@ -701,10 +715,77 @@ ONTARIO_COMPONENT_PROPS = {
 }
 
 
+_EDGE_SHAPES = (
+    ("soft", "Křivkový"),
+    ("rolling", "Vlnkový"),
+    ("scallop", "Vroubkovaný"),
+    ("peaks", "Horské vrcholky"),
+    ("zigzag", "Cikcak"),
+    ("diagonal", "Šikmý"),
+)
+_EDGE_COLORS = (
+    ("white", "Bílá"),
+    ("cream", "Krémová"),
+    ("pale", "Světlá doplňková"),
+    ("primary", "Hlavní"),
+    ("dark", "Tmavá hlavní"),
+    ("accent", "Akcentní"),
+)
+_EDGE_SIZES = (
+    ("subtle", "Jemný"),
+    ("sm", "Malý"),
+    ("md", "Střední"),
+    ("lg", "Velký"),
+)
+
+
+def _edge_shape_options(class_prefix: str) -> list[dict]:
+    return [
+        {"value": "none", "label": "Bez předělu"},
+        *[
+            {"value": value, "label": label, "class_name": f"{class_prefix}{value}"}
+            for value, label in _EDGE_SHAPES
+        ],
+    ]
+
+
+def _edge_color_options(class_prefix: str) -> list[dict]:
+    return [
+        {"value": value, "label": label, "class_name": f"{class_prefix}{value}"}
+        for value, label in _EDGE_COLORS
+    ]
+
+
+def _edge_size_options() -> list[dict]:
+    return [
+        {"value": value, "label": label, "class_name": f"sc-edge-size-{value}"}
+        for value, label in _EDGE_SIZES
+    ]
+
+
+def _decorative_divider(shape: str, name: str) -> dict:
+    return _element(
+        "div",
+        f"sc-decorative-divider sc-divider-shape-{shape} sc-divider-color-pale sc-edge-size-md",
+        name=name,
+        **{"aria-hidden": "true"},
+    )
+
+
 _ONTARIO_EDITOR = {
     "font_sets": [
         {"id": "themix", "label": "TheMix", "value": '"TheMix", Arial, sans-serif'},
         {"id": "skaut", "label": "SKAUT Bold", "value": '"SKAUT Bold", "TheMix", sans-serif'},
+    ],
+    "blocks": [
+        {
+            "id": f"divider-{shape}",
+            "label": f"Předěl – {label.lower()}",
+            "category": "Předěly a okraje",
+            "icon": "water" if shape == "rolling" else "grip-lines",
+            "content": _decorative_divider(shape, f"{label} předěl"),
+        }
+        for shape, label in _EDGE_SHAPES
     ],
     "resource_groups": [
         {
@@ -756,6 +837,62 @@ _ONTARIO_EDITOR = {
     # supplies generic field renderers, while this theme decides where those
     # fields appear and which CSS/attributes/classes they modify.
     "component_controls": [
+        {
+            "id": "decorative-divider",
+            "label": "Dekorativní předěl",
+            "icon": "water",
+            "match": {"all_classes": ["sc-decorative-divider"]},
+            "fields": [
+                {
+                    "id": "shape", "label": "Tvar", "type": "select", "default": "rolling",
+                    "options": _edge_shape_options("sc-divider-shape-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-divider-shape-"},
+                },
+                {
+                    "id": "color", "label": "Barva", "type": "select", "default": "pale",
+                    "options": _edge_color_options("sc-divider-color-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-divider-color-"},
+                },
+                {
+                    "id": "size", "label": "Výška", "type": "select", "default": "md",
+                    "options": _edge_size_options(),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-size-"},
+                },
+            ],
+        },
+        {
+            "id": "section-edges",
+            "label": "Dekorativní okraje sekce",
+            "icon": "water",
+            "match": {"tags": ["section", "header", "footer", "main", "article", "aside"]},
+            "fields": [
+                {
+                    "id": "top-shape", "label": "Horní okraj", "type": "select", "default": "none",
+                    "options": _edge_shape_options("sc-edge-top-shape-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-top-shape-"},
+                },
+                {
+                    "id": "top-color", "label": "Barva horního okraje", "type": "select", "default": "white",
+                    "options": _edge_color_options("sc-edge-top-color-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-top-color-"},
+                },
+                {
+                    "id": "bottom-shape", "label": "Dolní okraj", "type": "select", "default": "none",
+                    "options": _edge_shape_options("sc-edge-bottom-shape-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-bottom-shape-"},
+                },
+                {
+                    "id": "bottom-color", "label": "Barva dolního okraje", "type": "select", "default": "white",
+                    "options": _edge_color_options("sc-edge-bottom-color-"),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-bottom-color-"},
+                },
+                {
+                    "id": "edge-size", "label": "Výška okraje", "type": "select", "default": "md",
+                    "options": _edge_size_options(),
+                    "bind": {"kind": "class_choice", "remove_prefix": "sc-edge-size-"},
+                },
+            ],
+        },
         {
             "id": "photo-mask",
             "label": "Fotografie s barevnou maskou",
@@ -1090,6 +1227,38 @@ body:not(:has(.ontario-page-top)) .ontario-navbar.sc-scroll-nav--scrolled{backgr
 .sc-edge-diagonal:after{clip-path:polygon(0 62%,100% 30%,100% 100%,0 100%)}
 .sc-edge-peaks:after{clip-path:polygon(0 55%,9% 45%,17% 58%,27% 43%,38% 56%,49% 42%,61% 57%,72% 44%,84% 58%,93% 46%,100% 54%,100% 100%,0 100%)}
 .sc-edge-top:after{top:-1px;bottom:auto;transform:rotate(180deg)}
+
+/* Theme-owned decorative dividers. The top and bottom edge classes use
+   separate pseudo-elements, so both sides of one section can be configured
+   independently by the generic editor without theme-specific JavaScript. */
+.sc-edge-size-subtle{--sc-edge-height:clamp(12px,1.4vw,22px)}
+.sc-edge-size-sm{--sc-edge-height:1.75rem}.sc-edge-size-md{--sc-edge-height:3.25rem}.sc-edge-size-lg{--sc-edge-height:4.75rem}
+:is(.sc-edge-top-shape-soft,.sc-edge-top-shape-rolling,.sc-edge-top-shape-scallop,.sc-edge-top-shape-peaks,.sc-edge-top-shape-zigzag,.sc-edge-top-shape-diagonal,.sc-edge-bottom-shape-soft,.sc-edge-bottom-shape-rolling,.sc-edge-bottom-shape-scallop,.sc-edge-bottom-shape-peaks,.sc-edge-bottom-shape-zigzag,.sc-edge-bottom-shape-diagonal){position:relative;isolation:isolate;--sc-edge-top-fill:#fff;--sc-edge-bottom-fill:#fff}
+:is(.sc-edge-top-shape-soft,.sc-edge-top-shape-rolling,.sc-edge-top-shape-scallop,.sc-edge-top-shape-peaks,.sc-edge-top-shape-zigzag,.sc-edge-top-shape-diagonal):before,:is(.sc-edge-bottom-shape-soft,.sc-edge-bottom-shape-rolling,.sc-edge-bottom-shape-scallop,.sc-edge-bottom-shape-peaks,.sc-edge-bottom-shape-zigzag,.sc-edge-bottom-shape-diagonal):after{content:"";position:absolute;left:0;right:0;z-index:5;height:var(--sc-edge-height,3.25rem);pointer-events:none}
+:is(.sc-edge-top-shape-soft,.sc-edge-top-shape-rolling,.sc-edge-top-shape-scallop,.sc-edge-top-shape-peaks,.sc-edge-top-shape-zigzag,.sc-edge-top-shape-diagonal):before{top:-1px;background:var(--sc-edge-top-fill);transform:rotate(180deg)}
+:is(.sc-edge-bottom-shape-soft,.sc-edge-bottom-shape-rolling,.sc-edge-bottom-shape-scallop,.sc-edge-bottom-shape-peaks,.sc-edge-bottom-shape-zigzag,.sc-edge-bottom-shape-diagonal):after{bottom:-1px;background:var(--sc-edge-bottom-fill)}
+.sc-edge-top-color-white{--sc-edge-top-fill:#fff}.sc-edge-top-color-cream{--sc-edge-top-fill:var(--ontario-cream)}.sc-edge-top-color-pale{--sc-edge-top-fill:var(--ontario-blue-pale)}.sc-edge-top-color-primary{--sc-edge-top-fill:var(--ontario-blue)}.sc-edge-top-color-dark{--sc-edge-top-fill:var(--ontario-blue-dark)}.sc-edge-top-color-accent{--sc-edge-top-fill:var(--ontario-yellow)}
+.sc-edge-bottom-color-white{--sc-edge-bottom-fill:#fff}.sc-edge-bottom-color-cream{--sc-edge-bottom-fill:var(--ontario-cream)}.sc-edge-bottom-color-pale{--sc-edge-bottom-fill:var(--ontario-blue-pale)}.sc-edge-bottom-color-primary{--sc-edge-bottom-fill:var(--ontario-blue)}.sc-edge-bottom-color-dark{--sc-edge-bottom-fill:var(--ontario-blue-dark)}.sc-edge-bottom-color-accent{--sc-edge-bottom-fill:var(--ontario-yellow)}
+
+.sc-decorative-divider{position:relative;width:100%;height:var(--sc-edge-height,3.25rem);overflow:hidden;flex:0 0 auto;--sc-divider-fill:var(--ontario-blue-pale)}
+.sc-decorative-divider:after{content:"";position:absolute;inset:0;background:var(--sc-divider-fill);pointer-events:none}
+.sc-divider-color-white{--sc-divider-fill:#fff}.sc-divider-color-cream{--sc-divider-fill:var(--ontario-cream)}.sc-divider-color-pale{--sc-divider-fill:var(--ontario-blue-pale)}.sc-divider-color-primary{--sc-divider-fill:var(--ontario-blue)}.sc-divider-color-dark{--sc-divider-fill:var(--ontario-blue-dark)}.sc-divider-color-accent{--sc-divider-fill:var(--ontario-yellow)}
+
+:is(.sc-edge-top-shape-soft):before,:is(.sc-edge-bottom-shape-soft):after,.sc-divider-shape-soft:after{clip-path:ellipse(105% 57% at 50% 100%)}
+:is(.sc-edge-top-shape-rolling):before,:is(.sc-edge-bottom-shape-rolling):after,.sc-divider-shape-rolling:after{clip-path:polygon(0 56%,8% 48%,17% 59%,27% 46%,38% 58%,49% 44%,61% 57%,72% 45%,84% 58%,93% 47%,100% 55%,100% 100%,0 100%)}
+:is(.sc-edge-top-shape-peaks):before,:is(.sc-edge-bottom-shape-peaks):after,.sc-divider-shape-peaks:after{clip-path:polygon(0 55%,9% 45%,17% 58%,27% 43%,38% 56%,49% 42%,61% 57%,72% 44%,84% 58%,93% 46%,100% 54%,100% 100%,0 100%)}
+:is(.sc-edge-top-shape-zigzag):before,:is(.sc-edge-bottom-shape-zigzag):after,.sc-divider-shape-zigzag:after{clip-path:polygon(0 58%,6.25% 34%,12.5% 58%,18.75% 34%,25% 58%,31.25% 34%,37.5% 58%,43.75% 34%,50% 58%,56.25% 34%,62.5% 58%,68.75% 34%,75% 58%,81.25% 34%,87.5% 58%,93.75% 34%,100% 58%,100% 100%,0 100%)}
+:is(.sc-edge-top-shape-diagonal):before,:is(.sc-edge-bottom-shape-diagonal):after,.sc-divider-shape-diagonal:after{clip-path:polygon(0 62%,100% 30%,100% 100%,0 100%)}
+:is(.sc-edge-top-shape-scallop):before,:is(.sc-edge-bottom-shape-scallop):after,.sc-divider-shape-scallop:after{background:radial-gradient(circle at 50% 0,transparent 0 38%,var(--sc-divider-effective-fill) 40% 100%) 0 0/2.25rem 72% repeat-x,linear-gradient(var(--sc-divider-effective-fill),var(--sc-divider-effective-fill)) 0 70%/100% 31% no-repeat;--sc-divider-effective-fill:var(--sc-divider-fill,var(--sc-edge-bottom-fill,#fff))}
+:is(.sc-edge-top-shape-scallop):before{--sc-divider-effective-fill:var(--sc-edge-top-fill,#fff)}
+
+@supports ((mask-image:none) or (-webkit-mask-image:none)){
+  :is(.sc-edge-top-shape-soft,.sc-edge-top-shape-rolling):before,
+  :is(.sc-edge-bottom-shape-soft,.sc-edge-bottom-shape-rolling):after,
+  :is(.sc-divider-shape-soft,.sc-divider-shape-rolling):after{-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:100% 100%;mask-position:center;mask-repeat:no-repeat;mask-size:100% 100%;clip-path:none}
+  .sc-edge-top-shape-soft:before,.sc-edge-bottom-shape-soft:after,.sc-divider-shape-soft:after{-webkit-mask-image:url(assets/masks/edge-soft.svg);mask-image:url(assets/masks/edge-soft.svg)}
+  .sc-edge-top-shape-rolling:before,.sc-edge-bottom-shape-rolling:after,.sc-divider-shape-rolling:after{-webkit-mask-image:url(assets/masks/edge-rolling.svg);mask-image:url(assets/masks/edge-rolling.svg)}
+}
 .ontario-hero{min-height:100vh;min-height:100svh}.ontario-hero-content{padding-bottom:clamp(6rem,12vh,9rem)}
 
 .sc-shape-soft{border-radius:1.75rem 2.2rem 1.6rem 2rem/2rem 1.6rem 2.2rem 1.7rem!important}
@@ -1121,7 +1290,7 @@ body:not(:has(.ontario-page-top)) .ontario-navbar.sc-scroll-nav--scrolled{backgr
 @media(max-width:700px){.ontario-calendar .sc-calendar-table{width:100%!important;max-width:100%!important;overflow:visible!important}.ontario-calendar .sc-calendar-head,.ontario-calendar .sc-calendar-week{grid-template-columns:repeat(7,minmax(0,1fr))!important;width:100%!important;min-width:0!important}.ontario-calendar .sc-calendar-heading,.ontario-calendar .sc-calendar-day{min-width:0!important}.ontario-calendar .sc-calendar-heading{overflow:hidden;padding:.5rem .08rem;font-size:.72rem;white-space:nowrap}.ontario-calendar .sc-calendar-day{padding:.2rem}.ontario-calendar .sc-calendar-day-number{width:auto;height:auto;padding:0;font-size:.78rem}.ontario-calendar .sc-calendar-event-bar{box-sizing:border-box;inset-inline-start:calc((100% / 7) * var(--sc-calendar-start) + .08rem);width:calc((100% / 7) * var(--sc-calendar-span) - .16rem);padding:.12rem .18rem;font-size:.68rem}.ontario-calendar .sc-calendar-overflow{min-width:0;width:100%;padding-inline:.08rem;font-size:.65rem}}
 @media(max-width:575.98px){.ontario-detail .ontario-section{padding:2.75rem 0 3.5rem}.ontario-detail>.ontario-reading,.ontario-detail .container.ontario-reading{box-sizing:border-box;width:100%;padding-inline:1.25rem!important}.ontario-detail .ontario-reading>h1{font-size:clamp(2.35rem,12vw,2.75rem);overflow-wrap:anywhere}.ontario-detail .sc-event-facts{padding:1.05rem 1.1rem}.ontario-calendar.ontario-section{padding:3rem 0 3.75rem}.ontario-calendar>.container{padding-inline:1rem}.ontario-calendar .sc-calendar-view-switch{flex-wrap:wrap;row-gap:.45rem}.ontario-calendar .sc-calendar-count{flex-basis:100%;margin-inline-start:0}}
 
-.ontario-contact-page{background:#fff}.ontario-contact-hero{position:relative;min-height:410px;display:grid;place-items:center;overflow:hidden;background:url(assets/main_header.jpg) center 38%/cover no-repeat;color:#fff}.ontario-contact-hero .ontario-photo-mask{background:var(--ontario-blue-dark);opacity:.78;mix-blend-mode:multiply}.ontario-contact-hero-content{position:relative;z-index:2;padding:5rem 1rem;text-align:center}.ontario-contact-hero h1{margin-bottom:1rem}.ontario-contact-hero h2{margin:0}.ontario-leaders{padding-bottom:8rem;background:#fff}.ontario-leader-grid{max-width:680px;margin:3.5rem auto 0}.ontario-competencies{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.45rem;margin:.25rem auto 0}.ontario-badge-magenta{background:#b00075}.ontario-council{background:var(--ontario-blue-pale)}.ontario-person{height:100%}.ontario-person-photo{width:clamp(150px,15vw,210px);height:clamp(150px,15vw,210px);border-radius:48% 52% 46% 54%/52% 47% 53% 48%!important}.ontario-person-role{margin-top:1rem;color:#59616a}.ontario-person h3{margin:.25rem 0 .45rem}.ontario-person-contact{margin:.2rem 0}.ontario-person-contact a{font-weight:700;text-decoration:none}
+.ontario-contact-page{background:#fff}.ontario-contact-hero{position:relative;min-height:410px;display:grid;place-items:center;overflow:hidden;background:var(--ontario-blue-dark) url(assets/main_header.jpg) center 38%/cover no-repeat;color:#fff}.ontario-contact-hero .ontario-photo-mask{background:var(--ontario-blue-dark);opacity:.78;mix-blend-mode:multiply}.ontario-contact-hero-content{position:relative;z-index:2;padding:5rem 1rem;text-align:center}.ontario-contact-hero h1{margin-bottom:1rem}.ontario-contact-hero h2{margin:0}.ontario-leaders{padding-bottom:8rem;background:#fff}.ontario-leader-grid{max-width:680px;margin:3.5rem auto 0}.ontario-competencies{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:.45rem;margin:.25rem auto 0}.ontario-badge-magenta{background:#b00075}.ontario-council{background:var(--ontario-blue-pale)}.ontario-person{height:100%}.ontario-person-photo{width:clamp(150px,15vw,210px);height:clamp(150px,15vw,210px);border-radius:48% 52% 46% 54%/52% 47% 53% 48%!important}.ontario-person-role{margin-top:1rem;color:#59616a}.ontario-person h3{margin:.25rem 0 .45rem}.ontario-person-contact{margin:.2rem 0}.ontario-person-contact a{font-weight:700;text-decoration:none}
 
 .ontario-socials{text-align:center}.ontario-social-page-title{margin-bottom:7rem}.ontario-social-row{display:flex;justify-content:center;gap:.85rem;margin:1.5rem 0 8rem}.ontario-social-link{display:inline-grid;width:3.75rem;height:3.75rem;place-items:center;border-radius:50%;background:var(--ontario-social-color,var(--ontario-blue));color:#fff;font-size:1.85rem;text-decoration:none;transition:transform .18s ease}.ontario-social-instagram{--ontario-social-color:#cf347e}.ontario-social-youtube{--ontario-social-color:#e52329}.ontario-social-github{--ontario-social-color:#111}.ontario-social-link:hover,.ontario-social-link:focus-visible{color:#fff;transform:translateY(-3px) rotate(-2deg)}.ontario-related-title{margin-bottom:2.5rem}.ontario-related-links{max-width:800px;margin-inline:auto}.ontario-related-link{display:grid;justify-items:center;gap:1rem;color:var(--ontario-blue-dark);text-decoration:none}.ontario-related-logo,.ontario-related-link>.ontario-icon{width:112px;height:112px;object-fit:contain}.ontario-related-link>.ontario-icon{display:grid;place-items:center;border-radius:50%;background:var(--ontario-blue-pale);font-size:3.25rem}
 
@@ -1144,7 +1313,7 @@ img[data-sc-template-logo-hidden="true"]+[data-sc-template-logo-fallback]{displa
 .ontario-wordmark-fallback{align-items:center;min-height:44px;color:inherit;font-size:1.25rem;line-height:1;text-transform:uppercase}.ontario-wordmark-fallback-dark{display:none!important}.ontario-hero-logo-fallback{margin:0 auto 1.25rem}.ontario-footer-logo-fallback{color:#fff;font-size:1.7rem}
 
 @media(max-width:991.98px){.ontario-page-top{padding-top:0}.ontario-navbar{margin-bottom:0}.ontario-menu-shell>summary,body:has(.ontario-page-top) .ontario-menu-shell>summary{color:#fff}body:not(:has(.ontario-page-top)) .ontario-navbar{position:fixed;inset:0 0 auto;margin-bottom:0}.ontario-menu-shell[open]>summary,body:has(.ontario-page-top) .ontario-menu-shell[open]>summary{color:var(--ontario-blue-dark)!important}body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link{color:#111!important}body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link:hover,body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-link:focus-visible,body:has(.ontario-page-top) .ontario-menu-shell[open] .sc-menu-details[open]>summary{color:var(--ontario-blue-dark)!important}.ontario-contact-hero{min-height:360px}.ontario-social-row{margin-bottom:5rem}}
-@media(max-width:575.98px){.sc-edge-lg{--sc-edge-height:3.5rem}.ontario-contact-hero{min-height:320px}.ontario-contact-hero-content{padding:4rem 1rem}.ontario-leaders{padding-bottom:6rem}.ontario-social-page-title{margin-bottom:4rem}.ontario-social-link{width:3.25rem;height:3.25rem;font-size:1.55rem}}
+@media(max-width:575.98px){.sc-edge-lg,.sc-edge-size-lg{--sc-edge-height:3.5rem}.ontario-contact-hero{min-height:320px}.ontario-contact-hero-content{padding:4rem 1rem}.ontario-leaders{padding-bottom:6rem}.ontario-social-page-title{margin-bottom:4rem}.ontario-social-link{width:3.25rem;height:3.25rem;font-size:1.55rem}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 """
 

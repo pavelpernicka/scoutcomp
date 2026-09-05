@@ -2187,16 +2187,26 @@ def test_switching_linked_layout_splits_against_the_editor_shell(db_session):
 
 
 def test_media_id_repairs_transient_editor_blob_url_for_public_render(db_session):
-    compiled = compile_project(project({
-        "type": "image",
-        "attributes": {
-            "src": "blob:http://editor.invalid/temporary",
-            "data-sc-media-id": "42",
-            "alt": "Oddílový znak",
+    compiled = compile_project(project(
+        {
+            "type": "image",
+            "attributes": {
+                "src": "blob:http://editor.invalid/temporary",
+                "data-sc-media-id": "42",
+                "alt": "Oddílový znak",
+            },
         },
-    }))
+        {
+            "type": "default",
+            "tagName": "header",
+            "attributes": {"data-sc-background-media-id": "43"},
+            "style": {"background-image": "none", "background-size": "cover"},
+        },
+    ))
     rendered = render_project(db_session, compiled.tree)
     assert 'src="/api/web/media/42/file"' in rendered
+    assert 'background-image:url(&quot;/api/web/media/43/file&quot;)' in rendered
+    assert "background-size:cover" in rendered
     assert "blob:" not in rendered
 
 
@@ -2374,6 +2384,30 @@ def test_legacy_ontario_theme_can_be_installed_with_assets_and_default_hierarchi
     assert version.default_tokens["primary_color"] == "#255c9e"
     assert "var(--sc-primary-color,#255c9e)" in version.base_css
     assert ".ontario-footer{background:var(--ontario-dark)!important}" in version.base_css
+    editor = version.manifest["editor"]
+    assert {block["id"] for block in editor["blocks"]} >= {
+        "divider-soft", "divider-rolling", "divider-scallop",
+        "divider-peaks", "divider-zigzag", "divider-diagonal",
+    }
+    edge_control = next(
+        control for control in editor["component_controls"]
+        if control["id"] == "section-edges"
+    )
+    edge_fields = {field["id"]: field for field in edge_control["fields"]}
+    assert edge_fields["top-shape"]["bind"]["remove_prefix"] == "sc-edge-top-shape-"
+    assert edge_fields["bottom-shape"]["bind"]["remove_prefix"] == "sc-edge-bottom-shape-"
+    assert ".sc-edge-top-shape-soft" in version.base_css
+    assert ".sc-edge-bottom-shape-scallop" in version.base_css
+    leaders = db_session.query(WebSection).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:sections:leaders",
+    ).one()
+    council = db_session.query(WebSection).filter_by(
+        qualified_key=f"ontario@{ONTARIO_THEME_VERSION}:sections:council",
+    ).one()
+    assert "sc-section-edges" in str(leaders.project_data)
+    assert "sc-section-edges" in str(council.project_data)
+    assert "1234567789" in str(leaders.project_data)
+    assert "mail@etc.com" in str(council.project_data)
     assert db_session.get(WebSiteStyle, 1).active_theme_version_id != version.id
     assert db_session.query(WebTemplate).filter_by(theme_version_id=version.id).count() >= 16
     assert db_session.query(WebSection).filter_by(theme_version_id=version.id).count() >= 14

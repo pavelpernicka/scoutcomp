@@ -547,6 +547,23 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
         media_id = str(attributes.get("data-sc-media-id") or "").strip()
         if media_id and MEDIA_ID.fullmatch(media_id):
             attributes = {**attributes, "src": f"/api/web/media/{media_id}/file"}
+        # Background images use the same durable-id contract as image nodes.
+        # GrapesJS may keep ``background-image:none`` in CssComposer while the
+        # authenticated canvas displays a transient blob URL. Recreate a safe
+        # inline public URL here so the published hero cannot lose its image
+        # merely because the editor preview state was stripped on save.
+        background_media_id = str(attributes.get("data-sc-background-media-id") or "").strip()
+        node_style = node.get("style") if isinstance(node.get("style"), dict) else {}
+        if background_media_id and MEDIA_ID.fullmatch(background_media_id):
+            node_style = {
+                key: value for key, value in node_style.items()
+                if re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "-", str(key)).lower().replace("_", "-")
+                != "background-image"
+            }
+            node_style = {
+                **node_style,
+                "background-image": f'url("/api/web/media/{background_media_id}/file")',
+            }
         clean_attrs: dict[str, str] = {}
         class_value = node.get("classes") or attributes.get("class")
         if class_value:
@@ -571,7 +588,7 @@ def _normalise_node(node: Any, *, depth: int, counter: list[int]) -> dict[str, A
                 if key == "id" and not ID_TOKEN.fullmatch(str(value)):
                     continue
                 clean_attrs[key] = str(value)[:1000]
-        inline_declarations = _normalise_style_declarations(node.get("style"))
+        inline_declarations = _normalise_style_declarations(node_style)
         if inline_declarations:
             clean_attrs["style"] = ";".join(inline_declarations)
         result["attributes"] = clean_attrs

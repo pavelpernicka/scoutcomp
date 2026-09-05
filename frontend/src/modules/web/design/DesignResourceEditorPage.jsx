@@ -227,7 +227,7 @@ export default function DesignResourceEditorPage({ kind }) {
     if (target?.mode === "background" && !(mediaItem.is_image || mediaItem.mime?.startsWith("image/"))) return;
     if (!targetComponent || (target?.mode !== "background" && targetComponent.get?.("type") !== "image")) return;
     if (target?.mode === "background" && targetComponent?.addStyle) {
-      targetComponent.addStyle({ "background-image": "none" });
+      targetComponent.removeStyle?.("background-image");
       targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
       markComponentChanged();
       return;

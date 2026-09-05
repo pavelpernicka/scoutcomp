@@ -381,7 +381,10 @@ export default function WebEditorPage() {
       };
       const targetComponent = target?.component || target;
       if (target?.mode === "background" && targetComponent?.addStyle) {
-        targetComponent.addStyle({ "background-image": "none" });
+        // Keep the theme's previous/default image visible while the
+        // authenticated blob preview is loading. The durable media id is
+        // converted to a public URL when the project snapshot is saved.
+        targetComponent.removeStyle?.("background-image");
         targetComponent.addAttributes?.({ "data-sc-background-media-id": String(mediaItem.id) });
         autosaveRef.current?.schedule();
         return;

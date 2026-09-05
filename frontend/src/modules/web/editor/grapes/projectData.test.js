@@ -71,6 +71,23 @@ describe("GrapesJS project helpers", () => {
     });
   });
 
+  it("persists background media ids as stable public URLs", () => {
+    const editor = {
+      getProjectData: () => ({ pages: [{ component: {
+        type: "default",
+        tagName: "header",
+        attributes: { "data-sc-background-media-id": "27" },
+      } }] }),
+      getHtml: () => "",
+      getCss: () => "",
+      getDirtyCount: () => 1,
+    };
+
+    expect(getEditorSnapshot(editor).projectData.pages[0].component.style).toEqual({
+      "background-image": 'url("/media/27/file")',
+    });
+  });
+
   it("does not persist editor-only linked resource preview fragments", () => {
     const editor = {
       getProjectData: () => ({ pages: [{ component: {

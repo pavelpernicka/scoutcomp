@@ -155,7 +155,7 @@ function ThemeField({ owner, field, onSelectMedia, onChange }) {
         target.set?.("src", "");
       } else {
         target.removeAttributes?.("data-sc-background-media-id");
-        target.addStyle?.({ "background-image": "none" });
+        target.removeStyle?.("background-image");
       }
       onChange?.();
       refresh((current) => current + 1);
