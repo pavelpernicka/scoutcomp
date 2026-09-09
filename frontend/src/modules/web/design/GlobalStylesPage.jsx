@@ -16,7 +16,13 @@ export default function TemplateSettingsPage() {
   const { can } = useAuth();
   const queryClient = useQueryClient();
 
-  const stylesQuery = useQuery({ queryKey: ["web", "design", "styles"], queryFn: cmsApi.getGlobalStyles });
+  const stylesQuery = useQuery({
+    queryKey: ["web", "design", "styles"],
+    queryFn: cmsApi.getGlobalStyles,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const canvasStylesQuery = useQuery({ queryKey: ["web", "canvas-styles"], queryFn: cmsApi.getCanvasStyles, retry: 1 });
   const themesQuery = useQuery({ queryKey: ["web", "themes"], queryFn: cmsApi.listThemes });
   const canManageSettings = can("web.settings.manage") || can("web.manage");
@@ -82,7 +88,7 @@ export default function TemplateSettingsPage() {
       await saveThemeSiteSettings();
       return result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["web", "design", "styles"] }),
+    onSuccess: (saved) => queryClient.setQueryData(["web", "design", "styles"], saved),
   });
 
   const publish = useMutation({
@@ -96,7 +102,7 @@ export default function TemplateSettingsPage() {
       await saveThemeSiteSettings();
       return result;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["web", "design", "styles"] }),
+    onSuccess: (saved) => queryClient.setQueryData(["web", "design", "styles"], saved),
   });
 
   const renderField = (key, value, updateValue, isSiteSetting = false) => {

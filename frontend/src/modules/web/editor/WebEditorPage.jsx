@@ -43,6 +43,8 @@ export default function WebEditorPage() {
   const editorTemplateIdRef = useRef(null);
   const autosaveRef = useRef(null);
   const savedDirtyCountRef = useRef(undefined);
+  const hydratedPageRef = useRef(null);
+  const [editorSourceRevision, setEditorSourceRevision] = useState(0);
   const [mode, setMode] = useState("insert");
   const [leftOpen, setLeftOpen] = useState(() => !isCompactViewport());
   const [inspectorOpen, setInspectorOpen] = useState(() => !isCompactViewport());
@@ -55,7 +57,17 @@ export default function WebEditorPage() {
   const [revisionsOpen, setRevisionsOpen] = useState(false);
   const [mediaPickerTarget, setMediaPickerTarget] = useState(null); // null | "insert" | GrapesJS image component
 
-  const pageQuery = useQuery({ queryKey: ["web", "page", pageId], queryFn: () => cmsApi.getPageEditorData(pageId).then((data) => normalizePage({ ...data, project_data: data.project_data || data.data })), enabled: Number.isFinite(pageId) });
+  const pageQuery = useQuery({
+    queryKey: ["web", "page", pageId],
+    queryFn: () => cmsApi.getPageEditorData(pageId).then((data) => normalizePage({ ...data, project_data: data.project_data || data.data })),
+    enabled: Number.isFinite(pageId),
+    // An editor document is local working state. A focus/reconnect refetch must
+    // never replace it while somebody is typing; explicit reload operations
+    // below fetch the server snapshot deliberately.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const pagesQuery = useQuery({ queryKey: ["web", "pages"], queryFn: cmsApi.listPages });
   const sourcesQuery = useQuery({ queryKey: ["web", "data-sources"], queryFn: cmsApi.listDataSources, retry: 1 });
   const sectionsQuery = useQuery({ queryKey: ["web", "design", "sections"], queryFn: () => cmsApi.listDesignResources("sections"), retry: 1 });
@@ -73,11 +85,14 @@ export default function WebEditorPage() {
 
   useEffect(() => {
     if (!page) return;
+    const hydrationKey = `${page.id}:${editorSourceRevision}`;
+    if (hydratedPageRef.current === hydrationKey) return;
+    hydratedPageRef.current = hydrationKey;
     const next = { title: page.title || "", path_segment: page.path === "/" ? "/" : (page.path_segment || page.slug || ""), meta_description: page.meta_description || "", template_id: page.template_id || null, replace_content_with_template: false };
     pageRef.current = next;
     editorTemplateIdRef.current = page.template_id || null;
     setPageForm(next);
-  }, [page]);
+  }, [editorSourceRevision, page]);
 
   const activeThemeVersionId = canvasStylesQuery.data?.active_theme_version_id ?? null;
   const sections = filterCatalogResources(sectionsQuery.data, activeThemeVersionId);
@@ -132,7 +147,9 @@ export default function WebEditorPage() {
     blocks: editorBlocks,
     translate: t,
     language: i18n.language,
-    loadKey: page ? `${page.id}:${page.draft_version}:${page.template_id || "none"}` : undefined,
+    // draft_version changes after every autosave. It is concurrency metadata,
+    // not a new document identity, and must not trigger loadProjectData().
+    loadKey: page ? `${page.id}:${editorSourceRevision}` : undefined,
     canvasStyles: templateCSSQuery.data ? [...canvasStyles, { href: "", css: templateCSSQuery.data }] : canvasStyles,
     fontSets: canvasStylesQuery.data?.font_sets || EMPTY,
     preferContentSlotInsertion: true,
@@ -169,7 +186,7 @@ export default function WebEditorPage() {
       else release = cleanup;
     });
     return () => { disposed = true; release?.(); };
-  }, [editor.editorRef, editor.isReady, page?.id, page?.draft_version]);
+  }, [editor.editorRef, editor.isReady, page?.id, editorSourceRevision]);
 
   const getPayload = useCallback(() => {
     const snapshot = editor.getSnapshot();
@@ -355,7 +372,13 @@ export default function WebEditorPage() {
       const savedVersion = await autosave.saveNow();
       return cmsApi.publishPage(pageId, savedVersion);
     },
-    onSuccess: () => { setPublishedNotice(t("web.editor.publishedNotice")); queryClient.invalidateQueries({ queryKey: ["web", "pages"] }); queryClient.invalidateQueries({ queryKey: ["web", "page", pageId] }); },
+    onSuccess: () => {
+      setPublishedNotice(t("web.editor.publishedNotice"));
+      // The published state changed, but the open draft did not. Refetching
+      // the active detail here used to reload GrapesJS and discard focused
+      // inspector fields.
+      queryClient.invalidateQueries({ queryKey: ["web", "pages"] });
+    },
   });
 
   const changeTitle = (title) => {
@@ -451,6 +474,7 @@ export default function WebEditorPage() {
       // freshly composed document using the newly selected template.
       void autosaveRef.current?.saveNow()
         .then(() => pageQuery.refetch())
+        .then(() => setEditorSourceRevision((current) => current + 1))
         .catch(() => {});
     }
   };
@@ -493,8 +517,18 @@ export default function WebEditorPage() {
     navigate(`/admin/web/design/${apiKind}/${editable.id}/editor`);
   }, [handleClone, navigate]);
   const handleEditTemplate = useCallback(async (templateId) => {
-    const definition = templates.find((item) => String(item.id) === String(templateId));
-    if (!definition) return;
+    // The owner marker comes from the merged editor document and is already
+    // authoritative. The catalog can still be loading, filtered, or stale;
+    // requiring a matching list entry made this button silently do nothing.
+    let definition = templates.find((item) => String(item.id) === String(templateId));
+    if (!definition) {
+      try {
+        definition = await cmsApi.getTemplate(templateId);
+      } catch (error) {
+        console.error("template lookup failed", error);
+        return;
+      }
+    }
     let editable = definition;
     if (definition.is_locked) {
       try {
@@ -570,7 +604,14 @@ export default function WebEditorPage() {
     <div className="visually-hidden" aria-live="polite">{publishedNotice || t(`web.editor.saveStates.${autosave.status}`)}</div>
     {autosave.conflict && <div className="web-editor-conflict" role="alert"><i className="fas fa-triangle-exclamation" /><span><strong>{t("web.editor.conflictTitle")}</strong>{t("web.editor.conflictBody")}</span><button type="button" className="btn btn-sm btn-light" onClick={() => window.location.reload()}>{t("web.editor.reloadLatest")}</button></div>}
     {(preview !== null || previewMutation.isPending || previewError) && <PreviewDialog html={preview || ""} loading={previewMutation.isPending} error={previewError} device={device} onClose={closePreview} />}
-    {revisionsOpen && <RevisionsDialog pageId={pageId} onClose={() => setRevisionsOpen(false)} />}
+    {revisionsOpen && <RevisionsDialog
+      pageId={pageId}
+      onClose={() => setRevisionsOpen(false)}
+      onRestored={async () => {
+        await pageQuery.refetch();
+        setEditorSourceRevision((current) => current + 1);
+      }}
+    />}
     {mediaPickerTarget && <MediaPickerModal title={t("web.chooseFromMedia")} onSelect={handleMediaSelect} onClose={() => setMediaPickerTarget(null)} />}
   </div>;
 }

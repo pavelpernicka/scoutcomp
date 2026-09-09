@@ -7,7 +7,7 @@ router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload, _empty_project
 from .pages import _extract_page_content, rebuild_published_page_artifacts
-from .routes_design import _validate_custom_css
+from .routes_design import _validated_editor_css
 from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_CONFIG, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
 from .previews import build_preview, ensure_preview, get_current_preview, project_preview_svg
 # ---------------------------------------------------------------- components & templates
@@ -467,14 +467,14 @@ def create_template(payload: TemplatePayload, db: Session = Depends(get_db), cur
     if db.query(WebTemplate).filter_by(key=key).one_or_none():
         raise HTTPException(400, "Template with this key already exists")
     project = payload.project_data or _empty_project()
-    compile_project(project)
+    compiled = compile_project(project)
     from .linked_resources import validate_linked_resource_instances
     from .resource_props import ResourcePropsError
     try:
         validate_linked_resource_instances(db, project, published=False)
     except ResourcePropsError as exc:
         raise HTTPException(422, str(exc)) from exc
-    _validate_custom_css(payload.css)
+    safe_css = _validated_editor_css(payload.css, compiled.css)
     if payload.preview_media_id is not None and not db.query(WebMedia).filter_by(id=payload.preview_media_id).one_or_none():
         raise HTTPException(404, "Preview media not found")
     template = WebTemplate(
@@ -482,7 +482,7 @@ def create_template(payload: TemplatePayload, db: Session = Depends(get_db), cur
         name=payload.name.strip(),
         description=payload.description,
         html=payload.html,
-        css=payload.css,
+        css=safe_css,
         project_data=project,
         qualified_key=(payload.qualified_key if str(payload.qualified_key or "").startswith("site:template:") else f"site:template:{key}"),
         template_kind=payload.template_kind,
@@ -515,7 +515,8 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
     if expected != template.draft_version:
         raise HTTPException(409, "Template was changed by another editor")
     project = payload.project_data or template.project_data or _empty_project()
-    compile_project(project); _validate_custom_css(payload.css)
+    compiled = compile_project(project)
+    safe_css = _validated_editor_css(payload.css, compiled.css)
     from .linked_resources import validate_linked_resource_instances
     from .resource_props import ResourcePropsError
     try:
@@ -526,7 +527,7 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
         raise HTTPException(404, "Preview media not found")
     values = {
         WebTemplate.name: payload.name.strip(), WebTemplate.description: payload.description,
-        WebTemplate.project_data: project, WebTemplate.css: payload.css,
+        WebTemplate.project_data: project, WebTemplate.css: safe_css,
         WebTemplate.template_kind: payload.template_kind,
         WebTemplate.usage_mode: payload.usage_mode if payload.usage_mode in {"linked_layout", "copy_on_create"} else "linked_layout",
         WebTemplate.preview_media_id: payload.preview_media_id,
@@ -540,7 +541,7 @@ def update_template(template_id: int, payload: TemplatePayload, db: Session = De
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Template was changed by another editor")
     build_preview(
-        db, "templates", template_id, project, payload.css or "", title=payload.name.strip(),
+        db, "templates", template_id, project, safe_css, title=payload.name.strip(),
     )
     db.commit()
     db.refresh(template)
@@ -614,7 +615,8 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
         raise HTTPException(404, "Template not found")
     if template.draft_version != payload.expected_version:
         raise HTTPException(409, "Template was changed by another editor")
-    compile_project(template.project_data or _empty_project()); _validate_custom_css(template.css)
+    compiled = compile_project(template.project_data or _empty_project())
+    safe_css = _validated_editor_css(template.css or "", compiled.css)
     from .linked_resources import validate_linked_resource_instances
     from .resource_props import ResourcePropsError
     try:
@@ -625,7 +627,8 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
         WebTemplate.id == template.id, WebTemplate.draft_version == payload.expected_version,
     ).update({
         WebTemplate.published_project_data: template.project_data,
-        WebTemplate.published_css: template.css,
+        WebTemplate.css: safe_css,
+        WebTemplate.published_css: safe_css,
         WebTemplate.published_version: template.published_version + 1,
     }, synchronize_session=False)
     if updated != 1:
@@ -637,7 +640,7 @@ def publish_template(template_id: int, payload: PublishPayload, db: Session = De
     db.expire(template, ["published_project_data", "published_css", "published_version"])
     build_preview(
         db, "templates", template.id,
-        template.project_data or _empty_project(), template.css or "", title=template.name,
+        template.project_data or _empty_project(), safe_css, title=template.name,
     )
     # Layout content is part of each immutable public document.
     rebuild_published_page_artifacts(db)

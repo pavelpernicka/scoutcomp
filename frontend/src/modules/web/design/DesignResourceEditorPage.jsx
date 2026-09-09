@@ -51,10 +51,25 @@ export default function DesignResourceEditorPage({ kind }) {
   const editGenerationRef = useRef(0);
   const savedGenerationRef = useRef(0);
   const lastSaveCleanRef = useRef(true);
+  const hydratedResourceIdRef = useRef(null);
 
-  const listRequest = kind === "templates" ? cmsApi.listTemplates : () => cmsApi.listDesignResources(endpointKind);
-  const queryKey = ["web", "design", endpointKind];
-  const resourcesQuery = useQuery({ queryKey, queryFn: listRequest });
+  // A template editor needs one concrete template, not the whole active-theme
+  // catalog. Loading the catalog here made direct links fail when the page
+  // referenced an older theme template or when preview generation of any
+  // unrelated template failed.
+  const listRequest = kind === "templates"
+    ? () => cmsApi.getTemplate(resourceId).then((item) => [item])
+    : () => cmsApi.listDesignResources(endpointKind);
+  const queryKey = kind === "templates"
+    ? ["web", "design", endpointKind, resourceId]
+    : ["web", "design", endpointKind];
+  const resourcesQuery = useQuery({
+    queryKey,
+    queryFn: listRequest,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const canvasStylesQuery = useQuery({
     queryKey: ["web", "canvas-styles"],
     queryFn: cmsApi.getCanvasStyles,
@@ -100,6 +115,11 @@ export default function DesignResourceEditorPage({ kind }) {
 
   useEffect(() => {
     if (!resource) return;
+    // Query invalidations elsewhere may replace every list item with a fresh
+    // object. Only hydrate local fields when navigating to another resource;
+    // otherwise an in-progress name/schema edit would be overwritten.
+    if (hydratedResourceIdRef.current === resource.id) return;
+    hydratedResourceIdRef.current = resource.id;
     const next = {
       name: resource.name || "",
       description: resource.description || "",
@@ -175,7 +195,15 @@ export default function DesignResourceEditorPage({ kind }) {
     onDirtyChange: (dirty) => { if (dirty && !readOnly) setStatus("unsaved"); },
     onSelectionChange: () => setSelectionRevision((value) => value + 1),
     onReady: (instance) => {
-      if (resource?.css) instance.addStyle(resource.css);
+      // Canonical projects carry their own styles. Keep the separate CSS only
+      // as a compatibility source for older records whose project JSON did
+      // not persist a style collection yet.
+      const pages = resource?.project_data?.pages || [];
+      const hasProjectStyles = pages.some((page) => (
+        (Array.isArray(page?.styles) && page.styles.length > 0)
+        || (Array.isArray(page?.frames) && page.frames.some((frame) => Array.isArray(frame?.styles) && frame.styles.length > 0))
+      ));
+      if (resource?.css && !hasProjectStyles) instance.addStyle(resource.css);
       instance.clearDirtyCount();
     },
     onError: () => setError(t("web.errors.editorLoad")),
@@ -211,13 +239,14 @@ export default function DesignResourceEditorPage({ kind }) {
       else release = cleanup;
     });
     return () => { disposed = true; release?.(); };
-  }, [editor.editorRef, editor.isReady, resource?.id, resource?.draft_version]);
+  }, [editor.editorRef, editor.isReady, resource?.id]);
   const selectedComponent = selectionRevision >= 0 ? editor.editorRef.current?.getSelected?.() : null;
   const selectedLinkedResource = selectedComponent?.get?.("type") === "sc-resource-instance";
   const selectComponent = (component) => editor.editorRef.current?.select?.(component);
   const markComponentChanged = () => {
     if (readOnly) return;
     editGenerationRef.current += 1;
+    setError("");
     setStatus("unsaved");
   };
   const handleMediaSelect = (mediaItem) => {
@@ -350,6 +379,7 @@ export default function DesignResourceEditorPage({ kind }) {
 
   const changeForm = (field, value) => {
     editGenerationRef.current += 1;
+    setError("");
     const next = { ...formRef.current, [field]: value };
     formRef.current = next;
     setForm(next);

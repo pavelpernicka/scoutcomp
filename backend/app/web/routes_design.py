@@ -324,7 +324,30 @@ class SiteStylePayload(BaseModel):
 def _validate_custom_css(css: str) -> None:
     from ..web.renderer import UNSAFE_CSS
     if len(css) > 500_000 or UNSAFE_CSS.search(css):
-        raise HTTPException(422, "Global CSS violates the public rendering policy")
+        raise HTTPException(422, "CSS violates the public rendering policy")
+
+
+def _validated_editor_css(css: str, compiled_css: str) -> str:
+    """Return safe editor CSS, repairing legacy polluted snapshots.
+
+    GrapesJS project data is canonical and ``compiled_css`` is rebuilt from
+    its allow-listed style model. Older editor versions could copy a whole
+    global/theme stylesheet (or a pasted ``<style>`` wrapper) into the
+    resource's derived CSS column. Such a record became impossible to edit:
+    even a harmless width change kept resubmitting the old forbidden CSS.
+
+    New invalid CSS is therefore never admitted. If the redundant derived
+    string is invalid, fall back to the safe CSS compiled from the canonical
+    project and persist that repaired value on this update.
+    """
+    try:
+        _validate_custom_css(css)
+        return css
+    except HTTPException as exc:
+        if exc.status_code != 422:
+            raise
+        _validate_custom_css(compiled_css)
+        return compiled_css
 
 
 def _validate_design_tokens(tokens: dict) -> None:
@@ -355,15 +378,25 @@ def _project_references_part(value, identifiers: set[str]) -> bool:
 @router.put("/design/styles")
 def update_global_styles(payload: SiteStylePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     _require_action(db, current_user, "web.design.manage")
-    _validate_custom_css(payload.css)
-    _validate_design_tokens(payload.tokens)
     item = db.query(WebSiteStyle).filter_by(id=1).one_or_none()
     if not item:
         item = WebSiteStyle(id=1, draft_version=1); db.add(item); db.flush()
+    css = payload.css
+    try:
+        _validate_custom_css(css)
+    except HTTPException as exc:
+        # The settings screen has no raw-CSS editor. Older installations may
+        # still carry CSS that predates the current public-rendering policy;
+        # resubmitting that exact inaccessible value must not permanently
+        # block safe token/logo changes. Never apply this recovery to new CSS.
+        if exc.status_code != 422 or css != (item.draft_css or ""):
+            raise
+        css = ""
+    _validate_design_tokens(payload.tokens)
     updated = db.query(WebSiteStyle).filter(
         WebSiteStyle.id == item.id, WebSiteStyle.draft_version == payload.expected_version,
     ).update({
-        WebSiteStyle.draft_tokens: payload.tokens, WebSiteStyle.draft_css: payload.css,
+        WebSiteStyle.draft_tokens: payload.tokens, WebSiteStyle.draft_css: css,
         WebSiteStyle.draft_version: payload.expected_version + 1,
         WebSiteStyle.updated_by_id: current_user.id,
     }, synchronize_session=False)
@@ -516,12 +549,12 @@ def create_design_resource(kind: str, payload: DesignResourcePayload, db: Sessio
     model = DESIGN_MODELS.get(kind)
     if not model:
         raise HTTPException(404, "Unknown design resource kind")
-    compile_project(payload.project_data)
+    compiled = compile_project(payload.project_data)
     try:
         validate_linked_resource_instances(db, payload.project_data, published=False)
     except ResourcePropsError as exc:
         raise HTTPException(422, str(exc)) from exc
-    _validate_custom_css(payload.css)
+    safe_css = _validated_editor_css(payload.css, compiled.css)
     if db.query(model).filter_by(qualified_key=payload.qualified_key).first():
         raise HTTPException(409, "Resource key is already used")
     _validate_preview_media(db, payload.preview_media_id)
@@ -529,7 +562,7 @@ def create_design_resource(kind: str, payload: DesignResourcePayload, db: Sessio
     values = dict(
         qualified_key=payload.qualified_key, name=payload.name.strip(),
         theme_version_id=_active_theme_version_id(db), is_locked=False,
-        description=payload.description, project_data=payload.project_data, css=payload.css,
+        description=payload.description, project_data=payload.project_data, css=safe_css,
         prop_schema=schema, default_props=defaults, variants=variants,
         preview_media_id=payload.preview_media_id,
         draft_version=1, created_by_id=current_user.id,
@@ -564,18 +597,18 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
         raise HTTPException(409, "Resource was changed by another editor")
     if payload.qualified_key != item.qualified_key:
         raise HTTPException(409, "Resource qualified_key is immutable")
-    compile_project(payload.project_data)
+    compiled = compile_project(payload.project_data)
     try:
         validate_linked_resource_instances(db, payload.project_data, published=False)
     except ResourcePropsError as exc:
         raise HTTPException(422, str(exc)) from exc
-    _validate_custom_css(payload.css)
+    safe_css = _validated_editor_css(payload.css, compiled.css)
     _validate_preview_media(db, payload.preview_media_id)
     schema, defaults, variants = _normalise_resource_definition(payload)
     updated = db.query(model).filter(model.id == resource_id, model.draft_version == expected).update({
         model.name: payload.name.strip(),
         model.description: payload.description, model.project_data: payload.project_data,
-        model.css: payload.css, model.prop_schema: schema,
+        model.css: safe_css, model.prop_schema: schema,
         model.default_props: defaults, model.variants: variants,
         model.preview_media_id: payload.preview_media_id,
         model.draft_version: expected + 1,
@@ -583,7 +616,7 @@ def update_design_resource(kind: str, resource_id: int, payload: DesignResourceP
     if updated != 1:
         db.rollback(); raise HTTPException(409, "Resource was changed by another editor")
     build_resource_preview(
-        db, kind, resource_id, payload.project_data or {}, payload.css or "", title=payload.name.strip(),
+        db, kind, resource_id, payload.project_data or {}, safe_css, title=payload.name.strip(),
     )
     db.commit(); db.refresh(item)
     return _design_out(db, item)
@@ -608,19 +641,20 @@ def publish_design_resource(
     if item.draft_version != payload.expected_version:
         raise HTTPException(409, "Resource was changed by another editor")
     try:
-        compile_project(item.project_data)
+        compiled = compile_project(item.project_data)
         validate_linked_resource_instances(db, item.project_data, published=True)
         schema = normalise_prop_schema(item.prop_schema or [])
         defaults = normalise_default_props(schema, item.default_props or {})
         variants = normalise_variants(schema, defaults, item.variants or [])
     except (CompileError, ResourcePropsError) as exc:
         raise HTTPException(422, str(exc)) from exc
-    _validate_custom_css(item.css or "")
+    safe_css = _validated_editor_css(item.css or "", compiled.css)
     updated = db.query(model).filter(
         model.id == item.id, model.draft_version == payload.expected_version,
     ).update({
         model.published_project_data: item.project_data,
-        model.published_css: item.css,
+        model.css: safe_css,
+        model.published_css: safe_css,
         model.published_prop_schema: schema,
         model.published_default_props: defaults,
         model.published_variants: variants,
@@ -630,7 +664,7 @@ def publish_design_resource(
         db.rollback()
         raise HTTPException(409, "Resource was changed by another editor")
     build_resource_preview(
-        db, kind, item.id, item.project_data or {}, item.css or "", title=item.name,
+        db, kind, item.id, item.project_data or {}, safe_css, title=item.name,
     )
     db.commit()
     db.refresh(item)
