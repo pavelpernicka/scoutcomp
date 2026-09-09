@@ -172,6 +172,11 @@ export function AuthProvider({ children }) {
     );
   };
 
+  // Permission groups can be changed while an existing session is open.
+  // Keep an explicit refresh available to route guards so newly granted
+  // capabilities take effect without requiring logout or a full page reload.
+  const refreshProfile = () => fetchProfile(tokens?.accessToken);
+
   const value = {
     profile,
     isLoading: !isLoaded,
@@ -189,6 +194,7 @@ export function AuthProvider({ children }) {
     register,
     changePassword,
     updateProfile,
+    refreshProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
