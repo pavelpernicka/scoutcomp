@@ -13,6 +13,8 @@
 .text-muted, .form-text { color: #59685f !important; }
 .decorated-card__header { color: var(--scout-forest-dark); background: #edf2e9; border-bottom: 3px solid var(--scout-ochre); }
 .decorated-card__header .text-white { color: inherit !important; }
+.decorated-card__actions { display: flex; align-self: stretch; align-items: center; justify-content: flex-end; }
+.decorated-card__actions > .btn { display: inline-flex; align-items: center; justify-content: center; }
 
 .page-heading { background: var(--scout-forest); color: #fff; border-radius: 0.65rem; border-left: 0.45rem solid var(--scout-ochre); box-shadow: 0 0.3rem 1.1rem rgba(24, 60, 42, .13); }
 .page-heading__body { padding: clamp(1.25rem, 3vw, 2rem); }

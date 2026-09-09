@@ -34,6 +34,7 @@ def test_render_document_emits_safe_social_metadata():
         og_image="https://www.example.cz/media/1/file",
         og_type="article",
         site_name="Oddíl & přátelé",
+        site_runtime=True,
     )
 
     assert '<link rel="canonical" href="https://www.example.cz/stranka">' in document
@@ -42,6 +43,8 @@ def test_render_document_emits_safe_social_metadata():
     assert '<meta property="og:image" content="https://www.example.cz/media/1/file">' in document
     assert '<meta name="twitter:card" content="summary_large_image">' in document
     assert 'Oddíl &amp; přátelé' in document
+    assert '<link rel="stylesheet" href="/site-runtime.css">' in document
+    assert '<script src="/site-runtime.js" defer></script>' in document
 
 
 def test_sitemap_and_robots_use_configured_absolute_origin(db_session, monkeypatch):

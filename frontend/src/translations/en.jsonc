@@ -1719,7 +1719,13 @@
     "eventDetail": "Event details",
     "loadError": "The post could not be loaded",
     "back": "Back to posts",
-    "allPosts": "All posts"
+    "allPosts": "All posts",
+    "openImage": "View image full screen",
+    "imagePreview": "Image preview",
+    "zoomControls": "Zoom controls",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "resetZoom": "Reset zoom"
   },
   "messages": {
     "new": "New",

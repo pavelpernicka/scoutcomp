@@ -65,8 +65,137 @@ register_all_modules()
 
 app = FastAPI(title="ScoutComp Public Site", docs_url=None, redoc_url=None, openapi_url=None)
 
+_SITE_RUNTIME_CSS = r'''
+.sc-detail-lightbox-target{cursor:zoom-in}
+.sc-detail-lightbox-target:focus-visible,
+[data-sc-detail-lightbox-trigger]:focus-visible{outline:3px solid var(--sc-accent,#255c9e);outline-offset:4px}
+.sc-image-lightbox{box-sizing:border-box;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;padding:clamp(1rem,3vw,2.5rem);border:0;background:rgba(7,12,20,.94);color:#fff;overflow:hidden}
+.sc-image-lightbox[open]{display:grid;place-items:center}
+.sc-image-lightbox::backdrop{background:rgba(7,12,20,.94)}
+.sc-image-lightbox-figure{display:grid;width:100%;height:100%;min-width:0;min-height:0;grid-template-rows:minmax(0,1fr) auto;place-items:center;gap:.75rem;margin:0}
+.sc-image-lightbox-image{display:block;min-width:0;min-height:0;max-width:100%;max-height:100%;object-fit:contain;box-shadow:0 1rem 3rem rgba(0,0,0,.38)}
+.sc-image-lightbox-caption{max-width:min(72ch,calc(100vw - 8rem));margin:0;color:#fff;text-align:center;line-height:1.45}
+.sc-image-lightbox-caption:empty{display:none}
+.sc-image-lightbox-close{position:fixed;z-index:1;top:max(1rem,env(safe-area-inset-top));right:max(1rem,env(safe-area-inset-right));display:inline-flex;min-width:3rem;min-height:3rem;align-items:center;justify-content:center;gap:.45rem;padding:.55rem .8rem;border:1px solid rgba(255,255,255,.6);border-radius:.4rem;background:#fff;color:#17202a;font:700 .95rem/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 .4rem 1.25rem rgba(0,0,0,.28)}
+.sc-image-lightbox-close:hover{background:#eef3f6}.sc-image-lightbox-close:focus-visible{outline:3px solid #fff;outline-offset:3px}
+.sc-image-lightbox-close-mark{font-size:1.45rem;font-weight:400;line-height:.7}
+html.sc-image-lightbox-open{overflow:hidden}
+@media(max-width:575px){.sc-image-lightbox{padding:4.75rem .75rem max(.75rem,env(safe-area-inset-bottom))}.sc-image-lightbox-caption{max-width:calc(100vw - 1.5rem);font-size:.9rem}.sc-image-lightbox-close{top:max(.75rem,env(safe-area-inset-top));right:max(.75rem,env(safe-area-inset-right))}}
+'''
+
 _SITE_RUNTIME_JS = r'''(() => {
   "use strict";
+  const runtimeStyleHref = "/site-runtime.css";
+  if (!document.querySelector(`link[href="${runtimeStyleHref}"]`)) {
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = runtimeStyleHref;
+    document.head.append(stylesheet);
+  }
+
+  const detailImageSelector = ".web-post-cover,.web-post-body img,.sc-event-description img";
+  let lightbox = null;
+  let lightboxImage = null;
+  let lightboxCaption = null;
+  let lightboxTrigger = null;
+
+  const closeImageLightbox = () => {
+    if (!lightbox?.open) return;
+    if (typeof lightbox.close === "function") lightbox.close();
+    else {
+      lightbox.removeAttribute("open");
+      lightbox.dispatchEvent(new Event("close"));
+    }
+  };
+
+  const ensureImageLightbox = () => {
+    if (lightbox) return lightbox;
+    lightbox = document.createElement("dialog");
+    lightbox.className = "sc-image-lightbox";
+    lightbox.setAttribute("aria-label", "Náhled obrázku");
+    lightbox.innerHTML = `
+      <button class="sc-image-lightbox-close" type="button" aria-label="Zavřít náhled obrázku">
+        <span class="sc-image-lightbox-close-mark" aria-hidden="true">×</span><span>Zavřít</span>
+      </button>
+      <figure class="sc-image-lightbox-figure">
+        <img class="sc-image-lightbox-image" alt="">
+        <figcaption class="sc-image-lightbox-caption"></figcaption>
+      </figure>`;
+    document.body.append(lightbox);
+    lightboxImage = lightbox.querySelector(".sc-image-lightbox-image");
+    lightboxCaption = lightbox.querySelector(".sc-image-lightbox-caption");
+    lightbox.querySelector(".sc-image-lightbox-close").addEventListener("click", closeImageLightbox);
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox || event.target.classList.contains("sc-image-lightbox-figure")) {
+        closeImageLightbox();
+      }
+    });
+    lightbox.addEventListener("close", () => {
+      document.documentElement.classList.remove("sc-image-lightbox-open");
+      lightboxImage.removeAttribute("src");
+      lightboxTrigger?.focus({ preventScroll: true });
+      lightboxTrigger = null;
+    });
+    return lightbox;
+  };
+
+  const openImageLightbox = (image, trigger = image) => {
+    const source = image.currentSrc || image.src;
+    if (!source) return;
+    const dialog = ensureImageLightbox();
+    const description = (image.alt || image.title || "").trim();
+    lightboxImage.src = source;
+    lightboxImage.alt = description;
+    lightboxCaption.textContent = description;
+    lightboxTrigger = trigger;
+    document.documentElement.classList.add("sc-image-lightbox-open");
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+    dialog.querySelector(".sc-image-lightbox-close").focus({ preventScroll: true });
+  };
+
+  document.querySelectorAll(detailImageSelector).forEach((image) => {
+    image.classList.add("sc-detail-lightbox-target");
+    const link = image.closest("a");
+    if (link) {
+      link.dataset.scDetailLightboxTrigger = "";
+      link.setAttribute("aria-haspopup", "dialog");
+      return;
+    }
+    image.tabIndex = 0;
+    image.setAttribute("role", "button");
+    image.setAttribute("aria-haspopup", "dialog");
+    image.setAttribute(
+      "aria-label",
+      image.alt?.trim() ? `Zobrazit obrázek: ${image.alt.trim()}` : "Zobrazit obrázek v plné velikosti",
+    );
+  });
+
+  document.addEventListener("click", (event) => {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const directImage = event.target.closest?.(detailImageSelector);
+    const linkedTrigger = event.target.closest?.("[data-sc-detail-lightbox-trigger]");
+    const image = directImage || linkedTrigger?.querySelector(detailImageSelector);
+    if (!image) return;
+    event.preventDefault();
+    openImageLightbox(image, linkedTrigger || image);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && lightbox?.open) {
+      event.preventDefault();
+      closeImageLightbox();
+      return;
+    }
+    if (!["Enter", " "].includes(event.key)) return;
+    const directImage = event.target.matches?.(detailImageSelector) && !event.target.closest("a") ? event.target : null;
+    const linkedTrigger = event.target.closest?.("[data-sc-detail-lightbox-trigger]");
+    const image = directImage || linkedTrigger?.querySelector(detailImageSelector);
+    if (!image) return;
+    event.preventDefault();
+    openImageLightbox(image, linkedTrigger || image);
+  });
+
   const navigationSelector = ".sc-calendar-nav[href],.sc-calendar-today[href]";
   const requests = new WeakMap();
   const calendarDate = (calendar) => {
@@ -269,6 +398,18 @@ def site_runtime() -> Response:
         _SITE_RUNTIME_JS,
         media_type="application/javascript",
         headers={"Cache-Control": "public, max-age=0, must-revalidate", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@app.get("/site-runtime.css", include_in_schema=False)
+def site_runtime_styles() -> Response:
+    return Response(
+        _SITE_RUNTIME_CSS,
+        media_type="text/css",
+        headers={
+            "Cache-Control": "public, max-age=0, must-revalidate",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

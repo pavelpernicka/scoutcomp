@@ -1719,7 +1719,13 @@
     "eventDetail": "Detail akce",
     "loadError": "Článek se nepodařilo načíst",
     "back": "Zpět na příspěvky",
-    "allPosts": "Všechny příspěvky"
+    "allPosts": "Všechny příspěvky",
+    "openImage": "Zobrazit obrázek v plné velikosti",
+    "imagePreview": "Náhled obrázku",
+    "zoomControls": "Ovládání přiblížení",
+    "zoomIn": "Přiblížit",
+    "zoomOut": "Oddálit",
+    "resetZoom": "Obnovit velikost"
   },
   "messages": {
     "new": "Nové",

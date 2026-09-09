@@ -1928,13 +1928,16 @@ def render_document(
         f'<meta name="twitter:description" content="{escape(social_description, quote=True)}">'
         f'{twitter_image_meta}'
     )
-    runtime_script = '<script src="/site-runtime.js" defer></script>' if site_runtime else ""
+    runtime_assets = (
+        '<link rel="stylesheet" href="/site-runtime.css"><script src="/site-runtime.js" defer></script>'
+        if site_runtime else ""
+    )
     return (
         "<!doctype html><html lang=\"cs\"><head><meta charset=\"utf-8\">"
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         f"<title>{escape(title)}</title>"
         f'<meta name="description" content="{escape(description, quote=True)}">'
         f"{robots}{canonical}{social_meta}{favicon_link}<style>{BUILDER_LAYOUT_CSS}{root_css}{base_css}{css}</style>"
-        f'{runtime_script}</head>'
+        f'{runtime_assets}</head>'
         f"<body>{body}</body></html>"
     )

@@ -215,10 +215,33 @@
 .post-reading article { max-width: 760px; }
 .post-back-link { display: inline-flex; align-items: center; min-height: 2.5rem; color: var(--scout-forest); font-weight: 650; }
 .post-reading-header h1 { font-size: clamp(2rem, 4vw, 3.25rem); letter-spacing: -.025em; }
-.post-reading-cover { max-height: 440px; object-fit: cover; border-radius: .5rem; }
+.post-reading-cover {
+  display: block;
+  height: auto;
+  max-height: min(60vh, 42rem);
+  object-fit: contain;
+  border-radius: .5rem;
+  background: #f6eddc;
+}
+.post-reading-cover-trigger {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: .5rem;
+  background: #f6eddc;
+  cursor: zoom-in;
+}
+.post-reading-cover-trigger:focus-visible,
+.post-reading-body .rich-text-zoomable-image:focus-visible {
+  outline: 3px solid var(--scout-focus);
+  outline-offset: 3px;
+}
+.post-reading-body .rich-text-zoomable-image { cursor: zoom-in; }
 .post-reading-body { font-size: 1.075rem; line-height: 1.8; }
 .post-reading-body > * + * { margin-top: 1rem; }
 .post-reading-body h2, .post-reading-body h3 { margin-top: 2rem; line-height: 1.25; }
+@media (max-width: 575.98px) { .post-reading-cover { max-height: none; } }
 .post-event-info { background: #f2f8f5; border-color: #bfdbc9 !important; }
 .post-event-icon { width: 2.5rem; height: 2.5rem; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #198754; flex: 0 0 auto; }
 .post-event-choice-group { display: inline-flex; max-width: 100%; }

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import LoadingSpinner from "../components/LoadingSpinner";
 import HeroHeader from "../components/HeroHeader";
+import ImageLightbox from "../components/ImageLightbox";
 import UserAvatar from "../components/UserAvatar";
 import MediaPreview from "../modules/web/media/MediaPreview";
 import api from "../services/api";
@@ -98,6 +99,7 @@ export function PostDetailPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === "cs" ? "cs-CZ" : "en-US";
   const { id } = useParams();
+  const [lightboxImage, setLightboxImage] = useState(null);
   const { data: post, isLoading, isError } = useQuery({
     queryKey: ["posts", "feed", id],
     queryFn: async () => (await api.get(`/web/posts/feed/${id}`)).data,
@@ -107,9 +109,18 @@ export function PostDetailPage() {
   if (isError || !post) return <main className="post-reading py-4"><h1 className="h3">{t("posts.loadError")}</h1><Link to="/posts">{t("posts.back")}</Link></main>;
   return <main className="post-reading"><Link to="/posts" className="post-back-link small text-decoration-none"><i className="fas fa-arrow-left me-1" />{t("posts.allPosts")}</Link>
     <article className="mx-auto mt-3"><header className="post-reading-header"><h1>{post.title}</h1><div className="d-flex align-items-center gap-2 small text-muted mt-3"><UserAvatar user={{ real_name: post.author, avatar: post.author_avatar }} size={30} fallbackClass="bg-success" /><span>{post.author || t("common.group")} · {formatDate(post.published_at, locale)}</span></div></header>
-    {post.cover_media_id && <MediaPreview src={`/api/web/media/${post.cover_media_id}/file`} alt="" className="post-reading-cover w-100 my-4" />}
+    {post.cover_media_id && <button
+      type="button"
+      className="post-reading-cover-trigger w-100 my-4"
+      aria-label={t("posts.openImage")}
+      onClick={(event) => {
+        const image = event.currentTarget.querySelector("img");
+        if (image?.src) setLightboxImage({ src: image.currentSrc || image.src, alt: post.title, opener: event.currentTarget });
+      }}
+    ><MediaPreview src={`/api/web/media/${post.cover_media_id}/file`} alt={post.title} className="post-reading-cover w-100" /></button>}
     {post.event && <EventInfoBox event={post.event} />}
-    <RichTextContent className="post-reading-body" value={post.body} />
+    <RichTextContent className="post-reading-body" value={post.body} onImageActivate={setLightboxImage} imageActivationLabel={t("posts.openImage")} />
     </article>
+    <ImageLightbox image={lightboxImage} onClose={() => setLightboxImage(null)} />
   </main>;
 }
