@@ -85,7 +85,7 @@ async def _lifespan(_app: FastAPI):
 
 app = FastAPI(
     title="ScoutComp API",
-    version="1.0.1",
+    version="1.0.2",
     description="Modulární aplikace pro skautské oddíly",
     openapi_url=None, # disable automatic docs - managed by myself to fix issue with proxy
     docs_url=None,
