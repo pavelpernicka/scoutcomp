@@ -476,6 +476,20 @@ def is_media_published(db: Session, media_id: int) -> bool:
     ).first() is not None
 
 
+_IMG_RE2 = re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', re.I)
+_MD_IMG_RE2 = re.compile(r'!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)')
+
+def _first_image_from(description: str | None) -> str | None:
+    """Extract the first image URL from an event description (HTML or Markdown)."""
+    if not description:
+        return None
+    for pattern in (_IMG_RE2, _MD_IMG_RE2):
+        m = pattern.search(description)
+        if m:
+            return m.group(1)
+    return None
+
+
 def _plain_public_text(value: str | None, *, limit: int = 500) -> str:
     """Project legacy rich text to safe readable text for repeat/card data."""
     text = re.sub(r"<[^>]*>", " ", value or "")
@@ -573,6 +587,7 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         "color": event.color,
         "author": real_name or username or "ScoutComp",
         "author_avatar": safe_public_avatar(avatar),
+        "cover_url": _first_image_from(event.description),
     } for event, real_name, username, avatar in events]
 
 
@@ -679,6 +694,7 @@ EVENTS_DATA_SOURCE = WebDataSourceManifest(
         "end_at": PublicField("datetime", "Ends at"),
         "author": PublicField("string", "Author", nullable=False),
         "author_avatar": PublicField("url", "Author avatar"),
+        "cover_url": PublicField("url", "Cover image URL"),
         "url": PublicField("url", "URL"),
         "color": PublicField("string", "Color"),
     },
@@ -710,6 +726,7 @@ POSTS_DATA_SOURCE = WebDataSourceManifest(
         "published_at": PublicField("datetime", "Published at"), "url": PublicField("url", "URL", nullable=False),
         "cover_url": PublicField("url", "Cover image URL"), "author": PublicField("string", "Author", nullable=False),
         "author_avatar": PublicField("url", "Author avatar"),
+        "cover_url": PublicField("url", "Cover image URL"),
     },
     parameters={
         "limit": QueryParameter("integer", "Limit", default=10, minimum=1, maximum=50),

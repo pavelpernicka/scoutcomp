@@ -276,11 +276,27 @@ def _user_is_in_event_scope(db: Session, event: ScoutEvent, user: User) -> bool:
         return False
     return event.audience != "leaders" or user.id in _leader_user_ids(db, [user.id])
 
+import re as _re
+
+_IMG_RE = _re.compile(r'<img[^>]+src=["\']([^"\']+)["\']', _re.I)
+_MD_IMG_RE = _re.compile(r'!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)')
+
+def _first_image_from(description: str | None) -> str | None:
+    """Extract the first image URL from an event description (HTML or Markdown)."""
+    if not description:
+        return None
+    for pattern in (_IMG_RE, _MD_IMG_RE):
+        m = pattern.search(description)
+        if m:
+            return m.group(1)
+    return None
+
+
 def _linked_posts(db: Session, event_ids: list[int]) -> dict[int, list[dict]]:
     if not event_ids:
         return {}
     rows = (
-        db.query(WebPost.id, WebPost.event_id, WebPostRevision.title)
+        db.query(WebPost.id, WebPost.event_id, WebPostRevision.title, WebPostRevision.cover_media_id)
         .join(WebPostRevision, WebPostRevision.id == WebPost.published_revision_id)
         .filter(
             WebPost.event_id.in_(event_ids),
@@ -292,8 +308,8 @@ def _linked_posts(db: Session, event_ids: list[int]) -> dict[int, list[dict]]:
         .all()
     )
     result: dict[int, list[dict]] = {}
-    for post_id, event_id, title in rows:
-        result.setdefault(event_id, []).append({"id": post_id, "title": title})
+    for post_id, event_id, title, cover_media_id in rows:
+                result.setdefault(event_id, []).append({"id": post_id, "title": title, "cover_media_id": cover_media_id})
     return result
 
 
@@ -310,7 +326,7 @@ def serialize(event, *, linked_posts: list[dict] | None = None):
             "planned_deadline": event.planned_deadline, "is_public": event.is_public,
             "created_by_id": event.created_by_id,
             "linked_posts": linked_posts or [],
-            "team_name": event.team.name if getattr(event, "team", None) else None,
+                        "team_name": event.team.name if getattr(event, "team", None) else None,
             "team_names": [team.name for team in teams],
             "attendance": [{"user_id": a.user_id,
                             "user_name": a.user.real_name if a.user else None,
