@@ -16,6 +16,7 @@ import Input from "../components/Input";
 import Select from "../components/Select";
 import LoadingSpinner from "../components/LoadingSpinner";
 import AttendanceDialog from "../components/AttendanceDialog";
+import TeamScopePicker from "../components/TeamScopePicker";
 import EventMonthCalendar from "../components/calendar/EventMonthCalendar";
 import ArticleEditBox from "../modules/web/admin/ArticleEditBox";
 
@@ -86,6 +87,22 @@ const extractError = (error, fallback) => {
   return typeof detail === "string" && detail ? detail : fallback;
 };
 
+const eventTeamIds = (event) => {
+  if (Array.isArray(event?.team_ids)) {
+    return event.team_ids.map(Number).filter(Number.isFinite);
+  }
+  if (!event?.team_id) return [];
+  const legacyId = Number(event.team_id);
+  return Number.isFinite(legacyId) ? [legacyId] : [];
+};
+
+const eventTeamNames = (event) => {
+  if (Array.isArray(event?.team_names)) {
+    return event.team_names.filter(Boolean);
+  }
+  return event?.team_name ? [event.team_name] : [];
+};
+
 const emptyForm = () => ({
   title: "",
   kind: "meeting",
@@ -94,7 +111,7 @@ const emptyForm = () => ({
   location: "",
   description: "",
   color: "",
-  team_id: "",
+  team_ids: [],
   audience: "members",
   requires_planned: false,
   planned_deadline: "",
@@ -109,15 +126,16 @@ const mapEventToForm = (event) => ({
   location: event.location || "",
   description: event.description || "",
   color: event.color || "",
-  team_id: event.team_id ? String(event.team_id) : "",
+  team_ids: eventTeamIds(event),
   audience: event.audience || "members",
   requires_planned: Boolean(event.requires_planned),
   planned_deadline: formatServerDateToInputValue(event.planned_deadline),
   is_public: Boolean(event.is_public),
 });
 
-const validateEventForm = (form) => {
+const validateEventForm = (form, allowWholeUnit) => {
   if (!form.title.trim()) return "validationTitle";
+  if (!allowWholeUnit && form.team_ids.length === 0) return "validationTeamRequired";
   const startsAt = new Date(form.starts_at);
   if (!form.starts_at || Number.isNaN(startsAt.getTime())) return "validationStart";
   if (form.ends_at) {
@@ -146,7 +164,7 @@ KindBadge.propTypes = { kind: PropTypes.string, t: PropTypes.func };
 export default function Activity() {
   const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
-  const { can, profile, userId } = useAuth();
+  const { can, canGlobally, profile, userId } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState(loadPreferredActivityView);
@@ -170,6 +188,7 @@ export default function Activity() {
   const teamFilterRef = useRef(null);
   const filterDefaultsApplied = useRef(false);
   const processedEventParam = useRef(null);
+  const createTeamDefaultPending = useRef(false);
 
   useEffect(() => {
     try {
@@ -194,14 +213,16 @@ export default function Activity() {
   const canEdit = can("core.events.edit");
   const canDelete = can("core.events.delete");
   const canAttendance = can("core.attendance.manage");
-  const canPickTeam = can("core.teams.manage");
+  const canPickEventTeams = canCreate || canEdit;
+  const canCreateWholeUnit = canGlobally("core.events.create");
+  const canEditWholeUnit = canGlobally("core.events.edit");
   const isLeader = can("core.is_leader");
 
   useEffect(() => {
     if (filterDefaultsApplied.current || !profile?.user) return;
     filterDefaultsApplied.current = true;
     if (!isLeader && profile.user.team_id) {
-      setSelectedTeamIds([profile.user.team_id]);
+      setSelectedTeamIds([Number(profile.user.team_id)]);
     }
   }, [isLeader, profile]);
 
@@ -226,13 +247,17 @@ export default function Activity() {
     retry: false,
   });
 
-  const { data: teams = [] } = useQuery({
-    queryKey: ["teams"],
+  const {
+    data: eventTeamOptions = [],
+    isLoading: teamsLoading,
+    isError: teamsError,
+  } = useQuery({
+    queryKey: ["activity-event-team-options"],
     queryFn: async () => {
-      const { data } = await api.get("/teams");
+      const { data } = await api.get("/activity/event-team-options");
       return data;
     },
-    enabled: canPickTeam,
+    enabled: canPickEventTeams,
     retry: false,
   });
 
@@ -325,22 +350,59 @@ export default function Activity() {
   const teamOptions = useMemo(() => {
     const byId = new Map();
     if (profile?.user?.team_id && profile.user.team_name) {
-      byId.set(profile.user.team_id, profile.user.team_name);
+      byId.set(Number(profile.user.team_id), profile.user.team_name);
     }
     for (const event of events) {
-      if (event.team_id && event.team_name) {
-        byId.set(event.team_id, event.team_name);
-      }
+      const ids = eventTeamIds(event);
+      const names = eventTeamNames(event);
+      ids.forEach((id, index) => {
+        if (names[index]) byId.set(id, names[index]);
+      });
     }
     return [...byId.entries()]
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
   }, [events, i18n.language, profile]);
 
+  const teamPickerOptions = useMemo(() => {
+    const byId = new Map(eventTeamOptions.map((team) => [Number(team.id), team.name]));
+    if (editing) {
+      const ids = eventTeamIds(editing);
+      const names = eventTeamNames(editing);
+      ids.forEach((id, index) => {
+        if (!byId.has(id) && names[index]) byId.set(id, names[index]);
+      });
+    }
+    return [...byId.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, i18n.language));
+  }, [editing, eventTeamOptions, i18n.language]);
+
+  useEffect(() => {
+    if (
+      !formOpen ||
+      editing ||
+      canCreateWholeUnit ||
+      !createTeamDefaultPending.current ||
+      teamPickerOptions.length === 0
+    ) return;
+
+    const profileTeamId = Number(profile?.user?.team_id);
+    const defaultTeam = teamPickerOptions.find((team) => team.id === profileTeamId)
+      || teamPickerOptions[0];
+    setForm((current) => current.team_ids.length > 0
+      ? current
+      : { ...current, team_ids: [defaultTeam.id] });
+    createTeamDefaultPending.current = false;
+  }, [canCreateWholeUnit, editing, formOpen, profile, teamPickerOptions]);
+
   const filteredEvents = useMemo(() => {
     const byTeam = selectedTeamIds.length === 0
       ? events
-      : events.filter((event) => !event.team_id || selectedTeamIds.includes(event.team_id));
+      : events.filter((event) => {
+        const ids = eventTeamIds(event);
+        return ids.length === 0 || ids.some((id) => selectedTeamIds.includes(id));
+      });
     return councilOnly ? byTeam.filter((event) => event.audience === "leaders") : byTeam;
   }, [councilOnly, events, selectedTeamIds]);
 
@@ -392,8 +454,14 @@ export default function Activity() {
     setFormError(null);
     setEditing(null);
     const startsAt = date ? toLocalInput(date, true) : "";
+    const profileTeamId = Number(profile?.user?.team_id);
+    const defaultTeam = !canCreateWholeUnit
+      ? teamPickerOptions.find((team) => team.id === profileTeamId) || teamPickerOptions[0]
+      : null;
+    createTeamDefaultPending.current = !canCreateWholeUnit && !defaultTeam;
     setForm({
       ...emptyForm(),
+      team_ids: defaultTeam ? [defaultTeam.id] : [],
       starts_at: startsAt,
       ends_at: startsAt ? addHoursToInput(startsAt, 1) : "",
     });
@@ -405,6 +473,7 @@ export default function Activity() {
     setFormError(null);
     setSelectedEvent(null);
     setEditing(event);
+    createTeamDefaultPending.current = false;
     const nextForm = mapEventToForm(event);
     setForm(nextForm);
     setEndsAtAuto(!nextForm.ends_at && Boolean(nextForm.starts_at));
@@ -456,7 +525,10 @@ export default function Activity() {
 
   const handleSave = (eventForm) => {
     eventForm.preventDefault();
-    const validationError = validateEventForm(form);
+    const allowWholeUnit = editing
+      ? canEditWholeUnit || eventTeamIds(editing).length === 0
+      : canCreateWholeUnit;
+    const validationError = validateEventForm(form, allowWholeUnit);
     if (validationError) {
       setFormError(t(`calendar.${validationError}`));
       return;
@@ -469,7 +541,7 @@ export default function Activity() {
       location: form.location.trim() || null,
       description: form.description.trim() || null,
       color: form.color || null,
-      team_id: form.team_id ? Number(form.team_id) : null,
+      team_ids: form.team_ids,
       audience: form.audience || "members",
       requires_planned: Boolean(form.requires_planned),
       planned_deadline: form.requires_planned && form.planned_deadline
@@ -824,12 +896,12 @@ export default function Activity() {
           <div className="row g-3">
             <div className="col-12">
               <KindBadge kind={selectedEvent.kind} t={t} />
-              {selectedEvent.team_name && (
-                <span className="badge bg-dark ms-2">
-                  <i className="fas fa-users me-1"></i>
-                  {selectedEvent.team_name}
-                </span>
-              )}
+              <span className="badge bg-dark ms-2">
+                <i className="fas fa-users me-1"></i>
+                {eventTeamNames(selectedEvent).length > 0
+                  ? eventTeamNames(selectedEvent).join(", ")
+                  : t("calendar.unitWide")}
+              </span>
             </div>
             <div className="col-md-6">
               <div className="d-flex align-items-center gap-2 text-muted small mb-2">
@@ -1088,16 +1160,18 @@ export default function Activity() {
                 ]}
               />
             </div>
-            {canPickTeam && (
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">{t("calendar.team")}</label>
-                <Select
-                  value={form.team_id}
-                  onChange={(e) => setForm({ ...form, team_id: e.target.value })}
-                  options={[
-                    { value: "", label: t("calendar.unitWide") },
-                    ...teams.map((team) => ({ value: String(team.id), label: team.name })),
-                  ]}
+            {canPickEventTeams && (
+              <div className="col-12">
+                <TeamScopePicker
+                  value={form.team_ids}
+                  onChange={(teamIds) => setForm({ ...form, team_ids: teamIds })}
+                  teams={teamPickerOptions}
+                  isLoading={teamsLoading}
+                  error={teamsError}
+                  disabled={saveMutation.isPending}
+                  allowWholeUnit={editing
+                    ? canEditWholeUnit || eventTeamIds(editing).length === 0
+                    : canCreateWholeUnit}
                 />
               </div>
             )}
@@ -1248,11 +1322,11 @@ function EventListItem({ event, i18n, t, onClick, dimmed, myStatus }) {
               {event.location}
             </>
           )}
-          {event.team_name && (
+          {eventTeamNames(event).length > 0 && (
             <>
               {" · "}
               <i className="fas fa-users me-1"></i>
-              {event.team_name}
+              {eventTeamNames(event).join(", ")}
             </>
           )}
         </div>

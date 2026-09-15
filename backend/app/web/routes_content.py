@@ -463,8 +463,11 @@ def _serialize_linked_event(db: Session, event_id: int | None, user: User) -> di
         return None
     permissions = permission_keys(db, user)
     is_leader = "core.is_leader" in permissions
+    event_team_ids = {team.id for team in event.teams} or (
+        {event.team_id} if event.team_id is not None else set()
+    )
     if (event.audience == "leaders" and not is_leader) or (
-        event.team_id is not None and event.team_id != user.team_id and not is_leader
+        event_team_ids and user.team_id not in event_team_ids and not is_leader
     ):
         return None
     planned = db.query(ScoutAttendance).filter_by(

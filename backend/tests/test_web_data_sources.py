@@ -167,11 +167,16 @@ def test_events_are_public_by_event_flag_not_by_cms_page(db_session):
         ScoutEvent(title="První schůzka", kind="meeting", starts_at=_now(), team_id=first_team.id, is_public=True),
         ScoutEvent(title="Druhá schůzka", kind="meeting", starts_at=_now(), team_id=second_team.id, is_public=True),
     ])
+    db_session.flush()
+    db_session.add(ScoutEvent(
+        title="Společná schůzka", kind="meeting", starts_at=_now(),
+        team_id=first_team.id, teams=[first_team, second_team], is_public=True,
+    ))
     db_session.commit()
 
-    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": first_team.id})] == ["První schůzka"]
-    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": second_team.id})] == ["Druhá schůzka"]
-    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"kind": "meeting"})] == ["První schůzka", "Druhá schůzka"]
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": first_team.id})] == ["První schůzka", "Společná schůzka"]
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"team_id": second_team.id})] == ["Druhá schůzka", "Společná schůzka"]
+    assert [item["title"] for item in resolve_data_source(db_session, "core.events", {"kind": "meeting"})] == ["První schůzka", "Druhá schůzka", "Společná schůzka"]
 
 def test_request_cache_reuses_projected_result(db_session):
     _seed(db_session)

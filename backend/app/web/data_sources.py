@@ -527,7 +527,10 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
     if params.get("kind"):
         query = query.filter(ScoutEvent.kind == params["kind"])
     if params.get("team_id") is not None:
-        query = query.filter(ScoutEvent.team_id == params["team_id"])
+        query = query.filter(or_(
+            ScoutEvent.teams.any(id=params["team_id"]),
+            ScoutEvent.team_id == params["team_id"],
+        ))
     if params.get("from"):
         if params.get("overlap"):
             # Calendar windows include events which started before the first

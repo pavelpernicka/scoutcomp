@@ -243,9 +243,13 @@ def list_member_attendance(
         raise HTTPException(404, "Member not found")
     real = aliased(ScoutAttendance)
     planned = aliased(ScoutAttendance)
-    intended_for_member = ScoutEvent.team_id.is_(None)
+    intended_for_member = and_(~ScoutEvent.teams.any(), ScoutEvent.team_id.is_(None))
     if user.team_id is not None:
-        intended_for_member = or_(intended_for_member, ScoutEvent.team_id == user.team_id)
+        intended_for_member = or_(
+            intended_for_member,
+            ScoutEvent.teams.any(id=user.team_id),
+            ScoutEvent.team_id == user.team_id,
+        )
     query = (
         db.query(ScoutEvent, real.status.label("real_status"), planned.status.label("planned_status"))
         .outerjoin(real, and_(real.event_id == ScoutEvent.id, real.user_id == user_id, real.mode == "real"))

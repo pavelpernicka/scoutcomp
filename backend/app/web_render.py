@@ -17,6 +17,7 @@ from html.parser import HTMLParser
 from typing import Iterable
 from urllib.parse import urlparse
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from .models import ScoutEvent, WebMedia, WebPage
@@ -220,8 +221,13 @@ def _now() -> datetime:
 def _event_query(db: Session, team_id: int | None = None) -> Iterable[ScoutEvent]:
     query = db.query(ScoutEvent).filter(ScoutEvent.audience == "members")
     if team_id:
-        query = query.filter(ScoutEvent.team_id == team_id)
+        query = query.filter(or_(ScoutEvent.teams.any(id=team_id), ScoutEvent.team_id == team_id))
     return query
+
+
+def _event_team_names(event: ScoutEvent) -> str:
+    teams = list(getattr(event, "teams", None) or ([event.team] if getattr(event, "team", None) else []))
+    return ", ".join(escape(team.name) for team in teams if team.name)
 
 
 def _int_param(value: str | None) -> int | None:
@@ -258,9 +264,9 @@ def render_events_list(db: Session, params: dict, *, team_id: int | None = None,
         icon = KIND_ICONS.get(kind, KIND_ICONS["other"])
         label = KIND_LABELS.get(kind, "Akce")
         meta = f"{_fmt_datetime(event.starts_at)} · {location}" if location else _fmt_datetime(event.starts_at)
-        team_name = escape(event.team.name) if event.team and event.team.name else None
-        if team_name:
-            meta = f"{meta} · {team_name}"
+        team_names = _event_team_names(event)
+        if team_names:
+            meta = f"{meta} · {team_names}"
         description = escape((event.description or "").strip()[:160])
         desc_html = f'<p class="web-list-desc">{description}</p>' if description else ""
         cards.append(
@@ -288,7 +294,7 @@ def render_meetups(db: Session, params: dict, *, team_id: int | None = None, cur
         return '<div class="web-empty">Zatím žádné naplánované schůzky.</div>'
     items = []
     for event in events:
-        team_name = escape(event.team.name) if event.team and event.team.name else ""
+        team_name = _event_team_names(event)
         location = escape(event.location) if event.location else None
         items.append(
             f'<li class="web-list-item">'

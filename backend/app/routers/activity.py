@@ -51,11 +51,65 @@ class EventPayload(BaseModel):
     ends_at: datetime | None = None
     location: str | None = None
     color: str | None = Field(default=None, min_length=4, max_length=16)
+    team_ids: list[int] | None = Field(default=None, max_length=100)
     team_id: int | None = None
     audience: str = "members"  # members | leaders
     requires_planned: bool = False
     planned_deadline: datetime | None = None
     is_public: bool = True
+
+
+def _payload_team_ids(payload: EventPayload) -> set[int]:
+    """Prefer the multi-team contract while accepting legacy single-team clients."""
+    raw_ids = payload.team_ids if payload.team_ids is not None else (
+        [payload.team_id] if payload.team_id is not None else []
+    )
+    if any(team_id <= 0 for team_id in raw_ids):
+        raise HTTPException(422, "team_ids must contain positive team identifiers")
+    return set(raw_ids)
+
+
+def _event_team_ids(event: ScoutEvent) -> set[int]:
+    teams = getattr(event, "teams", None)
+    if teams:
+        return {team.id for team in teams}
+    return {event.team_id} if event.team_id is not None else set()
+
+
+def _load_target_teams(db: Session, team_ids: set[int]) -> list[Team]:
+    if not team_ids:
+        return []
+    teams = db.query(Team).filter(Team.id.in_(team_ids)).order_by(Team.name, Team.id).all()
+    if {team.id for team in teams} != team_ids:
+        raise HTTPException(422, "One or more selected teams do not exist")
+    return teams
+
+
+def _allows_event_target(
+    db: Session,
+    user: User,
+    action: str,
+    team_ids: set[int],
+    *,
+    owner_id: int | None = None,
+    current_team_ids: set[int] | None = None,
+) -> bool:
+    """Authorize the complete event scope, never only one selected team."""
+    scopes = permission_scopes(db, user, action)
+    if "any" in scopes:
+        return True
+    if "own" in scopes and owner_id == user.id and (
+        current_team_ids is None or team_ids == current_team_ids
+    ):
+        return True
+    return bool(team_ids) and "team" in scopes and team_ids.issubset(managed_team_ids(user))
+
+
+def _assign_event_teams(event: ScoutEvent, teams: list[Team]) -> None:
+    event.teams = teams
+    # Preserve the legacy scalar for old integrations. For multi-team events it
+    # deliberately represents only the first target; team_ids is authoritative.
+    event.team_id = teams[0].id if teams else None
 
 class AttendancePayload(BaseModel):
     user_id: int
@@ -191,13 +245,14 @@ def _event_scope_users(
     }
     users_by_event: dict[int, set[int]] = {}
     for event in events:
+        target_team_ids = _event_team_ids(event)
         scoped_ids: set[int] = set()
         for user in users:
             if user.id not in readable_ids:
                 continue
-            if event.team_id is not None and (
-                user.team_id != event.team_id
-                and event.team_id not in managed_by_user[user.id]
+            if target_team_ids and not (
+                user.team_id in target_team_ids
+                or target_team_ids.intersection(managed_by_user[user.id])
             ):
                 continue
             if event.audience == "leaders" and user.id not in leader_ids:
@@ -213,9 +268,10 @@ def _user_is_in_event_scope(db: Session, event: ScoutEvent, user: User) -> bool:
         return False
     if user.id not in _permission_user_ids(db, [user.id], "core", "events.read"):
         return False
-    if event.team_id is not None and (
-        user.team_id != event.team_id
-        and event.team_id not in {team.id for team in user.managed_teams}
+    target_team_ids = _event_team_ids(event)
+    if target_team_ids and not (
+        user.team_id in target_team_ids
+        or target_team_ids.intersection(team.id for team in user.managed_teams)
     ):
         return False
     return event.audience != "leaders" or user.id in _leader_user_ids(db, [user.id])
@@ -246,13 +302,16 @@ def _can_read_posts(db: Session, user: User) -> bool:
 
 
 def serialize(event, *, linked_posts: list[dict] | None = None):
-    return {"id": event.id, "team_id": event.team_id, "title": event.title, "description": event.description,
+    teams = list(getattr(event, "teams", None) or ([event.team] if getattr(event, "team", None) else []))
+    return {"id": event.id, "team_id": event.team_id, "team_ids": [team.id for team in teams],
+            "title": event.title, "description": event.description,
             "kind": event.kind, "starts_at": event.starts_at, "ends_at": event.ends_at, "location": event.location,
             "color": event.color, "audience": event.audience, "requires_planned": event.requires_planned,
             "planned_deadline": event.planned_deadline, "is_public": event.is_public,
             "created_by_id": event.created_by_id,
             "linked_posts": linked_posts or [],
             "team_name": event.team.name if getattr(event, "team", None) else None,
+            "team_names": [team.name for team in teams],
             "attendance": [{"user_id": a.user_id,
                             "user_name": a.user.real_name if a.user else None,
                             "user_group": a.user.permission_groups[0].name if a.user and a.user.permission_groups else None,
@@ -263,9 +322,11 @@ def list_events(team_id: int | None = Query(None), db: Session = Depends(get_db)
     if not allows(db, current_user, "core.events.read"): raise HTTPException(403, "Missing permission")
     query = db.query(ScoutEvent).options(
         joinedload(ScoutEvent.team),
+        selectinload(ScoutEvent.teams),
         selectinload(ScoutEvent.attendances).selectinload(ScoutAttendance.user).selectinload(User.permission_groups),
     )
-    if team_id is not None: query = query.filter(ScoutEvent.team_id == team_id)
+    if team_id is not None:
+        query = query.filter(or_(ScoutEvent.teams.any(Team.id == team_id), ScoutEvent.team_id == team_id))
     if not _is_leader(db, current_user):
         query = query.filter(ScoutEvent.audience == "members")
     events = query.order_by(ScoutEvent.starts_at.desc()).all()
@@ -284,7 +345,7 @@ def list_event_options(
     """Lightweight event browser for pickers; newest events are returned first."""
     if not allows(db, current_user, "core.events.read"):
         raise HTTPException(403, "Missing permission")
-    visible = db.query(ScoutEvent).options(joinedload(ScoutEvent.team))
+    visible = db.query(ScoutEvent).options(joinedload(ScoutEvent.team), selectinload(ScoutEvent.teams))
     if not _is_leader(db, current_user):
         visible = visible.filter(ScoutEvent.audience == "members")
 
@@ -318,6 +379,24 @@ def list_event_presets(db: Session = Depends(get_db), current_user: User = Depen
     return _get_event_presets(db)
 
 
+@router.get("/event-team-options")
+def list_event_team_options(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Return only teams the caller may target while creating or editing events."""
+    create_scopes = permission_scopes(db, current_user, "core.events.create")
+    edit_scopes = permission_scopes(db, current_user, "core.events.edit")
+    scopes = create_scopes | edit_scopes
+    if not scopes:
+        raise HTTPException(403, "Missing event management permission")
+    query = db.query(Team).order_by(Team.name, Team.id)
+    if "any" not in scopes:
+        team_ids = managed_team_ids(current_user) if "team" in scopes else set()
+        query = query.filter(Team.id.in_(team_ids) if team_ids else Team.id == -1)
+    return [{"id": team.id, "name": team.name} for team in query.all()]
+
+
 @router.put("/event-presets")
 def update_event_presets(payload: list[EventPresetPayload], db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     keys = permission_keys(db, current_user)
@@ -336,10 +415,10 @@ def update_event_presets(payload: list[EventPresetPayload], db: Session = Depend
 
 @router.get("/members")
 def list_activity_members(event_id: int = Query(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if event is None:
         raise HTTPException(404, "Event not found")
-    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id):
+    if not _allows_event_target(db, current_user, "core.attendance.manage", _event_team_ids(event)):
         raise HTTPException(403, "Missing permission")
     users, users_by_event, leader_ids = _event_scope_users(db, [event])
     scoped_ids = users_by_event[event.id]
@@ -349,10 +428,16 @@ def list_activity_members(event_id: int = Query(...), db: Session = Depends(get_
 
 @router.post("/events", status_code=status.HTTP_201_CREATED)
 def create_event(payload: EventPayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    if not allows(db, current_user, "core.events.create", team_id=payload.team_id): raise HTTPException(403, "Missing permission")
+    team_ids = _payload_team_ids(payload)
+    if not _allows_event_target(db, current_user, "core.events.create", team_ids):
+        raise HTTPException(403, "Missing permission")
     if payload.audience == "leaders" and not _is_leader(db, current_user):
         raise HTTPException(403, "Only leaders can create council events")
-    event = ScoutEvent(**payload.model_dump(), created_by_id=current_user.id); db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit()
+    teams = _load_target_teams(db, team_ids)
+    event_data = payload.model_dump(exclude={"team_id", "team_ids"})
+    event = ScoutEvent(**event_data, created_by_id=current_user.id)
+    _assign_event_teams(event, teams)
+    db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit()
     background_tasks.add_task(_deliver_event_created_push, event.id, current_user.id)
     db.refresh(event)
     posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
@@ -360,13 +445,21 @@ def create_event(payload: EventPayload, background_tasks: BackgroundTasks, db: S
 
 @router.put("/events/{event_id}")
 def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if not event: raise HTTPException(404, "Event not found")
-    if not allows(db, current_user, "core.events.edit", owner_id=event.created_by_id, team_id=event.team_id): raise HTTPException(403, "Missing permission")
+    current_team_ids = _event_team_ids(event)
+    team_ids = _payload_team_ids(payload)
+    if not _allows_event_target(
+        db, current_user, "core.events.edit", team_ids,
+        owner_id=event.created_by_id, current_team_ids=current_team_ids,
+    ):
+        raise HTTPException(403, "Missing permission")
     if payload.audience == "leaders" and not _is_leader(db, current_user):
         raise HTTPException(403, "Only leaders can set council audience")
     was_public = event.is_public
-    for key, value in payload.model_dump().items(): setattr(event, key, value)
+    teams = _load_target_teams(db, team_ids)
+    for key, value in payload.model_dump(exclude={"team_id", "team_ids"}).items(): setattr(event, key, value)
+    _assign_event_teams(event, teams)
     if was_public or event.is_public:
         from ..web.pages import rebuild_published_page_artifacts
         rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
@@ -377,9 +470,11 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
 
 @router.delete("/events/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_event(event_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if not event: raise HTTPException(404, "Event not found")
-    if not allows(db, current_user, "core.events.delete", owner_id=event.created_by_id, team_id=event.team_id):
+    if not _allows_event_target(
+        db, current_user, "core.events.delete", _event_team_ids(event), owner_id=event.created_by_id,
+    ):
         raise HTTPException(403, "Missing permission")
     was_public = event.is_public
     db.delete(event)
@@ -390,10 +485,10 @@ def delete_event(event_id: int, db: Session = Depends(get_db), current_user: Use
 
 @router.post("/events/{event_id}/attendance")
 def set_attendance(event_id: int, payload: AttendancePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     target_user = db.get(User, payload.user_id)
     if not event or not target_user: raise HTTPException(404, "Event or user not found")
-    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id): raise HTTPException(403, "Missing permission")
+    if not _allows_event_target(db, current_user, "core.attendance.manage", _event_team_ids(event)): raise HTTPException(403, "Missing permission")
     if not _user_is_in_event_scope(db, event, target_user):
         raise HTTPException(422, "User is outside the event scope")
     if payload.mode not in ("planned", "real"):
@@ -406,7 +501,7 @@ def set_attendance(event_id: int, payload: AttendancePayload, db: Session = Depe
 @router.post("/events/{event_id}/planned")
 def set_own_planned_attendance(event_id: int, payload: SelfPlannedPayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Members declare their own planned attendance for an event (self sign-up)."""
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if not event:
         raise HTTPException(404, "Event not found")
     if not allows(db, current_user, "core.events.read"):
@@ -436,7 +531,7 @@ def set_own_planned_attendance(event_id: int, payload: SelfPlannedPayload, db: S
 @router.delete("/events/{event_id}/planned")
 def unregister_from_planned(event_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """Members unregister their own planned attendance for an event."""
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if not event:
         raise HTTPException(404, "Event not found")
     if not allows(db, current_user, "core.events.read"):
@@ -453,9 +548,9 @@ def unregister_from_planned(event_id: int, db: Session = Depends(get_db), curren
 
 @router.post("/events/{event_id}/message")
 def message_attendees(event_id: int, payload: EventMessagePayload, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    event = db.get(ScoutEvent, event_id)
+    event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
     if not event: raise HTTPException(404, "Event not found")
-    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id): raise HTTPException(403, "Missing permission")
+    if not _allows_event_target(db, current_user, "core.attendance.manage", _event_team_ids(event)): raise HTTPException(403, "Missing permission")
     rows = (
         db.query(User, ScoutAttendance.status)
         .join(ScoutAttendance, ScoutAttendance.user_id == User.id)
@@ -517,15 +612,20 @@ def _scope_attendance_event_query(query, db: Session, user: User):
     team_ids = managed_team_ids(user) if "team" in scopes else set()
     if not team_ids:
         return query.filter(ScoutEvent.id == -1)
-    return query.filter(ScoutEvent.team_id.in_(team_ids))
+    return query.filter(
+        or_(ScoutEvent.teams.any(Team.id.in_(team_ids)), ScoutEvent.team_id.in_(team_ids)),
+        ~ScoutEvent.teams.any(~Team.id.in_(team_ids)),
+    )
 
 
 def serialize_admin_event(event, include_members=False, db: Session | None = None):
     real_count = sum(1 for a in event.attendances if a.mode == "real" and a.status == "present")
     planned_count = sum(1 for a in event.attendances if a.mode == "planned")
+    teams = list(getattr(event, "teams", None) or ([event.team] if getattr(event, "team", None) else []))
     data = {
         "id": event.id,
         "team_id": event.team_id,
+        "team_ids": [team.id for team in teams],
         "title": event.title,
         "description": event.description,
         "kind": event.kind,
@@ -538,6 +638,7 @@ def serialize_admin_event(event, include_members=False, db: Session | None = Non
         "planned_deadline": event.planned_deadline,
         "created_by_id": event.created_by_id,
         "team_name": event.team.name if getattr(event, "team", None) else None,
+        "team_names": [team.name for team in teams],
         "real_count": real_count,
         "planned_count": planned_count,
         "attendance": [
@@ -580,6 +681,7 @@ def admin_list_events(
 ):
     query = db.query(ScoutEvent).options(
         joinedload(ScoutEvent.team),
+        selectinload(ScoutEvent.teams),
         joinedload(ScoutEvent.attendances),
     )
     query = _scope_attendance_event_query(query, db, current_user)
@@ -588,7 +690,7 @@ def admin_list_events(
     if date_to:
         query = query.filter(ScoutEvent.starts_at <= date_to)
     if team_id:
-        query = query.filter(ScoutEvent.team_id == team_id)
+        query = query.filter(or_(ScoutEvent.teams.any(Team.id == team_id), ScoutEvent.team_id == team_id))
     if kind:
         query = query.filter(ScoutEvent.kind == kind)
     total = query.count()
@@ -605,7 +707,7 @@ def admin_list_events(
             planned_count = sum(1 for attendance in event.attendances if attendance.mode == "planned")
             writer.writerow([
                 event.id, event.title, event.kind, event.starts_at, event.ends_at or "",
-                event.location or "", event.team.name if event.team else "", real_count, planned_count
+                event.location or "", ", ".join(team.name for team in event.teams), real_count, planned_count
             ])
         output.seek(0)
         return StreamingResponse(
@@ -624,11 +726,12 @@ def admin_get_event(
 ):
     event = db.query(ScoutEvent).options(
         joinedload(ScoutEvent.team),
+        selectinload(ScoutEvent.teams),
         joinedload(ScoutEvent.attendances),
     ).filter(ScoutEvent.id == event_id).one_or_none()
     if not event:
         raise HTTPException(404, "Event not found")
-    if not allows(db, current_user, "core.attendance.manage", team_id=event.team_id):
+    if not _allows_event_target(db, current_user, "core.attendance.manage", _event_team_ids(event)):
         raise HTTPException(403, "Missing permission")
     return serialize_admin_event(event, include_members=True, db=db)
 
@@ -688,7 +791,7 @@ def admin_member_attendance(
 
     query = (
         db.query(ScoutEvent)
-        .options(joinedload(ScoutEvent.team))
+        .options(joinedload(ScoutEvent.team), selectinload(ScoutEvent.teams))
         .join(ScoutAttendance, ScoutAttendance.event_id == ScoutEvent.id)
         .filter(ScoutAttendance.user_id == user_id)
         .distinct()
@@ -720,6 +823,7 @@ def admin_member_attendance(
             "kind": event.kind,
             "starts_at": event.starts_at,
             "team_name": event.team.name if event.team else None,
+            "team_names": [team.name for team in event.teams],
             "real_status": real.status if real else None,
             "planned_status": planned.status if planned else None,
             "registered_on": planned.created_at if planned else (real.created_at if real else None),
@@ -750,7 +854,7 @@ def admin_attendance_matrix(
     current_user: User = Depends(require_attendance_manage),
 ):
     """Attendance matrix: events as columns, members grouped by team with per-event real status."""
-    event_query = db.query(ScoutEvent)
+    event_query = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams))
     event_query = _scope_attendance_event_query(event_query, db, current_user)
     if date_from:
         event_query = event_query.filter(ScoutEvent.starts_at >= date_from)
@@ -814,9 +918,7 @@ def _event_push_recipient_ids(db: Session, event: ScoutEvent, creator_id: int) -
     for user in users:
         if not allows(db, user, "core.events.read"):
             continue
-        if user.team_id is not None and event.team_id not in {None, user.team_id}:
-            continue
-        if event.audience == "leaders" and not _is_leader(db, user):
+        if not _user_is_in_event_scope(db, event, user):
             continue
         recipient_ids.add(user.id)
     return recipient_ids
@@ -825,7 +927,7 @@ def _event_push_recipient_ids(db: Session, event: ScoutEvent, creator_id: int) -
 def _deliver_event_created_push(event_id: int, creator_id: int) -> None:
     """Resolve visibility after commit in a fresh task-owned session."""
     with SessionLocal() as db:
-        event = db.get(ScoutEvent, event_id)
+        event = db.query(ScoutEvent).options(selectinload(ScoutEvent.teams)).filter(ScoutEvent.id == event_id).one_or_none()
         if event is None:
             return
         recipient_ids = _event_push_recipient_ids(db, event, creator_id)

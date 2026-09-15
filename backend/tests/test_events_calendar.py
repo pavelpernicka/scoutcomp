@@ -1,7 +1,7 @@
 from datetime import datetime, timezone, timedelta
 
 import pytest
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 from app.core.security import get_password_hash
 from app.models import (
@@ -17,10 +17,14 @@ from app.models import (
 from app.modules import registry
 from app.routers.activity import (
     AttendancePayload,
+    EventPayload,
     admin_attendance_matrix,
+    create_event,
     list_activity_members,
+    list_event_team_options,
     list_events,
     set_attendance,
+    update_event,
 )
 from app.web.data_sources import resolve_data_source
 
@@ -137,6 +141,78 @@ def test_admin_can_create_unit_wide_event(client, db_session):
     assert response.status_code == 201
     assert response.json()["team_id"] is None
     assert response.json()["team_name"] is None
+
+
+def test_admin_can_create_and_retarget_multi_team_event(db_session):
+    alpha = Team(name="Alpha", join_code="MULTIALPHA")
+    beta = Team(name="Beta", join_code="MULTIBETA")
+    admin = _user("admin", RoleEnum.ADMIN)
+    db_session.add_all([alpha, beta, admin])
+    db_session.commit()
+    registry.seed(db_session)
+    db_session.refresh(admin)
+    assert list_event_team_options(db_session, admin) == [
+        {"id": alpha.id, "name": "Alpha"},
+        {"id": beta.id, "name": "Beta"},
+    ]
+
+    created = create_event(
+        EventPayload(**_event_payload(team_ids=[alpha.id, beta.id])),
+        BackgroundTasks(), db_session, admin,
+    )
+    assert created["team_ids"] == [alpha.id, beta.id]
+    assert created["team_names"] == ["Alpha", "Beta"]
+
+    updated = update_event(
+        created["id"],
+        EventPayload(**_event_payload(title="Jen Beta", team_ids=[beta.id])),
+        db_session, admin,
+    )
+    assert updated["team_ids"] == [beta.id]
+    assert updated["team_names"] == ["Beta"]
+
+    unit_wide = update_event(
+        created["id"],
+        EventPayload(**_event_payload(title="Celý oddíl", team_ids=[])),
+        db_session, admin,
+    )
+    assert unit_wide["team_ids"] == []
+    assert unit_wide["team_names"] == []
+    assert unit_wide["team_id"] is None
+
+
+def test_team_scoped_leader_cannot_target_unmanaged_teams_or_whole_unit(db_session):
+    alpha = Team(name="Alpha", join_code="SCOPEDALPHA")
+    beta = Team(name="Beta", join_code="SCOPEDBETA")
+    leader = _user("leader", RoleEnum.GROUP_ADMIN, alpha)
+    db_session.add_all([alpha, beta, leader])
+    db_session.commit()
+    registry.seed(db_session)
+    db_session.refresh(leader)
+    assert list_event_team_options(db_session, leader) == [
+        {"id": alpha.id, "name": "Alpha"},
+    ]
+
+    for forbidden_ids in ([alpha.id, beta.id], [], [beta.id]):
+        with pytest.raises(HTTPException) as caught:
+            create_event(
+                EventPayload(**_event_payload(team_ids=forbidden_ids)),
+                BackgroundTasks(), db_session, leader,
+            )
+        assert caught.value.status_code == 403
+
+    own_event = create_event(
+        EventPayload(**_event_payload(team_ids=[alpha.id])),
+        BackgroundTasks(), db_session, leader,
+    )
+    for forbidden_ids in ([alpha.id, beta.id], [], [beta.id]):
+        with pytest.raises(HTTPException) as caught:
+            update_event(
+                own_event["id"],
+                EventPayload(**_event_payload(team_ids=forbidden_ids)),
+                db_session, leader,
+            )
+        assert caught.value.status_code == 403
 
 
 def test_event_public_visibility_is_explicit_and_available_to_cms(client, db_session):

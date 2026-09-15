@@ -1331,6 +1331,40 @@ def _add_web_publication_artifacts(conn: Connection) -> None:
             conn.execute(text(f"ALTER TABLE web_page_revisions ADD COLUMN {name} {definition}"))
 
 
+def _create_scout_event_teams(conn: Connection) -> None:
+    """Add normalized multi-team event targets and backfill legacy events."""
+    tables = set(inspect(conn).get_table_names())
+    if "scout_events" not in tables or "teams" not in tables:
+        return
+    conn.execute(text(
+        """
+        CREATE TABLE IF NOT EXISTS scout_event_teams (
+            event_id INTEGER NOT NULL REFERENCES scout_events(id) ON DELETE CASCADE,
+            team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+            PRIMARY KEY (event_id, team_id)
+        )
+        """
+    ))
+    event_columns = {column["name"] for column in inspect(conn).get_columns("scout_events")}
+    if "team_id" in event_columns:
+        conn.execute(text(
+            """
+            INSERT INTO scout_event_teams (event_id, team_id)
+            SELECT event.id, event.team_id
+            FROM scout_events AS event
+            WHERE event.team_id IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM scout_event_teams AS target
+                  WHERE target.event_id = event.id AND target.team_id = event.team_id
+              )
+            """
+        ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_scout_event_teams_team_id "
+        "ON scout_event_teams (team_id)"
+    ))
+
+
 def _add_web_publication_dependencies(conn: Connection) -> None:
     """Persist data-source dependencies for targeted public regeneration."""
     inspector = inspect(conn)
@@ -3064,6 +3098,11 @@ MIGRATIONS: List[Migration] = [
         "20260824_add_web_publication_dependencies",
         _add_web_publication_dependencies,
         "Track data-source dependencies for targeted public regeneration",
+    ),
+    Migration(
+        "20260915_create_scout_event_teams",
+        _create_scout_event_teams,
+        "Allow events to target multiple teams",
     ),
 ]
 

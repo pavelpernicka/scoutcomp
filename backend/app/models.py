@@ -684,6 +684,15 @@ class RegisteredModule(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
 
+class ScoutEventTeam(Base):
+    """Explicit team targets for an event; no rows means the whole unit."""
+
+    __tablename__ = "scout_event_teams"
+
+    event_id = Column(Integer, ForeignKey("scout_events.id", ondelete="CASCADE"), primary_key=True)
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), primary_key=True)
+
+
 class ScoutEvent(Base):
     __tablename__ = "scout_events"
 
@@ -705,6 +714,7 @@ class ScoutEvent(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
 
     team = relationship("Team")
+    teams = relationship("Team", secondary="scout_event_teams", order_by="Team.name")
     attendances = relationship(
         "ScoutAttendance",
         back_populates="event",
