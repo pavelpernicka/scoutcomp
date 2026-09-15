@@ -1,8 +1,8 @@
-import { useId } from "react";
+import { useId, useState, useRef, useEffect } from "react";
 import PropTypes from "prop-types";
 import { useTranslation } from "react-i18next";
 
-/** Selects either the whole unit or one or more teams. An empty value means the whole unit. */
+/** Multi-select dropdown for event team scope. Whole unit (empty) or one/more teams. */
 export default function TeamScopePicker({
   value,
   onChange,
@@ -14,79 +14,120 @@ export default function TeamScopePicker({
 }) {
   const { t } = useTranslation();
   const fieldId = useId();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
   const selectedIds = new Set(value.map(Number));
 
-  const toggleTeam = (teamId, checked) => {
-    const normalizedId = Number(teamId);
-    if (checked) {
-      onChange([...selectedIds, normalizedId]);
-      return;
-    }
-    onChange(value.filter((id) => Number(id) !== normalizedId));
+  const isAll = value.length === 0;
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const handleToggleAll = () => {
+    if (isAll) return;
+    onChange([]);
   };
 
+  const handleToggleTeam = (teamId) => {
+    const id = Number(teamId);
+    if (selectedIds.has(id)) {
+      const next = value.filter((v) => Number(v) !== id);
+      onChange(next.length === 0 ? [] : next);
+    } else {
+      onChange([...value.map(Number), id]);
+    }
+  };
+
+  const label = isAll
+    ? t("calendar.unitWide")
+    : teams
+        .filter((t) => selectedIds.has(Number(t.id)))
+        .map((t) => t.name)
+        .join(", ");
+
   return (
-    <fieldset disabled={disabled} aria-describedby={`${fieldId}-hint`}>
-      <legend className="form-label small fw-semibold mb-1">{t("calendar.teamScope")}</legend>
-      <div className="border rounded p-2">
-        {allowWholeUnit && (
-          <>
-            <label className="d-flex align-items-start gap-2 rounded px-2 py-1 user-select-none">
-              <input
-                type="radio"
-                className="form-check-input mt-1"
-                name={`${fieldId}-scope`}
-                checked={value.length === 0}
-                onChange={() => onChange([])}
-              />
-              <span>
-                <span className="d-block fw-semibold">{t("calendar.unitWide")}</span>
-                <span className="d-block small text-muted">{t("calendar.unitWideHint")}</span>
-              </span>
-            </label>
-
-            <hr className="my-2" />
-          </>
-        )}
-
-        {isLoading && (
-          <div className="small text-muted px-2 py-1" role="status">
-            <i className="fas fa-spinner fa-spin me-1" aria-hidden="true" />
-            {t("calendar.teamsLoading")}
-          </div>
-        )}
-
-        {error && (
-          <div className="small text-danger px-2 py-1" role="alert">
-            {t("calendar.teamsLoadError")}
-          </div>
-        )}
-
-        {!isLoading && teams.length === 0 && !error && (
-          <div className="small text-muted px-2 py-1">{t("calendar.noTeamsAvailable")}</div>
-        )}
-
-        {teams.map((team) => (
-          <label
-            key={team.id}
-            className="d-flex align-items-center gap-2 rounded px-2 py-1 user-select-none"
+    <div>
+      <label className="form-label small fw-semibold mb-1">
+        {t("calendar.teamScope")}
+      </label>
+      <div className="position-relative" ref={containerRef}>
+        <button
+          type="button"
+          className={`form-select text-start${error ? " is-invalid" : ""}`}
+          disabled={disabled || isLoading}
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-describedby={`${fieldId}-hint`}
+          style={{ minWidth: 0 }}
+        >
+          {isLoading ? (
+            <>
+              <i className="fas fa-spinner fa-spin me-1" aria-hidden="true" />
+              {t("calendar.teamsLoading")}
+            </>
+          ) : (
+            <span className={isAll ? "" : "fw-semibold"}>{label}</span>
+          )}
+        </button>
+        {open && (
+          <div
+            className="position-absolute start-0 w-100 border rounded bg-white shadow-sm"
+            style={{ zIndex: 1000, maxHeight: "16rem", overflowY: "auto" }}
           >
-            <input
-              type="checkbox"
-              className="form-check-input m-0"
-              checked={selectedIds.has(Number(team.id))}
-              onChange={(event) => toggleTeam(team.id, event.target.checked)}
-            />
-            <span>{team.name}</span>
-          </label>
-        ))}
+            {allowWholeUnit && (
+              <label className="d-flex align-items-center gap-2 px-3 py-2 m-0 user-select-none cursor-pointer"
+                style={{ cursor: "pointer" }}>
+                <input
+                  type="radio"
+                  className="form-check-input m-0"
+                  name={`${fieldId}-all`}
+                  checked={isAll}
+                  onChange={handleToggleAll}
+                />
+                <span>
+                  <span className="d-block fw-semibold small">{t("calendar.unitWide")}</span>
+                  <span className="d-block text-muted" style={{ fontSize: ".75rem" }}>
+                    {t("calendar.unitWideHint")}
+                  </span>
+                </span>
+              </label>
+            )}
+
+            {allowWholeUnit && <hr className="my-0" />}
+
+            {teams.map((team) => (
+              <label
+                key={team.id}
+                className="d-flex align-items-center gap-2 px-3 py-2 m-0 user-select-none"
+                style={{ cursor: "pointer" }}
+              >
+                <input
+                  type="checkbox"
+                  className="form-check-input m-0"
+                  checked={selectedIds.has(Number(team.id))}
+                  onChange={() => handleToggleTeam(team.id)}
+                />
+                <span className="small">{team.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </div>
       <div id={`${fieldId}-hint`} className="form-text">
         {allowWholeUnit
           ? t("calendar.teamScopeHint")
           : t("calendar.teamScopeTeamsOnlyHint")}
       </div>
-    </fieldset>
+    </div>
   );
 }
 
