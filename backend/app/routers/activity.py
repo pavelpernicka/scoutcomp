@@ -464,6 +464,7 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
     teams = _load_target_teams(db, team_ids)
     for key, value in payload.model_dump(exclude={"team_id", "team_ids"}).items(): setattr(event, key, value)
     _assign_event_teams(event, teams)
+    db.flush()
     if was_public or event.is_public:
         from ..web.pages import rebuild_published_page_artifacts
         rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
