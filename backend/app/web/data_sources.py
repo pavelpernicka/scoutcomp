@@ -530,6 +530,7 @@ def _event_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         query = query.filter(or_(
             ScoutEvent.teams.any(id=params["team_id"]),
             ScoutEvent.team_id == params["team_id"],
+            and_(ScoutEvent.team_id.is_(None), ~ScoutEvent.teams.any()),
         ))
     if params.get("from"):
         if params.get("overlap"):

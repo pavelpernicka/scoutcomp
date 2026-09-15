@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..dependencies import get_current_active_user, get_db
@@ -326,7 +326,11 @@ def list_events(team_id: int | None = Query(None), db: Session = Depends(get_db)
         selectinload(ScoutEvent.attendances).selectinload(ScoutAttendance.user).selectinload(User.permission_groups),
     )
     if team_id is not None:
-        query = query.filter(or_(ScoutEvent.teams.any(Team.id == team_id), ScoutEvent.team_id == team_id))
+        query = query.filter(or_(
+            ScoutEvent.teams.any(Team.id == team_id),
+            ScoutEvent.team_id == team_id,
+            and_(ScoutEvent.team_id.is_(None), ~ScoutEvent.teams.any()),
+        ))
     if not _is_leader(db, current_user):
         query = query.filter(ScoutEvent.audience == "members")
     events = query.order_by(ScoutEvent.starts_at.desc()).all()
@@ -690,7 +694,11 @@ def admin_list_events(
     if date_to:
         query = query.filter(ScoutEvent.starts_at <= date_to)
     if team_id:
-        query = query.filter(or_(ScoutEvent.teams.any(Team.id == team_id), ScoutEvent.team_id == team_id))
+        query = query.filter(or_(
+            ScoutEvent.teams.any(Team.id == team_id),
+            ScoutEvent.team_id == team_id,
+            and_(ScoutEvent.team_id.is_(None), ~ScoutEvent.teams.any()),
+        ))
     if kind:
         query = query.filter(ScoutEvent.kind == kind)
     total = query.count()
