@@ -515,6 +515,30 @@ def test_public_image_binding_accepts_verified_avatar_and_replaces_missing_or_un
     assert '<div aria-hidden="true" class="sc-image-placeholder"></div>' in missing
 
 
+def test_ontario_event_card_renders_cover_image_and_falls_back_to_placeholder(db_session):
+    from app.web.ontario_theme import ONTARIO_EVENT_CARD
+
+    compiled = compile_project(project({
+        "type": "sc-repeat", "source": "core.events",
+        "components": [deepcopy(ONTARIO_EVENT_CARD)],
+    }))
+    event = {
+        "title": "Výprava", "description": "Víkend venku", "author": "Vedoucí",
+        "author_avatar": None, "start_at": datetime(2026, 9, 19, 8),
+        "url": "/udalosti/1", "cover_url": "/media/7/file",
+    }
+
+    with_cover = render_project(db_session, compiled.tree, resolver=lambda *_: [event])
+    without_cover = render_project(
+        db_session, compiled.tree,
+        resolver=lambda *_: [{**event, "cover_url": None}],
+    )
+
+    assert 'class="card-img-top ontario-photo-tint sc-image-placeholder--event"' in with_cover
+    assert 'src="/media/7/file"' in with_cover
+    assert '<div aria-hidden="true" class="card-img-top ontario-photo-tint sc-image-placeholder--event sc-image-placeholder"></div>' in without_cover
+
+
 def test_hierarchical_menu_component_preserves_children_and_safe_links(db_session):
     compiled = compile_project(project({"type": "sc-menu", "location": "main"}))
     assert compiled.tree["components"][0] == {"type": "sc-menu", "location": "main", "components": []}

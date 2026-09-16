@@ -372,11 +372,13 @@ def _media_references(value: Any) -> set[int]:
 
 
 def published_media_ids(db: Session) -> set[int]:
-    """Media reachable from the current immutable public snapshots.
+    """Media reachable from current public content.
 
     The public data-source catalogue and the public file endpoint share this
     exact boundary, so draft-only uploads and metadata cannot be enumerated by
-    visitor-facing repeaters.
+    visitor-facing repeaters. Public events are mutable domain records rather
+    than CMS snapshots, but their descriptions are rendered by the same public
+    data-source boundary and may therefore publish embedded media too.
     """
     result: set[int] = {
         row[0] for row in db.query(WebMedia.id).filter(WebMedia.is_public.is_(True)).all()
@@ -415,6 +417,11 @@ def published_media_ids(db: Session) -> set[int]:
         if revision.og_image_id is not None:
             result.add(revision.og_image_id)
         result.update(_media_references(revision.body))
+
+    for (description,) in db.query(ScoutEvent.description).filter(
+        ScoutEvent.is_public.is_(True),
+    ).all():
+        result.update(_media_references(description))
 
     identity_assets = db.query(Config.value).filter(
         Config.key.in_(("web.site_logo", "web.favicon", "web.og_image")),
@@ -468,6 +475,13 @@ def is_media_published(db: Session, media_id: int) -> bool:
         ),
     ).first()
     if post_reference is not None:
+        return True
+
+    event_reference = db.query(ScoutEvent.id).filter(
+        ScoutEvent.is_public.is_(True),
+        ScoutEvent.description.like(reference),
+    ).first()
+    if event_reference is not None:
         return True
 
     return db.query(Config.key).filter(

@@ -1,4 +1,6 @@
 """Authenticated CMS templates routes."""
+import hashlib
+import json
 from copy import deepcopy
 
 from .routes_common import *  # noqa: F403
@@ -10,6 +12,16 @@ from .pages import _extract_page_content, rebuild_published_page_artifacts
 from .routes_design import _validated_editor_css
 from .default_template import DEFAULT_SCOUT_TEMPLATE, DEFAULT_THEME_ID, DEFAULT_THEME_NAME, DEFAULT_THEME_VERSION, DEFAULT_THEME_DESCRIPTION, DEFAULT_THEME_CONFIG, DEFAULT_THEME_TEMPLATES, DEFAULT_THEME_SECTIONS, DEFAULT_THEME_COMPONENTS
 from .previews import build_preview, ensure_preview, get_current_preview, project_preview_svg
+
+def _project_hash(data: dict) -> str:
+    """Content hash for detecting code-owned project-data changes."""
+    if not isinstance(data, dict):
+        return ""
+    return hashlib.sha256(json.dumps(data, sort_keys=True, default=str).encode()).hexdigest()
+
+
+
+
 # ---------------------------------------------------------------- components & templates
 
 _DEFAULT_TEMPLATE_SVG = (
@@ -194,7 +206,13 @@ def seed_default_theme(db: Session) -> None:
                 template.description = DEFAULT_THEME_DESCRIPTION
             if not template.project_data:
                 template.project_data = project_data
-            if not template.published_project_data:
+            # Code-owned system layouts are authoritative; republish when the
+            # built-in project data changes without erasing an author draft.
+            if template.published_project_data and template.is_system and _project_hash(template.published_project_data) != _project_hash(project_data):
+                template.published_project_data = project_data
+                template.published_version = (template.published_version or 0) + 1
+                theme_css_changed = True
+            elif not template.published_project_data:
                 template.published_project_data = project_data
                 template.published_version = max(template.published_version or 0, 1)
             template.theme_version_id = version.id
@@ -247,7 +265,12 @@ def seed_default_theme(db: Session) -> None:
                     row.description = DEFAULT_THEME_DESCRIPTION
                 if not row.project_data:
                     row.project_data = project_data
-                if not row.published_project_data:
+                # Detect code-owned data changes by content hash.
+                if row.published_project_data and _project_hash(row.published_project_data) != _project_hash(project_data):
+                    row.published_project_data = project_data
+                    row.published_version = max(row.published_version or 0, 1) + 1
+                    theme_css_changed = True
+                elif not row.published_project_data:
                     row.published_project_data = project_data
                     row.published_version = max(row.published_version or 0, 1)
                 row.theme_version_id = version.id
@@ -314,6 +337,7 @@ def seed_default_pages(db: Session) -> None:
     """Create any missing default pages (main, news) idempotently and keep
     the built-in slugs in their default published state."""
     seed_default_templates(db)
+    seed_default_theme(db)
     from .ontario_theme import (
         ONTARIO_THEME_ID,
         ONTARIO_THEME_TEMPLATES,

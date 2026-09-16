@@ -254,7 +254,11 @@ ONTARIO_POST_CARD = _element("article", "card shadow-sm ontario-card ontario-pos
 ])
 
 ONTARIO_EVENT_CARD = _element("article", "card shadow-sm ontario-card ontario-event-card", name="Karta události", components=[
-    _element("div", "card-img-top sc-image-placeholder sc-image-placeholder--event", **{"aria-hidden": "true"}),
+    {"type": "image", "tagName": "img", "name": "Náhled události", "attributes": {
+        "class": "card-img-top ontario-photo-tint sc-image-placeholder--event",
+        "alt": "", "loading": "lazy",
+    },
+     "scBindings": {"src": {"scope": "context", "field": "cover_url"}, "alt": {"scope": "context", "field": "title"}}},
     _element("div", "card-body", components=[
         _element("div", "ontario-card-meta", components=[
             _element("span", "ontario-card-author", components=[

@@ -82,8 +82,9 @@ def test_events_are_public_only_and_projected_through_allowlist(db_session):
     assert [item["title"] for item in result] == ["Public"]
     assert set(result[0]) == {
         "id", "title", "description", "kind", "start_at", "end_at", "url", "color",
-        "author", "author_avatar",
+        "author", "author_avatar", "cover_url",
     }
+    assert result[0]["cover_url"] is None
     with pytest.raises(DataSourceValidationError):
         resolve_data_source(db_session, "core.events", {"private": True})
     with pytest.raises(DataSourceValidationError):
@@ -330,7 +331,9 @@ def test_menu_source_reads_published_tree_and_projects_nested_items(db_session):
     assert "private_note" not in result[0]
 
 
-def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_session):
+def test_media_source_exposes_only_media_referenced_by_public_content(db_session):
+    from app.web.data_sources import is_media_published
+
     _seed(db_session)
     public = WebMedia(filename="public.png", path="public.png", mime="image/png", size=1, album="Live")
     background = WebMedia(filename="background.png", path="background.png", mime="image/png", size=1, album="Live")
@@ -338,8 +341,20 @@ def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_se
         filename="gallery.png", path="gallery.png", mime="image/png", size=1,
         album="Live", is_public=True,
     )
+    event_cover = WebMedia(filename="event.png", path="event.png", mime="image/png", size=1, album="Live")
+    private_event_cover = WebMedia(filename="private-event.png", path="private-event.png", mime="image/png", size=1, album="Private")
     draft = WebMedia(filename="draft.png", path="draft.png", mime="image/png", size=1, album="Draft secret")
-    db_session.add_all([public, background, gallery, draft]); db_session.flush()
+    db_session.add_all([public, background, gallery, event_cover, private_event_cover, draft]); db_session.flush()
+    db_session.add_all([
+        ScoutEvent(
+            title="Public event", kind="trip", starts_at=_now(), is_public=True,
+            description=f'<p><img src="/api/web/media/{event_cover.id}/file"></p>',
+        ),
+        ScoutEvent(
+            title="Private event", kind="trip", starts_at=_now(), is_public=False,
+            description=f'<p><img src="/api/web/media/{private_event_cover.id}/file"></p>',
+        ),
+    ])
     page = WebPage(
         slug="gallery", path_segment="gallery", path="/gallery", title="Gallery",
         data={}, published=True, draft_version=1,
@@ -360,8 +375,10 @@ def test_media_source_exposes_only_media_referenced_by_published_snapshots(db_se
 
     result = resolve_data_source(db_session, "core.media")
 
-    assert {item["id"] for item in result} == {public.id, background.id, gallery.id}
+    assert {item["id"] for item in result} == {public.id, background.id, gallery.id, event_cover.id}
     assert all(item["album"] != "Draft secret" for item in result)
+    assert is_media_published(db_session, event_cover.id) is True
+    assert is_media_published(db_session, private_event_cover.id) is False
 
 
 def test_web_manage_implies_granular_permissions_but_explicit_deny_wins(db_session):

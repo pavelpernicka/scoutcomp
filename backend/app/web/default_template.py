@@ -551,6 +551,7 @@ DEFAULT_THEME_SECTIONS.update({
             {"type": "default", "tagName": "div", "attributes": {"class": "sc-scout-grid"}, "components": [{
                 "type": "sc-repeat", "source": "core.events", "params": {"limit": 6},
                 "components": [{"type": "link", "tagName": "a", "attributes": {"class": "sc-scout-event"}, "scBindings": {"href": {"scope": "context", "field": "url"}}, "components": [
+                    {"type": "image", "tagName": "img", "scBindings": {"src": {"scope": "context", "field": "cover_url"}}, "attributes": {"class": "sc-scout-event-image"}},
                     {"type": "heading", "tagName": "h3", "scBindings": {"text": {"scope": "context", "field": "title"}}},
                     {"type": "text", "tagName": "p", "scBindings": {"text": {"scope": "context", "field": "description"}}},
                 ]}], "empty": [{"type": "text", "tagName": "p", "content": "Další schůzky právě připravujeme."}],
