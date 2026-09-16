@@ -30,6 +30,7 @@ from ..services.web_push import (
     notification_timestamp,
 )
 from ..timezones import utc_storage_to_local
+from ..web.artifact_queue import enqueue_artifact_invalidations, wake_artifact_dispatcher
 
 router = APIRouter(prefix="/activity", tags=["scout activity"])
 admin_router = APIRouter(prefix="/admin/core/attendance", tags=["admin attendance"])
@@ -37,11 +38,12 @@ admin_router = APIRouter(prefix="/admin/core/attendance", tags=["admin attendanc
 EVENT_PRESETS_KEY = "event_presets"
 
 
-def _refresh_public_web_artifacts(db: Session, event: ScoutEvent | None) -> None:
-    """Keep static public event/team listings coherent before commit."""
+def _refresh_public_web_artifacts(db: Session, event: ScoutEvent | None) -> bool:
+    """Durably queue static public event listings in the caller's transaction."""
     if event is not None and event.is_public:
-        from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
+        enqueue_artifact_invalidations(db, {"source:core.events"})
+        return True
+    return False
 
 class EventPayload(BaseModel):
     title: str = Field(min_length=1, max_length=200)
@@ -457,7 +459,9 @@ def create_event(payload: EventPayload, background_tasks: BackgroundTasks, db: S
     event_data = payload.model_dump(exclude={"team_id", "team_ids"})
     event = ScoutEvent(**event_data, created_by_id=current_user.id)
     _assign_event_teams(event, teams)
-    db.add(event); db.flush(); _refresh_public_web_artifacts(db, event); db.commit()
+    db.add(event); db.flush(); queued = _refresh_public_web_artifacts(db, event); db.commit()
+    if queued:
+        wake_artifact_dispatcher()
     background_tasks.add_task(_deliver_event_created_push, event.id, current_user.id)
     db.refresh(event)
     posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
@@ -481,10 +485,12 @@ def update_event(event_id: int, payload: EventPayload, db: Session = Depends(get
     for key, value in payload.model_dump(exclude={"team_id", "team_ids"}).items(): setattr(event, key, value)
     _assign_event_teams(event, teams)
     db.flush()
-    if was_public or event.is_public:
-        from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
+    should_refresh_public_artifacts = bool(was_public or event.is_public)
+    if should_refresh_public_artifacts:
+        enqueue_artifact_invalidations(db, {"source:core.events"})
     db.commit()
+    if should_refresh_public_artifacts:
+        wake_artifact_dispatcher()
     posts = _linked_posts(db, [event.id]).get(event.id) if _can_read_posts(db, current_user) else None
     return serialize(event, linked_posts=posts)
 
@@ -500,9 +506,10 @@ def delete_event(event_id: int, db: Session = Depends(get_db), current_user: Use
     was_public = event.is_public
     db.delete(event)
     if was_public:
-        from ..web.pages import rebuild_published_page_artifacts
-        rebuild_published_page_artifacts(db, dependency_keys={"source:core.events"})
+        enqueue_artifact_invalidations(db, {"source:core.events"})
     db.commit()
+    if was_public:
+        wake_artifact_dispatcher()
 
 @router.post("/events/{event_id}/attendance")
 def set_attendance(event_id: int, payload: AttendancePayload, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):

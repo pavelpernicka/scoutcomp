@@ -20,6 +20,7 @@ from app.routers.activity import (
     EventPayload,
     admin_attendance_matrix,
     create_event,
+    delete_event,
     list_activity_members,
     list_event_team_options,
     list_events,
@@ -179,6 +180,32 @@ def test_admin_can_create_and_retarget_multi_team_event(db_session):
     assert unit_wide["team_ids"] == []
     assert unit_wide["team_names"] == []
     assert unit_wide["team_id"] is None
+
+
+def test_deleting_public_event_durably_enqueues_web_invalidation(db_session):
+    from app.models import WebArtifactInvalidation
+
+    admin = _user("delete-public-event", RoleEnum.ADMIN)
+    db_session.add(admin)
+    db_session.flush()
+    event = ScoutEvent(
+        title="Public event",
+        kind="meeting",
+        starts_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        is_public=True,
+        created_by_id=admin.id,
+    )
+    db_session.add(event)
+    db_session.commit()
+    registry.seed(db_session)
+
+    delete_event(event.id, db_session, admin)
+
+    assert db_session.get(ScoutEvent, event.id) is None
+    assert [
+        row.dependency_key
+        for row in db_session.query(WebArtifactInvalidation).all()
+    ] == ["source:core.events"]
 
 
 def test_team_scoped_leader_cannot_target_unmanaged_teams_or_whole_unit(db_session):

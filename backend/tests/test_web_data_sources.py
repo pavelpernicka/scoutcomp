@@ -221,6 +221,28 @@ def test_posts_source_reads_published_snapshot_not_mutable_draft(db_session):
     assert result[0]["url"] == "/post/live"
 
 
+def test_posts_source_excludes_unpublished_snapshot(db_session):
+    _seed(db_session)
+    post = WebPost(title="Hidden", slug="hidden", published=False)
+    db_session.add(post)
+    db_session.flush()
+    publication = WebPostRevision(
+        post_id=post.id,
+        revision_number=1,
+        source_version=1,
+        title="Hidden",
+        slug="hidden",
+        reason="publish",
+        is_publication=True,
+    )
+    db_session.add(publication)
+    db_session.flush()
+    post.published_revision_id = publication.id
+    db_session.commit()
+
+    assert resolve_data_source(db_session, "core.posts") == []
+
+
 def test_public_content_urls_follow_validated_site_schemes(db_session):
     _seed(db_session)
     post = WebPost(title="Článek", slug="clanek", published=True)

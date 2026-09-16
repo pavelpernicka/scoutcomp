@@ -17,6 +17,7 @@ from .modules.registration import register_all_modules
 from .migrations import run_migrations
 from .module_gate import ModuleGateMiddleware
 from .services.web_push import start_push_dispatcher, stop_push_dispatcher
+from .web.artifact_queue import start_artifact_dispatcher, stop_artifact_dispatcher
 from .routers import (
     announcements,
     auth,
@@ -76,11 +77,13 @@ run_migrations(engine)
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    dispatcher = start_push_dispatcher()
+    push_dispatcher = start_push_dispatcher()
+    artifact_dispatcher = start_artifact_dispatcher()
     try:
         yield
     finally:
-        stop_push_dispatcher(dispatcher)
+        stop_artifact_dispatcher(artifact_dispatcher)
+        stop_push_dispatcher(push_dispatcher)
 
 
 app = FastAPI(

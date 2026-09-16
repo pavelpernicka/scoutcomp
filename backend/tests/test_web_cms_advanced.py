@@ -1568,7 +1568,7 @@ def test_multiday_event_schedule_separates_start_and_end_for_readability():
 
 
 def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
-    from app.web.routes_content import delete_menu, delete_post
+    from app.web.routes_content import delete_menu
     from app.web.routes_design import activate_theme_version
     from app.web.routes_pages import delete_page
     from app.web.routes_templates import delete_template
@@ -1590,9 +1590,8 @@ def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
         project_data=project(), published_project_data=project(), published_version=1,
     )
     page = WebPage(slug="live-page", title="Live page", data=project(), published=True)
-    post = WebPost(slug="live-post", title="Live post", published=True)
     menu = WebMenu(name="Main", location="main")
-    db_session.add_all([template, page, post, menu]); db_session.flush()
+    db_session.add_all([template, page, menu]); db_session.flush()
     page_revision = WebPageRevision(
         page_id=page.id, revision_number=1, source_version=1, title=page.title,
         path="/live-page", path_segment="live-page", data=project(),
@@ -1611,7 +1610,6 @@ def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
 
     calls = (
         lambda: delete_page(page.id, db_session, user),
-        lambda: delete_post(post.id, db_session, user),
         lambda: delete_menu(menu.id, db_session, user),
         lambda: activate_theme_version(999999, db_session, user),
         lambda: delete_template(template.id, db_session, user),
@@ -1620,6 +1618,47 @@ def test_explicit_publish_deny_blocks_live_destructive_actions(db_session):
         with pytest.raises(HTTPException) as caught:
             call()
         assert caught.value.status_code == 403
+
+
+def test_post_manager_can_delete_another_authors_published_post(db_session):
+    from app.web.routes_content import delete_post
+
+    registry.seed(db_session)
+    owner = User(
+        username="post-owner", real_name="Post owner", password_hash="x",
+        role=RoleEnum.MEMBER,
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    manager = User(
+        username="post-manager", real_name="Post manager", password_hash="x",
+        role=RoleEnum.MEMBER,
+        first_login_at=datetime.now(timezone.utc).replace(tzinfo=None),
+    )
+    db_session.add_all([owner, manager]); db_session.flush()
+    manage = db_session.query(PermissionDefinition).filter_by(
+        module_code="core", code="posts.manage",
+    ).one()
+    publish = db_session.query(PermissionDefinition).filter_by(
+        module_code="core", code="posts.publish",
+    ).one()
+    db_session.add_all([
+        DirectUserPermission(user_id=manager.id, permission_id=manage.id),
+        DirectUserPermissionDeny(user_id=manager.id, permission_id=publish.id),
+    ])
+    post = WebPost(
+        slug="another-authors-post",
+        title="Another author's post",
+        published=True,
+        created_by_id=owner.id,
+    )
+    db_session.add(post)
+    db_session.commit()
+
+    delete_post(post.id, db_session, manager)
+
+    db_session.refresh(post)
+    assert post.deleted_at is not None
+    assert post.published is False
 
 
 def test_media_magic_size_and_path_security(tmp_path):

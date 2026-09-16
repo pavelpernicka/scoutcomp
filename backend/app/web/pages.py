@@ -7,14 +7,14 @@ from datetime import date, datetime, timezone
 import json
 import re
 import uuid
-from typing import Any
+from typing import Any, Callable
 
 from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, defer
 from unidecode import unidecode
 
-from ..models import WebPage, WebPageRevision, WebTemplate
+from ..models import WebArtifactInvalidation, WebPage, WebPageRevision, WebTemplate
 from ..timezones import application_timezone
 from .linked_resources import validate_linked_resource_instances
 from .renderer import (
@@ -533,7 +533,11 @@ def publish_page(db: Session, page: WebPage, *, expected_version: int, user_id: 
     return revision
 
 
-def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRevision) -> None:
+def _render_publication_artifacts(
+    db: Session,
+    page: WebPage,
+    revision: WebPageRevision,
+) -> dict[Any, Any]:
     """Materialise page 1 and bounded pagination variants in the same tx.
 
     The linked pagination component uses only ``?page=N`` and shows a next
@@ -579,10 +583,66 @@ def _build_publication_artifacts(db: Session, page: WebPage, revision: WebPageRe
                 db, page, revision, query={"month": month}, use_artifact=False,
                 dependency_sink=dependencies,
             )
-    revision.rendered_html = default
-    revision.rendered_variants = variants
-    revision.rendered_at = datetime.now(timezone.utc)
-    revision.render_dependencies = sorted(dependencies)
+    return {
+        WebPageRevision.rendered_html: default,
+        WebPageRevision.rendered_variants: variants,
+        WebPageRevision.rendered_at: datetime.now(timezone.utc),
+        WebPageRevision.render_dependencies: sorted(dependencies),
+    }
+
+
+def _apply_publication_artifacts(
+    db: Session,
+    revision: WebPageRevision | int,
+    values: dict[Any, Any],
+    *,
+    artifact_generation: int | None = None,
+) -> bool:
+    if artifact_generation is not None:
+        revision_id = revision if isinstance(revision, int) else revision.id
+        updated = db.query(WebPageRevision).filter(
+            WebPageRevision.id == revision_id,
+            WebPageRevision.artifact_generation < artifact_generation,
+        ).update(
+            {**values, WebPageRevision.artifact_generation: artifact_generation},
+            synchronize_session=False,
+        )
+        return updated == 1
+
+    if isinstance(revision, int):  # pragma: no cover - guarded internal contract
+        raise TypeError("Synchronous artifact application requires a revision object")
+
+    # Explicit page/template/theme publication remains synchronous.  Stamp it
+    # with at least the newest queued generation so an already-running older
+    # worker cannot overwrite this deliberate rebuild.
+    newest_queued_generation = int(
+        db.query(func.max(WebArtifactInvalidation.id)).scalar() or 0
+    )
+    revision.rendered_html = values[WebPageRevision.rendered_html]
+    revision.rendered_variants = values[WebPageRevision.rendered_variants]
+    revision.rendered_at = values[WebPageRevision.rendered_at]
+    revision.render_dependencies = values[WebPageRevision.render_dependencies]
+    revision.artifact_generation = max(
+        int(revision.artifact_generation or 0),
+        newest_queued_generation,
+    )
+    return True
+
+
+def _build_publication_artifacts(
+    db: Session,
+    page: WebPage,
+    revision: WebPageRevision,
+    *,
+    artifact_generation: int | None = None,
+) -> bool:
+    values = _render_publication_artifacts(db, page, revision)
+    return _apply_publication_artifacts(
+        db,
+        revision,
+        values,
+        artifact_generation=artifact_generation,
+    )
 
 
 def rebuild_published_page_artifacts(
@@ -590,6 +650,8 @@ def rebuild_published_page_artifacts(
     *,
     page_ids: set[int] | None = None,
     dependency_keys: set[str] | None = None,
+    artifact_generation: int | None = None,
+    prepare_commit: Callable[[], bool] | None = None,
 ) -> int:
     """Regenerate immutable output before a related publication is committed.
 
@@ -622,10 +684,14 @@ def rebuild_published_page_artifacts(
             if not isinstance(recorded, list) or bool(set(recorded) & dependency_keys)
         }
         if not dependent_ids:
+            if artifact_generation is not None and prepare_commit is not None:
+                db.rollback()
+                prepare_commit()
             return 0
         query = query.filter(WebPage.id.in_(dependent_ids))
     pages = query.order_by(WebPage.id.asc()).all()
     count = 0
+    staged: list[tuple[int, dict[Any, Any]]] = []
     for published_page in pages:
         revision = db.query(WebPageRevision).options(
             defer(WebPageRevision.rendered_html),
@@ -636,8 +702,31 @@ def rebuild_published_page_artifacts(
         ).one_or_none()
         if revision is None:
             continue
-        _build_publication_artifacts(db, published_page, revision)
-        count += 1
+        if artifact_generation is not None:
+            # Render every affected page before the first UPDATE.  On SQLite
+            # this keeps the write-lock phase short, so event/post mutations
+            # can continue enqueueing while expensive rendering is in flight.
+            staged.append((
+                revision.id,
+                _render_publication_artifacts(db, published_page, revision),
+            ))
+        elif _build_publication_artifacts(db, published_page, revision):
+            count += 1
+    if artifact_generation is not None and prepare_commit is not None:
+        # End the potentially long read snapshot before acquiring the short
+        # write fence.  This avoids SQLITE_BUSY_SNAPSHOT when a route enqueues
+        # a newer mutation during rendering.
+        db.rollback()
+        if not prepare_commit():
+            return 0
+    for revision_id, values in staged:
+        if _apply_publication_artifacts(
+            db,
+            revision_id,
+            values,
+            artifact_generation=artifact_generation,
+        ):
+            count += 1
     return count
 
 

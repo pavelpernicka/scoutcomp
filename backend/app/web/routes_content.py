@@ -11,6 +11,7 @@ router = APIRouter(prefix="/web", tags=["web"])
 
 from .routes_pages import PublishPayload
 from .pages import rebuild_published_page_artifacts
+from .artifact_queue import enqueue_artifact_invalidations, wake_artifact_dispatcher
 
 
 def _require_post_manage(db: Session, user: User) -> None:
@@ -386,11 +387,11 @@ def _publish_post(
     if updated != 1:
         db.rollback()
         raise HTTPException(409, "Draft was changed by another editor")
-    rebuild_published_page_artifacts(
-        db,
-        dependency_keys={"source:core.posts", "source:web.posts"},
+    enqueue_artifact_invalidations(
+        db, {"source:core.posts", "source:web.posts"},
     )
     db.commit()
+    wake_artifact_dispatcher()
     db.refresh(post)
 
     if first_publication and background_tasks is not None:
@@ -675,11 +676,11 @@ def unpublish_post(post_id: int, db: Session = Depends(get_db), current_user: Us
         raise HTTPException(404, "Post not found")
     post.published = False
     post.published_at = None
-    rebuild_published_page_artifacts(
-        db,
-        dependency_keys={"source:core.posts", "source:web.posts"},
+    enqueue_artifact_invalidations(
+        db, {"source:core.posts", "source:web.posts"},
     )
     db.commit()
+    wake_artifact_dispatcher()
     db.refresh(post)
     return _serialize_post(post)
 
@@ -690,17 +691,16 @@ def delete_post(post_id: int, db: Session = Depends(get_db), current_user: User 
     post = db.query(WebPost).filter_by(id=post_id, deleted_at=None).one_or_none()
     if not post:
         raise HTTPException(404, "Post not found")
-    if post.published_revision_id or post.published:
-        _require_post_publish(db, current_user)
     was_public = bool(post.published)
     post.deleted_at = datetime.now(timezone.utc)
     post.published = False
     if was_public:
-        rebuild_published_page_artifacts(
-            db,
-            dependency_keys={"source:core.posts", "source:web.posts"},
+        enqueue_artifact_invalidations(
+            db, {"source:core.posts", "source:web.posts"},
         )
     db.commit()
+    if was_public:
+        wake_artifact_dispatcher()
 
 
 def _parse_dt(value: str | None) -> datetime | None:

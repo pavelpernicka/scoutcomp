@@ -2698,6 +2698,62 @@ def _create_push_deliveries_table(conn: Connection) -> None:
     ))
 
 
+def _create_web_artifact_invalidation_queue(conn: Connection) -> None:
+    """Create the durable, generation-safe public artifact rebuild queue."""
+    from .models import WebArtifactInvalidation
+
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "web_artifact_invalidations" not in tables:
+        logger.info("Creating 'web_artifact_invalidations' table")
+        # Let SQLAlchemy emit the dialect-specific identity syntax.  In
+        # particular, SQLite needs AUTOINCREMENT for generations never to be
+        # reused while PostgreSQL must not receive SQLite's keyword.
+        WebArtifactInvalidation.__table__.create(bind=conn, checkfirst=True)
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_artifact_invalidations_dependency_key "
+        "ON web_artifact_invalidations(dependency_key)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_artifact_invalidations_available_at "
+        "ON web_artifact_invalidations(available_at)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_artifact_invalidations_lock_token "
+        "ON web_artifact_invalidations(lock_token)"
+    ))
+    conn.execute(text(
+        "CREATE INDEX IF NOT EXISTS ix_web_artifact_invalidations_ready "
+        "ON web_artifact_invalidations(available_at, locked_at)"
+    ))
+
+    revision_columns = {
+        column["name"]
+        for column in inspect(conn).get_columns("web_page_revisions")
+    }
+    if "artifact_generation" not in revision_columns:
+        conn.execute(text(
+            "ALTER TABLE web_page_revisions "
+            "ADD COLUMN artifact_generation INTEGER NOT NULL DEFAULT 0"
+        ))
+
+
+def _create_web_artifact_invalidation_fence(conn: Connection) -> None:
+    """Create and idempotently seed the cross-dialect rebuild write fence."""
+    from .models import WebArtifactInvalidationFence
+
+    WebArtifactInvalidationFence.__table__.create(bind=conn, checkfirst=True)
+    fence_exists = conn.execute(text(
+        "SELECT 1 FROM web_artifact_invalidation_fence WHERE id = 1"
+    )).first()
+    if fence_exists is None:
+        conn.execute(WebArtifactInvalidationFence.__table__.insert().values(
+            id=1,
+            generation=0,
+            updated_at=datetime.now(timezone.utc),
+        ))
+
+
 def _generalize_public_event_settings(conn: Connection) -> None:
     """Copy legacy meeting settings to event settings without losing custom URLs."""
     if "config" not in set(inspect(conn).get_table_names()):
@@ -3103,6 +3159,16 @@ MIGRATIONS: List[Migration] = [
         "20260915_create_scout_event_teams",
         _create_scout_event_teams,
         "Allow events to target multiple teams",
+    ),
+    Migration(
+        "20260916_create_web_artifact_invalidation_queue",
+        _create_web_artifact_invalidation_queue,
+        "Queue targeted public artifact rebuilds with generation guards",
+    ),
+    Migration(
+        "20260916_add_web_artifact_invalidation_fence",
+        _create_web_artifact_invalidation_fence,
+        "Order source mutations and artifact replacement across SQL dialects",
     ),
 ]
 

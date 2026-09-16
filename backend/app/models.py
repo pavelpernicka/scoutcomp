@@ -887,6 +887,10 @@ class WebPageRevision(Base):
     # ``NULL`` means an older/unknown artifact and therefore requires a
     # conservative rebuild; an empty list is a known static document.
     render_dependencies = Column(JSON, nullable=True)
+    # Monotonic durable-invalidation generation which produced the rendered
+    # document.  Background workers use it as a compare-and-swap guard so a
+    # slow, older rebuild can never overwrite a newer one.
+    artifact_generation = Column(Integer, nullable=False, default=0, server_default="0")
     reason = Column(String(32), nullable=True)
     is_publication = Column(Boolean, nullable=False, default=False)
     seo_title = Column(String(200), nullable=True)
@@ -1244,6 +1248,48 @@ class Config(Base):
     value = Column(Text, nullable=False)
     created_at = Column(DateTime, default=func.now(), nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class WebArtifactInvalidation(Base):
+    """Durable request to rebuild pages depending on one public data source."""
+
+    __tablename__ = "web_artifact_invalidations"
+
+    # The AUTOINCREMENT id doubles as the globally monotonic generation.
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    dependency_key = Column(String(200), nullable=False, index=True)
+    attempt_count = Column(Integer, nullable=False, default=0)
+    available_at = Column(DateTime, nullable=False, default=func.now(), index=True)
+    locked_at = Column(DateTime, nullable=True)
+    lock_token = Column(String(64), nullable=True, index=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index(
+            "ix_web_artifact_invalidations_ready",
+            "available_at",
+            "locked_at",
+        ),
+        {"sqlite_autoincrement": True},
+    )
+
+
+class WebArtifactInvalidationFence(Base):
+    """Singleton write fence ordering mutations and artifact replacement."""
+
+    __tablename__ = "web_artifact_invalidation_fence"
+
+    id = Column(Integer, primary_key=True)
+    generation = Column(Integer, nullable=False, default=0, server_default="0")
+    updated_at = Column(
+        DateTime,
+        nullable=False,
+        default=func.now(),
+        onupdate=func.now(),
+        server_default=func.now(),
+    )
 
 
 class PushSubscription(Base):

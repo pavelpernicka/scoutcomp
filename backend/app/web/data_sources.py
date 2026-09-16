@@ -621,7 +621,11 @@ def _posts_source(db: Session, params: Mapping[str, Any], context: ResolveContex
         db.query(WebPostRevision, WebPost.published_at, User.real_name, User.username, User.avatar)
         .join(WebPost, WebPost.published_revision_id == WebPostRevision.id)
         .outerjoin(User, User.id == WebPost.created_by_id)
-        .filter(WebPost.deleted_at.is_(None), WebPostRevision.is_publication.is_(True))
+        .filter(
+            WebPost.published.is_(True),
+            WebPost.deleted_at.is_(None),
+            WebPostRevision.is_publication.is_(True),
+        )
         .order_by(order)
         .offset(offset)
         .limit(limit)
