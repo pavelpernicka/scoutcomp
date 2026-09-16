@@ -504,7 +504,7 @@ def _first_image_from(description: str | None) -> str | None:
     return None
 
 
-def _plain_public_text(value: str | None, *, limit: int = 500) -> str:
+def _plain_public_text(value: str | None, *, limit: int = 250) -> str:
     """Project legacy rich text to safe readable text for repeat/card data."""
     text = re.sub(r"<[^>]*>", " ", value or "")
     return re.sub(r"\s+", " ", unescape(text)).strip()[:limit]

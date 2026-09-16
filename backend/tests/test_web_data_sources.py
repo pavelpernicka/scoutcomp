@@ -435,6 +435,7 @@ def test_posts_source_projects_legacy_html_excerpt_to_plain_public_text(db_sessi
 
     assert _plain_public_excerpt('<p>Ahoj <img src="/api/web/media/2/file"> světe</p>') == "Ahoj světe"
     assert _plain_public_text('<p>Schůzka <img src="/api/web/media/2/file"> dnes</p>') == "Schůzka dnes"
+    assert _plain_public_excerpt("x" * 300) == "x" * 250
 
 
 def test_explicit_empty_event_settings_do_not_restore_legacy_values(db_session):
